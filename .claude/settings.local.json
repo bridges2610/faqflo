@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/beaubridges/Desktop/Claude\\\\ Code/FAQ\\\\ App/**)"
+    ]
+  }
+}
