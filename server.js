@@ -6,6 +6,28 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ── Rate limiter ─────────────────────────────────────────────────────────────
+const RATE_LIMIT = 10;
+const rateLimitMap = new Map(); // ip → { count, resetAt }
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+
+  if (!entry || now >= entry.resetAt) {
+    // Start of a new day window — midnight UTC
+    const tomorrow = new Date();
+    tomorrow.setUTCHours(24, 0, 0, 0);
+    rateLimitMap.set(ip, { count: 1, resetAt: tomorrow.getTime() });
+    return true;
+  }
+
+  if (entry.count >= RATE_LIMIT) return false;
+
+  entry.count += 1;
+  return true;
+}
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
@@ -16,6 +38,11 @@ app.get('/', (req, res) => {
 
 // ── POST /api/generate — proxy to Anthropic ─────────────────────────────────
 app.post('/api/generate', async (req, res) => {
+  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  if (!checkRateLimit(ip)) {
+    return res.status(429).json({ error: "You've reached today's limit. Come back tomorrow!" });
+  }
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey || apiKey === 'sk-ant-your-key-here') {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured in the .env file.' });
