@@ -7,7 +7,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Rate limiter ─────────────────────────────────────────────────────────────
-const RATE_LIMIT = 10;
+const RATE_LIMIT = 7;
 const rateLimitMap = new Map(); // ip → { count, resetAt }
 
 function checkRateLimit(ip) {
