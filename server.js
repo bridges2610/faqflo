@@ -36,6 +36,11 @@ app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// ── GET /seo-guide — serve the SEO guide ────────────────────────────────────
+app.get('/seo-guide', (req, res) => {
+  res.sendFile(path.join(__dirname, 'seo-guide.html'));
+});
+
 // ── POST /api/generate — proxy to Anthropic ─────────────────────────────────
 app.post('/api/generate', async (req, res) => {
   const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
