@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Favicon derived from the "Flo" chip in the wordmark: same brand blue,
+       same rounded-square shape. The wordmark itself is type-only, so it has no
+       icon form — this stands in for it at favicon size, where "FaqFlo" would
+       be unreadable. Kept upright rather than tilted: a 3° rotation reads as a
+       rendering glitch in a 16px browser tab. -->
+  <rect width="40" height="40" rx="11" fill="#2563EB"/>
+  <text x="20" y="20" fill="#FFFFFF" font-family="Plus Jakarta Sans, Segoe UI, system-ui, -apple-system, sans-serif"
+        font-size="24" font-weight="800" letter-spacing="-0.5"
+        text-anchor="middle" dominant-baseline="central">F</text>
+</svg>
