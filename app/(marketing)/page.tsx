@@ -6,6 +6,7 @@ import { PricingTeaser } from '@/components/marketing/pricing-teaser';
 import { SiteFaq } from '@/components/marketing/site-faq';
 import { Stats } from '@/components/marketing/stats';
 import { WhatIsAeo } from '@/components/marketing/what-is-aeo';
+import { WhoAndFeatures } from '@/components/marketing/who-and-features';
 import { WhyFaqs } from '@/components/marketing/why-faqs';
 import { Badge } from '@/components/ui/badge';
 
@@ -24,11 +25,10 @@ export default function Home() {
           <div className="mx-auto mb-12 max-w-2xl text-center">
             <Badge tone="success">Free · No signup</Badge>
             <h2 className="mt-5 text-[2rem] text-balance sm:text-[2.5rem]">
-              Try it right now
+              Give it a try right now
             </h2>
             <p className="text-slate mt-4 text-[1.0625rem] leading-relaxed">
-              Paste a page from your site and watch FaqFlo turn it into questions your customers
-              actually ask.
+              Write a description or paste a URL
             </p>
           </div>
 
@@ -38,6 +38,9 @@ export default function Home() {
 
       <HowItWorks />
       <WhatIsAeo />
+      {/* Answers "is this for me?" on white, between the cloud AEO section and
+          the tint-blue pricing band — and immediately before the price. */}
+      <WhoAndFeatures />
       <PricingTeaser />
       <FinalCta />
       {/* FAQ sits last, as asked. The more usual order puts it before the CTA

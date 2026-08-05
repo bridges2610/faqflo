@@ -19,8 +19,9 @@ export const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Dutch', 'Ja
 export type Language = (typeof LANGUAGES)[number];
 
 export const MIN_FAQ_COUNT = 3;
-export const MAX_FAQ_COUNT = 7;
-export const DEFAULT_FAQ_COUNT = 6;
+/** Free-tier ceiling: 5 question/answer pairs per generation. */
+export const MAX_FAQ_COUNT = 5;
+export const DEFAULT_FAQ_COUNT = 5;
 
 /** Anthropic input cap. Also applied when extracting text from a URL. */
 export const MAX_CONTENT_CHARS = 8000;

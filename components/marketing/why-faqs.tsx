@@ -8,14 +8,14 @@ import { Underline } from '@/components/ui/doodle';
   each step causes the next, and the last one is money. (It's also, conveniently,
   the brand name.)
 
-  The roofing scenario carries over from the hero on purpose, so the page tells
-  one continuous story instead of inventing a new example every section.
+  Step 01 uses a bracketed [service]/[city] template rather than the hero's
+  roofing scenario, so any visitor can drop their own trade into it.
 */
 const STEPS = [
   {
     n: '01',
     title: 'They ask something specific',
-    body: '"Do you handle storm damage?" Nobody browses a services page hoping to stumble on it — they arrive with an exact question already in mind.',
+    body: '"Do you provide [service] in [city]?" Nobody browses a service or product page hoping to stumble on it — they arrive with an exact question already in mind.',
   },
   {
     n: '02',

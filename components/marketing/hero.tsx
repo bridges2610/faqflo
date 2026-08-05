@@ -87,7 +87,7 @@ export function Hero() {
           </div>
 
           <p className="text-slate mt-5 text-sm">
-            No signup, no card. Paste one line. You&rsquo;re live.
+            Very easy setup. Works with every website.
           </p>
         </div>
 

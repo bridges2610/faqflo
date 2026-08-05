@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
+import { Check } from '@/components/ui/check';
 
 /*
   ⚠️ PLACEHOLDER PRICES. These are stand-ins, not researched numbers. Set the
@@ -92,25 +93,6 @@ const PLANS: Plan[] = [
  */
 function money(value: number): string {
   return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`;
-}
-
-function Check() {
-  return (
-    <svg
-      className="text-primary mt-[0.35rem] shrink-0"
-      width="13"
-      height="13"
-      viewBox="0 0 12 12"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <polyline points="1.5 6.5 4.5 9.5 10.5 2.5" />
-    </svg>
-  );
 }
 
 export function PricingTeaser() {
@@ -226,7 +208,7 @@ export function PricingTeaser() {
                 <ul className="mt-7 space-y-3">
                   {plan.features.map((feature) => (
                     <li key={feature} className="text-slate flex gap-2.5 text-sm">
-                      <Check />
+                      <Check className="text-primary mt-[0.35rem] shrink-0" />
                       {feature}
                     </li>
                   ))}
