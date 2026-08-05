@@ -28,6 +28,9 @@ type Plan = {
   featured: boolean;
   note: string | null;
   features: string[];
+  /** Optional extra sold alongside the plan, rendered as a callout under the
+      feature list. Only Business has one. */
+  addOn?: { label: string; body: string };
 };
 
 const PLANS: Plan[] = [
@@ -79,9 +82,14 @@ const PLANS: Plan[] = [
       'Up to 5 sites',
       'Full analytics',
       'Unanswered-question report',
-      'FaqFlo badge removed',
-      'Priority support',
+      // "available", not "Concierge setup" — a flat bullet would read as
+      // included in the $49, which is the one thing it must not imply.
+      'Concierge setup available',
     ],
+    addOn: {
+      label: 'Concierge',
+      body: 'We generate your FAQs and install them on your site — you approve, we publish.',
+    },
   },
 ];
 
@@ -213,6 +221,16 @@ export function PricingTeaser() {
                     </li>
                   ))}
                 </ul>
+
+                {plan.addOn && (
+                  <div className="border-line mt-7 border-t pt-5">
+                    <p className="text-slate font-mono text-xs tracking-wide uppercase">
+                      Optional add-on
+                    </p>
+                    <p className="text-navy mt-2 text-sm font-semibold">{plan.addOn.label}</p>
+                    <p className="text-slate mt-1 text-sm leading-relaxed">{plan.addOn.body}</p>
+                  </div>
+                )}
               </div>
             );
           })}
