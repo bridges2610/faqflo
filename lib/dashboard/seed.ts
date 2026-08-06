@@ -29,7 +29,7 @@ import { buildActionPlan } from '@/lib/audit/actions';
 import { buildPillars, overallScore } from '@/lib/audit/score';
 import type { AuditReport, Finding } from '@/lib/audit/types';
 import { contentHash } from './export';
-import { STAY_CITED_QUERY_CAP } from './plans';
+import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 
 export function newId(prefix: string): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
@@ -309,6 +309,9 @@ function seedAudit(): AuditReport {
     // Opportunities come from live account state, so the workspace recomputes
     // them on render rather than trusting a stored snapshot.
     opportunities: [],
+    discovered: 4,
+    skipped: [],
+    stoppedBecause: 'exhausted',
     crawled: [
       { url: 'https://summitroofing.com/', status: 200, finalUrl: 'https://summitroofing.com/', bytes: 41_200, ms: 420 },
       { url: 'https://summitroofing.com/services', status: 200, finalUrl: 'https://summitroofing.com/services', bytes: 33_100, ms: 380 },
@@ -395,8 +398,10 @@ export function buildSeed(): DashboardData {
       daily: seedDaily(30),
       latest,
       competitors,
-      queriesUsed: 186,
-      queryCap: STAY_CITED_QUERY_CAP,
+      promptsTracked: 12,
+      promptCap: STAY_CITED_PROMPT_CAP,
+      runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
+      checksUsed: 186,
       periodResetsAt: daysAhead(11),
     },
   ];
@@ -418,8 +423,10 @@ export function emptyTracking(siteId: string): SiteTracking {
     daily: [],
     latest: [],
     competitors: [],
-    queriesUsed: 0,
-    queryCap: STAY_CITED_QUERY_CAP,
+    promptsTracked: 0,
+    promptCap: STAY_CITED_PROMPT_CAP,
+    runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
+    checksUsed: 0,
     periodResetsAt: daysAhead(30),
   };
 }

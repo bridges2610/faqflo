@@ -166,12 +166,20 @@ export type SiteTracking = {
   latest: CitationCheck[];
   competitors: CompetitorShare[];
   /**
-   * Engine queries used this period against the plan's cap. Tracking costs
-   * money every time it runs, so the cap is part of the product, not an
-   * implementation detail — and it's shown rather than silently enforced.
+   * The tracking budget, in the unit the customer actually buys.
+   *
+   * A PROMPT is one question we watch. It is deliberately independent of the
+   * page budget: pages are scanned, prompts are asked, and the two scale
+   * differently. Nothing here may ever be computed from a page count.
+   *
+   * `checksUsed` is the cost side — engine calls actually spent — shown so the
+   * price of the allowance is visible, not so anyone has to think in it.
    */
-  queriesUsed: number;
-  queryCap: number;
+  promptsTracked: number;
+  promptCap: number;
+  /** How many times each prompt is asked per period. */
+  runsPerPeriod: number;
+  checksUsed: number;
   periodResetsAt: string;
 };
 

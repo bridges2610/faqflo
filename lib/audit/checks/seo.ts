@@ -35,7 +35,7 @@ export function seoChecks(set: PageSet): Finding[] {
       status: missing.length === 0 ? 'pass' : missing.length < pages.length ? 'warn' : 'fail',
       detail:
         missing.length === 0
-          ? `All ${pages.length} crawled ${pages.length === 1 ? 'page has' : 'pages have'} a title tag.`
+          ? `All ${pages.length} scanned ${pages.length === 1 ? 'page has' : 'pages have'} a title tag.`
           : `${missing.length} of ${pages.length} pages have no title tag. It is the single strongest signal of what a page is about.`,
       weight: 3,
       evidence: missing.map((p) => p.finalUrl).slice(0, 5),
@@ -77,7 +77,7 @@ export function seoChecks(set: PageSet): Finding[] {
             pillar: P,
             label: 'Titles are unique',
             status: 'na',
-            detail: 'Only one page was crawled, so there is nothing to compare titles against.',
+            detail: 'Only one page was scanned, so there is nothing to compare titles against.',
             weight: 2,
           }
         : {
@@ -87,7 +87,7 @@ export function seoChecks(set: PageSet): Finding[] {
             status: dupes.length === 0 ? 'pass' : 'fail',
             detail:
               dupes.length === 0
-                ? 'Every crawled page has its own title.'
+                ? `All ${titled.length} scanned pages have their own title.`
                 : `${dupes.length} title${dupes.length === 1 ? ' is' : 's are'} used on more than one page. Identical titles make pages compete with each other.`,
             weight: 2,
             evidence: dupes.slice(0, 4),
@@ -111,7 +111,7 @@ export function seoChecks(set: PageSet): Finding[] {
       status: missing.length === 0 ? 'pass' : missing.length < pages.length ? 'warn' : 'fail',
       detail:
         missing.length === 0
-          ? 'Every crawled page has a meta description.'
+          ? `All ${pages.length} scanned pages have a meta description.`
           : `${missing.length} of ${pages.length} pages have no meta description, so engines write their own summary from whatever text they find first.`,
       weight: 2,
       evidence: missing.map((p) => p.finalUrl).slice(0, 5),
@@ -151,7 +151,7 @@ export function seoChecks(set: PageSet): Finding[] {
       status: wrong.length === 0 ? 'pass' : wrong.length < pages.length ? 'warn' : 'fail',
       detail:
         wrong.length === 0
-          ? 'Every crawled page has exactly one H1.'
+          ? `All ${pages.length} scanned pages have exactly one H1.`
           : `${wrong.length} of ${pages.length} pages have no H1, or more than one. The H1 is the page's headline claim about itself.`,
       weight: 2,
       evidence: wrong
@@ -173,7 +173,7 @@ export function seoChecks(set: PageSet): Finding[] {
             pillar: P,
             label: 'Images have alt text',
             status: 'na',
-            detail: 'No images found on the crawled pages.',
+            detail: 'No images found on the scanned pages.',
             weight: 1,
           }
         : {
@@ -230,7 +230,7 @@ export function seoChecks(set: PageSet): Finding[] {
       status: thin.length === 0 ? 'pass' : thin.length < pages.length ? 'warn' : 'fail',
       detail:
         thin.length === 0
-          ? 'Every crawled page carries a reasonable amount of text.'
+          ? `All ${pages.length} scanned pages carry a reasonable amount of text.`
           : `${thin.length} of ${pages.length} pages have under 300 words. Thin pages rarely have enough substance to be worth quoting.`,
       weight: 2,
       evidence: thin.map((p) => `${p.facts.wordCount} words — ${p.finalUrl}`).slice(0, 4),

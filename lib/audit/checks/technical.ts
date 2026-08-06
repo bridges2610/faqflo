@@ -175,7 +175,9 @@ export function technicalChecks(set: PageSet): Finding[] {
           label: 'Structured data parses',
           status: facts.schemaParsed ? 'pass' : 'fail',
           detail: facts.schemaParsed
-            ? `All ${facts.schemaBlocks} JSON-LD ${facts.schemaBlocks === 1 ? 'block' : 'blocks'} parse cleanly.`
+            ? facts.schemaBlocks === 1
+              ? 'The page’s one JSON-LD block parses cleanly.'
+              : `All ${facts.schemaBlocks} JSON-LD blocks parse cleanly.`
             : 'At least one JSON-LD block is invalid JSON. A machine that cannot parse it ignores the whole block.',
           weight: 2,
         },
@@ -259,6 +261,37 @@ export function technicalChecks(set: PageSet): Finding[] {
           weight: 1,
         },
   );
+
+  /* Coverage ---------------------------------------------------------------- */
+  /*
+    Informational, not scored. A site isn't wrong for being bigger than the
+    budget — but every counting finding below is about the pages we actually
+    read, and that has to be stated where the reader can see it rather than
+    inferred from a list of URLs at the bottom of the report.
+  */
+  {
+    const read = set.crawled.length;
+    const found = Math.max(set.discovered, read);
+    const reason =
+      set.stoppedBecause === 'time'
+        ? ' The scan stopped early because the site was slow to respond.'
+        : set.stoppedBecause === 'budget'
+          ? ' Pages were chosen by link depth, sitemap presence and page type — not the order they were found in.'
+          : '';
+
+    findings.push({
+      id: 'coverage',
+      pillar: P,
+      label: 'Pages scanned',
+      status: 'na',
+      detail:
+        found > read
+          ? `Scanned ${read} of ${found} pages found.${reason} Everything below describes the ${read} ${read === 1 ? 'page that was' : 'that were'} read.`
+          : `Scanned all ${read} ${read === 1 ? 'page' : 'pages'} found on the site.`,
+      weight: 0,
+      evidence: set.skipped.length ? [`Not scanned, best first: ${set.skipped.slice(0, 5).join(', ')}`] : undefined,
+    });
+  }
 
   /* Site-wide reachability ------------------------------------------------ */
   {

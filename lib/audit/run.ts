@@ -13,7 +13,7 @@ import { authorityChecks, citationChecks } from './checks/identity';
 import { seoChecks } from './checks/seo';
 import { structureChecks } from './checks/structure';
 import { technicalChecks } from './checks/technical';
-import { fetchPageSet, fetchQuick, type PageSet } from './fetcher';
+import { fetchPageSet, fetchQuick, type CrawlBudget, type PageSet } from './fetcher';
 import { buildPillars, overallScore } from './score';
 import {
   QUICK_FINDING_IDS,
@@ -25,6 +25,8 @@ import {
 
 export type RunOptions = {
   depth: AuditDepth;
+  /** Page budget for a full run. Ignored by `quick`, which reads one page. */
+  budget?: CrawlBudget;
   /**
    * Filled in by the caller from the account's own data — tracking for the AI
    * visibility pillar, and the loop's state for opportunities. The engine never
@@ -46,7 +48,10 @@ const LOCKED_VISIBILITY: Finding = {
 };
 
 export async function runAudit(entryUrl: string, options: RunOptions): Promise<AuditReport | null> {
-  const set = options.depth === 'quick' ? await fetchQuick(entryUrl) : await fetchPageSet(entryUrl);
+  const set =
+    options.depth === 'quick'
+      ? await fetchQuick(entryUrl)
+      : await fetchPageSet(entryUrl, options.budget);
   if (!set) return null;
 
   const findings =
@@ -73,6 +78,9 @@ export async function runAudit(entryUrl: string, options: RunOptions): Promise<A
     actions: options.depth === 'quick' ? [] : buildActionPlan(findings, ctx),
     opportunities: options.opportunities ?? [],
     crawled: set.crawled,
+    discovered: set.discovered,
+    skipped: set.skipped,
+    stoppedBecause: set.stoppedBecause,
     checkedAt: new Date().toISOString(),
   };
 }

@@ -35,12 +35,13 @@ export const AUDIT_RATE_LIMIT = 20;
 /**
  * Ceiling for a full audit.
  *
- * A full run makes roughly eight outbound requests to somebody else's server,
- * so it is both more expensive for us and more conspicuous to them. Kept well
- * below the quick limit, and counted in its own bucket so a stranger kicking
- * the tyres on the free check can't exhaust it.
+ * A full run now reads up to a hundred pages — a hundred outbound requests to
+ * somebody else's server, not the handful it used to be. This limiter is the
+ * only thing standing between an unauthenticated endpoint and hammering a
+ * stranger's site, so it drops accordingly, in its own bucket so someone
+ * kicking the tyres on the free check can't exhaust it.
  */
-export const AUDIT_FULL_RATE_LIMIT = 10;
+export const AUDIT_FULL_RATE_LIMIT = 4;
 
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();

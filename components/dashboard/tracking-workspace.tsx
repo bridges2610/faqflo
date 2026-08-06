@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canTrack } from '@/lib/dashboard/plans';
+import { canTrack, engineChecksFor } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import { ENGINES } from '@/lib/dashboard/types';
 import { CitationChart } from './citation-chart';
@@ -76,7 +76,8 @@ export function TrackingWorkspace() {
   const citationRate = latest.length ? (cited / latest.length) * 100 : 0;
 
   const uncited = latest.filter((c) => c.outcome === 'absent');
-  const usedPct = tracking ? (tracking.queriesUsed / tracking.queryCap) * 100 : 0;
+  // The bar tracks prompts — the thing bought — not the checks they cost.
+  const usedPct = tracking ? (tracking.promptsTracked / tracking.promptCap) * 100 : 0;
 
   return (
     <>
@@ -172,21 +173,29 @@ export function TrackingWorkspace() {
           </Card>
         </div>
 
-        {/* The cap is part of the product. Asking an engine a question costs
-            money every time, so the plan buys a finite number of checks — and a
-            customer running low should see it here rather than wonder why their
-            results stopped moving. */}
+        {/* The budget, in the unit that's actually bought.
+
+            Prompts lead; engine checks are the cost of them and sit underneath.
+            "300 checks" tells a solo marketer nothing about how many questions
+            they can watch — they'd have to divide by engines and frequency
+            themselves. Note there is no page count anywhere near this: pages
+            are scanned, prompts are asked, and the two never derive from each
+            other. */}
         {tracking && (
           <Card tone="cloud" className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-navy text-sm font-semibold">
-                  {formatNumber(tracking.queriesUsed)} of {formatNumber(tracking.queryCap)} engine
-                  checks used
+                  {formatNumber(tracking.promptsTracked)} of {formatNumber(tracking.promptCap)}{' '}
+                  prompts tracked
                 </p>
                 <p className="text-slate mt-0.5 text-xs">
-                  Resets {timeUntil(tracking.periodResetsAt)} · every check is a real question put
-                  to a real engine
+                  {formatNumber(tracking.checksUsed)} of{' '}
+                  {formatNumber(
+                    engineChecksFor(tracking.promptCap, ENGINES.length, tracking.runsPerPeriod),
+                  )}{' '}
+                  engine checks this period · each prompt is asked {ENGINES.length} engines ×{' '}
+                  {tracking.runsPerPeriod} times · resets {timeUntil(tracking.periodResetsAt)}
                 </p>
               </div>
               <div className="bg-line h-2 w-40 overflow-hidden rounded-full">

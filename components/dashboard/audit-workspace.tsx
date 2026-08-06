@@ -7,7 +7,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScoreDial } from '@/components/ui/score-dial';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canRunFullAudit } from '@/lib/dashboard/plans';
+import { canRunFullAudit, pageBudgetFor } from '@/lib/dashboard/plans';
 import { opportunities, visibilityFindings } from '@/lib/dashboard/audit-context';
 import { timeAgo } from '@/lib/dashboard/format';
 import { useCopy } from '@/lib/dashboard/use-copy';
@@ -235,7 +235,11 @@ export function AuditWorkspace() {
       const res = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: site.domain, depth: full ? 'full' : 'quick' }),
+        body: JSON.stringify({
+          url: site.domain,
+          depth: full ? 'full' : 'quick',
+          maxPages: pageBudgetFor(site),
+        }),
       });
       const crawl = (await res.json()) as AuditReport | { error: string };
       if (!res.ok || 'error' in crawl) {
@@ -406,15 +410,50 @@ export function AuditWorkspace() {
               ))}
             </div>
 
+            {/* The scan's own working. A budget spent on 100 of 340 pages is
+                only trustworthy if the report says which 100 and why it
+                stopped — otherwise every count above reads as site-wide. */}
             <Card tone="cloud" className="p-5">
-              <p className="text-slate font-mono text-xs tracking-wide uppercase">Pages read</p>
-              <ul className="mt-2 space-y-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <p className="text-slate font-mono text-xs tracking-wide uppercase">Pages read</p>
+                <p className="text-slate text-xs">
+                  {shown.crawled.length} of {Math.max(shown.discovered, shown.crawled.length)} found
+                  {shown.stoppedBecause === 'budget' && ' · stopped at the page budget'}
+                  {shown.stoppedBecause === 'time' && ' · stopped on time, the site was slow'}
+                  {shown.stoppedBecause === 'exhausted' && ' · that is the whole site'}
+                </p>
+              </div>
+
+              {shown.stoppedBecause !== 'exhausted' && (
+                <p className="text-slate mt-2 text-xs leading-relaxed">
+                  Pages were chosen by how close they sit to the homepage, whether the sitemap
+                  lists them, and what kind of page they look like — not the order they were found
+                  in.
+                </p>
+              )}
+
+              <ul className="mt-3 max-h-64 space-y-1 overflow-auto">
                 {shown.crawled.map((p) => (
                   <li key={p.url} className="text-slate font-mono text-xs break-all">
                     {p.status} · {p.finalUrl}
                   </li>
                 ))}
               </ul>
+
+              {shown.skipped.length > 0 && (
+                <>
+                  <p className="text-slate mt-4 font-mono text-xs tracking-wide uppercase">
+                    Not scanned, best first
+                  </p>
+                  <ul className="mt-2 max-h-40 space-y-1 overflow-auto">
+                    {shown.skipped.slice(0, 10).map((u) => (
+                      <li key={u} className="text-slate font-mono text-xs break-all opacity-70">
+                        {u}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
             </Card>
           </>
         )}

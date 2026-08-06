@@ -151,7 +151,7 @@ export function structureChecks(set: PageSet): Finding[] {
       status: structured >= 2 ? 'pass' : structured === 1 ? 'warn' : 'fail',
       detail:
         structured >= 2
-          ? `${structured} lists or tables across the crawled pages. Structured facts are the easiest thing for a machine to lift accurately.`
+          ? `${structured} lists or tables across the scanned pages. Structured facts are the easiest thing for a machine to lift accurately.`
           : 'Almost no lists or tables. Steps, options and comparisons get quoted far more often when they are marked up as lists.',
       weight: 2,
     });

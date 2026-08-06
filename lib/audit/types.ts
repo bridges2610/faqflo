@@ -105,6 +105,13 @@ export type AuditReport = {
   opportunities: Opportunity[];
   /** Every page actually fetched, so the report can show its working. */
   crawled: CrawledPage[];
+  /** Unique in-scope URLs found, read or not. Bigger than crawled on a big site. */
+  discovered: number;
+  /** Best-scoring URLs the budget didn't reach. */
+  skipped: string[];
+  /** Why the crawl ended — the difference between "that's the site" and
+      "that's what we had budget for". */
+  stoppedBecause: 'budget' | 'time' | 'exhausted';
   checkedAt: string;
 };
 
@@ -130,7 +137,10 @@ export function isAuditReport(value: unknown): value is AuditReport {
     Array.isArray(r.pillars) &&
     Array.isArray(r.crawled) &&
     Array.isArray(r.actions) &&
-    Array.isArray(r.opportunities)
+    Array.isArray(r.opportunities) &&
+    typeof r.discovered === 'number' &&
+    Array.isArray(r.skipped) &&
+    typeof r.stoppedBecause === 'string'
   );
 }
 

@@ -19,10 +19,44 @@ import type { DashboardData, Site, Subscription, User } from './types';
 
 export const FREE_FAQ_CAP = 5;
 
-/** Engine queries per period, per site. Named here because the cost of running
-    them is the reason the subscription exists — an uncapped tracker on a fixed
-    monthly price loses money on its heaviest users. */
-export const STAY_CITED_QUERY_CAP = 300;
+/**
+ * How many pages an audit may read.
+ *
+ * A BUDGET, NOT A GOAL. The crawler spends it on the pages most worth reading
+ * rather than the first hundred it trips over — see scoreCandidate() in
+ * lib/audit/fetcher.ts. The free tier is one page because that endpoint is
+ * unauthenticated and every page is an outbound request to somebody else's
+ * server.
+ */
+export const PAGE_BUDGET = { free: 1, paid: 100 } as const;
+
+export function pageBudgetFor(site: Site | null): number {
+  return hasGetCited(site) ? PAGE_BUDGET.paid : PAGE_BUDGET.free;
+}
+
+/**
+ * How many prompts a subscription may track.
+ *
+ * ⚠️ THIS IS NOT DERIVED FROM A PAGE COUNT, AND MUST NOT BE.
+ *
+ * Scanning is priced per page; tracking is priced per query. They scale
+ * differently and belong to different jobs: someone with 30 pages might care
+ * about 15 prompts, and someone with 3 pages might care about 40. Tying the two
+ * would charge people for questions they never asked.
+ *
+ * A prompt is one question we watch. What it COSTS is derived from it —
+ * engineChecksFor() below — so the cost is visible without being the unit
+ * anyone has to reason in.
+ */
+export const STAY_CITED_PROMPT_CAP = 25;
+
+/** How often each tracked prompt is put to the engines. Weekly. */
+export const TRACKING_RUNS_PER_PERIOD = 4;
+
+/** The real cost of a prompt allowance: every prompt, every engine, every run. */
+export function engineChecksFor(promptCap: number, engines: number, runs: number): number {
+  return promptCap * engines * runs;
+}
 
 export type EntitlementId = 'get_cited' | 'stay_cited';
 

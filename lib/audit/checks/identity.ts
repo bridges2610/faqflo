@@ -76,7 +76,7 @@ export function citationChecks(set: PageSet): Finding[] {
       detail:
         found.length >= 1
           ? `Contact details are present (${found.join(' and ')}), which is part of how an assistant judges a business as real.`
-          : 'No phone number or email address anywhere in the crawled pages.',
+          : 'No phone number or email address on any scanned page.',
       weight: 2,
     });
   }

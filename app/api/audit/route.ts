@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { runAudit } from '@/lib/audit/run';
 import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import type { AuditDepth } from '@/lib/audit/types';
+import { AUDIT_TIME_BUDGET_MS, MAX_AUDIT_PAGES } from '@/lib/audit/limits';
 import { AUDIT_FULL_RATE_LIMIT, AUDIT_RATE_LIMIT, checkRateLimit, clientIp } from '@/lib/rate-limit';
 
 /*
@@ -36,10 +37,23 @@ export async function POST(request: Request) {
     return fail('Invalid request body.', 400);
   }
 
-  const { url: input, depth: rawDepth } = (body ?? {}) as Record<string, unknown>;
+  const { url: input, depth: rawDepth, maxPages } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof input !== 'string') return fail('A web address is required.', 400);
   const depth: AuditDepth = rawDepth === 'full' ? 'full' : 'quick';
+
+  /*
+    The page budget, clamped.
+
+    There is no session here, so this cannot enforce the customer's actual tier
+    — the dashboard sends `pageBudgetFor(site)` and an arbitrary caller can send
+    whatever it likes. What the clamp does do is bound the blast radius: nobody
+    gets more than the paid ceiling, so the worst case is a known number of
+    outbound requests rather than an unbounded one. Per-tier enforcement belongs
+    with auth, alongside gating this route at all.
+  */
+  const requested = typeof maxPages === 'number' && Number.isFinite(maxPages) ? maxPages : 1;
+  const pageBudget = Math.max(1, Math.min(Math.floor(requested), MAX_AUDIT_PAGES));
 
   const ip = clientIp(request.headers);
   const withinQuick = checkRateLimit(`audit:${ip}`, AUDIT_RATE_LIMIT);
@@ -63,7 +77,10 @@ export async function POST(request: Request) {
       finding would let any caller put whatever they liked in a pillar labelled
       "AI visibility".
     */
-    const report = await runAudit(checked.url.toString(), { depth });
+    const report = await runAudit(checked.url.toString(), {
+      depth,
+      budget: { maxPages: pageBudget, maxMs: AUDIT_TIME_BUDGET_MS },
+    });
 
     if (!report) {
       return fail("We couldn't load that page. Check the address and try again.", 400);
