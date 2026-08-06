@@ -42,10 +42,26 @@ function AnswerCard() {
           covers emergency roof repairs across Franklin, usually on site within 24 hours.
         </p>
 
+        {/*
+          The source chip is the whole point of the illustration — a citation
+          with nothing cited isn't a citation — so it stays, but the domain is
+          blurred rather than named. It reads as "your site goes here" instead
+          of putting a specific business on the page.
+
+          The blurred text is aria-hidden and unselectable, with a plain label
+          for screen readers: nobody should have a fake domain read out to them
+          as though it were real.
+        */}
         <div className="border-line mt-4 flex items-center gap-2 border-t pt-3">
           <span className="text-slate text-xs">Source</span>
           <span className="bg-primary-soft text-primary rounded-md px-2 py-0.5 font-mono text-xs">
-            summitroofing.com
+            <span className="sr-only">your website</span>
+            <span
+              className="inline-block blur-[3px] select-none"
+              aria-hidden="true"
+            >
+              yourbusiness.com
+            </span>
           </span>
         </div>
       </div>

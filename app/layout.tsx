@@ -54,7 +54,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${jakarta.variable} ${inter.variable} ${jetbrains.variable}`}
     >
-      <body className="flex min-h-dvh flex-col">
+      {/*
+        suppressHydrationWarning is here for browser extensions, not for our own
+        markup. Grammarly and friends stamp attributes onto <body> (
+        data-gr-ext-installed, data-new-gr-c-s-check-loaded) before React
+        hydrates, so the client element carries attributes the server never
+        sent. Nothing we render is variable.
+
+        It applies to this element only and one level deep — it does NOT
+        silence real mismatches inside the app, which is why it belongs on
+        <body> and nowhere else.
+      */}
+      <body className="flex min-h-dvh flex-col" suppressHydrationWarning>
         {children}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
