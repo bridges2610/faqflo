@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Underline } from '@/components/ui/doodle';
+import { ScoreDial } from '@/components/ui/score-dial';
 import { scoreBand } from '@/lib/audit/score';
-import type { AuditCheck, AuditResult, CheckStatus } from '@/lib/audit/types';
+import type { AuditReport, CheckStatus, Finding } from '@/lib/audit/types';
 
 /*
   The lead hook: type an address, find out whether AI can read your site.
@@ -21,6 +22,7 @@ const STATUS_STYLES: Record<CheckStatus, { chip: string; word: string }> = {
   warn: { chip: 'bg-accent-soft text-teal-ink', word: 'Needs a look' },
   fail: { chip: 'bg-error/12 text-error-ink', word: 'Problem' },
   locked: { chip: 'bg-cloud text-slate border border-line', word: 'Not checked' },
+  na: { chip: 'bg-cloud text-slate border border-line', word: 'Not applicable' },
 };
 
 function StatusIcon({ status }: { status: CheckStatus }) {
@@ -48,40 +50,12 @@ function StatusIcon({ status }: { status: CheckStatus }) {
   );
 }
 
-/** The score as a ring. One number, so it's a dial rather than a chart. */
-function ScoreDial({ score }: { score: number }) {
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  const filled = (score / 100) * circumference;
-
-  return (
-    <div className="relative h-32 w-32 shrink-0">
-      <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-        <circle cx="60" cy="60" r={radius} fill="none" stroke="#E2E8F0" strokeWidth="10" />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          fill="none"
-          stroke="#2563EB"
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={`${filled} ${circumference}`}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-display text-navy text-[2rem] leading-none font-extrabold tabular-nums">
-          {score}
-        </span>
-        <span className="text-slate mt-1 font-mono text-[0.625rem] tracking-wide uppercase">
-          out of 100
-        </span>
-      </div>
-    </div>
-  );
+/** The report groups findings by pillar; the teaser shows them as one list. */
+function findingsOf(report: AuditReport): Finding[] {
+  return report.pillars.flatMap((p) => p.findings);
 }
 
-function CheckRow({ check }: { check: AuditCheck }) {
+function CheckRow({ check }: { check: Finding }) {
   const style = STATUS_STYLES[check.status];
 
   return (
@@ -106,7 +80,7 @@ export function VisibilityAudit() {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AuditResult | null>(null);
+  const [result, setResult] = useState<AuditReport | null>(null);
 
   async function run(e: React.FormEvent) {
     e.preventDefault();
@@ -119,7 +93,7 @@ export function VisibilityAudit() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
-      const data = (await res.json()) as AuditResult | { error: string };
+      const data = (await res.json()) as AuditReport | { error: string };
 
       if (!res.ok || 'error' in data) {
         setError('error' in data ? data.error : 'That check failed. Try again.');
@@ -193,18 +167,27 @@ export function VisibilityAudit() {
                     the score down. A score that quietly penalises what we chose
                     not to measure would be selling, not diagnosing. */}
                 <p className="text-slate mt-3 text-xs leading-relaxed">
-                  Scored on the {result.checks.filter((c) => c.status !== 'locked').length} checks we
-                  ran. The citation check is part of the full audit and isn&rsquo;t counted here
-                  either way.
+                  Scored on the {result.scoredCount} checks we ran. The citation check is part of
+                  the full audit and isn&rsquo;t counted here either way.
                 </p>
               </div>
             </div>
 
             <ul className="divide-line mt-6 divide-y border-t border-line pt-2">
-              {result.checks.map((check) => (
+              {findingsOf(result).map((check) => (
                 <CheckRow key={check.id} check={check} />
               ))}
             </ul>
+
+            {/* Names what the paid audit adds, without pretending this was it. */}
+            <p className="border-line text-slate mt-6 border-t pt-5 text-sm leading-relaxed">
+              This is the quick check on one page. The full audit reads your other pages too —
+              structure, titles, identity and trust — and turns what it finds into a ranked list of
+              what to fix first.{' '}
+              <a href="#pricing" className="text-primary hover:text-primary-hover font-semibold">
+                See what it covers →
+              </a>
+            </p>
           </Card>
         )}
       </div>

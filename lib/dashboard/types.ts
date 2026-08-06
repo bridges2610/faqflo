@@ -11,6 +11,7 @@
  * decided.
  */
 
+import type { AuditReport } from '@/lib/audit/types';
 import type { Language, Tone } from '@/lib/faq';
 
 /**
@@ -80,11 +81,14 @@ export type FaqGroup = {
   publishedHash: string | null;
 };
 
-export type SiteAudit = {
-  score: number;
-  checkedAt: string;
-  checks: { id: string; label: string; status: 'pass' | 'warn' | 'fail' | 'locked'; detail: string }[];
-};
+/**
+ * The last audit run for a site.
+ *
+ * The full report rather than a summary: the Audit page should show what it
+ * found when you come back to it, and the Overview's score tile should be the
+ * same number that report arrived at — not a copy that can drift from it.
+ */
+export type SiteAudit = AuditReport;
 
 export type FaqStatus = 'published' | 'draft';
 

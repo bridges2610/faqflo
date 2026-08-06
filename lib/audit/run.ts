@@ -1,0 +1,110 @@
+/**
+ * Running an audit end to end.
+ *
+ * Two depths, one engine. The free teaser on the marketing page and the full
+ * audit inside the dashboard run the same checks over the same parser — the
+ * difference is how many pages get fetched and how many findings are kept.
+ * That's deliberate: two implementations would eventually disagree, and the
+ * one a stranger sees first is the one that has to be right.
+ */
+
+import { buildActionPlan, type ActionContext } from './actions';
+import { authorityChecks, citationChecks } from './checks/identity';
+import { seoChecks } from './checks/seo';
+import { structureChecks } from './checks/structure';
+import { technicalChecks } from './checks/technical';
+import { fetchPageSet, fetchQuick, type PageSet } from './fetcher';
+import { buildPillars, overallScore } from './score';
+import {
+  QUICK_FINDING_IDS,
+  type AuditDepth,
+  type AuditReport,
+  type Finding,
+  type Opportunity,
+} from './types';
+
+export type RunOptions = {
+  depth: AuditDepth;
+  /**
+   * Filled in by the caller from the account's own data — tracking for the AI
+   * visibility pillar, and the loop's state for opportunities. The engine never
+   * fabricates either: given nothing, the pillar stays locked.
+   */
+  visibility?: Finding[];
+  opportunities?: Opportunity[];
+  actionContext?: ActionContext;
+};
+
+const LOCKED_VISIBILITY: Finding = {
+  id: 'cited',
+  pillar: 'visibility',
+  label: 'Cited in AI answers today',
+  status: 'locked',
+  detail:
+    'Asking ChatGPT, Perplexity and Google AI Overviews what they say about you costs money per question, so it runs with tracking rather than on every audit.',
+  weight: 0,
+};
+
+export async function runAudit(entryUrl: string, options: RunOptions): Promise<AuditReport | null> {
+  const set = options.depth === 'quick' ? await fetchQuick(entryUrl) : await fetchPageSet(entryUrl);
+  if (!set) return null;
+
+  const findings =
+    options.depth === 'quick' ? quickFindings(set) : fullFindings(set, options.visibility);
+
+  const pillars = buildPillars(findings);
+  const domain = hostOf(set.entry.finalUrl);
+
+  const ctx: ActionContext = options.actionContext ?? {
+    domain,
+    faqsHref: '/dashboard/faqs',
+    publishHref: '/dashboard/publish',
+    questionsHref: '/dashboard/questions',
+  };
+
+  return {
+    depth: options.depth,
+    url: set.entry.finalUrl,
+    domain,
+    score: overallScore(pillars),
+    scoredCount: pillars.reduce((n, p) => n + p.scoredCount, 0),
+    pillars,
+    // The teaser sells the full audit; it doesn't pretend to be one.
+    actions: options.depth === 'quick' ? [] : buildActionPlan(findings, ctx),
+    opportunities: options.opportunities ?? [],
+    crawled: set.crawled,
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * The free check: three findings from a single page, plus the locked one.
+ *
+ * Pulled from the same technical/structure modules rather than reimplemented,
+ * so a wording or threshold change lands in both places at once.
+ */
+function quickFindings(set: PageSet): Finding[] {
+  const all = [...technicalChecks(set), ...structureChecks(set)];
+  const wanted = new Set<string>(QUICK_FINDING_IDS);
+
+  return [...all.filter((f) => wanted.has(f.id)), LOCKED_VISIBILITY];
+}
+
+function fullFindings(set: PageSet, visibility?: Finding[]): Finding[] {
+  return [
+    ...technicalChecks(set),
+    ...structureChecks(set),
+    ...seoChecks(set),
+    ...citationChecks(set),
+    ...authorityChecks(set),
+    ...(visibility?.length ? visibility : [LOCKED_VISIBILITY]),
+  ];
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}

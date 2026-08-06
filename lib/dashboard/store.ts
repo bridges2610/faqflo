@@ -21,13 +21,23 @@
  * trying to read user state) behind an empty dashboard.
  */
 
+import { isAuditReport } from '@/lib/audit/types';
 import { contentHash, normalizePath } from './export';
 import { buildSeed, emptyTracking, newId } from './seed';
-import type { DashboardData, DiscoveredQuestion, FaqEntry, FaqGroup, Site, User } from './types';
+import type {
+  DashboardData,
+  DiscoveredQuestion,
+  FaqEntry,
+  FaqGroup,
+  Site,
+  SiteAudit,
+  User,
+} from './types';
 
-// v3: answers moved from site-scoped to group-scoped, and publish state moved
-// from the site onto the group. A v2 payload can't be read into these types.
-const STORAGE_KEY = 'faqflo.dashboard.v3';
+// v4: site.lastAudit went from a three-check summary to the full audit report.
+// (v3 moved answers from site-scoped to group-scoped.) An older payload can't
+// be read into these types, so the key moves rather than the data migrating.
+const STORAGE_KEY = 'faqflo.dashboard.v4';
 
 function assertClient(fn: string): void {
   if (typeof window === 'undefined') {
@@ -39,11 +49,38 @@ function read(): DashboardData | null {
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as DashboardData;
+    return normalise(JSON.parse(raw) as DashboardData);
   } catch {
     window.localStorage.removeItem(STORAGE_KEY);
     return null;
   }
+}
+
+/**
+ * Repair what a stored snapshot can't be trusted to contain.
+ *
+ * Bumping the storage key covers a shape change that has already landed, but
+ * not a payload written *while* one was landing — a browser open through a
+ * deploy can persist a half-old record under the new key and replay it forever.
+ * Rather than let that reach the UI and crash on the first missing array, a
+ * stored audit that no longer matches the report shape is dropped, and the
+ * Audit page offers to run a fresh one.
+ *
+ * Dropping beats coercing: a partial report shown as though it were whole would
+ * put numbers on screen that nothing measured.
+ */
+function normalise(data: DashboardData): DashboardData {
+  return {
+    ...data,
+    sites: (data.sites ?? []).map((site) => ({
+      ...site,
+      lastAudit: isAuditReport(site.lastAudit) ? site.lastAudit : null,
+    })),
+    groups: data.groups ?? [],
+    faqs: data.faqs ?? [],
+    questions: data.questions ?? [],
+    tracking: data.tracking ?? [],
+  };
 }
 
 function write(data: DashboardData): DashboardData {
@@ -158,6 +195,15 @@ export async function setGetCited(id: string, granted: boolean): Promise<Dashboa
     sites: data.sites.map((s) =>
       s.id === id ? { ...s, getCitedAt: granted ? (s.getCitedAt ?? now()) : null } : s,
     ),
+  });
+}
+
+/** Keep the latest audit so the page shows its findings when you come back. */
+export async function saveAudit(siteId: string, report: SiteAudit): Promise<DashboardData> {
+  const data = requireData('saveAudit');
+  return write({
+    ...data,
+    sites: data.sites.map((s) => (s.id === siteId ? { ...s, lastAudit: report } : s)),
   });
 }
 

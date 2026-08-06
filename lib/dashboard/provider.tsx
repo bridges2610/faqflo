@@ -18,6 +18,7 @@ import type {
   FaqEntry,
   FaqGroup,
   Site,
+  SiteAudit,
   SiteTracking,
   Subscription,
   User,
@@ -50,6 +51,7 @@ type Ctx = {
   removeGroup: (id: string) => Promise<void>;
   moveGroup: (id: string, direction: 'up' | 'down') => Promise<void>;
   markPublished: (groupId: string) => Promise<void>;
+  saveAudit: (siteId: string, report: SiteAudit) => Promise<void>;
 
   addFaqs: (groupId: string, entries: store.NewFaq[]) => Promise<void>;
   editFaq: (
@@ -155,6 +157,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     removeGroup: (id) => apply(() => store.deleteGroup(id)),
     moveGroup: (id, direction) => apply(() => store.moveGroup(id, direction)),
     markPublished: (id) => apply(() => store.markGroupPublished(id)),
+    saveAudit: (siteId, report) => apply(() => store.saveAudit(siteId, report)),
 
     addFaqs: (id, entries) => apply(() => store.createFaqs(id, entries)),
     editFaq: (id, patch) => apply(() => store.updateFaq(id, patch)),

@@ -32,6 +32,16 @@ export const DASHBOARD_RATE_LIMIT = 40;
  */
 export const AUDIT_RATE_LIMIT = 20;
 
+/**
+ * Ceiling for a full audit.
+ *
+ * A full run makes roughly eight outbound requests to somebody else's server,
+ * so it is both more expensive for us and more conspicuous to them. Kept well
+ * below the quick limit, and counted in its own bucket so a stranger kicking
+ * the tyres on the free check can't exhaust it.
+ */
+export const AUDIT_FULL_RATE_LIMIT = 10;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 

@@ -25,6 +25,9 @@ import {
   type SiteTracking,
   type User,
 } from './types';
+import { buildActionPlan } from '@/lib/audit/actions';
+import { buildPillars, overallScore } from '@/lib/audit/score';
+import type { AuditReport, Finding } from '@/lib/audit/types';
 import { contentHash } from './export';
 import { STAY_CITED_QUERY_CAP } from './plans';
 
@@ -178,6 +181,144 @@ function seedChecks(siteId: string): CitationCheck[] {
   return checks;
 }
 
+/**
+ * A stored audit for the demo site.
+ *
+ * The findings are written out; the score is NOT. It's computed by the same
+ * scorer the live audit uses, so the demo can't quietly assert a number its own
+ * arithmetic wouldn't produce — and it stays right if the weights ever change.
+ */
+function seedAudit(): AuditReport {
+  const findings: Finding[] = [
+    {
+      id: 'raw-html',
+      pillar: 'technical',
+      label: 'Content readable without JavaScript',
+      status: 'pass',
+      detail: 'About 1,240 words are in the HTML itself, so a crawler sees them on the very first request.',
+      weight: 3,
+    },
+    {
+      id: 'crawlers',
+      pillar: 'technical',
+      label: 'AI crawlers allowed',
+      status: 'pass',
+      detail: 'GPTBot, ClaudeBot, Google-Extended and PerplexityBot are all permitted by robots.txt.',
+      weight: 3,
+    },
+    {
+      id: 'sitemap',
+      pillar: 'technical',
+      label: 'Sitemap available',
+      status: 'warn',
+      detail: 'A sitemap.xml exists, but robots.txt does not mention it.',
+      weight: 2,
+    },
+    {
+      id: 'qa-markup',
+      pillar: 'structure',
+      label: 'Questions marked up for machines',
+      status: 'warn',
+      detail: 'Two pages carry question markup; the rest do not.',
+      weight: 3,
+    },
+    {
+      id: 'answer-first',
+      pillar: 'structure',
+      label: 'Answers come first',
+      status: 'pass',
+      detail: '5 of 6 questions are answered in a short paragraph directly underneath.',
+      weight: 3,
+    },
+    {
+      id: 'specificity',
+      pillar: 'structure',
+      label: 'Answers are specific',
+      status: 'pass',
+      detail: 'The copy carries concrete detail — timeframes, coverage areas, warranty lengths.',
+      weight: 2,
+    },
+    {
+      id: 'title',
+      pillar: 'seo',
+      label: 'Every page has a title',
+      status: 'pass',
+      detail: 'All 4 crawled pages have a title tag.',
+      weight: 3,
+    },
+    {
+      id: 'meta-description',
+      pillar: 'seo',
+      label: 'Pages have meta descriptions',
+      status: 'fail',
+      detail: '3 of 4 pages have no meta description.',
+      weight: 2,
+    },
+    {
+      id: 'org-schema',
+      pillar: 'citation',
+      label: 'Business identified in structured data',
+      status: 'warn',
+      detail: 'There is business markup, but it is missing a url.',
+      weight: 3,
+    },
+    {
+      id: 'llms-txt',
+      pillar: 'citation',
+      label: 'llms.txt published',
+      status: 'fail',
+      detail: 'No llms.txt at the site root.',
+      weight: 1,
+    },
+    {
+      id: 'identity-pages',
+      pillar: 'authority',
+      label: 'About and contact pages exist',
+      status: 'pass',
+      detail: 'Both an about page and a contact page were found.',
+      weight: 3,
+    },
+    {
+      id: 'social-proof',
+      pillar: 'authority',
+      label: 'Reviews or testimonials',
+      status: 'warn',
+      detail: 'Testimonials appear in the copy but carry no markup.',
+      weight: 2,
+    },
+  ];
+
+  const pillars = buildPillars(findings);
+
+  return {
+    depth: 'full',
+    url: 'https://summitroofing.com/',
+    domain: 'summitroofing.com',
+    score: overallScore(pillars),
+    scoredCount: pillars.reduce((n, p) => n + p.scoredCount, 0),
+    pillars,
+    // Built by the real planner from the findings above, not written out — so
+    // the demo's plan is ranked and costed by the same code a live audit uses,
+    // and its "+N points" are as derived as anyone else's.
+    actions: buildActionPlan(findings, {
+      domain: 'summitroofing.com',
+      faqsHref: '/dashboard/faqs',
+      publishHref: '/dashboard/publish',
+      questionsHref: '/dashboard/questions',
+    }),
+    // Opportunities come from live account state, so the workspace recomputes
+    // them on render rather than trusting a stored snapshot.
+    opportunities: [],
+    crawled: [
+      { url: 'https://summitroofing.com/', status: 200, finalUrl: 'https://summitroofing.com/', bytes: 41_200, ms: 420 },
+      { url: 'https://summitroofing.com/services', status: 200, finalUrl: 'https://summitroofing.com/services', bytes: 33_100, ms: 380 },
+      { url: 'https://summitroofing.com/pricing', status: 200, finalUrl: 'https://summitroofing.com/pricing', bytes: 21_800, ms: 350 },
+      { url: 'https://summitroofing.com/about', status: 200, finalUrl: 'https://summitroofing.com/about', bytes: 18_400, ms: 330 },
+    ],
+    checkedAt: daysAgo(6),
+  };
+}
+
 export function buildSeed(): DashboardData {
   const site: Site = {
     id: newId('site'),
@@ -185,36 +326,7 @@ export function buildSeed(): DashboardData {
     domain: 'summitroofing.com',
     createdAt: daysAgo(38),
     getCitedAt: daysAgo(31),
-    lastAudit: {
-      score: 72,
-      checkedAt: daysAgo(6),
-      checks: [
-        {
-          id: 'raw-html',
-          label: 'Content readable without JavaScript',
-          status: 'pass',
-          detail: 'About 1,240 words are in the HTML itself.',
-        },
-        {
-          id: 'crawlers',
-          label: 'AI crawlers allowed',
-          status: 'pass',
-          detail: 'GPTBot, ClaudeBot, Google-Extended and PerplexityBot are all permitted.',
-        },
-        {
-          id: 'schema',
-          label: 'Questions marked up for machines',
-          status: 'warn',
-          detail: 'Organization markup is present, but the published answers are not marked up yet.',
-        },
-        {
-          id: 'cited',
-          label: 'Cited in AI answers today',
-          status: 'warn',
-          detail: 'Cited for 2 of the 8 questions we checked.',
-        },
-      ],
-    },
+    lastAudit: seedAudit(),
   };
 
   const groups: FaqGroup[] = [];
