@@ -14,21 +14,35 @@
 
 export const RATE_LIMIT = 3;
 
+/**
+ * Ceiling for the dashboard generator.
+ *
+ * Higher than the free limit, but not absent: that route is not authenticated
+ * yet, so this is the only thing standing between a stranger and an unmetered
+ * Claude endpoint. It goes away when a real session check replaces it.
+ */
+export const DASHBOARD_RATE_LIMIT = 40;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 
-export function checkRateLimit(ip: string): boolean {
+/**
+ * @param key   Bucket to count against — namespace it per route (`dash:${ip}`)
+ *              so one surface's usage can't exhaust another's allowance.
+ * @param limit Requests per UTC day. Defaults to the free-tier limit.
+ */
+export function checkRateLimit(key: string, limit: number = RATE_LIMIT): boolean {
   const now = Date.now();
-  const entry = hits.get(ip);
+  const entry = hits.get(key);
 
   if (!entry || now >= entry.resetAt) {
     const midnightUtc = new Date();
     midnightUtc.setUTCHours(24, 0, 0, 0);
-    hits.set(ip, { count: 1, resetAt: midnightUtc.getTime() });
+    hits.set(key, { count: 1, resetAt: midnightUtc.getTime() });
     return true;
   }
 
-  if (entry.count >= RATE_LIMIT) return false;
+  if (entry.count >= limit) return false;
 
   entry.count += 1;
   return true;

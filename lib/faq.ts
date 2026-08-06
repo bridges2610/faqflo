@@ -23,6 +23,14 @@ export const MIN_FAQ_COUNT = 3;
 export const MAX_FAQ_COUNT = 5;
 export const DEFAULT_FAQ_COUNT = 5;
 
+/**
+ * Ceiling for the dashboard generator. Higher than the free cap because paid
+ * plans advertise an unlimited generator, but still finite — one request is one
+ * model call, and an unbounded count is an unbounded bill.
+ */
+export const MAX_FAQ_COUNT_PAID = 12;
+export const DEFAULT_FAQ_COUNT_PAID = 6;
+
 /** Anthropic input cap. Also applied when extracting text from a URL. */
 export const MAX_CONTENT_CHARS = 8000;
 
@@ -87,12 +95,19 @@ Content:
 ${content.slice(0, MAX_CONTENT_CHARS)}`;
 }
 
-export function clampCount(value: unknown): number {
-  return Number.isInteger(value) &&
-    (value as number) >= MIN_FAQ_COUNT &&
-    (value as number) <= MAX_FAQ_COUNT
+/**
+ * Coerce a requested count into the allowed range, falling back to the default
+ * for anything out of range or not an integer.
+ *
+ * `max` defaults to the free ceiling so existing callers are unaffected; the
+ * dashboard route passes MAX_FAQ_COUNT_PAID. The fallback is clamped to `max`
+ * too, so a lower ceiling can never return a default above it.
+ */
+export function clampCount(value: unknown, max: number = MAX_FAQ_COUNT): number {
+  const fallback = Math.min(DEFAULT_FAQ_COUNT, max);
+  return Number.isInteger(value) && (value as number) >= MIN_FAQ_COUNT && (value as number) <= max
     ? (value as number)
-    : DEFAULT_FAQ_COUNT;
+    : fallback;
 }
 
 export function coerceTone(value: unknown): Tone {
