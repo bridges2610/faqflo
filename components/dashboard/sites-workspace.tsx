@@ -28,9 +28,23 @@ function SiteRow({ id }: { id: string }) {
   if (!row || !data) return null;
 
   const isCurrent = site?.id === row.id;
-  const siteFaqs = data.faqs.filter((f) => f.siteId === row.id);
+
+  // Answers hang off groups now, so a site's totals are gathered across them.
+  const siteGroups = data.groups.filter((g) => g.siteId === row.id);
+  const groupIds = new Set(siteGroups.map((g) => g.id));
+  const siteFaqs = data.faqs.filter((f) => groupIds.has(f.groupId));
   const published = siteFaqs.filter((f) => f.status === 'published').length;
-  const state = publishState(row, siteFaqs);
+
+  // Publishing is per page, so a site is only "current" when every group that
+  // has something to publish has been pasted with its latest content.
+  const groupStates = siteGroups.map((g) =>
+    publishState(
+      g,
+      siteFaqs.filter((f) => f.groupId === g.id),
+    ),
+  );
+  const staleCount = groupStates.filter((s) => s === 'stale').length;
+  const liveCount = groupStates.filter((s) => s === 'current').length;
   const setUp = hasGetCited(row);
 
   return (
@@ -40,12 +54,17 @@ function SiteRow({ id }: { id: string }) {
           <span className="text-navy font-semibold">{row.name}</span>
           {isCurrent && <Badge tone="blue">Selected</Badge>}
           {setUp ? <Badge tone="cyan">Get Cited</Badge> : <Badge tone="neutral">Free</Badge>}
-          {state === 'stale' && <Badge tone="neutral">Live copy out of date</Badge>}
-          {state === 'current' && <Badge tone="success">Published</Badge>}
+          {staleCount > 0 && (
+            <Badge tone="neutral">
+              {staleCount} {staleCount === 1 ? 'page' : 'pages'} out of date
+            </Badge>
+          )}
+          {staleCount === 0 && liveCount > 0 && <Badge tone="success">Published</Badge>}
         </div>
         <p className="text-slate mt-1 text-sm">
-          <span className="font-mono text-xs">{row.domain}</span> · {published} published ·{' '}
-          {row.publishedAt ? `pasted ${timeAgo(row.publishedAt)}` : 'never pasted'}
+          <span className="font-mono text-xs">{row.domain}</span> · {siteGroups.length}{' '}
+          {siteGroups.length === 1 ? 'group' : 'groups'} · {published} published · added{' '}
+          {timeAgo(row.createdAt)}
         </p>
       </div>
 

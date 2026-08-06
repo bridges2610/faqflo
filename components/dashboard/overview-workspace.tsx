@@ -24,7 +24,8 @@ import { StatTile } from './stat-tile';
 type NextAction = { title: string; body: string; href: string; cta: string } | null;
 
 export function OverviewWorkspace() {
-  const { site, sites, faqs, questions, tracking, data, user, resetDemo } = useDashboard();
+  const { site, sites, groups, faqs, faqsIn, questions, tracking, data, user, resetDemo } =
+    useDashboard();
 
   if (!site || !data) {
     return (
@@ -42,7 +43,23 @@ export function OverviewWorkspace() {
   const published = faqs.filter((f) => f.status === 'published');
   const drafts = faqs.filter((f) => f.status === 'draft');
   const emptyDrafts = drafts.filter((f) => !f.answer.trim());
-  const state = publishState(site, faqs);
+
+  /* Publishing is per page now, so the site's state is the aggregate: stale if
+     any group has drifted, never if nothing has been pasted at all, current
+     only when every group holding published answers is up to date. */
+  const groupStates = groups.map((g) => publishState(g, faqsIn(g.id)));
+  const staleGroups = groupStates.filter((s) => s === 'stale').length;
+  const neverGroups = groupStates.filter((s) => s === 'never').length;
+  const liveGroups = groupStates.filter((s) => s === 'current').length;
+  const state: 'stale' | 'never' | 'current' | 'nothing-to-publish' =
+    staleGroups > 0
+      ? 'stale'
+      : liveGroups > 0
+        ? 'current'
+        : neverGroups > 0
+          ? 'never'
+          : 'nothing-to-publish';
+
   const uncovered = questions.filter((q) => !q.covered);
   const cited = tracking?.latest.filter((c) => c.outcome === 'cited').length ?? 0;
   const checks = tracking?.latest.length ?? 0;
@@ -59,10 +76,10 @@ export function OverviewWorkspace() {
     }
     if (state === 'stale') {
       return {
-        title: 'Your live copy is out of date',
-        body: 'Your answers have changed since you last pasted them. Until you paste the update, the engines are still reading the old version.',
+        title: `${staleGroups} ${staleGroups === 1 ? 'page is' : 'pages are'} out of date`,
+        body: 'Answers have changed since those pages were last pasted. Until you paste the update, the engines are still reading the old version.',
         href: '/dashboard/publish',
-        cta: 'Get the updated block',
+        cta: 'Get the updated blocks',
       };
     }
     if (published.length === 0) {
@@ -75,8 +92,8 @@ export function OverviewWorkspace() {
     }
     if (state === 'never') {
       return {
-        title: 'Paste the export onto your site',
-        body: 'Your answers exist here but not on your domain. Until they are on your site, there is nothing for a crawler to find or quote.',
+        title: 'Paste the export onto your pages',
+        body: 'Your answers exist here but not on your domain. Until they are on the page, there is nothing for a crawler to find or quote.',
         href: '/dashboard/publish',
         cta: 'Get the HTML',
       };
@@ -114,13 +131,11 @@ export function OverviewWorkspace() {
         title={`Hello, ${data.user.name.split(' ')[0]}`}
         description={`${site.name} · ${site.domain}`}
         action={
-          <Badge
-            tone={state === 'current' ? 'success' : state === 'stale' ? 'neutral' : 'neutral'}
-          >
+          <Badge tone={state === 'current' ? 'success' : 'neutral'}>
             {state === 'current'
-              ? `Live copy current · ${timeAgo(site.publishedAt)}`
+              ? `${liveGroups} ${liveGroups === 1 ? 'page' : 'pages'} live and current`
               : state === 'stale'
-                ? 'Live copy out of date'
+                ? `${staleGroups} ${staleGroups === 1 ? 'page' : 'pages'} out of date`
                 : 'Not on your site yet'}
           </Badge>
         }
@@ -187,7 +202,9 @@ export function OverviewWorkspace() {
                 {
                   step: 'Answers',
                   done: published.length > 0,
-                  detail: `${published.length} published, ${drafts.length} draft`,
+                  detail: `${published.length} published across ${groups.length} ${
+                    groups.length === 1 ? 'group' : 'groups'
+                  }, ${drafts.length} draft`,
                   href: '/dashboard/faqs',
                 },
                 {
@@ -195,9 +212,9 @@ export function OverviewWorkspace() {
                   done: state === 'current',
                   detail:
                     state === 'current'
-                      ? `Pasted ${timeAgo(site.publishedAt)}`
+                      ? `${liveGroups} of ${groups.length} ${groups.length === 1 ? 'page' : 'pages'} live`
                       : state === 'stale'
-                        ? 'Live copy is out of date'
+                        ? `${staleGroups} ${staleGroups === 1 ? 'page needs' : 'pages need'} re-pasting`
                         : 'Not pasted yet',
                   href: '/dashboard/publish',
                 },

@@ -17,11 +17,14 @@ import type { Faq } from '@/lib/faq';
 */
 export function DraftReview({
   candidates,
+  destination,
   onSave,
   onDiscard,
   saving = false,
 }: {
   candidates: Faq[];
+  /** Group these will be saved into — named so it can't be a surprise. */
+  destination: string;
   onSave: (kept: Faq[], status: 'draft' | 'published') => void;
   onDiscard: () => void;
   saving?: boolean;
@@ -45,7 +48,9 @@ export function DraftReview({
         <div>
           <h2 className="text-lg">Review before saving</h2>
           <p className="text-slate mt-1 text-sm">
-            {kept.length} of {candidates.length} selected. Untick anything you don&rsquo;t want.
+            {kept.length} of {candidates.length} selected, going into{' '}
+            <span className="text-navy font-semibold">{destination}</span>. Untick anything you
+            don&rsquo;t want.
           </p>
         </div>
         <Badge tone="success">New</Badge>

@@ -16,6 +16,7 @@ import type {
   DashboardData,
   DiscoveredQuestion,
   FaqEntry,
+  FaqGroup,
   Site,
   SiteTracking,
   Subscription,
@@ -30,23 +31,35 @@ type Ctx = {
   site: Site | null;
   sites: Site[];
   selectSite: (id: string) => void;
-  /** FAQs for the selected site, already ordered by position. */
+  /** Groups on the selected site, ordered. */
+  groups: FaqGroup[];
+  /** Every answer on the selected site, across its groups. */
   faqs: FaqEntry[];
+  /** Answers in one group, ordered by position. */
+  faqsIn: (groupId: string) => FaqEntry[];
   questions: DiscoveredQuestion[];
   tracking: SiteTracking | null;
 
   addSite: (input: store.NewSite) => Promise<void>;
   renameSite: (id: string, patch: Partial<store.NewSite>) => Promise<void>;
   removeSite: (id: string) => Promise<void>;
-  addFaqs: (siteId: string, entries: store.NewFaq[]) => Promise<void>;
+
+  /** Resolves with the new group's id, so the caller can open it. */
+  addGroup: (siteId: string, input: store.NewGroup) => Promise<string | undefined>;
+  editGroup: (id: string, patch: Partial<store.NewGroup>) => Promise<void>;
+  removeGroup: (id: string) => Promise<void>;
+  moveGroup: (id: string, direction: 'up' | 'down') => Promise<void>;
+  markPublished: (groupId: string) => Promise<void>;
+
+  addFaqs: (groupId: string, entries: store.NewFaq[]) => Promise<void>;
   editFaq: (
     id: string,
     patch: Partial<Pick<FaqEntry, 'question' | 'answer' | 'status'>>,
   ) => Promise<void>;
   removeFaq: (id: string) => Promise<void>;
   moveFaq: (id: string, direction: 'up' | 'down') => Promise<void>;
+  moveFaqToGroup: (id: string, groupId: string) => Promise<void>;
   coverQuestion: (id: string) => Promise<void>;
-  markPublished: (siteId: string) => Promise<void>;
 
   /** Demo-only entitlement controls — see the switcher in the header. */
   setGetCited: (siteId: string, granted: boolean) => Promise<void>;
@@ -84,9 +97,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const site = useMemo(() => data?.sites.find((s) => s.id === siteId) ?? null, [data, siteId]);
 
+  const groups = useMemo(
+    () => (data && site ? store.groupsForSite(data, site.id) : []),
+    [data, site],
+  );
+
   const faqs = useMemo(
     () => (data && site ? store.faqsForSite(data, site.id) : []),
     [data, site],
+  );
+
+  const faqsIn = useCallback(
+    (groupId: string) => (data ? store.faqsForGroup(data, groupId) : []),
+    [data],
   );
 
   const questions = useMemo(
@@ -106,19 +129,39 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     site,
     sites: data?.sites ?? [],
     selectSite: setSiteId,
+    groups,
     faqs,
+    faqsIn,
     questions,
     tracking,
 
     addSite: (input) => apply(() => store.createSite(input)),
     renameSite: (id, patch) => apply(() => store.updateSite(id, patch)),
     removeSite: (id) => apply(() => store.deleteSite(id)),
+
+    addGroup: async (siteId, input) => {
+      // Identified by diffing rather than by trusting append order — the store
+      // is free to sort or reorder without silently breaking the caller.
+      const existing = new Set((data?.groups ?? []).map((g) => g.id));
+      let created: string | undefined;
+      await apply(async () => {
+        const next = await store.createGroup(siteId, input);
+        created = next.groups.find((g) => !existing.has(g.id))?.id;
+        return next;
+      });
+      return created;
+    },
+    editGroup: (id, patch) => apply(() => store.updateGroup(id, patch)),
+    removeGroup: (id) => apply(() => store.deleteGroup(id)),
+    moveGroup: (id, direction) => apply(() => store.moveGroup(id, direction)),
+    markPublished: (id) => apply(() => store.markGroupPublished(id)),
+
     addFaqs: (id, entries) => apply(() => store.createFaqs(id, entries)),
     editFaq: (id, patch) => apply(() => store.updateFaq(id, patch)),
     removeFaq: (id) => apply(() => store.deleteFaq(id)),
     moveFaq: (id, direction) => apply(() => store.moveFaq(id, direction)),
+    moveFaqToGroup: (id, groupId) => apply(() => store.moveFaqToGroup(id, groupId)),
     coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
-    markPublished: (id) => apply(() => store.markPublished(id)),
 
     setGetCited: (id, granted) => apply(() => store.setGetCited(id, granted)),
     setSubscription: (subscription) => apply(() => store.updateUser({ subscription })),

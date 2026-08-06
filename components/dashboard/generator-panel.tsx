@@ -13,6 +13,7 @@ import {
   type Language,
   type Tone,
 } from '@/lib/faq';
+import type { FaqGroup } from '@/lib/dashboard/types';
 
 /*
   The dashboard generator.
@@ -35,9 +36,16 @@ export type GenerationMeta = { tone: Tone; language: Language };
 
 export function GeneratorPanel({
   onGenerated,
+  groups,
+  targetGroupId,
+  onTargetChange,
   disabled = false,
 }: {
   onGenerated: (faqs: Faq[], meta: GenerationMeta) => void;
+  /** Where the generated set will land. */
+  groups: FaqGroup[];
+  targetGroupId: string | null;
+  onTargetChange: (id: string) => void;
   disabled?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('text');
@@ -172,7 +180,42 @@ export function GeneratorPanel({
         )}
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-3">
+      {/* All four controls in one grid. They carry equal weight, so laying the
+          destination out differently from the other three made it read as a
+          separate kind of thing. */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Where it lands is chosen before generating, not after: the group
+            decides which page these answers get pasted onto. With one group
+            there's nothing to choose, and a one-option select is a control that
+            does nothing — so it states the destination instead. */}
+        {groups.length > 1 ? (
+          <label className="block">
+            <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+              Add to
+            </span>
+            <select
+              value={targetGroupId ?? ''}
+              onChange={(e) => onTargetChange(e.target.value)}
+              className="border-line text-navy focus:border-primary mt-1.5 w-full truncate rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name} · {g.path}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <div className="block">
+            <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+              Add to
+            </span>
+            <p className="text-navy border-line mt-1.5 truncate rounded-input border border-dashed px-3 py-2 text-sm">
+              {groups[0]?.name ?? '—'}
+            </p>
+          </div>
+        )}
+
         <label className="block">
           <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
             How many

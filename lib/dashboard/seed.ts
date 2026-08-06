@@ -11,7 +11,21 @@
  * in the header is how you see the locked states.
  */
 
-import { ENGINES, type CitationCheck, type CitationDay, type CompetitorShare, type DashboardData, type DiscoveredQuestion, type Engine, type FaqEntry, type Site, type SiteTracking, type User } from './types';
+import {
+  ENGINES,
+  type CitationCheck,
+  type CitationDay,
+  type CompetitorShare,
+  type DashboardData,
+  type DiscoveredQuestion,
+  type Engine,
+  type FaqEntry,
+  type FaqGroup,
+  type Site,
+  type SiteTracking,
+  type User,
+} from './types';
+import { contentHash } from './export';
 import { STAY_CITED_QUERY_CAP } from './plans';
 
 export function newId(prefix: string): string {
@@ -38,36 +52,65 @@ function dateKey(n: number): string {
   ).padStart(2, '0')}`;
 }
 
-const SEED_FAQS: { q: string; a: string; status: 'published' | 'draft' }[] = [
+/*
+  Two groups, because one group wouldn't show why groups exist.
+
+  The service page is left deliberately stale (its stored hash won't match its
+  answers) and the pricing page is current, so both states of the publish nudge
+  are visible side by side the first time the dashboard is opened.
+*/
+type SeedGroup = {
+  name: string;
+  path: string;
+  /** 'stale' stores a hash that can't match; 'current' stores the real one. */
+  state: 'stale' | 'current';
+  faqs: { q: string; a: string; status: 'published' | 'draft' }[];
+};
+
+const SEED_GROUPS: SeedGroup[] = [
   {
-    q: 'Do you handle emergency roof repairs?',
-    a: 'Yes. Summit Roofing keeps two crews on call for emergency work across Franklin and is usually on site within 24 hours. Call the office line and describe the leak, and we will tell you how to limit the damage while we are on the way.',
-    status: 'published',
+    name: 'Service page',
+    path: '/services',
+    state: 'stale',
+    faqs: [
+      {
+        q: 'Do you handle emergency roof repairs?',
+        a: 'Yes. Summit Roofing keeps two crews on call for emergency work across Franklin and is usually on site within 24 hours. Call the office line and describe the leak, and we will tell you how to limit the damage while we are on the way.',
+        status: 'published',
+      },
+      {
+        q: 'Which areas does Summit Roofing cover?',
+        a: 'We work across Franklin and the surrounding towns within roughly a 30-mile radius, including Brentwood, Spring Hill and Nolensville. If you are just outside that, call anyway and we will tell you honestly whether the trip makes sense.',
+        status: 'published',
+      },
+      {
+        q: 'How long does a full roof replacement take?',
+        a: 'A typical single-family home takes two to three days once materials are on site. Weather is the main variable, and we give you a firm window before work begins.',
+        status: 'published',
+      },
+      {
+        q: 'Does Summit Roofing work with insurance claims?',
+        a: 'Yes. We document storm and hail damage in the format adjusters expect, and we can speak to your insurer directly if you would rather not manage the claim yourself.',
+        status: 'published',
+      },
+    ],
   },
   {
-    q: 'Which areas does Summit Roofing cover?',
-    a: 'We work across Franklin and the surrounding towns within roughly a 30-mile radius, including Brentwood, Spring Hill and Nolensville. If you are just outside that, call anyway and we will tell you honestly whether the trip makes sense.',
-    status: 'published',
-  },
-  {
-    q: 'How much does a roof inspection cost in Franklin?',
-    a: 'Roof inspections are free for homeowners in our service area, and you receive a written report with photographs. There is no obligation to book the repair with us afterwards.',
-    status: 'published',
-  },
-  {
-    q: 'How long does a full roof replacement take?',
-    a: 'A typical single-family home takes two to three days once materials are on site. Weather is the main variable, and we give you a firm window before work begins.',
-    status: 'published',
-  },
-  {
-    q: 'Does Summit Roofing work with insurance claims?',
-    a: 'Yes. We document storm and hail damage in the format adjusters expect, and we can speak to your insurer directly if you would rather not manage the claim yourself.',
-    status: 'published',
-  },
-  {
-    q: 'What warranty comes with the work?',
-    a: 'Workmanship is covered for ten years and materials carry the manufacturer warranty, usually 25 to 30 years. Both are written into the contract before any work begins.',
-    status: 'draft',
+    name: 'Pricing page',
+    path: '/pricing',
+    state: 'current',
+    faqs: [
+      {
+        q: 'How much does a roof inspection cost in Franklin?',
+        a: 'Roof inspections are free for homeowners in our service area, and you receive a written report with photographs. There is no obligation to book the repair with us afterwards.',
+        status: 'published',
+      },
+      {
+        q: 'What warranty comes with the work?',
+        a: 'Workmanship is covered for ten years and materials carry the manufacturer warranty, usually 25 to 30 years. Both are written into the contract before any work begins.',
+        status: 'draft',
+      },
+    ],
   },
 ];
 
@@ -142,11 +185,6 @@ export function buildSeed(): DashboardData {
     domain: 'summitroofing.com',
     createdAt: daysAgo(38),
     getCitedAt: daysAgo(31),
-    publishedAt: daysAgo(24),
-    // Left deliberately mismatched with the current answer set, so the "your
-    // live copy is out of date" nudge is visible on a fresh install rather than
-    // being something you have to go and provoke.
-    publishedHash: 'stale00',
     lastAudit: {
       score: 72,
       checkedAt: daysAgo(6),
@@ -179,19 +217,42 @@ export function buildSeed(): DashboardData {
     },
   };
 
-  const faqs: FaqEntry[] = SEED_FAQS.map((f, i) => ({
-    id: newId('faq'),
-    siteId: site.id,
-    question: f.q,
-    answer: f.a,
-    status: f.status,
-    position: i,
-    source: 'generated',
-    tone: 'Professional',
-    language: 'English',
-    createdAt: daysAgo(30 - i),
-    updatedAt: daysAgo(Math.max(0, 12 - i * 2)),
-  }));
+  const groups: FaqGroup[] = [];
+  const faqs: FaqEntry[] = [];
+
+  SEED_GROUPS.forEach((seed, gi) => {
+    const group: FaqGroup = {
+      id: newId('grp'),
+      siteId: site.id,
+      name: seed.name,
+      path: seed.path,
+      position: gi,
+      createdAt: daysAgo(30 - gi),
+      publishedAt: daysAgo(24 - gi * 6),
+      publishedHash: null, // set below, once its answers exist
+    };
+
+    const entries: FaqEntry[] = seed.faqs.map((f, i) => ({
+      id: newId('faq'),
+      groupId: group.id,
+      question: f.q,
+      answer: f.a,
+      status: f.status,
+      position: i,
+      source: 'generated',
+      tone: 'Professional',
+      language: 'English',
+      createdAt: daysAgo(30 - i),
+      updatedAt: daysAgo(Math.max(0, 12 - i * 2)),
+    }));
+
+    // 'stale' stores a hash that cannot match anything, so the group opens in
+    // the out-of-date state; 'current' stores the real hash of what it holds.
+    group.publishedHash = seed.state === 'stale' ? 'staleseed' : contentHash(entries);
+
+    groups.push(group);
+    faqs.push(...entries);
+  });
 
   const questions: DiscoveredQuestion[] = SEED_QUESTIONS.map((q, i) => ({
     id: newId('q'),
@@ -236,7 +297,7 @@ export function buildSeed(): DashboardData {
     subscriptionSince: daysAgo(31),
   };
 
-  return { user, sites: [site], faqs, questions, tracking };
+  return { user, sites: [site], groups, faqs, questions, tracking };
 }
 
 export function emptyTracking(siteId: string): SiteTracking {

@@ -40,17 +40,44 @@ export type Site = {
   createdAt: string;
   /** When Get Cited was bought for this site. null = free tier for this site. */
   getCitedAt: string | null;
-  /** When the export was last marked as pasted onto the live site. */
-  publishedAt: string | null;
-  /**
-   * Fingerprint of the answer set at the moment it was published. Comparing it
-   * with the current set is what powers the "your live copy is out of date"
-   * nudge — the content is re-pasted by hand, so drift is expected and has to
-   * be visible rather than assumed.
-   */
-  publishedHash: string | null;
   /** Latest stored audit for this site, if one has been run. */
   lastAudit: SiteAudit | null;
+};
+
+/**
+ * A set of answers bound to one page of the customer's site.
+ *
+ * Groups exist because a site has more than one page worth of questions: the
+ * ones that belong on a service page are not the ones that belong on pricing.
+ * Each group is exported, pasted and tracked separately, which is what lets the
+ * schema point at the page the answers actually live on and lets the stale
+ * nudge say which page needs re-pasting.
+ */
+export type FaqGroup = {
+  id: string;
+  siteId: string;
+  /** What the customer calls it: "Service page". */
+  name: string;
+  /**
+   * Path on the site, leading slash, no origin — "/services".
+   *
+   * A path rather than a full URL on purpose: the site already owns the domain,
+   * and storing an absolute URL here would let the two disagree. The export
+   * would then emit schema pointing at a domain the customer doesn't own.
+   */
+  path: string;
+  /** Ordering on the Answers page. */
+  position: number;
+  createdAt: string;
+  /** When this group's export was last marked as pasted onto the live page. */
+  publishedAt: string | null;
+  /**
+   * Fingerprint of the answers at the moment they were pasted. Comparing it
+   * with the current set is what powers the "your live copy is out of date"
+   * nudge — the content is re-pasted by hand, so drift is expected and has to
+   * be visible rather than assumed away.
+   */
+  publishedHash: string | null;
 };
 
 export type SiteAudit = {
@@ -63,13 +90,14 @@ export type FaqStatus = 'published' | 'draft';
 
 export type FaqEntry = {
   id: string;
-  siteId: string;
+  /** The group owns the answer; the group knows its site. */
+  groupId: string;
   question: string;
   answer: string;
   /** Only published entries reach the export and the schema. */
   status: FaqStatus;
-  /** Explicit ordering — reordering swaps two positions rather than relying
-      on array index, which wouldn't survive a real query's ORDER BY. */
+  /** Ordering WITHIN the group — reordering swaps two positions rather than
+      relying on array index, which wouldn't survive a real query's ORDER BY. */
   position: number;
   source: 'generated' | 'manual' | 'discovered';
   tone: Tone;
@@ -147,6 +175,7 @@ export type SiteTracking = {
 export type DashboardData = {
   user: User;
   sites: Site[];
+  groups: FaqGroup[];
   faqs: FaqEntry[];
   questions: DiscoveredQuestion[];
   tracking: SiteTracking[];

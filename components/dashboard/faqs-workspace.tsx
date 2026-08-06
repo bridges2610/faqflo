@@ -1,43 +1,56 @@
 'use client';
 
 import { useState } from 'react';
-import { ButtonLink } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
 import type { Faq } from '@/lib/faq';
 import { DraftReview } from './draft-review';
 import { EmptyState } from './empty-state';
-import { FaqList } from './faq-list';
 import { GeneratorPanel, type GenerationMeta } from './generator-panel';
+import { GroupCard } from './group-card';
+import { GroupForm } from './group-form';
 import { PageHeader } from './page-header';
+import { PlusIcon } from './nav-icons';
 
 /*
-  The FAQs screen: generate → review → manage, top to bottom in the order the
-  work actually happens.
+  The Answers screen: generate → review → manage, grouped by the page each set
+  belongs on.
+
+  Generation targets a specific group rather than a general pile, because an
+  answer's group decides which page it gets pasted onto — picking that after the
+  fact is how answers end up on the wrong page.
 */
 export function FaqsWorkspace() {
-  const { site, faqs, addFaqs } = useDashboard();
+  const { site, groups, addFaqs } = useDashboard();
   const [candidates, setCandidates] = useState<Faq[] | null>(null);
   const [meta, setMeta] = useState<GenerationMeta | null>(null);
+  const [targetGroupId, setTargetGroupId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [addingGroup, setAddingGroup] = useState(false);
+  /** Group that should open itself — just created, or just written into. */
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
 
   if (!site) {
     return (
       <>
-        <PageHeader title="FAQs" description="Everything your customers ask, in one place." />
+        <PageHeader title="Answers" description="Everything your customers ask, by page." />
         <EmptyState
           title="Add a site first"
-          body="FAQs belong to a site, so there's one thing to do before this page is useful."
-          action={<ButtonLink href="/dashboard/setup">Go to setup</ButtonLink>}
+          body="Answers belong to a page of a site, so there's one thing to do before this page is useful."
+          action={<ButtonLink href="/dashboard/sites">Go to sites</ButtonLink>}
         />
       </>
     );
   }
 
+  // Default the generator's target to the first group, but let it be changed.
+  const activeGroupId = targetGroupId ?? groups[0]?.id ?? null;
+
   async function save(kept: Faq[], status: 'draft' | 'published') {
-    if (!site) return;
+    if (!activeGroupId) return;
     setSaving(true);
     await addFaqs(
-      site.id,
+      activeGroupId,
       kept.map((f) => ({
         question: f.q,
         answer: f.a,
@@ -50,37 +63,85 @@ export function FaqsWorkspace() {
     setSaving(false);
     setCandidates(null);
     setMeta(null);
+    // Show the customer where the answers went.
+    setOpenGroupId(activeGroupId);
   }
+
+  const targetGroup = groups.find((g) => g.id === activeGroupId) ?? null;
 
   return (
     <>
       <PageHeader
-        title="FAQs"
-        description={`Questions and answers for ${site.name}. Published entries are what goes into the export you paste onto your site — drafts stay here.`}
+        title="Answers"
+        description={`Questions and answers for ${site.name}, grouped by the page they go on. Each group gets its own block of code to paste.`}
+        action={
+          <Button size="sm" variant="ghost" onClick={() => setAddingGroup((v) => !v)}>
+            <PlusIcon className="h-4 w-4" />
+            New group
+          </Button>
+        }
       />
 
       <div className="space-y-5">
-        <GeneratorPanel
-          disabled={saving}
-          onGenerated={(generated, generationMeta) => {
-            setCandidates(generated);
-            setMeta(generationMeta);
-          }}
-        />
-
-        {candidates && (
-          <DraftReview
-            candidates={candidates}
-            saving={saving}
-            onSave={save}
-            onDiscard={() => {
-              setCandidates(null);
-              setMeta(null);
+        {addingGroup && (
+          <GroupForm
+            siteId={site.id}
+            domain={site.domain}
+            onDone={(createdId) => {
+              setAddingGroup(false);
+              if (createdId) setOpenGroupId(createdId);
             }}
           />
         )}
 
-        <FaqList siteId={site.id} faqs={faqs} />
+        {groups.length === 0 ? (
+          <EmptyState
+            title="No groups yet"
+            body="A group is one page's worth of answers — your service page, your pricing page. Add the first one and you can start writing."
+            action={<Button onClick={() => setAddingGroup(true)}>Add a group</Button>}
+          />
+        ) : (
+          <>
+            <GeneratorPanel
+              disabled={saving}
+              groups={groups}
+              targetGroupId={activeGroupId}
+              onTargetChange={setTargetGroupId}
+              onGenerated={(generated, generationMeta) => {
+                setCandidates(generated);
+                setMeta(generationMeta);
+              }}
+            />
+
+            {candidates && targetGroup && (
+              <DraftReview
+                candidates={candidates}
+                destination={targetGroup.name}
+                saving={saving}
+                onSave={save}
+                onDiscard={() => {
+                  setCandidates(null);
+                  setMeta(null);
+                }}
+              />
+            )}
+
+            {groups.map((group, i) => (
+              <GroupCard
+                key={group.id}
+                group={group}
+                domain={site.domain}
+                isFirst={i === 0}
+                isLast={i === groups.length - 1}
+                // A lone group opens on arrival: collapsing the only thing on
+                // the page leaves it looking empty, and there's nothing to scan
+                // between when there's one of something.
+                defaultOpen={groups.length === 1}
+                forceOpen={openGroupId === group.id}
+              />
+            ))}
+          </>
+        )}
       </div>
     </>
   );

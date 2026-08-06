@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canDiscover } from '@/lib/dashboard/plans';
 import { formatNumber } from '@/lib/dashboard/format';
+import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
@@ -19,7 +20,7 @@ import { UpgradeCard } from './upgrade-card';
   into Generate.
 */
 export function DiscoverWorkspace() {
-  const { site, questions, faqs, addFaqs, coverQuestion } = useDashboard();
+  const { site, questions, faqs, coverQuestion } = useDashboard();
 
   if (!site) {
     return (
@@ -49,15 +50,6 @@ export function DiscoverWorkspace() {
   }
 
   const uncovered = questions.filter((q) => !q.covered);
-
-  async function draft(id: string, question: string) {
-    if (!site) return;
-    // The answer is left empty on purpose. A placeholder answer that reached
-    // the export would be worse than no answer at all — this is a prompt for a
-    // human, not a shortcut past one.
-    await addFaqs(site.id, [{ question, answer: '', status: 'draft', source: 'discovered' }]);
-    await coverQuestion(id);
-  }
 
   return (
     <>
@@ -100,9 +92,10 @@ export function DiscoverWorkspace() {
                   {q.covered ? (
                     <Badge tone="success">Answered</Badge>
                   ) : (
-                    <Button size="sm" variant="ghost" onClick={() => draft(q.id, q.question)}>
-                      Draft an answer
-                    </Button>
+                    <DraftIntoGroup
+                      question={q.question}
+                      onDrafted={() => coverQuestion(q.id)}
+                    />
                   )}
                 </li>
               ))}

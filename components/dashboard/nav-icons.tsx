@@ -133,6 +133,33 @@ export function ArrowDownIcon({ className = '' }: IconProps) {
   );
 }
 
+export function CopyIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <rect x="7" y="7" width="9.5" height="9.5" rx="1.8" />
+      <path d="M13 4.5H5.3A1.8 1.8 0 0 0 3.5 6.3V14" />
+    </svg>
+  );
+}
+
+/** Confirmation tick, sized to swap in for CopyIcon without shifting layout. */
+export function TickIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <polyline points="4 10.5 8.2 14.5 16 5.5" />
+    </svg>
+  );
+}
+
+/** Points right when closed; callers rotate it 90° to point down when open. */
+export function ChevronIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <path d="M8 5l5 5-5 5" />
+    </svg>
+  );
+}
+
 export function LockIcon({ className = '' }: IconProps) {
   return (
     <svg {...BASE} className={className}>

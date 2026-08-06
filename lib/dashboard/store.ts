@@ -11,19 +11,23 @@
  * write is synchronous and free, and handing the caller a complete snapshot
  * keeps the provider to a single setState with no chance of the two drifting.
  *
+ * Ownership runs site → group → answer. Answers no longer know their site;
+ * they know their group, and the group knows the site. Anything needing
+ * site-wide answers goes through faqsForSite() rather than reaching past the
+ * group.
+ *
  * SSR: every entry point throws if called on the server. That's deliberate —
  * silently returning empty data would hide a real bug (a Server Component
  * trying to read user state) behind an empty dashboard.
  */
 
-import { contentHash } from './export';
+import { contentHash, normalizePath } from './export';
 import { buildSeed, emptyTracking, newId } from './seed';
-import type { DashboardData, DiscoveredQuestion, FaqEntry, Site, User } from './types';
+import type { DashboardData, DiscoveredQuestion, FaqEntry, FaqGroup, Site, User } from './types';
 
-// Bumped from v1: the model changed shape with the AEO pivot (widget traffic
-// out, citations in), and rehydrating a v1 payload into these types would fail
-// in a hundred small ways rather than one obvious one.
-const STORAGE_KEY = 'faqflo.dashboard.v2';
+// v3: answers moved from site-scoped to group-scoped, and publish state moved
+// from the site onto the group. A v2 payload can't be read into these types.
+const STORAGE_KEY = 'faqflo.dashboard.v3';
 
 function assertClient(fn: string): void {
   if (typeof window === 'undefined') {
@@ -85,13 +89,26 @@ export async function createSite(input: NewSite): Promise<DashboardData> {
     domain: normalizeDomain(input.domain),
     createdAt: now(),
     getCitedAt: null,
-    publishedAt: null,
-    publishedHash: null,
     lastAudit: null,
   };
+
+  // A site with no group has nowhere to put an answer, so it gets one for its
+  // home page immediately. The customer renames it or adds more.
+  const group: FaqGroup = {
+    id: newId('grp'),
+    siteId: site.id,
+    name: 'Home page',
+    path: '/',
+    position: 0,
+    createdAt: now(),
+    publishedAt: null,
+    publishedHash: null,
+  };
+
   return write({
     ...data,
     sites: [...data.sites, site],
+    groups: [...data.groups, group],
     tracking: [...data.tracking, emptyTracking(site.id)],
   });
 }
@@ -114,10 +131,13 @@ export async function updateSite(id: string, patch: Partial<NewSite>): Promise<D
 
 export async function deleteSite(id: string): Promise<DashboardData> {
   const data = requireData('deleteSite');
+  const groupIds = new Set(data.groups.filter((g) => g.siteId === id).map((g) => g.id));
+
   return write({
     ...data,
     sites: data.sites.filter((s) => s.id !== id),
-    faqs: data.faqs.filter((f) => f.siteId !== id),
+    groups: data.groups.filter((g) => g.siteId !== id),
+    faqs: data.faqs.filter((f) => !groupIds.has(f.groupId)),
     questions: data.questions.filter((q) => q.siteId !== id),
     tracking: data.tracking.filter((t) => t.siteId !== id),
   });
@@ -141,37 +161,105 @@ export async function setGetCited(id: string, granted: boolean): Promise<Dashboa
   });
 }
 
-/**
- * Record that the customer has pasted the current export onto their live site.
- *
- * Storing the hash at this moment is what makes the staleness nudge work later:
- * the content is re-pasted by hand, so the only way to know the live copy has
- * drifted is to remember what it looked like when they said they pasted it.
- */
-export async function markPublished(id: string): Promise<DashboardData> {
-  const data = requireData('markPublished');
-  const site = data.sites.find((s) => s.id === id);
-  if (!site) return data;
-
-  const hash = contentHash(
-    site,
-    data.faqs.filter((f) => f.siteId === id),
-  );
-
-  return write({
-    ...data,
-    sites: data.sites.map((s) =>
-      s.id === id ? { ...s, publishedAt: now(), publishedHash: hash } : s,
-    ),
-  });
-}
-
 export function normalizeDomain(input: string): string {
   return input
     .trim()
     .toLowerCase()
     .replace(/^https?:\/\//, '')
     .replace(/\/.*$/, '');
+}
+
+/* --------------------------------------------------------------- groups --- */
+
+export type NewGroup = { name: string; path: string };
+
+export async function createGroup(siteId: string, input: NewGroup): Promise<DashboardData> {
+  const data = requireData('createGroup');
+  const group: FaqGroup = {
+    id: newId('grp'),
+    siteId,
+    name: input.name.trim(),
+    path: normalizePath(input.path),
+    position: data.groups.filter((g) => g.siteId === siteId).length,
+    createdAt: now(),
+    publishedAt: null,
+    publishedHash: null,
+  };
+  return write({ ...data, groups: [...data.groups, group] });
+}
+
+export async function updateGroup(id: string, patch: Partial<NewGroup>): Promise<DashboardData> {
+  const data = requireData('updateGroup');
+  return write({
+    ...data,
+    groups: data.groups.map((g) =>
+      g.id === id
+        ? {
+            ...g,
+            ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
+            ...(patch.path !== undefined ? { path: normalizePath(patch.path) } : {}),
+          }
+        : g,
+    ),
+  });
+}
+
+/** Deleting a group takes its answers with it — the cascade a foreign key
+    would do for us later. */
+export async function deleteGroup(id: string): Promise<DashboardData> {
+  const data = requireData('deleteGroup');
+  const target = data.groups.find((g) => g.id === id);
+  if (!target) return data;
+
+  const groups = data.groups
+    .filter((g) => g.id !== id)
+    .map((g) =>
+      g.siteId === target.siteId && g.position > target.position
+        ? { ...g, position: g.position - 1 }
+        : g,
+    );
+
+  return write({ ...data, groups, faqs: data.faqs.filter((f) => f.groupId !== id) });
+}
+
+export async function moveGroup(id: string, direction: 'up' | 'down'): Promise<DashboardData> {
+  const data = requireData('moveGroup');
+  const target = data.groups.find((g) => g.id === id);
+  if (!target) return data;
+
+  const neighbourPosition = target.position + (direction === 'up' ? -1 : 1);
+  const neighbour = data.groups.find(
+    (g) => g.siteId === target.siteId && g.position === neighbourPosition,
+  );
+  if (!neighbour) return data;
+
+  return write({
+    ...data,
+    groups: data.groups.map((g) => {
+      if (g.id === target.id) return { ...g, position: neighbourPosition };
+      if (g.id === neighbour.id) return { ...g, position: target.position };
+      return g;
+    }),
+  });
+}
+
+/**
+ * Record that the customer has pasted this group's export onto its page.
+ *
+ * Storing the hash at this moment is what makes the staleness nudge work later:
+ * the content is re-pasted by hand, so the only way to know a page's live copy
+ * has drifted is to remember what it looked like when they said they pasted it.
+ */
+export async function markGroupPublished(id: string): Promise<DashboardData> {
+  const data = requireData('markGroupPublished');
+  const hash = contentHash(data.faqs.filter((f) => f.groupId === id));
+
+  return write({
+    ...data,
+    groups: data.groups.map((g) =>
+      g.id === id ? { ...g, publishedAt: now(), publishedHash: hash } : g,
+    ),
+  });
 }
 
 /* ----------------------------------------------------------------- faqs --- */
@@ -185,14 +273,14 @@ export type NewFaq = {
   language?: FaqEntry['language'];
 };
 
-export async function createFaqs(siteId: string, entries: NewFaq[]): Promise<DashboardData> {
+export async function createFaqs(groupId: string, entries: NewFaq[]): Promise<DashboardData> {
   const data = requireData('createFaqs');
-  const start = data.faqs.filter((f) => f.siteId === siteId).length;
+  const start = data.faqs.filter((f) => f.groupId === groupId).length;
   const stamp = now();
 
   const created: FaqEntry[] = entries.map((e, i) => ({
     id: newId('faq'),
-    siteId,
+    groupId,
     question: e.question.trim(),
     answer: e.answer.trim(),
     status: e.status ?? 'draft',
@@ -226,7 +314,7 @@ export async function deleteFaq(id: string): Promise<DashboardData> {
   const faqs = data.faqs
     .filter((f) => f.id !== id)
     .map((f) =>
-      f.siteId === target.siteId && f.position > target.position
+      f.groupId === target.groupId && f.position > target.position
         ? { ...f, position: f.position - 1 }
         : f,
     );
@@ -241,7 +329,7 @@ export async function moveFaq(id: string, direction: 'up' | 'down'): Promise<Das
 
   const neighbourPosition = target.position + (direction === 'up' ? -1 : 1);
   const neighbour = data.faqs.find(
-    (f) => f.siteId === target.siteId && f.position === neighbourPosition,
+    (f) => f.groupId === target.groupId && f.position === neighbourPosition,
   );
   if (!neighbour) return data;
 
@@ -255,9 +343,34 @@ export async function moveFaq(id: string, direction: 'up' | 'down'): Promise<Das
   });
 }
 
+/**
+ * Move an answer to another group.
+ *
+ * It lands at the end of the target and the gap it left behind closes, so both
+ * groups keep contiguous positions. Without the renumbering the source group
+ * would carry a hole, and every later reorder would skip a slot.
+ */
+export async function moveFaqToGroup(id: string, groupId: string): Promise<DashboardData> {
+  const data = requireData('moveFaqToGroup');
+  const target = data.faqs.find((f) => f.id === id);
+  if (!target || target.groupId === groupId) return data;
+
+  const nextPosition = data.faqs.filter((f) => f.groupId === groupId).length;
+
+  return write({
+    ...data,
+    faqs: data.faqs.map((f) => {
+      if (f.id === id) return { ...f, groupId, position: nextPosition, updatedAt: now() };
+      if (f.groupId === target.groupId && f.position > target.position) {
+        return { ...f, position: f.position - 1 };
+      }
+      return f;
+    }),
+  });
+}
+
 /* ------------------------------------------------------------ questions --- */
 
-/** Mark a discovered question as covered once an answer has been drafted. */
 export async function markQuestionCovered(id: string): Promise<DashboardData> {
   const data = requireData('markQuestionCovered');
   return write({
@@ -284,18 +397,22 @@ export async function addQuestions(
 
 /* ------------------------------------------------------------- selectors --- */
 
-export function faqsForSite(data: DashboardData, siteId: string): FaqEntry[] {
-  return data.faqs.filter((f) => f.siteId === siteId).sort((a, b) => a.position - b.position);
+export function groupsForSite(data: DashboardData, siteId: string): FaqGroup[] {
+  return data.groups.filter((g) => g.siteId === siteId).sort((a, b) => a.position - b.position);
 }
 
-export function publishedFaqs(data: DashboardData, siteId: string): FaqEntry[] {
-  return faqsForSite(data, siteId).filter((f) => f.status === 'published');
+export function faqsForGroup(data: DashboardData, groupId: string): FaqEntry[] {
+  return data.faqs.filter((f) => f.groupId === groupId).sort((a, b) => a.position - b.position);
+}
+
+/** Every answer on a site, across its groups — for counts and llms.txt. */
+export function faqsForSite(data: DashboardData, siteId: string): FaqEntry[] {
+  const groupIds = new Set(groupsForSite(data, siteId).map((g) => g.id));
+  return data.faqs.filter((f) => groupIds.has(f.groupId));
 }
 
 export function questionsForSite(data: DashboardData, siteId: string): DiscoveredQuestion[] {
-  return data.questions
-    .filter((q) => q.siteId === siteId)
-    .sort((a, b) => b.volume - a.volume);
+  return data.questions.filter((q) => q.siteId === siteId).sort((a, b) => b.volume - a.volume);
 }
 
 export function trackingForSite(data: DashboardData, siteId: string) {

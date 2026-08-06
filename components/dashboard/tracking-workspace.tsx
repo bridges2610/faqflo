@@ -8,6 +8,7 @@ import { canTrack } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import { ENGINES } from '@/lib/dashboard/types';
 import { CitationChart } from './citation-chart';
+import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { StatTile } from './stat-tile';
@@ -25,7 +26,7 @@ import { UpgradeCard } from './upgrade-card';
      the UI, not from results quietly going stale.
 */
 export function TrackingWorkspace() {
-  const { site, user, tracking, questions, addFaqs, coverQuestion } = useDashboard();
+  const { site, user, tracking, questions, coverQuestion } = useDashboard();
 
   if (!site) {
     return (
@@ -76,13 +77,6 @@ export function TrackingWorkspace() {
 
   const uncited = latest.filter((c) => c.outcome === 'absent');
   const usedPct = tracking ? (tracking.queriesUsed / tracking.queryCap) * 100 : 0;
-
-  async function draftFrom(question: string) {
-    if (!site) return;
-    await addFaqs(site.id, [{ question, answer: '', status: 'draft', source: 'discovered' }]);
-    const match = questions.find((q) => q.question === question);
-    if (match) await coverQuestion(match.id);
-  }
 
   return (
     <>
@@ -164,9 +158,13 @@ export function TrackingWorkspace() {
                         {timeAgo(c.checkedAt)}
                       </p>
                     </div>
-                    <Button size="sm" variant="ghost" onClick={() => draftFrom(c.question)}>
-                      Draft an answer
-                    </Button>
+                    <DraftIntoGroup
+                      question={c.question}
+                      onDrafted={async () => {
+                        const match = questions.find((q) => q.question === c.question);
+                        if (match) await coverQuestion(match.id);
+                      }}
+                    />
                   </li>
                 ))}
               </ul>

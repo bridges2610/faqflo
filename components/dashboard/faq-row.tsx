@@ -8,7 +8,7 @@ import type { FaqEntry } from '@/lib/dashboard/types';
 import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './nav-icons';
 
 /*
-  One FAQ, with everything you can do to it.
+  One answer, with everything you can do to it.
 
   Editing happens inline rather than in a modal: a modal would need focus
   trapping, scroll locking and an escape route, all to show two fields that fit
@@ -26,13 +26,15 @@ export function FaqRow({
   isFirst: boolean;
   isLast: boolean;
 }) {
-  const { editFaq, removeFaq, moveFaq } = useDashboard();
+  const { editFaq, removeFaq, moveFaq, moveFaqToGroup, groups } = useDashboard();
   const [editing, setEditing] = useState(false);
   const [question, setQuestion] = useState(faq.question);
   const [answer, setAnswer] = useState(faq.answer);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [moving, setMoving] = useState(false);
 
   const published = faq.status === 'published';
+  const otherGroups = groups.filter((g) => g.id !== faq.groupId);
 
   function startEdit() {
     setQuestion(faq.question);
@@ -138,13 +140,50 @@ export function FaqRow({
                 {published ? 'Unpublish' : 'Publish'}
               </button>
 
+              {/* A generated set usually contains one or two answers that
+                  belong on a different page. Only offered when there's
+                  somewhere to move to. */}
+              {otherGroups.length > 0 &&
+                (moving ? (
+                  <span className="flex items-center gap-2">
+                    <label className="sr-only" htmlFor={`move-${faq.id}`}>
+                      Move to group
+                    </label>
+                    <select
+                      id={`move-${faq.id}`}
+                      defaultValue=""
+                      onChange={(e) => {
+                        if (e.target.value) moveFaqToGroup(faq.id, e.target.value);
+                        setMoving(false);
+                      }}
+                      className="border-line text-navy focus:border-primary rounded-input border bg-white px-2 py-1 text-sm outline-none"
+                    >
+                      <option value="" disabled>
+                        Move to…
+                      </option>
+                      {otherGroups.map((g) => (
+                        <option key={g.id} value={g.id}>
+                          {g.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={() => setMoving(false)} className="text-slate text-sm">
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setMoving(true)}
+                    className="text-slate hover:text-navy text-sm transition-colors duration-150"
+                  >
+                    Move to…
+                  </button>
+                ))}
+
               {confirmDelete ? (
                 <span className="flex items-center gap-2 text-sm">
                   <span className="text-slate">Delete?</span>
-                  <button
-                    onClick={() => removeFaq(faq.id)}
-                    className="text-error-ink font-semibold"
-                  >
+                  <button onClick={() => removeFaq(faq.id)} className="text-error-ink font-semibold">
                     Yes
                   </button>
                   <button onClick={() => setConfirmDelete(false)} className="text-slate">
