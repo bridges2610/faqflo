@@ -55,12 +55,12 @@ function AnswerCard() {
         <div className="border-line mt-4 flex items-center gap-2 border-t pt-3">
           <span className="text-slate text-xs">Source</span>
           <span className="bg-primary-soft text-primary rounded-md px-2 py-0.5 font-mono text-xs">
-            <span className="sr-only">your website</span>
+            <span className="sr-only">the cited website</span>
             <span
               className="inline-block blur-[3px] select-none"
               aria-hidden="true"
             >
-              yourbusiness.com
+              summitroofing.com
             </span>
           </span>
         </div>

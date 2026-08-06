@@ -33,14 +33,6 @@ const FAQS = [
     a: 'Check where the HTML lands first. Some builders wrap embedded code in an iframe, and content inside an iframe isn’t read as part of your page — so it won’t earn you the citation. If yours does that, put the answers in a native text or HTML section instead of an embed.',
   },
   {
-    q: 'Does this give me FAQ rich results in Google?',
-    a: 'No, and anyone promising that is selling you something out of date — Google retired FAQ rich results. The schema we generate is for machine clarity: it tells an assistant which text is a question, which is the answer, and which business they belong to.',
-  },
-  {
-    q: 'What happens when my answers change?',
-    a: 'You re-paste the updated block. FAQs change rarely, so this is a couple of minutes a few times a year — and the dashboard tells you when your live copy no longer matches what you’ve got here.',
-  },
-  {
     q: 'Does the content live on your site or mine?',
     a: 'Yours, always, on your own domain. Hosting it on a FaqFlo subdomain would mean the citation and the click go to us instead of you, which would defeat the point.',
   },
