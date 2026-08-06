@@ -65,21 +65,22 @@ export function Hero() {
           </span>
 
           <h1 className="mt-6 text-[2.75rem] leading-[1.05] text-balance sm:text-[3.5rem]">
-            Get your business listed on{' '}
+            Get your business{' '}
             <span className="relative inline-block whitespace-nowrap">
-              <span className="text-brand-gradient">AI Search</span>
+              <span className="text-brand-gradient">cited by AI</span>
               <Underline className="text-accent absolute -bottom-2 left-0 h-4 w-full sm:-bottom-3 sm:h-5" />
             </span>
           </h1>
 
           <p className="text-slate mt-8 max-w-lg text-lg leading-relaxed">
-            Add your FAQs, paste one line of code, and start showing up when people ask Google and
-            AI assistants about what you do.
+            Find out whether ChatGPT, Perplexity and Google&rsquo;s AI answers can even read your
+            site — then turn what you know into answers they can quote, published on your own
+            domain.
           </p>
 
           <div className="mt-9 flex flex-wrap items-center gap-3">
-            <ButtonLink href="/#try" size="lg" arrow>
-              Try it free
+            <ButtonLink href="/#audit" size="lg" arrow>
+              Check my site free
             </ButtonLink>
             <ButtonLink href="/#how" size="lg" variant="ghost">
               See how it works
@@ -87,7 +88,7 @@ export function Hero() {
           </div>
 
           <p className="text-slate mt-5 text-sm">
-            Very easy setup. Works with every website.
+            No signup for the check. Your content stays on your domain.
           </p>
         </div>
 

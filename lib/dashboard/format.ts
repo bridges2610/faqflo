@@ -28,6 +28,27 @@ export function timeAgo(iso: string | null): string {
   });
 }
 
+/**
+ * "in 3 days" — the forward-looking counterpart to timeAgo().
+ *
+ * timeAgo() clamps elapsed time at zero, so handing it a future date returns
+ * "just now", which would tell someone their quota resets immediately. Dates in
+ * the future need their own function rather than a string replace on that one.
+ */
+export function timeUntil(iso: string | null): string {
+  if (!iso) return 'unknown';
+
+  const seconds = Math.round((new Date(iso).getTime() - Date.now()) / 1000);
+  if (seconds <= 0) return 'now';
+
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+  const days = Math.round(hours / 24);
+  return `in ${days} day${days === 1 ? '' : 's'}`;
+}
+
 /** Thousands separators, so 12480 doesn't read as 1248 at a glance. */
 export function formatNumber(n: number): string {
   return n.toLocaleString();

@@ -13,28 +13,36 @@ import { FaqItem } from '@/components/ui/faq-item';
 */
 const FAQS = [
   {
-    q: 'Is FaqFlo really free?',
-    a: 'The generator is, and stays that way — three FAQ sets a day, no account, no card. Paid plans are for when you want the widget live on your own site with analytics behind it.',
+    q: 'Is the check really free?',
+    a: 'Yes — the visibility score and the FAQ generator are free, with no account and no card. The full audit, the publish-ready export, and citation tracking are the paid parts.',
   },
   {
     q: 'What is answer engine optimisation?',
-    a: 'It’s optimising your content so AI assistants like ChatGPT, Perplexity, and Google’s AI answers can find, understand, and quote you. It’s a different job from ranking in blue links, and FAQs are the format that does it best.',
+    a: 'It’s shaping your content so AI assistants like ChatGPT, Perplexity, and Google’s AI answers can find, understand, and quote you. It’s a different job from ranking in blue links, and question-and-answer content is the format that does it best.',
   },
   {
     q: 'Do I need a developer?',
-    a: 'No. Generating and copying FAQs takes no setup at all. When the widget launches, installing it is pasting one line into your site — the same as adding an analytics tag.',
+    a: 'No, and you don’t need a plugin either. You get a block of plain HTML and you paste it into your site’s own code block — the Custom HTML block in WordPress, a code block in Squarespace, an embed in Webflow. If you can paste a paragraph, you can do this.',
   },
   {
-    q: 'What content should I feed it?',
-    a: 'Anything that explains what you do: an about page, a product or service page, a blog post, your documentation. Around 200 words or more gives it enough to work from.',
+    q: 'Why not just a JavaScript widget?',
+    a: 'Because AI crawlers don’t run JavaScript. Anything a script draws after the page loads is invisible to exactly the systems this is meant to reach, so the answers have to be in the HTML itself. That’s the whole reason the delivery is a copy-paste block rather than one line of script.',
   },
   {
-    q: 'Can I edit the questions it writes?',
-    a: 'Always. Treat the output as a strong first draft — copy it out, cut what doesn’t fit, and rewrite anything in your own words. The FAQs are yours to publish and use commercially.',
+    q: 'Will this work on Wix or a site builder?',
+    a: 'Check where the HTML lands first. Some builders wrap embedded code in an iframe, and content inside an iframe isn’t read as part of your page — so it won’t earn you the citation. If yours does that, put the answers in a native text or HTML section instead of an embed.',
   },
   {
-    q: 'Which languages does it support?',
-    a: 'English, Spanish, French, German, Dutch, and Japanese, in a professional, casual, or authoritative tone. Pick once and the whole set matches.',
+    q: 'Does this give me FAQ rich results in Google?',
+    a: 'No, and anyone promising that is selling you something out of date — Google retired FAQ rich results. The schema we generate is for machine clarity: it tells an assistant which text is a question, which is the answer, and which business they belong to.',
+  },
+  {
+    q: 'What happens when my answers change?',
+    a: 'You re-paste the updated block. FAQs change rarely, so this is a couple of minutes a few times a year — and the dashboard tells you when your live copy no longer matches what you’ve got here.',
+  },
+  {
+    q: 'Does the content live on your site or mine?',
+    a: 'Yours, always, on your own domain. Hosting it on a FaqFlo subdomain would mean the citation and the click go to us instead of you, which would defeat the point.',
   },
 ];
 

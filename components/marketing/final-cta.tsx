@@ -30,19 +30,20 @@ export function FinalCta() {
               band, just under the 4.5 bar for small text. */}
           <span className="text-navy inline-flex items-center gap-2 text-[0.8125rem] font-semibold tracking-wide uppercase">
             <Sparkle className="h-3.5 w-3.5" />
-            Two minutes, start to finish
+            Takes about ten seconds
           </span>
 
           <h2 className="text-navy mt-4 text-[2.25rem] text-balance sm:text-[3rem]">
-            Paste one line. You&rsquo;re live.
+            Find out what AI sees.
           </h2>
           <p className="text-navy/75 mt-4 max-w-lg text-[1.0625rem] leading-relaxed">
-            Try the generator now — no account, no card, no catch.
+            One address, one honest answer about whether the engines can read you — no account, no
+            card, no catch.
           </p>
         </div>
 
-        <ButtonLink href="/#try" size="lg" arrow variant="dark" className="shrink-0">
-          Write my FAQs
+        <ButtonLink href="/#audit" size="lg" arrow variant="dark" className="shrink-0">
+          Check my site
         </ButtonLink>
       </div>
     </section>

@@ -16,10 +16,14 @@
  * trying to read user state) behind an empty dashboard.
  */
 
-import { buildSeed, emptyAnalytics, newId } from './seed';
-import type { DashboardData, FaqEntry, Site, User } from './types';
+import { contentHash } from './export';
+import { buildSeed, emptyTracking, newId } from './seed';
+import type { DashboardData, DiscoveredQuestion, FaqEntry, Site, User } from './types';
 
-const STORAGE_KEY = 'faqflo.dashboard.v1';
+// Bumped from v1: the model changed shape with the AEO pivot (widget traffic
+// out, citations in), and rehydrating a v1 payload into these types would fail
+// in a hundred small ways rather than one obvious one.
+const STORAGE_KEY = 'faqflo.dashboard.v2';
 
 function assertClient(fn: string): void {
   if (typeof window === 'undefined') {
@@ -33,8 +37,6 @@ function read(): DashboardData | null {
   try {
     return JSON.parse(raw) as DashboardData;
   } catch {
-    // Corrupt or half-written payload: drop it and reseed rather than leaving
-    // the dashboard permanently broken for that browser.
     window.localStorage.removeItem(STORAGE_KEY);
     return null;
   }
@@ -56,13 +58,11 @@ function now(): string {
   return new Date().toISOString();
 }
 
-/** Load, seeding on first visit. The only function that may run with no data. */
 export async function loadDashboard(): Promise<DashboardData> {
   assertClient('loadDashboard');
   return read() ?? write(buildSeed());
 }
 
-/** Wipe and reseed — the dev "reset demo data" action. */
 export async function resetDashboard(): Promise<DashboardData> {
   assertClient('resetDashboard');
   return write(buildSeed());
@@ -84,13 +84,15 @@ export async function createSite(input: NewSite): Promise<DashboardData> {
     name: input.name.trim(),
     domain: normalizeDomain(input.domain),
     createdAt: now(),
-    installedAt: null,
-    lastSeenAt: null,
+    getCitedAt: null,
+    publishedAt: null,
+    publishedHash: null,
+    lastAudit: null,
   };
   return write({
     ...data,
     sites: [...data.sites, site],
-    analytics: [...data.analytics, emptyAnalytics(site.id)],
+    tracking: [...data.tracking, emptyTracking(site.id)],
   });
 }
 
@@ -110,38 +112,60 @@ export async function updateSite(id: string, patch: Partial<NewSite>): Promise<D
   });
 }
 
-/**
- * Record that the widget has been seen on a site.
- *
- * In production this is written by the embed's first request, never by the
- * dashboard — installation is something we observe, not something the customer
- * asserts. It's exposed here so the demo has a way to reach the installed
- * state, and the Setup page labels that control as a demo action.
- */
-export async function markSiteInstalled(id: string): Promise<DashboardData> {
-  const data = requireData('markSiteInstalled');
-  const stamp = now();
-  return write({
-    ...data,
-    sites: data.sites.map((s) =>
-      s.id === id ? { ...s, installedAt: s.installedAt ?? stamp, lastSeenAt: stamp } : s,
-    ),
-  });
-}
-
-/** Deleting a site takes its FAQs and analytics with it — the cascade a
-    foreign key would do for us later. */
 export async function deleteSite(id: string): Promise<DashboardData> {
   const data = requireData('deleteSite');
   return write({
     ...data,
     sites: data.sites.filter((s) => s.id !== id),
     faqs: data.faqs.filter((f) => f.siteId !== id),
-    analytics: data.analytics.filter((a) => a.siteId !== id),
+    questions: data.questions.filter((q) => q.siteId !== id),
+    tracking: data.tracking.filter((t) => t.siteId !== id),
   });
 }
 
-/** Strip scheme, path and any trailing slash so the stored value is a bare host. */
+/**
+ * Grant or revoke Get Cited for one site.
+ *
+ * In production this is written by the payment webhook, never by the client —
+ * a browser that can grant its own entitlements has no entitlements. It exists
+ * here because the entitlement currently lives in localStorage anyway, and the
+ * UI labels the control as a demo action.
+ */
+export async function setGetCited(id: string, granted: boolean): Promise<DashboardData> {
+  const data = requireData('setGetCited');
+  return write({
+    ...data,
+    sites: data.sites.map((s) =>
+      s.id === id ? { ...s, getCitedAt: granted ? (s.getCitedAt ?? now()) : null } : s,
+    ),
+  });
+}
+
+/**
+ * Record that the customer has pasted the current export onto their live site.
+ *
+ * Storing the hash at this moment is what makes the staleness nudge work later:
+ * the content is re-pasted by hand, so the only way to know the live copy has
+ * drifted is to remember what it looked like when they said they pasted it.
+ */
+export async function markPublished(id: string): Promise<DashboardData> {
+  const data = requireData('markPublished');
+  const site = data.sites.find((s) => s.id === id);
+  if (!site) return data;
+
+  const hash = contentHash(
+    site,
+    data.faqs.filter((f) => f.siteId === id),
+  );
+
+  return write({
+    ...data,
+    sites: data.sites.map((s) =>
+      s.id === id ? { ...s, publishedAt: now(), publishedHash: hash } : s,
+    ),
+  });
+}
+
 export function normalizeDomain(input: string): string {
   return input
     .trim()
@@ -161,7 +185,6 @@ export type NewFaq = {
   language?: FaqEntry['language'];
 };
 
-/** Append entries to a site, keeping `position` contiguous. */
 export async function createFaqs(siteId: string, entries: NewFaq[]): Promise<DashboardData> {
   const data = requireData('createFaqs');
   const start = data.faqs.filter((f) => f.siteId === siteId).length;
@@ -200,7 +223,6 @@ export async function deleteFaq(id: string): Promise<DashboardData> {
   const target = data.faqs.find((f) => f.id === id);
   if (!target) return data;
 
-  // Close the gap left behind so positions stay contiguous within the site.
   const faqs = data.faqs
     .filter((f) => f.id !== id)
     .map((f) =>
@@ -212,7 +234,6 @@ export async function deleteFaq(id: string): Promise<DashboardData> {
   return write({ ...data, faqs });
 }
 
-/** Swap an entry with its neighbour. No-op at either end of the list. */
 export async function moveFaq(id: string, direction: 'up' | 'down'): Promise<DashboardData> {
   const data = requireData('moveFaq');
   const target = data.faqs.find((f) => f.id === id);
@@ -234,9 +255,34 @@ export async function moveFaq(id: string, direction: 'up' | 'down'): Promise<Das
   });
 }
 
+/* ------------------------------------------------------------ questions --- */
+
+/** Mark a discovered question as covered once an answer has been drafted. */
+export async function markQuestionCovered(id: string): Promise<DashboardData> {
+  const data = requireData('markQuestionCovered');
+  return write({
+    ...data,
+    questions: data.questions.map((q) => (q.id === id ? { ...q, covered: true } : q)),
+  });
+}
+
+export async function addQuestions(
+  siteId: string,
+  questions: { question: string; volume: number }[],
+): Promise<DashboardData> {
+  const data = requireData('addQuestions');
+  const created: DiscoveredQuestion[] = questions.map((q) => ({
+    id: newId('q'),
+    siteId,
+    question: q.question,
+    volume: q.volume,
+    covered: false,
+    addedAt: now(),
+  }));
+  return write({ ...data, questions: [...data.questions, ...created] });
+}
+
 /* ------------------------------------------------------------- selectors --- */
-/* Pure reads over a snapshot. They live here so the same "query" is used by
-   every page, rather than each one filtering the array its own way. */
 
 export function faqsForSite(data: DashboardData, siteId: string): FaqEntry[] {
   return data.faqs.filter((f) => f.siteId === siteId).sort((a, b) => a.position - b.position);
@@ -246,6 +292,12 @@ export function publishedFaqs(data: DashboardData, siteId: string): FaqEntry[] {
   return faqsForSite(data, siteId).filter((f) => f.status === 'published');
 }
 
-export function analyticsForSite(data: DashboardData, siteId: string) {
-  return data.analytics.find((a) => a.siteId === siteId) ?? emptyAnalytics(siteId);
+export function questionsForSite(data: DashboardData, siteId: string): DiscoveredQuestion[] {
+  return data.questions
+    .filter((q) => q.siteId === siteId)
+    .sort((a, b) => b.volume - a.volume);
+}
+
+export function trackingForSite(data: DashboardData, siteId: string) {
+  return data.tracking.find((t) => t.siteId === siteId) ?? emptyTracking(siteId);
 }

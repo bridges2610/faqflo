@@ -2,35 +2,36 @@
 
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useDashboard } from '@/lib/dashboard/provider';
-import { PLAN_LIMITS, nextPlanUp } from '@/lib/dashboard/plans';
+import { ENTITLEMENTS, type EntitlementId } from '@/lib/dashboard/plans';
 import { LockIcon } from './nav-icons';
 
 /**
  * What a locked feature shows instead of nothing.
  *
- * Three things every time: what it is, which plan has it, and the way to get
- * there. A disabled control with no explanation reads as a bug, and a feature
- * that's simply hidden can't be sold.
- *
- * Renders nothing when the current plan already includes the feature, so
- * callers can drop it in without a surrounding conditional.
+ * It names the entitlement, and the entitlement knows its own scope — so a
+ * Get Cited lock says "for this site" and a Stay Cited lock doesn't, because
+ * one is bought per site and the other covers the account. Getting that wrong
+ * in the copy would teach the customer the wrong mental model of what they own.
  */
 export function UpgradeCard({
+  entitlement,
   title,
   body,
-  /** Set when the block is a limit rather than a missing feature. */
+  siteName,
   compact = false,
 }: {
+  entitlement: EntitlementId;
   title: string;
   body: string;
+  /** Named when the entitlement is per-site, so the scope is unambiguous. */
+  siteName?: string;
   compact?: boolean;
 }) {
-  const { plan } = useDashboard();
-  const next = nextPlanUp(plan);
-  if (!next) return null;
-
-  const target = PLAN_LIMITS[next];
+  const target = ENTITLEMENTS[entitlement];
+  const scopeLine =
+    target.scope === 'site'
+      ? `Unlocks this for ${siteName ?? 'this site'} — bought once, not a subscription.`
+      : 'Covers every site on your account, for as long as you keep it running.';
 
   return (
     <Card tone="cloud" className={compact ? 'p-5' : 'p-7'}>
@@ -42,9 +43,9 @@ export function UpgradeCard({
           <h3 className="text-base leading-snug">{title}</h3>
           <p className="text-slate mt-1.5 text-sm leading-relaxed">{body}</p>
           <p className="text-slate mt-3 text-sm">
-            Included with <span className="text-navy font-semibold">{target.label}</span> · $
-            {target.monthly}/month
+            <span className="text-navy font-semibold">{target.label}</span> · {target.price}
           </p>
+          <p className="text-slate mt-1 text-xs leading-relaxed">{scopeLine}</p>
           <ButtonLink href="/#pricing" size="sm" className="mt-4">
             See {target.label}
           </ButtonLink>

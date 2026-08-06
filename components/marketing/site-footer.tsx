@@ -5,6 +5,7 @@ const COLUMNS = [
   {
     heading: 'Product',
     links: [
+      { href: '/#audit', label: 'Free visibility check' },
       { href: '/#try', label: 'Free generator' },
       { href: '/#how', label: 'How it works' },
       { href: '/#pricing', label: 'Pricing' },
@@ -27,8 +28,8 @@ export function SiteFooter() {
           <div className="max-w-xs">
             <Wordmark />
             <p className="text-slate mt-4 text-sm leading-relaxed">
-              Get your business listed on AI Search. Add your FAQs, paste one line, and let the answer
-              engines do the rest.
+              Get your business cited by AI. Check what the engines can see, publish answers they can
+              quote, and track whether they start naming you.
             </p>
           </div>
 

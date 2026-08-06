@@ -6,239 +6,241 @@ import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
 
 /*
-  ⚠️ PLACEHOLDER PRICES. These are stand-ins, not researched numbers. Set the
-  real figures before this goes live; they also have to match the Stripe prices
-  created in step 4.
+  ⚠️ PLACEHOLDER PRICES. Starting points to test, not researched numbers. Set
+  the real figures before launch; they also have to match the Stripe prices.
 
-  Annual rates are set explicitly rather than derived from a "months free"
-  formula, because the two no longer line up: $15/mo billed annually is $180
-  against $228 monthly — a $48 saving, or roughly 2.5 months free, not 2.
-  Storing both rates keeps the displayed numbers honest whatever the discount
-  works out to.
+  The structure is the decision, not the dollars: a one-time fee for the
+  discrete "get me set up" job, and a subscription for the continuous "keep me
+  cited" job. Tracking costs us money every month it runs — repeatedly asking
+  ChatGPT, Perplexity and Google what they say about a customer — so it can only
+  be funded by recurring revenue. One-time money cannot pay a forever cost.
+
+  The three tiers are no longer the same kind of thing, so `price` is a union
+  rather than a monthly figure with nulls in it. That's what stops a one-time
+  fee from being rendered as "$129 per month".
 */
+
+type Price =
+  | { kind: 'free' }
+  | { kind: 'oneTime'; amount: number }
+  // The annual figure is the total charged, not a derived per-month rate: $290
+  // a year displays as $24.17/month, and storing 24.17 would bill $290.04.
+  | { kind: 'subscription'; monthly: number; annualTotal: number };
+
 type Plan = {
   name: string;
-  /** null = free tier, so there's no annual variant to switch to. */
-  monthly: number | null;
-  /** Per-month rate when billed annually. */
-  annualMonthly: number | null;
+  price: Price;
   blurb: string;
   cta: string;
   href: string;
   featured: boolean;
   note: string | null;
   features: string[];
-  /** Optional extra sold alongside the plan, rendered as a callout under the
-      feature list. Only Business has one. */
-  addOn?: { label: string; body: string };
 };
 
 const PLANS: Plan[] = [
   {
     name: 'Free',
-    monthly: null,
-    annualMonthly: null,
-    blurb: 'The generator, whenever you need it.',
-    cta: 'Start generating',
-    href: '/#try',
+    price: { kind: 'free' },
+    blurb: 'Find out where you stand.',
+    cta: 'Check my site',
+    href: '/#audit',
     featured: false,
     note: null,
     features: [
-      'Free FAQ generator',
-      '3 FAQ sets a day',
-      'No account needed',
-      'Six languages, three tones',
+      'Quick AI-visibility score',
+      'Is your content readable without JavaScript',
+      'Are AI crawlers allowed in',
+      'FAQ generator, capped',
     ],
   },
   {
-    name: 'Pro',
-    monthly: 19,
-    annualMonthly: 15,
-    blurb: 'For one site that wants to get found.',
-    cta: 'Join the waitlist',
-    href: '/#try',
+    name: 'Get Cited',
+    price: { kind: 'oneTime', amount: 129 },
+    blurb: 'The one-off job of getting set up properly.',
+    cta: 'Get set up',
+    href: '/#audit',
     featured: true,
-    note: 'Most popular',
+    note: 'Start here',
     features: [
-      'Everything in Free',
-      '1 site',
-      'Embed widget — one line',
-      'Unlimited FAQs',
-      'AEO schema published for you',
-      'Basic analytics',
+      'Full audit, including whether AI cites you today',
+      'The questions people actually ask AI in your category',
+      'A complete answer-first FAQ set, written to be quoted',
+      'Publish-ready HTML for your own site',
+      'Entity schema and llms.txt',
+      'One site, yours to keep',
     ],
   },
   {
-    name: 'Business',
-    monthly: 49,
-    annualMonthly: 40,
-    blurb: 'For agencies and multi-site owners.',
-    cta: 'Join the waitlist',
-    href: '/#try',
+    name: 'Stay Cited',
+    price: { kind: 'subscription', monthly: 29, annualTotal: 290 },
+    blurb: 'Because being cited once is not the same as staying cited.',
+    cta: 'Keep me cited',
+    href: '/#audit',
     featured: false,
     note: null,
     features: [
-      'Everything in Pro',
-      'Up to 5 sites',
-      'Full analytics',
-      'Unanswered-question report',
-      // "available", not "Concierge setup" — a flat bullet would read as
-      // included in the $49, which is the one thing it must not imply.
-      'Concierge setup available',
+      'Citation tracking across ChatGPT, Perplexity and Google AI Overviews',
+      'Monthly re-audit as your site changes',
+      'Questions you are not being cited for, fed back into new answers',
+      'Alerts when a citation appears or disappears',
+      'Unlimited regeneration',
     ],
-    addOn: {
-      label: 'Concierge',
-      body: 'We generate your FAQs and install them on your site — you approve, we publish.',
-    },
   },
 ];
 
-/**
- * Whole dollars when the figure is exact, cents when it isn't.
- *
- * Deliberately never rounds to a whole number: $190/12 is $15.83, and showing
- * either "$16" or "$15" would misstate a real price.
- */
+/** Whole dollars when exact, cents when not — $290/12 is $24.17, not $24. */
 function money(value: number): string {
   return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`;
 }
 
-export function PricingTeaser() {
-  // Defaults to monthly so this section agrees with the price advertised
-  // everywhere else on the page.
-  const [annual, setAnnual] = useState(false);
+/**
+ * Price block per kind.
+ *
+ * The billing switch lives inside the subscription card rather than above all
+ * three. A page-level monthly/annual control would imply it changes the free
+ * tier and the one-time fee, and it changes neither.
+ */
+function PriceBlock({ price }: { price: Price }) {
+  const [annual, setAnnual] = useState(true); // annual is the default offer
 
+  if (price.kind === 'free') {
+    return (
+      <div className="mt-5">
+        <p className="flex items-baseline gap-1.5">
+          <span className="font-display text-navy text-[2.5rem] leading-none font-extrabold">
+            $0
+          </span>
+          <span className="text-slate text-sm">forever</span>
+        </p>
+        <p className="text-slate mt-1.5 h-4 text-xs leading-4">No account, no card</p>
+      </div>
+    );
+  }
+
+  if (price.kind === 'oneTime') {
+    return (
+      <div className="mt-5">
+        <p className="flex items-baseline gap-1.5">
+          <span className="font-display text-navy text-[2.5rem] leading-none font-extrabold">
+            {money(price.amount)}
+          </span>
+          <span className="text-slate text-sm">once</span>
+        </p>
+        <p className="text-slate mt-1.5 h-4 text-xs leading-4">Per site · not a subscription</p>
+      </div>
+    );
+  }
+
+  const perMonth = annual ? price.annualTotal / 12 : price.monthly;
+  const yearlySaving = price.monthly * 12 - price.annualTotal;
+
+  return (
+    <div className="mt-5">
+      <p className="flex items-baseline gap-1.5">
+        <span className="font-display text-navy text-[2.5rem] leading-none font-extrabold">
+          {money(perMonth)}
+        </span>
+        <span className="text-slate text-sm">per month</span>
+      </p>
+      <p className="text-slate mt-1.5 h-4 text-xs leading-4">
+        {annual
+          ? `${money(price.annualTotal)} billed yearly · save ${money(yearlySaving)}`
+          : 'Billed monthly · cancel any time'}
+      </p>
+
+      <div
+        className="bg-cloud border-line mt-3 inline-flex items-center gap-1 rounded-full border p-1"
+        role="group"
+        aria-label="Billing period for Stay Cited"
+      >
+        <button
+          type="button"
+          onClick={() => setAnnual(true)}
+          aria-pressed={annual}
+          className={`flex items-center gap-1.5 rounded-full py-1 pr-1.5 pl-3 text-xs transition-all duration-200 ${
+            annual ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
+          }`}
+        >
+          Annual
+          <span className="bg-accent-soft text-navy rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold">
+            2 months free
+          </span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setAnnual(false)}
+          aria-pressed={!annual}
+          className={`rounded-full px-3 py-1 text-xs transition-all duration-200 ${
+            !annual ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
+          }`}
+        >
+          Monthly
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export function PricingTeaser() {
   return (
     <section id="pricing" className="bg-tint-blue scroll-mt-24 px-5 py-20 sm:px-8 sm:py-24">
       <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-2xl text-center">
           <Badge>Pricing</Badge>
           <h2 className="mt-5 text-[2rem] text-balance sm:text-[2.5rem]">
-            Start free. Upgrade when it&rsquo;s working.
+            Get set up once. Stay cited monthly.
           </h2>
           <p className="text-slate mt-4 text-[1.0625rem] leading-relaxed">
-            The generator is free for good. Paid plans are for when you want your answers live on
-            your own site.
+            Checking where you stand is free. Getting properly set up is a one-off job with a
+            one-off price. Staying cited is the part that never finishes.
           </p>
         </div>
 
-        {/* Same segmented-control language as the generator's input switcher. */}
-        <div className="mt-9 flex justify-center">
-          <div
-            className="bg-cloud border-line inline-flex items-center gap-1 rounded-full border p-1"
-            role="group"
-            aria-label="Billing period"
-          >
-            <button
-              onClick={() => setAnnual(false)}
-              aria-pressed={!annual}
-              className={`rounded-full px-4 py-1.5 text-sm transition-all duration-200 ${
-                !annual
-                  ? 'text-navy shadow-soft bg-white font-semibold'
-                  : 'text-slate hover:text-navy'
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              onClick={() => setAnnual(true)}
-              aria-pressed={annual}
-              className={`flex items-center gap-2 rounded-full py-1.5 pr-2 pl-4 text-sm transition-all duration-200 ${
-                annual ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
-              }`}
-            >
-              Annual
-              {/* Not <Badge> — overriding its size/padding via className would
-                  collide with the component's own utilities at equal
-                  specificity, so which wins would depend on CSS output order.
-
-                  "2 months free" is a floor, not the exact figure: Pro actually
-                  saves 2.53 months' worth and Business 2.20. It understates the
-                  discount rather than overstating it, which is the safe
-                  direction for a claim — and the per-plan saving underneath
-                  each price is exact. */}
-              <span className="bg-accent-soft text-navy rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold">
-                2 months free
-              </span>
-            </button>
-          </div>
-        </div>
-
         <div className="mt-12 grid items-start gap-5 md:grid-cols-3">
-          {PLANS.map((plan) => {
-            const isPaid = plan.monthly !== null && plan.annualMonthly !== null;
-            const perMonth = !isPaid ? 0 : annual ? plan.annualMonthly! : plan.monthly!;
-            const billedYearly = !isPaid ? 0 : plan.annualMonthly! * 12;
-            const yearlySaving = !isPaid ? 0 : (plan.monthly! - plan.annualMonthly!) * 12;
+          {PLANS.map((plan) => (
+            <div
+              key={plan.name}
+              className={`relative rounded-2xl border bg-white p-7 ${
+                plan.featured
+                  ? 'border-primary shadow-hero md:-mt-4 md:pb-9'
+                  : 'border-line shadow-card'
+              }`}
+            >
+              {plan.note && (
+                <span className="bg-brand-gradient-bright text-navy shadow-soft absolute -top-3 left-7 rounded-full px-3 py-1 text-xs font-bold">
+                  {plan.note}
+                </span>
+              )}
 
-            return (
-              <div
-                key={plan.name}
-                className={`relative rounded-2xl border bg-white p-7 ${
-                  plan.featured
-                    ? 'border-primary shadow-hero md:-mt-4 md:pb-9'
-                    : 'border-line shadow-card'
-                }`}
+              <h3 className="text-xl">{plan.name}</h3>
+              <p className="text-slate mt-1.5 text-sm">{plan.blurb}</p>
+
+              <PriceBlock price={plan.price} />
+
+              <ButtonLink
+                href={plan.href}
+                variant={plan.featured ? 'primary' : 'ghost'}
+                className="mt-5 w-full"
               >
-                {plan.note && (
-                  <span className="bg-brand-gradient-bright text-navy shadow-soft absolute -top-3 left-7 rounded-full px-3 py-1 text-xs font-bold">
-                    {plan.note}
-                  </span>
-                )}
+                {plan.cta}
+              </ButtonLink>
 
-                <h3 className="text-xl">{plan.name}</h3>
-                <p className="text-slate mt-1.5 text-sm">{plan.blurb}</p>
-
-                <p className="mt-5 flex items-baseline gap-1.5">
-                  <span className="font-display text-navy text-[2.5rem] leading-none font-extrabold">
-                    {isPaid ? money(perMonth) : '$0'}
-                  </span>
-                  <span className="text-slate text-sm">{isPaid ? 'per month' : 'forever'}</span>
-                </p>
-
-                {/* Fixed height so the cards don't jump when the toggle flips.
-                    Both figures are exact — the annual rate is a set price, not
-                    a derived one, so $15 × 12 really is the $180 charged. */}
-                <p className="text-slate mt-1.5 h-4 text-xs leading-4">
-                  {isPaid && annual
-                    ? `${money(billedYearly)} billed yearly · save ${money(yearlySaving)}`
-                    : ''}
-                </p>
-
-                <ButtonLink
-                  href={plan.href}
-                  variant={plan.featured ? 'primary' : 'ghost'}
-                  className="mt-5 w-full"
-                >
-                  {plan.cta}
-                </ButtonLink>
-
-                <ul className="mt-7 space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="text-slate flex gap-2.5 text-sm">
-                      <Check className="text-primary mt-[0.35rem] shrink-0" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-
-                {plan.addOn && (
-                  <div className="border-line mt-7 border-t pt-5">
-                    <p className="text-slate font-mono text-xs tracking-wide uppercase">
-                      Optional add-on
-                    </p>
-                    <p className="text-navy mt-2 text-sm font-semibold">{plan.addOn.label}</p>
-                    <p className="text-slate mt-1 text-sm leading-relaxed">{plan.addOn.body}</p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+              <ul className="mt-7 space-y-3">
+                {plan.features.map((feature) => (
+                  <li key={feature} className="text-slate flex gap-2.5 text-sm">
+                    <Check className="text-primary mt-[0.35rem] shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
 
         <p className="text-slate mt-8 text-center text-sm">
-          Widget and analytics are coming soon — join the waitlist and we&rsquo;ll tell you the
-          moment they land.
+          Stay Cited builds on Get Cited — one sets your answers up properly, the other watches
+          whether the AI engines pick them up.
         </p>
       </div>
     </section>

@@ -28,19 +28,19 @@ const GA_ID = 'G-7JX690DTV7';
 export const metadata: Metadata = {
   metadataBase: new URL('https://www.faqflo.com'),
   title: {
-    default: 'FaqFlo — Get your business listed on AI Search',
+    default: 'FaqFlo — Get your business cited by AI',
     template: '%s — FaqFlo',
   },
   description:
-    'Add your FAQs, paste one line of code, and get your answers in front of people asking Google and AI assistants. Free FAQ generator, no signup.',
+    'Check whether ChatGPT, Perplexity and Google AI Overviews can read your site, publish answers they can quote on your own domain, and track whether they start citing you. Free visibility check, no signup.',
   // Favicon comes from app/icon.svg (the new bubble mark) — Next picks that up
   // automatically, so there's no `icons` entry pointing at the old PNG.
   openGraph: {
     type: 'website',
     siteName: 'FaqFlo',
-    title: 'FaqFlo — Get your business listed on AI Search',
+    title: 'FaqFlo — Get your business cited by AI',
     description:
-      'Add your FAQs, paste one line of code, and get found by Google and AI assistants.',
+      'Find out what AI can see on your site, publish answers it can quote, and track the citations.',
   },
 };
 

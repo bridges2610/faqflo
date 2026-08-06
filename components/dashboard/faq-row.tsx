@@ -51,7 +51,7 @@ export function FaqRow({
   return (
     <li className="py-4">
       <div className="flex items-start gap-3">
-        {/* Reorder — position decides the order in the widget and in the
+        {/* Reorder — position decides the order in the exported HTML and in the
             schema, so it's worth having where the eye already is. */}
         <div className="flex shrink-0 flex-col gap-0.5 pt-0.5">
           <button

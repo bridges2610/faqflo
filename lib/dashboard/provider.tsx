@@ -12,26 +12,32 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as store from './store';
-import { limitsFor, type PlanLimits } from './plans';
-import type { DashboardData, FaqEntry, PlanId, Site, SiteAnalytics } from './types';
+import type {
+  DashboardData,
+  DiscoveredQuestion,
+  FaqEntry,
+  Site,
+  SiteTracking,
+  Subscription,
+  User,
+} from './types';
 
 type Ctx = {
   loading: boolean;
   data: DashboardData | null;
+  user: User | null;
   /** Currently selected site, or null while loading / if none exist. */
   site: Site | null;
   sites: Site[];
   selectSite: (id: string) => void;
-  plan: PlanId;
-  limits: PlanLimits;
   /** FAQs for the selected site, already ordered by position. */
   faqs: FaqEntry[];
-  analytics: SiteAnalytics | null;
+  questions: DiscoveredQuestion[];
+  tracking: SiteTracking | null;
 
   addSite: (input: store.NewSite) => Promise<void>;
   renameSite: (id: string, patch: Partial<store.NewSite>) => Promise<void>;
   removeSite: (id: string) => Promise<void>;
-  markInstalled: (id: string) => Promise<void>;
   addFaqs: (siteId: string, entries: store.NewFaq[]) => Promise<void>;
   editFaq: (
     id: string,
@@ -39,7 +45,12 @@ type Ctx = {
   ) => Promise<void>;
   removeFaq: (id: string) => Promise<void>;
   moveFaq: (id: string, direction: 'up' | 'down') => Promise<void>;
-  setPlan: (plan: PlanId) => Promise<void>;
+  coverQuestion: (id: string) => Promise<void>;
+  markPublished: (siteId: string) => Promise<void>;
+
+  /** Demo-only entitlement controls — see the switcher in the header. */
+  setGetCited: (siteId: string, granted: boolean) => Promise<void>;
+  setSubscription: (subscription: Subscription) => Promise<void>;
   resetDemo: () => Promise<void>;
 };
 
@@ -71,43 +82,46 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const site = useMemo(
-    () => data?.sites.find((s) => s.id === siteId) ?? null,
-    [data, siteId],
-  );
+  const site = useMemo(() => data?.sites.find((s) => s.id === siteId) ?? null, [data, siteId]);
 
   const faqs = useMemo(
     () => (data && site ? store.faqsForSite(data, site.id) : []),
     [data, site],
   );
 
-  const analytics = useMemo(
-    () => (data && site ? store.analyticsForSite(data, site.id) : null),
+  const questions = useMemo(
+    () => (data && site ? store.questionsForSite(data, site.id) : []),
     [data, site],
   );
 
-  const plan = data?.user.plan ?? 'pro';
+  const tracking = useMemo(
+    () => (data && site ? store.trackingForSite(data, site.id) : null),
+    [data, site],
+  );
 
   const value: Ctx = {
     loading: data === null,
     data,
+    user: data?.user ?? null,
     site,
     sites: data?.sites ?? [],
     selectSite: setSiteId,
-    plan,
-    limits: limitsFor(plan),
     faqs,
-    analytics,
+    questions,
+    tracking,
 
     addSite: (input) => apply(() => store.createSite(input)),
     renameSite: (id, patch) => apply(() => store.updateSite(id, patch)),
     removeSite: (id) => apply(() => store.deleteSite(id)),
-    markInstalled: (id) => apply(() => store.markSiteInstalled(id)),
     addFaqs: (id, entries) => apply(() => store.createFaqs(id, entries)),
     editFaq: (id, patch) => apply(() => store.updateFaq(id, patch)),
     removeFaq: (id) => apply(() => store.deleteFaq(id)),
     moveFaq: (id, direction) => apply(() => store.moveFaq(id, direction)),
-    setPlan: (next) => apply(() => store.updateUser({ plan: next })),
+    coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
+    markPublished: (id) => apply(() => store.markPublished(id)),
+
+    setGetCited: (id, granted) => apply(() => store.setGetCited(id, granted)),
+    setSubscription: (subscription) => apply(() => store.updateUser({ subscription })),
     resetDemo: () => apply(() => store.resetDashboard()),
   };
 

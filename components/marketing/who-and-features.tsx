@@ -27,43 +27,41 @@ type Audience = { who: string; line: string };
 
 const AUDIENCES: Audience[] = [
   {
-    who: 'Service businesses',
-    line: 'Trades, clinics, contractors — anyone answering “do you do X in Y?” all day.',
+    who: 'Small businesses',
+    line: 'Anyone who would rather be the answer than pay an SEO agency to chase links.',
+  },
+  {
+    who: 'Local services',
+    line: 'Trades, clinics, contractors — “who does X in Y?” is the question AI gets asked most.',
   },
   {
     who: 'E-commerce',
-    line: 'Product pages where sizing, shipping and returns decide the sale.',
-  },
-  {
-    who: 'Agencies',
-    line: 'Ship FAQs across every client site without writing them from scratch.',
-  },
-  {
-    who: 'Freelancers',
-    line: 'One-person shops that need to look like they’ve thought of everything.',
+    line: 'Sizing, shipping and returns questions that decide the sale before anyone visits.',
   },
   {
     who: 'SaaS',
-    line: 'Turn docs and onboarding questions into answers assistants can quote.',
+    line: 'Turn docs and onboarding questions into answers an assistant can quote verbatim.',
   },
   {
-    who: 'Bloggers & creators',
-    line: 'Give every post a Q&A block an answer engine can lift.',
+    who: 'Creators',
+    line: 'Be the source an assistant names, instead of the page it quietly summarised.',
+  },
+  {
+    who: 'Agencies',
+    line: 'Run the same loop across client sites, with the citations to show for it.',
   },
 ];
 
-/* Paid features only — the free generator sells itself two sections up, and
-   repeating it here would bury the reason to upgrade. Every line matches a
-   bullet on a paid plan in pricing-teaser.tsx, so the two sections can't drift.
-   None of these have shipped yet, which is why the column is tagged once at the
-   top rather than on all six rows. */
+/* Paid features only — the free score and the generator sell themselves higher
+   up the page. Every line matches a bullet on a paid plan in
+   pricing-teaser.tsx, so the two sections can't drift apart. */
 const FEATURES = [
-  'Premium FAQ generator (unlimited)',
-  'Embed widget — one line of code',
-  'Style controls to match your site',
-  'FAQ schema published for you',
-  'Analytics on what people actually ask',
-  'AEO opportunities — questions you aren’t answering yet',
+  'Full audit — including whether AI cites you today',
+  'The questions people actually ask AI in your category',
+  'Answer-first Q&A written to be quoted',
+  'Publish-ready HTML for your own domain',
+  'Entity schema and llms.txt',
+  'Citation tracking across ChatGPT, Perplexity and Google AI Overviews',
 ];
 
 /** Small caps kicker above each column heading, as used on the AEO panels. */
@@ -87,9 +85,9 @@ export function WhoAndFeatures() {
             </span>
           </h2>
           <p className="text-slate mt-6 text-[1.0625rem] leading-relaxed">
-            If people ask questions about what you do, they&rsquo;re asking somewhere — a search
-            box, a chat window, your inbox. FaqFlo turns those questions into answers that live on
-            your page.
+            If people ask questions about what you do, more of them are asking an assistant every
+            month. FaqFlo turns what you know into answers those assistants can read, quote, and
+            credit back to you.
           </p>
         </div>
 
@@ -115,7 +113,7 @@ export function WhoAndFeatures() {
               <Kicker>Features</Kicker>
               <Badge tone="neutral">Coming soon</Badge>
             </div>
-            <h3 className="mt-3 text-xl">What a paid plan adds</h3>
+            <h3 className="mt-3 text-xl">What Get Cited and Stay Cited add</h3>
 
             <ul className="mt-6 space-y-3">
               {FEATURES.map((feature) => (
@@ -133,8 +131,8 @@ export function WhoAndFeatures() {
               >
                 Get started today
               </Link>{' '}
-              and grow your visibility from there — every answer you publish is one more question
-              you get found for.
+              and grow your visibility from there — every answer you publish is one more question an
+              assistant can cite you for.
             </p>
           </Card>
         </div>

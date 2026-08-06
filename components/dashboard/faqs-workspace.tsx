@@ -56,7 +56,7 @@ export function FaqsWorkspace() {
     <>
       <PageHeader
         title="FAQs"
-        description={`Questions and answers for ${site.name}. Published entries appear in your widget and in the schema answer engines read.`}
+        description={`Questions and answers for ${site.name}. Published entries are what goes into the export you paste onto your site — drafts stay here.`}
       />
 
       <div className="space-y-5">

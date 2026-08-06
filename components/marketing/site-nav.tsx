@@ -29,8 +29,8 @@ export function SiteNav() {
           ))}
         </ul>
 
-        <ButtonLink href="/#try" size="sm" arrow>
-          Try it free
+        <ButtonLink href="/#audit" size="sm" arrow>
+          Check my site
         </ButtonLink>
       </nav>
     </header>

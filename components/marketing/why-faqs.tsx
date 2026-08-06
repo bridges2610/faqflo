@@ -14,18 +14,18 @@ import { Underline } from '@/components/ui/doodle';
 const STEPS = [
   {
     n: '01',
-    title: 'They ask something specific',
-    body: '"Do you provide [service] in [city]?" Nobody browses a service or product page hoping to stumble on it — they arrive with an exact question already in mind.',
+    title: 'They ask an assistant, not a search box',
+    body: '"Who does [service] in [city]?" There is no list of ten links to work through any more — there is one answer, and either you are in it or you are not.',
   },
   {
     n: '02',
-    title: 'They want it answered on your page',
-    body: 'Not on a phone call, not in a PDF, not three scrolls down. If the answer isn’t right there in plain words, they leave and ask someone who has it.',
+    title: 'The assistant needs something quotable',
+    body: 'It is looking for a specific question with a short, factual answer attached. Marketing prose spread across a page gives it nothing it can lift.',
   },
   {
     n: '03',
-    title: 'AI reads that Q&A and quotes it',
-    body: 'A two-sentence answer is easy to lift into a response. FaqFlo publishes yours with proper FAQ schema, so assistants can tell exactly what’s a question and what’s the answer.',
+    title: 'A Q&A block is exactly that shape',
+    body: 'Question, answer, on your own domain, in plain HTML a crawler can read on the first request. That is why FAQs are the vehicle — not because FAQs are the point.',
   },
 ];
 
@@ -76,18 +76,20 @@ export function WhyFaqs() {
     <section id="why-faqs" className="scroll-mt-24 bg-white px-5 py-20 sm:px-8 sm:py-24">
       <div className="mx-auto max-w-6xl">
         <div className="max-w-2xl">
-          <p className="text-primary text-xs font-bold tracking-[0.14em] uppercase">Why FAQs</p>
+          <p className="text-primary text-xs font-bold tracking-[0.14em] uppercase">
+            Why Q&amp;A
+          </p>
           <h2 className="mt-4 text-[2rem] text-balance sm:text-[2.5rem]">
-            Why are FAQs so{' '}
+            Why answers, and not more{' '}
             <span className="relative inline-block">
-              important
+              content
               <Underline className="text-accent absolute -bottom-2 left-0 h-3.5 w-full" />
             </span>
             ?
           </h2>
           <p className="text-slate mt-6 text-[1.0625rem] leading-relaxed">
-            Because your customers aren&rsquo;t browsing. They&rsquo;re asking — and every question
-            they ask is a chance to be the one who answered it.
+            Because your customers aren&rsquo;t browsing. They&rsquo;re asking a machine — and that
+            machine is looking for something short enough to quote and clear enough to trust.
           </p>
         </div>
 

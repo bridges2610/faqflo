@@ -23,6 +23,15 @@ export const RATE_LIMIT = 3;
  */
 export const DASHBOARD_RATE_LIMIT = 40;
 
+/**
+ * Ceiling for the free visibility audit.
+ *
+ * Higher than the generator's limit because an audit costs us two HTTP fetches
+ * rather than a model call, and it's the top of the funnel — a stranger kicking
+ * the tyres on a few sites is the behaviour we want.
+ */
+export const AUDIT_RATE_LIMIT = 20;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 

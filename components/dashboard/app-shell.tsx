@@ -5,17 +5,19 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Wordmark } from '@/components/ui/wordmark';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { PLAN_LIMITS } from '@/lib/dashboard/plans';
+import { hasStayCited } from '@/lib/dashboard/plans';
 import {
   AeoIcon,
   ChartIcon,
   CloseIcon,
   FaqIcon,
+  GlobeIcon,
   HomeIcon,
   MenuIcon,
+  SearchIcon,
   SetupIcon,
 } from './nav-icons';
-import { PlanSwitcher } from './plan-badge';
+import { EntitlementSwitcher } from './plan-badge';
 import { SiteSwitcher } from './site-switcher';
 
 type NavItem = {
@@ -24,12 +26,17 @@ type NavItem = {
   Icon: (props: { className?: string }) => React.ReactElement;
 };
 
+/* The loop, in order: audit → discover → generate → publish → track. The nav
+   is the product's shape, so someone who has never read the marketing page can
+   still tell what this thing does from the sidebar alone. */
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Overview', Icon: HomeIcon },
-  { href: '/dashboard/faqs', label: 'FAQs', Icon: FaqIcon },
-  { href: '/dashboard/setup', label: 'Setup', Icon: SetupIcon },
-  { href: '/dashboard/aeo', label: 'AEO', Icon: AeoIcon },
-  { href: '/dashboard/analytics', label: 'Analytics', Icon: ChartIcon },
+  { href: '/dashboard/audit', label: 'Audit', Icon: AeoIcon },
+  { href: '/dashboard/questions', label: 'Questions', Icon: SearchIcon },
+  { href: '/dashboard/faqs', label: 'Answers', Icon: FaqIcon },
+  { href: '/dashboard/publish', label: 'Publish', Icon: SetupIcon },
+  { href: '/dashboard/tracking', label: 'Tracking', Icon: ChartIcon },
+  { href: '/dashboard/sites', label: 'Sites', Icon: GlobeIcon },
 ];
 
 /** Overview owns the exact path; the rest own their subtree. */
@@ -65,23 +72,33 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Plan summary + upgrade path, pinned to the bottom of the sidebar. */
+/**
+ * What this account owns, pinned to the bottom of the sidebar.
+ *
+ * Says both scopes explicitly, because they're different: Get Cited is counted
+ * per site, Stay Cited is on or off for the whole account.
+ */
 function PlanFooter() {
-  const { plan, limits, sites } = useDashboard();
+  const { sites, user } = useDashboard();
+
+  const setUp = sites.filter((s) => s.getCitedAt).length;
+  const tracking = hasStayCited(user);
 
   return (
     <div className="border-line bg-cloud rounded-xl border p-4">
-      <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Your plan</p>
-      <p className="text-navy mt-1 font-semibold">{limits.label}</p>
-      <p className="text-slate mt-1 text-xs leading-relaxed">
-        {sites.length} of {limits.sites} {limits.sites === 1 ? 'site' : 'sites'} used
+      <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Your account</p>
+      <p className="text-navy mt-1 text-sm font-semibold">
+        {setUp} of {sites.length} {sites.length === 1 ? 'site' : 'sites'} set up
       </p>
-      {plan === 'pro' && (
+      <p className="text-slate mt-1 text-xs leading-relaxed">
+        {tracking ? 'Stay Cited is active' : 'Tracking is off'}
+      </p>
+      {!tracking && (
         <Link
           href="/#pricing"
           className="text-primary hover:text-primary-hover mt-3 inline-block text-xs font-semibold"
         >
-          Upgrade to {PLAN_LIMITS.business.label} →
+          Add Stay Cited →
         </Link>
       )}
     </div>
@@ -165,7 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-3">
-              <PlanSwitcher />
+              <EntitlementSwitcher />
             </div>
           </div>
         </header>

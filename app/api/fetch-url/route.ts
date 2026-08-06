@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import { MAX_CONTENT_CHARS } from '@/lib/faq';
 
 const FETCH_TIMEOUT_MS = 10_000;
@@ -45,18 +46,15 @@ export async function POST(request: Request) {
   const { url } = (body ?? {}) as Record<string, unknown>;
   if (typeof url !== 'string' || !url) return fail('URL is required.');
 
-  let parsed: URL;
-  try {
-    parsed = new URL(url);
-  } catch {
-    return fail('Invalid URL.');
-  }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    return fail('URL must use http or https.');
-  }
+  // This fetch happens from our server, inside our network, to an address a
+  // stranger typed. Without this guard it will happily fetch the cloud metadata
+  // endpoint or something on the private network and hand back the body.
+  const checked = checkPublicHttpUrl(url);
+  if (!checked.ok) return fail(checked.reason);
+  const parsed = checked.url;
 
   try {
-    const pageRes = await fetch(url, {
+    const pageRes = await fetch(parsed.toString(), {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FaqFlo/2.0)' },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       redirect: 'follow',

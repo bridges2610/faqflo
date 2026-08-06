@@ -2,43 +2,58 @@
 
 import { Badge } from '@/components/ui/badge';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { PLAN_LIMITS } from '@/lib/dashboard/plans';
-import type { PlanId } from '@/lib/dashboard/types';
+import { hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
 
-const PLAN_IDS = Object.keys(PLAN_LIMITS) as PlanId[];
-
-/** Read-only plan pill. */
+/** What this account and this site are entitled to, at a glance. */
 export function PlanBadge() {
-  const { plan } = useDashboard();
-  return <Badge tone={plan === 'business' ? 'cyan' : 'blue'}>{PLAN_LIMITS[plan].label}</Badge>;
+  const { user, site } = useDashboard();
+
+  if (hasStayCited(user)) return <Badge tone="cyan">Stay Cited</Badge>;
+  if (hasGetCited(site)) return <Badge tone="blue">Get Cited</Badge>;
+  return <Badge tone="neutral">Free</Badge>;
 }
 
 /**
- * DEV ONLY — flips the signed-in user between plans so both tiers can be seen
- * without editing a constant.
+ * DEV ONLY — toggles the two entitlements so both the unlocked and locked
+ * states can be seen without buying anything.
  *
- * ⚠️ DELETE THIS BEFORE LAUNCH, along with its use in app-shell.tsx. Once plans
- * come from Stripe, the client must never be able to set its own tier; this
- * exists purely because the plan currently lives in localStorage anyway.
+ * ⚠️ DELETE THIS BEFORE LAUNCH, along with its use in app-shell.tsx and the
+ * store functions it calls. Once entitlements come from Stripe, a client that
+ * can grant its own is a client with no entitlements at all. It exists only
+ * because they currently live in localStorage anyway.
  */
-export function PlanSwitcher() {
-  const { plan, setPlan } = useDashboard();
+export function EntitlementSwitcher() {
+  const { user, site, setGetCited, setSubscription } = useDashboard();
+
+  const getCited = hasGetCited(site);
+  const stayCited = hasStayCited(user);
 
   return (
-    <label className="border-line bg-cloud flex items-center gap-2 rounded-full border py-1 pr-1 pl-3">
+    <div className="border-line bg-cloud flex items-center gap-1 rounded-full border py-1 pr-1 pl-3">
       <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Dev</span>
-      <select
-        value={plan}
-        onChange={(e) => setPlan(e.target.value as PlanId)}
-        aria-label="Preview plan (development only)"
-        className="text-navy focus:border-primary rounded-full border border-transparent bg-white px-2.5 py-1 text-sm font-semibold outline-none"
+
+      <button
+        onClick={() => site && setGetCited(site.id, !getCited)}
+        disabled={!site}
+        aria-pressed={getCited}
+        title="Get Cited is bought per site"
+        className={`rounded-full px-2.5 py-1 text-xs transition-all duration-200 disabled:opacity-40 ${
+          getCited ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
+        }`}
       >
-        {PLAN_IDS.map((id) => (
-          <option key={id} value={id}>
-            {PLAN_LIMITS[id].label}
-          </option>
-        ))}
-      </select>
-    </label>
+        Get Cited
+      </button>
+
+      <button
+        onClick={() => setSubscription(stayCited ? 'none' : 'stay_cited')}
+        aria-pressed={stayCited}
+        title="Stay Cited is an account subscription"
+        className={`rounded-full px-2.5 py-1 text-xs transition-all duration-200 ${
+          stayCited ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
+        }`}
+      >
+        Stay Cited
+      </button>
+    </div>
   );
 }

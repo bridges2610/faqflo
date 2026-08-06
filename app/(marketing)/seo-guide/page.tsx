@@ -114,15 +114,21 @@ export default function SeoGuide() {
           </ol>
         </Section>
 
-        <Section label="Technical edge" title="FAQ schema markup">
+        <Section label="Technical edge" title="Schema markup, and what it actually does now">
           <P>
-            Adding FAQ schema — a small piece of code — tells Google explicitly that your content
-            contains questions and answers. That can trigger rich results, showing your FAQs right
-            in the listings, taking up more space and earning more clicks.
+            Schema — a small block of structured data — tells a machine which text is a question,
+            which is the answer, and which business they belong to. It removes the guesswork for
+            anything reading your page programmatically.
           </P>
           <P>
-            Most platforms (WordPress, Webflow, Squarespace) have plugins for this. FaqFlo publishes
-            it for you automatically.
+            One correction worth making, because plenty of advice hasn&rsquo;t caught up:{' '}
+            <strong>Google retired FAQ rich results</strong>. Schema will not put a dropdown of your
+            questions under your search listing any more. It is worth adding for machine clarity —
+            which is what answer engines lean on — not for a listing that no longer exists.
+          </P>
+          <P>
+            You don&rsquo;t need a plugin for it. It&rsquo;s a block of markup you paste into your
+            page alongside the answers themselves, and FaqFlo generates both for you.
           </P>
         </Section>
 

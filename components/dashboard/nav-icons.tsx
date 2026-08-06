@@ -57,6 +57,25 @@ export function AeoIcon({ className = '' }: IconProps) {
   );
 }
 
+export function SearchIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <circle cx="8.8" cy="8.8" r="5.3" />
+      <path d="M12.8 12.8 17 17" />
+    </svg>
+  );
+}
+
+export function GlobeIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <circle cx="10" cy="10" r="6.5" />
+      <path d="M3.5 10h13" />
+      <path d="M10 3.5c1.8 2 2.6 4.2 2.6 6.5S11.8 16.5 10 16.5 7.4 12.3 7.4 10 8.2 3.5 10 3.5Z" />
+    </svg>
+  );
+}
+
 export function ChartIcon({ className = '' }: IconProps) {
   return (
     <svg {...BASE} className={className}>
