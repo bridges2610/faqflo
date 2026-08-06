@@ -30,9 +30,24 @@ export function scoreOf(findings: Finding[]): number | null {
   return Math.round((earned / total) * 100);
 }
 
+/**
+ * Evidence lines repeat far more than they used to.
+ *
+ * At five pages a duplicate was a curiosity; at a hundred it's the norm — the
+ * same heading, the same missing tag, the same complaint over and over — and a
+ * list showing one example four times is worse than useless, because it looks
+ * like four findings. Deduped once here rather than at each of the forty places
+ * a finding gets built.
+ */
+function dedupeEvidence(finding: Finding): Finding {
+  if (!finding.evidence || finding.evidence.length < 2) return finding;
+  const unique = [...new Set(finding.evidence)];
+  return unique.length === finding.evidence.length ? finding : { ...finding, evidence: unique };
+}
+
 export function buildPillars(findings: Finding[]): PillarResult[] {
   return PILLARS.map((pillar) => {
-    const mine = findings.filter((f) => f.pillar === pillar.id);
+    const mine = findings.filter((f) => f.pillar === pillar.id).map(dedupeEvidence);
     return {
       id: pillar.id,
       label: pillar.label,

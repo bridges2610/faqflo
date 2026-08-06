@@ -27,6 +27,11 @@ export function structureChecks(set: PageSet): Finding[] {
     const questionHeadings = pages.flatMap((p) =>
       p.facts.headings.filter((h) => isQuestion(h.text)).map((h) => `${h.text} — ${p.finalUrl}`),
     );
+    // Distinct questions, so the sample shows five different ones rather than
+    // the same site-wide heading five times.
+    const distinctQuestions = [...new Set(pages.flatMap((p) =>
+      p.facts.headings.filter((h) => isQuestion(h.text)).map((h) => h.text),
+    ))];
 
     findings.push({
       id: 'question-headings',
@@ -40,7 +45,7 @@ export function structureChecks(set: PageSet): Finding[] {
             ? `Only ${questionHeadings.length} heading is phrased as a question. Assistants match a user's question against your headings, so a handful more is the cheapest win here.`
             : 'No heading anywhere is phrased as a question. An assistant has nothing to match a real question against.',
       weight: 3,
-      evidence: questionHeadings.slice(0, 5),
+      evidence: distinctQuestions.slice(0, 5),
     });
   }
 
@@ -48,7 +53,15 @@ export function structureChecks(set: PageSet): Finding[] {
   {
     let answered = 0;
     let tooLong = 0;
-    const examples: string[] = [];
+    /*
+      A Set, so the four examples are four DIFFERENT questions.
+
+      Boilerplate headings — an FAQ block in a footer, a repeated section title —
+      appear on every page of a site. Filling the list in encounter order gave
+      the same line four times over, which reads as four problems and teaches
+      the reader nothing.
+    */
+    const examples = new Set<string>();
 
     for (const page of pages) {
       for (const pair of questionAnswerPairs(page.facts)) {
@@ -57,7 +70,7 @@ export function structureChecks(set: PageSet): Finding[] {
         if (words <= ANSWER_FIRST_WORDS) answered += 1;
         else {
           tooLong += 1;
-          if (examples.length < 4) examples.push(`${pair.question} — ${words} words before a break`);
+          if (examples.size < 4) examples.add(`${pair.question} — ${words} words before a break`);
         }
       }
     }
@@ -83,7 +96,7 @@ export function structureChecks(set: PageSet): Finding[] {
                 ? `${answered} of ${total} questions are answered in a short paragraph directly underneath, which is the form that gets quoted.`
                 : `${tooLong} of ${total} questions run into long prose before answering. An assistant lifts the first sentences it finds — make those the answer.`,
             weight: 3,
-            evidence: examples,
+            evidence: [...examples],
           },
     );
   }

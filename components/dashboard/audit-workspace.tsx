@@ -193,8 +193,11 @@ function FindingRow({ finding }: { finding: Finding }) {
         <p className="text-slate mt-0.5 text-sm leading-relaxed">{finding.detail}</p>
         {finding.evidence && finding.evidence.length > 0 && (
           <ul className="text-slate mt-1.5 space-y-0.5">
-            {finding.evidence.map((e) => (
-              <li key={e} className="font-mono text-[0.6875rem] break-all">
+            {/* Index keys: this is a static display list with no reordering and
+                no identity of its own, and evidence lines are not guaranteed
+                unique — the same heading really can appear on several pages. */}
+            {finding.evidence.map((e, i) => (
+              <li key={`${i}-${e}`} className="font-mono text-[0.6875rem] break-all">
                 {e}
               </li>
             ))}
