@@ -349,6 +349,12 @@ export function AuditWorkspace() {
                     {shown.crawled.length === 1 ? 'page' : 'pages'} · {timeAgo(shown.checkedAt)}.
                     Anything we couldn&rsquo;t measure is marked and left out of the score.
                   </p>
+
+                  {/* The way out of the jargon. Prominent, because most people
+                      opening an audit want the answer, not the evidence. */}
+                  <ButtonLink href="/dashboard/audit/summary" size="sm" className="mt-4">
+                    What this means for me →
+                  </ButtonLink>
                 </div>
               </div>
             </Card>

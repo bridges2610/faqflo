@@ -205,3 +205,157 @@
     pointer-events: none;
   }
 }
+
+/*
+  Printing the audit summary.
+
+  This page gets handed to someone — printed, or saved as a PDF and emailed —
+  so on paper it should read as a consultant's report, not as a screenshot of a
+  web app. Screen chrome goes, the card metaphor goes (floating panels with
+  shadows print as grey smudges), and what's left is a masthead, ruled sections
+  and one column of prose.
+
+  Rules are scoped to .print-report rather than styling every card in the app,
+  so nothing here can quietly reformat a page it was never designed for.
+*/
+@media print {
+  @page {
+    margin: 14mm 14mm 16mm;
+  }
+
+  /* App chrome, and anything that can't be clicked on paper. */
+  aside,
+  header,
+  nextjs-portal,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #111827;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  main > div {
+    max-width: none !important;
+  }
+
+  /* ---- The report itself ------------------------------------------------ */
+
+  .print-report {
+    font-size: 10.5pt;
+    line-height: 1.5;
+  }
+
+  /* Cards flatten into sections: no border, no radius, no shadow, no inset. */
+  .print-report > div > div,
+  .print-report > div {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  .print-report > div {
+    background: #fff !important;
+    border: 0 !important;
+    border-top: 1px solid #d1d5db !important;
+    padding: 6mm 0 0 !important;
+    margin-top: 6mm !important;
+    /* A section may flow across a page — forcing it whole is what left the
+       first page two-thirds empty. Its rows are what must stay intact. */
+    break-inside: auto;
+  }
+
+  /* The masthead: no rule above it, and it sets the tone for the document. */
+  .print-report > div:first-child {
+    border-top: 0 !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+    border-bottom: 2px solid #0b1b3a !important;
+    padding-bottom: 4mm !important;
+  }
+
+  /* The verdict block leads, so it gets air and no rule of its own. */
+  .print-report > div:nth-child(2) {
+    border-top: 0 !important;
+    margin-top: 4mm !important;
+  }
+
+  .print-report h1 {
+    font-size: 20pt;
+  }
+
+  .print-report h2 {
+    font-size: 12pt;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .print-report h3 {
+    font-size: 11pt;
+  }
+
+  /* A heading stranded at the foot of a page is the classic print failure. */
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+    break-inside: avoid;
+  }
+
+  /* Two columns for the short "what's working" lines — it's a long list of
+     one-liners, and a single column of them wastes half the page. */
+  .print-report .print-columns {
+    columns: 2;
+    column-gap: 10mm;
+  }
+
+  /* Individual items stay whole; sections don't have to. */
+  .print-report li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-report p {
+    orphans: 2;
+    widows: 2;
+  }
+
+  /* Surfaces that exist to tint the screen just cost ink. */
+  .print-report [class*='bg-cloud'],
+  .print-report [class*='bg-tint'],
+  .print-report [class*='bg-primary-soft'],
+  .print-report [class*='bg-accent-soft'],
+  .print-report [class*='bg-success'] {
+    background: #fff !important;
+  }
+
+  /* The numbered steps keep their shape — they're the spine of the last
+     section — but as an outline rather than a filled disc. */
+  .print-report ol li > div > span:first-child,
+  .print-report .print-step {
+    border: 1px solid #0b1b3a;
+    color: #0b1b3a !important;
+  }
+
+  /* Snippets are the one thing that must survive verbatim, so they keep a
+     border and a background you can see the edges of. */
+  .print-report pre {
+    border: 1px solid #d1d5db !important;
+    background: #f9fafb !important;
+    white-space: pre-wrap;
+    word-break: break-all;
+    break-inside: avoid;
+  }
+
+  /* The closing line sits at the end of the flow, not pinned to a page. */
+  .print-report > p:last-child {
+    margin-top: 8mm;
+    border-top: 1px solid #d1d5db;
+    padding-top: 3mm;
+  }
+}
