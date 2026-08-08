@@ -13,7 +13,13 @@ import { authorityChecks, citationChecks } from './checks/identity';
 import { seoChecks } from './checks/seo';
 import { structureChecks } from './checks/structure';
 import { technicalChecks } from './checks/technical';
-import { fetchPageSet, fetchQuick, type CrawlBudget, type PageSet } from './fetcher';
+import {
+  fetchPageSet,
+  fetchQuick,
+  type CrawlBudget,
+  type FetchFailure,
+  type PageSet,
+} from './fetcher';
 import { buildPillars, overallScore } from './score';
 import {
   QUICK_FINDING_IDS,
@@ -47,12 +53,25 @@ const LOCKED_VISIBILITY: Finding = {
   weight: 0,
 };
 
-export async function runAudit(entryUrl: string, options: RunOptions): Promise<AuditReport | null> {
-  const set =
+export type AuditResult =
+  | { ok: true; report: AuditReport }
+  | { ok: false; failure: FetchFailure };
+
+/**
+ * Failure carries a reason rather than a null.
+ *
+ * A null told the caller only that there was no report, so the route said
+ * "check the address" to a firewall block and a typo alike. The reason travels
+ * up untouched; turning it into words is the route's job, since that's where
+ * the audience is.
+ */
+export async function runAudit(entryUrl: string, options: RunOptions): Promise<AuditResult> {
+  const fetched =
     options.depth === 'quick'
       ? await fetchQuick(entryUrl)
       : await fetchPageSet(entryUrl, options.budget);
-  if (!set) return null;
+  if (!fetched.ok) return fetched;
+  const set = fetched.set;
 
   const findings =
     options.depth === 'quick' ? quickFindings(set) : fullFindings(set, options.visibility);
@@ -68,20 +87,23 @@ export async function runAudit(entryUrl: string, options: RunOptions): Promise<A
   };
 
   return {
-    depth: options.depth,
-    url: set.entry.finalUrl,
-    domain,
-    score: overallScore(pillars),
-    scoredCount: pillars.reduce((n, p) => n + p.scoredCount, 0),
-    pillars,
-    // The teaser sells the full audit; it doesn't pretend to be one.
-    actions: options.depth === 'quick' ? [] : buildActionPlan(findings, ctx),
-    opportunities: options.opportunities ?? [],
-    crawled: set.crawled,
-    discovered: set.discovered,
-    skipped: set.skipped,
-    stoppedBecause: set.stoppedBecause,
-    checkedAt: new Date().toISOString(),
+    ok: true,
+    report: {
+      depth: options.depth,
+      url: set.entry.finalUrl,
+      domain,
+      score: overallScore(pillars),
+      scoredCount: pillars.reduce((n, p) => n + p.scoredCount, 0),
+      pillars,
+      // The teaser sells the full audit; it doesn't pretend to be one.
+      actions: options.depth === 'quick' ? [] : buildActionPlan(findings, ctx),
+      opportunities: options.opportunities ?? [],
+      crawled: set.crawled,
+      discovered: set.discovered,
+      skipped: set.skipped,
+      stoppedBecause: set.stoppedBecause,
+      checkedAt: new Date().toISOString(),
+    },
   };
 }
 

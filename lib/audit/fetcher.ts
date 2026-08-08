@@ -20,7 +20,20 @@ import type { CrawledPage } from './types';
 
 const TIMEOUT_MS = 10_000;
 const CONCURRENCY = 6;
-const UA = 'Mozilla/5.0 (compatible; FaqFlo-Audit/1.0; +https://faqflo.com)';
+/**
+ * We identify as ourselves, not as a browser.
+ *
+ * This used to read `Mozilla/5.0 (compatible; FaqFlo-Audit/1.0; ...)`, and that
+ * disguise was actively costing us pages: WAFs fingerprint the
+ * `Mozilla/5.0 (compatible; <bot>)` shape and 403 it, while the same hosts
+ * serve the honest string fine. letsroof.com is the worked example — SiteGround
+ * returned a 403 interstitial to the masquerade and the real page to this.
+ * Claiming to be Chrome fares no better; the point isn't to look human.
+ *
+ * The `+url` also means a site owner reading their logs can find out who we are
+ * and choose, which is the only basis on which we should expect to be let in.
+ */
+const UA = 'FaqFlo-Audit/1.0 (+https://faqflo.com)';
 
 /** Default ceilings. The caller passes the real ones from the plan. */
 export const DEFAULT_MAX_PAGES = 1;
@@ -29,6 +42,53 @@ export const DEFAULT_MAX_MS = 60_000;
 export type CrawlBudget = { maxPages: number; maxMs: number };
 
 export type FetchedPage = CrawledPage & { html: string; facts: PageFacts };
+
+/**
+ * Why we couldn't read a page.
+ *
+ * This exists because "we got nothing back" is not one thing, and the audit was
+ * reporting it as one: a firewall turning us away and a mistyped address
+ * produced the same sentence, and only one of them is the user's fault. The
+ * kinds below are the distinctions worth making to somebody who just wants to
+ * know whether to fix their typing, call their host, or wait.
+ *
+ * Only the entry page carries one. A page that fails mid-crawl is dropped
+ * quietly, as it always was — one unreachable link out of a hundred is not
+ * something to interrupt a report for.
+ */
+export type FetchFailure =
+  | { kind: 'blocked'; status: number }
+  | { kind: 'notfound'; status: number }
+  | { kind: 'server'; status: number }
+  | { kind: 'timeout' }
+  | { kind: 'unreachable' }
+  | { kind: 'empty' };
+
+type FetchResult =
+  | { ok: true; status: number; finalUrl: string; body: string; ms: number }
+  | { ok: false; failure: FetchFailure };
+
+export type PageSetResult = { ok: true; set: PageSet } | { ok: false; failure: FetchFailure };
+
+/**
+ * The HTTP status behind a result, successful or not.
+ *
+ * The 404 probe needs this: a non-2xx response is the *expected* answer there,
+ * and the status is the finding. Null means we never got one at all — timeout,
+ * dead host — which is not the same as a site that answered badly.
+ */
+function statusOf(res: FetchResult): number | null {
+  if (res.ok) return res.status;
+  return 'status' in res.failure ? res.failure.status : null;
+}
+
+function classify(status: number): FetchFailure {
+  if (status === 404 || status === 410) return { kind: 'notfound', status };
+  if (status >= 500) return { kind: 'server', status };
+  // 401/403/429/451 say so outright; anything else non-2xx that isn't a
+  // redirect (fetch already followed those) is a refusal in practice.
+  return { kind: 'blocked', status };
+}
 
 export type PageSet = {
   entry: FetchedPage;
@@ -103,11 +163,11 @@ function pathSegments(raw: string): number {
   }
 }
 
-async function fetchOnce(
-  url: string,
-): Promise<{ status: number; finalUrl: string; body: string; ms: number } | null> {
+async function fetchOnce(url: string): Promise<FetchResult> {
   const guard = checkPublicHttpUrl(url);
-  if (!guard.ok) return null;
+  // The route already vetted the entry URL; this catches the ones we found
+  // inside somebody else's markup, which is where the risk actually lives.
+  if (!guard.ok) return { ok: false, failure: { kind: 'unreachable' } };
 
   const started = Date.now();
   try {
@@ -116,31 +176,51 @@ async function fetchOnce(
       signal: AbortSignal.timeout(TIMEOUT_MS),
       redirect: 'follow',
     });
-    const body = res.ok ? await res.text() : '';
+
+    if (!res.ok) return { ok: false, failure: classify(res.status) };
+
     return {
+      ok: true,
       status: res.status,
       finalUrl: res.url || guard.url.toString(),
-      body,
+      body: await res.text(),
       ms: Date.now() - started,
     };
-  } catch {
-    return null;
+  } catch (err) {
+    // A timeout and a dead host both throw here, and they mean different
+    // things to the person who typed the address.
+    const timedOut = err instanceof Error && err.name === 'TimeoutError';
+    return { ok: false, failure: { kind: timedOut ? 'timeout' : 'unreachable' } };
   }
 }
 
-async function fetchPage(url: string): Promise<FetchedPage | null> {
+async function fetchEntry(
+  url: string,
+): Promise<{ ok: true; page: FetchedPage } | { ok: false; failure: FetchFailure }> {
   const res = await fetchOnce(url);
-  if (!res || !res.body) return null;
+  if (!res.ok) return res;
+  // A 200 with nothing in it isn't something we can audit, and saying so beats
+  // reporting a score built from an empty document.
+  if (!res.body) return { ok: false, failure: { kind: 'empty' } };
 
   return {
-    url,
-    status: res.status,
-    finalUrl: res.finalUrl,
-    bytes: res.body.length,
-    ms: res.ms,
-    html: res.body,
-    facts: parsePage(res.body, res.finalUrl),
+    ok: true,
+    page: {
+      url,
+      status: res.status,
+      finalUrl: res.finalUrl,
+      bytes: res.body.length,
+      ms: res.ms,
+      html: res.body,
+      facts: parsePage(res.body, res.finalUrl),
+    },
   };
+}
+
+/** The crawl loop's version: a page we couldn't read is simply not in the set. */
+async function fetchPage(url: string): Promise<FetchedPage | null> {
+  const res = await fetchEntry(url);
+  return res.ok ? res.page : null;
 }
 
 /**
@@ -173,7 +253,7 @@ async function sitemapUrls(
   for (const child of locs.slice(0, 5)) {
     if (stop() || out.length >= cap) break;
     const res = await fetchOnce(child);
-    if (res?.status === 200) {
+    if (res.ok && res.status === 200) {
       out.push(...(await sitemapUrls(res.body, stop, cap - out.length)));
     }
   }
@@ -206,36 +286,41 @@ function inScope(raw: string, origin: string, base: string): string | null {
 }
 
 /** Fetch just the entry page — what the free teaser needs. */
-export async function fetchQuick(entryUrl: string): Promise<PageSet | null> {
-  const entry = await fetchPage(entryUrl);
-  if (!entry) return null;
+export async function fetchQuick(entryUrl: string): Promise<PageSetResult> {
+  const res = await fetchEntry(entryUrl);
+  if (!res.ok) return res;
+  const entry = res.page;
 
   const robots = await fetchOnce(new URL('/robots.txt', entry.finalUrl).toString());
 
   return {
-    entry,
-    others: [],
-    robotsTxt: robots && robots.status === 200 ? robots.body : null,
-    sitemapXml: null,
-    llmsTxt: null,
-    notFoundStatus: null,
-    crawled: [toCrawled(entry)],
-    discovered: 1,
-    skipped: [],
-    budget: { maxPages: 1, maxMs: DEFAULT_MAX_MS },
-    stoppedBecause: 'budget',
+    ok: true,
+    set: {
+      entry,
+      others: [],
+      robotsTxt: robots.ok && robots.status === 200 ? robots.body : null,
+      sitemapXml: null,
+      llmsTxt: null,
+      notFoundStatus: null,
+      crawled: [toCrawled(entry)],
+      discovered: 1,
+      skipped: [],
+      budget: { maxPages: 1, maxMs: DEFAULT_MAX_MS },
+      stoppedBecause: 'budget',
+    },
   };
 }
 
 export async function fetchPageSet(
   entryUrl: string,
   budget: CrawlBudget = { maxPages: DEFAULT_MAX_PAGES, maxMs: DEFAULT_MAX_MS },
-): Promise<PageSet | null> {
+): Promise<PageSetResult> {
   const startedAt = Date.now();
   const outOfTime = () => Date.now() - startedAt > budget.maxMs;
 
-  const entry = await fetchPage(entryUrl);
-  if (!entry) return null;
+  const res = await fetchEntry(entryUrl);
+  if (!res.ok) return res;
+  const entry = res.page;
 
   const base = entry.finalUrl;
   const origin = new URL(base).origin;
@@ -248,8 +333,8 @@ export async function fetchPageSet(
     fetchOnce(at('/faqflo-audit-404-probe')),
   ]);
 
-  const robotsTxt = robots?.status === 200 ? robots.body : null;
-  const sitemapXml = sitemap?.status === 200 ? sitemap.body : null;
+  const robotsTxt = robots.ok && robots.status === 200 ? robots.body : null;
+  const sitemapXml = sitemap.ok && sitemap.status === 200 ? sitemap.body : null;
 
   /* ------------------------------------------------------------ frontier --- */
 
@@ -337,17 +422,20 @@ export async function fetchPageSet(
     .map((c) => c.url);
 
   return {
-    entry,
-    others,
-    robotsTxt,
-    sitemapXml,
-    llmsTxt: llms?.status === 200 ? llms.body : null,
-    notFoundStatus: missing?.status ?? null,
-    crawled: [entry, ...others].map(toCrawled),
-    discovered: seen.size + frontier.size,
-    skipped: skipped.slice(0, 20),
-    budget,
-    stoppedBecause,
+    ok: true,
+    set: {
+      entry,
+      others,
+      robotsTxt,
+      sitemapXml,
+      llmsTxt: llms.ok && llms.status === 200 ? llms.body : null,
+      notFoundStatus: statusOf(missing),
+      crawled: [entry, ...others].map(toCrawled),
+      discovered: seen.size + frontier.size,
+      skipped: skipped.slice(0, 20),
+      budget,
+      stoppedBecause,
+    },
   };
 }
 

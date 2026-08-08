@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import type { FetchFailure } from '@/lib/audit/fetcher';
 import { runAudit } from '@/lib/audit/run';
 import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import type { AuditDepth } from '@/lib/audit/types';
@@ -27,6 +28,53 @@ import { AUDIT_FULL_RATE_LIMIT, AUDIT_RATE_LIMIT, checkRateLimit, clientIp } fro
 
 function fail(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
+}
+
+/**
+ * Why we couldn't read the site, in words, naming it.
+ *
+ * This used to be one sentence — "check the address and try again" — for every
+ * way a fetch can fail, which meant we blamed the user for their host's
+ * firewall, their host's downtime, and their host's slowness. Only the two
+ * cases below that mention the address are ones where the address might
+ * actually be wrong; the rest say plainly whose problem it is.
+ *
+ * The HTTP status follows the same honesty: 502/504 when the far end is at
+ * fault, 400 only when the input plausibly is.
+ */
+function describe(failure: FetchFailure, domain: string): { message: string; status: number } {
+  switch (failure.kind) {
+    case 'blocked':
+      return {
+        message: `${domain} turned our checker away (HTTP ${failure.status}). Its firewall or bot protection is blocking us — the address is fine. Whoever manages the site can allow FaqFlo-Audit.`,
+        status: 502,
+      };
+    case 'notfound':
+      return {
+        message: `${domain} says that page doesn't exist (HTTP ${failure.status}). Check the address, or try the site's home page.`,
+        status: 400,
+      };
+    case 'server':
+      return {
+        message: `${domain} returned an error (HTTP ${failure.status}). That's a problem on their end — try again shortly.`,
+        status: 502,
+      };
+    case 'timeout':
+      return {
+        message: `${domain} took too long to respond. Try again in a moment.`,
+        status: 504,
+      };
+    case 'unreachable':
+      return {
+        message: `We couldn't reach ${domain}. Check the address, and that the site is online.`,
+        status: 400,
+      };
+    case 'empty':
+      return {
+        message: `${domain} answered, but the page was empty — there was nothing for us to read.`,
+        status: 502,
+      };
+  }
 }
 
 export async function POST(request: Request) {
@@ -77,16 +125,20 @@ export async function POST(request: Request) {
       finding would let any caller put whatever they liked in a pillar labelled
       "AI visibility".
     */
-    const report = await runAudit(checked.url.toString(), {
+    const result = await runAudit(checked.url.toString(), {
       depth,
       budget: { maxPages: pageBudget, maxMs: AUDIT_TIME_BUDGET_MS },
     });
 
-    if (!report) {
-      return fail("We couldn't load that page. Check the address and try again.", 400);
+    if (!result.ok) {
+      const { message, status } = describe(
+        result.failure,
+        checked.url.hostname.replace(/^www\./, ''),
+      );
+      return fail(message, status);
     }
 
-    return NextResponse.json(report);
+    return NextResponse.json(result.report);
   } catch (err) {
     console.error('Audit failed:', err);
     return fail('Something went wrong running that audit. Please try again.', 500);

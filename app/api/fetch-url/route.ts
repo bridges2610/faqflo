@@ -55,7 +55,10 @@ export async function POST(request: Request) {
 
   try {
     const pageRes = await fetch(parsed.toString(), {
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; FaqFlo/2.0)' },
+      // Honest, for the reasons spelled out in lib/audit/fetcher.ts: the
+      // `Mozilla/5.0 (compatible; ...)` disguise this used to send is the exact
+      // shape WAFs 403 on, so it lost us pages it was meant to win.
+      headers: { 'User-Agent': 'FaqFlo/2.0 (+https://faqflo.com)' },
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       redirect: 'follow',
     });
