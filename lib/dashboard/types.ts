@@ -43,6 +43,26 @@ export type Site = {
   getCitedAt: string | null;
   /** Latest stored audit for this site, if one has been run. */
   lastAudit: SiteAudit | null;
+
+  /**
+   * What the business does and where — "Roofing contractor", "Rockland County, NY".
+   *
+   * Both null until something fills them: the audit reads them from the site's
+   * own markup, an LLM infers them from the homepage when there is none, and
+   * the customer can correct either. Content and Discover are both written
+   * against a category and an area, and until now the copy promised that while
+   * nothing supplied it.
+   */
+  industry: string | null;
+  location: string | null;
+  /**
+   * How we came to believe the two fields above.
+   *
+   * Kept because they are not equally trustworthy and the UI has to say which
+   * one it used — but mostly because `manual` is a promise: once a customer has
+   * corrected us, no later audit or inference may overwrite their answer.
+   */
+  profileSource: 'schema' | 'inferred' | 'manual' | null;
 };
 
 /**
@@ -183,6 +203,55 @@ export type SiteTracking = {
   periodResetsAt: string;
 };
 
+/**
+ * A page the site ought to have, and whether it does.
+ *
+ * `slugs` is what makes this checkable without a second model call: the LLM
+ * proposes the page set for the industry AND how to recognise each one, so
+ * matching it against the crawl afterwards is ordinary string work. Without
+ * them we'd be asking a model the same question on every render and getting a
+ * slightly different answer each time.
+ */
+export type MustHavePage = {
+  /** Stable key — 'about', 'services', 'pricing'. */
+  role: string;
+  /** What the customer calls it: "Services". */
+  label: string;
+  /** Why this industry needs it. Shown when the page is missing. */
+  why: string;
+  /** URL-path or title fragments that identify the page. */
+  slugs: string[];
+};
+
+/** An article worth writing, and the reason it's worth writing. */
+export type ArticleTopic = {
+  title: string;
+  /** The angle to take — what makes this piece different from the obvious one. */
+  angle: string;
+  /** What someone would type into a search box. */
+  primaryKeyword: string;
+  /** What someone would ask an assistant out loud. The AEO half. */
+  aeoQuestion: string;
+  why: string;
+};
+
+/**
+ * The generated plan for one site. One per site, replaced on regenerate.
+ *
+ * Stored rather than derived because it costs a model call: without this the
+ * page would bill on every visit and show a different answer each time, which
+ * is not a plan so much as a slot machine.
+ */
+export type ContentPlan = {
+  siteId: string;
+  /** Resolved at generation time — what the plan was actually written for. */
+  industry: string;
+  location: string | null;
+  mustHave: MustHavePage[];
+  topics: ArticleTopic[];
+  generatedAt: string;
+};
+
 /** Everything the app keeps for one account. One row per key, in DB terms. */
 export type DashboardData = {
   user: User;
@@ -191,4 +260,5 @@ export type DashboardData = {
   faqs: FaqEntry[];
   questions: DiscoveredQuestion[];
   tracking: SiteTracking[];
+  contentPlans: ContentPlan[];
 };

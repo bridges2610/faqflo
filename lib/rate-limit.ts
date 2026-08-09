@@ -43,6 +43,17 @@ export const AUDIT_RATE_LIMIT = 20;
  */
 export const AUDIT_FULL_RATE_LIMIT = 4;
 
+/**
+ * Ceiling for the content plan.
+ *
+ * The most expensive call in the app: a hundred pages of context on the biggest
+ * model, at roughly a sixth of a dollar a run. Low because it should be — a
+ * plan is generated once per site and then read, so a customer who legitimately
+ * needs ten in a day is a customer with ten sites, and anyone past that is
+ * either testing or spending our money for us.
+ */
+export const CONTENT_RATE_LIMIT = 10;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 

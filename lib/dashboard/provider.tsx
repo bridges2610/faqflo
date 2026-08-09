@@ -13,6 +13,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as store from './store';
 import type {
+  ContentPlan,
   DashboardData,
   DiscoveredQuestion,
   FaqEntry,
@@ -40,9 +41,11 @@ type Ctx = {
   faqsIn: (groupId: string) => FaqEntry[];
   questions: DiscoveredQuestion[];
   tracking: SiteTracking | null;
+  /** The generated content plan for the active site; null until one is made. */
+  contentPlan: ContentPlan | null;
 
   addSite: (input: store.NewSite) => Promise<void>;
-  renameSite: (id: string, patch: Partial<store.NewSite>) => Promise<void>;
+  renameSite: (id: string, patch: store.SitePatch) => Promise<void>;
   removeSite: (id: string) => Promise<void>;
 
   /** Resolves with the new group's id, so the caller can open it. */
@@ -52,6 +55,7 @@ type Ctx = {
   moveGroup: (id: string, direction: 'up' | 'down') => Promise<void>;
   markPublished: (groupId: string) => Promise<void>;
   saveAudit: (siteId: string, report: SiteAudit) => Promise<void>;
+  saveContentPlan: (plan: ContentPlan) => Promise<void>;
 
   addFaqs: (groupId: string, entries: store.NewFaq[]) => Promise<void>;
   editFaq: (
@@ -124,6 +128,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     [data, site],
   );
 
+  const contentPlan = useMemo(
+    () => (data && site ? store.contentPlanForSite(data, site.id) : null),
+    [data, site],
+  );
+
   const value: Ctx = {
     loading: data === null,
     data,
@@ -136,6 +145,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     faqsIn,
     questions,
     tracking,
+    contentPlan,
 
     addSite: (input) => apply(() => store.createSite(input)),
     renameSite: (id, patch) => apply(() => store.updateSite(id, patch)),
@@ -158,6 +168,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     moveGroup: (id, direction) => apply(() => store.moveGroup(id, direction)),
     markPublished: (id) => apply(() => store.markGroupPublished(id)),
     saveAudit: (siteId, report) => apply(() => store.saveAudit(siteId, report)),
+    saveContentPlan: (plan) => apply(() => store.saveContentPlan(plan)),
 
     addFaqs: (id, entries) => apply(() => store.createFaqs(id, entries)),
     editFaq: (id, patch) => apply(() => store.updateFaq(id, patch)),

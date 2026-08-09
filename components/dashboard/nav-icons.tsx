@@ -38,6 +38,17 @@ export function FaqIcon({ className = '' }: IconProps) {
   );
 }
 
+/** Content: a page with lines of writing on it. */
+export function DocIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <path d="M5 3h6.5L16 7v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+      <path d="M11.5 3v4H16" />
+      <path d="M7 11h6M7 14h4" />
+    </svg>
+  );
+}
+
 export function SetupIcon({ className = '' }: IconProps) {
   return (
     <svg {...BASE} className={className}>

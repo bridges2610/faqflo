@@ -65,6 +65,7 @@ const PLANS: Plan[] = [
     features: [
       'Full audit, including whether AI cites you today',
       'The questions people actually ask AI in your category',
+      'The pages your industry expects, and which of yours are missing',
       'A complete answer-first FAQ set, written to be quoted',
       'Publish-ready HTML for your own site',
       'Entity schema and llms.txt',

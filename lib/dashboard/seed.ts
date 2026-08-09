@@ -16,6 +16,7 @@ import {
   type CitationCheck,
   type CitationDay,
   type CompetitorShare,
+  type ContentPlan,
   type DashboardData,
   type DiscoveredQuestion,
   type Engine,
@@ -318,7 +319,198 @@ function seedAudit(): AuditReport {
       { url: 'https://summitroofing.com/pricing', status: 200, finalUrl: 'https://summitroofing.com/pricing', bytes: 21_800, ms: 350 },
       { url: 'https://summitroofing.com/about', status: 200, finalUrl: 'https://summitroofing.com/about', bytes: 18_400, ms: 330 },
     ],
+    /*
+      What the Content page reads.
+
+      Deliberately uneven: the services page carries FAQ markup and the pricing
+      page doesn't, because "you have this page but it answers nothing" is the
+      state the Content page exists to surface, and a demo where everything
+      passes shows none of its own value. There is no testimonials or service
+      area page at all, so the missing rows have something to say too.
+    */
+    pages: [
+      {
+        url: 'https://summitroofing.com/',
+        title: 'Summit Roofing — Roof Repair & Replacement in Franklin, TN',
+        headings: ['Roofing you can rely on', 'What we do', 'Why Franklin homeowners choose us'],
+        questionHeadings: 0,
+        hasFaqSchema: false,
+        faqQuestions: [],
+        wordCount: 1240,
+      },
+      {
+        url: 'https://summitroofing.com/services',
+        title: 'Our Roofing Services | Summit Roofing',
+        headings: ['Roof repair', 'Full replacement', 'Storm & hail damage', 'Gutters'],
+        questionHeadings: 3,
+        hasFaqSchema: true,
+        faqQuestions: [
+          'How long does a roof replacement take?',
+          'Do you handle insurance claims?',
+          'What areas do you serve?',
+        ],
+        wordCount: 980,
+      },
+      {
+        url: 'https://summitroofing.com/pricing',
+        title: 'Roofing Prices | Summit Roofing',
+        headings: ['What a roof costs in Franklin', 'Financing'],
+        questionHeadings: 1,
+        hasFaqSchema: false,
+        faqQuestions: [],
+        wordCount: 620,
+      },
+      {
+        url: 'https://summitroofing.com/about',
+        title: 'About Summit Roofing',
+        headings: ['Family owned since 2004', 'Our crew'],
+        questionHeadings: 0,
+        hasFaqSchema: false,
+        faqQuestions: [],
+        wordCount: 540,
+      },
+    ],
+    profile: {
+      name: 'Summit Roofing',
+      industry: 'Roofing contractor',
+      location: 'Franklin, TN',
+      source: 'schema',
+    },
+    profileHint:
+      'Title: Summit Roofing — Roof Repair & Replacement in Franklin, TN\nDescription: Family-owned roofing contractor serving Franklin and greater Nashville since 2004.',
     checkedAt: daysAgo(6),
+  };
+}
+
+/**
+ * A plan for the demo site, so Content isn't an empty page on first look.
+ *
+ * Written to match the seeded audit above: `slugs` here resolve against those
+ * four page URLs, so the table shows two pages present, one present without
+ * answers, and the rest missing — the same mix a real site produces.
+ */
+function seedContentPlan(siteId: string): ContentPlan {
+  return {
+    siteId,
+    industry: 'Roofing contractor',
+    location: 'Franklin, TN',
+    mustHave: [
+      {
+        role: 'services',
+        label: 'Services',
+        why: 'The page that says what you actually do. Assistants quote it when someone asks who handles a job.',
+        slugs: ['services', 'what-we-do'],
+      },
+      {
+        role: 'pricing',
+        label: 'Pricing',
+        why: 'Cost is the first question a roofing customer asks, and the one assistants most often answer with a competitor.',
+        slugs: ['pricing', 'cost', 'price'],
+      },
+      {
+        role: 'about',
+        label: 'About',
+        why: 'Establishes who the business is, which is what an engine needs before it will name you.',
+        slugs: ['about', 'our-story', 'who-we-are'],
+      },
+      {
+        role: 'service-area',
+        label: 'Service area',
+        why: 'Roofing is bought locally. Without a page naming the towns you cover, "near me" questions cannot match you.',
+        slugs: ['service-area', 'areas-we-serve', 'locations'],
+      },
+      {
+        role: 'storm-damage',
+        label: 'Storm & hail damage',
+        why: 'Storm work is urgent and searched separately from routine repair — it rarely finds a general services page.',
+        slugs: ['storm', 'hail', 'emergency'],
+      },
+      {
+        role: 'financing',
+        label: 'Financing',
+        why: 'A roof is a five-figure purchase. People search for how to pay for it before they search for who fits it.',
+        slugs: ['financing', 'finance', 'payment-plans'],
+      },
+      {
+        role: 'testimonials',
+        label: 'Reviews',
+        why: 'Third-party proof is what turns a mention into a recommendation.',
+        slugs: ['reviews', 'testimonials'],
+      },
+    ],
+    topics: [
+      {
+        title: 'What a new roof actually costs in Franklin, TN (2026 prices)',
+        angle: 'Real local ranges by roof size and material, not a national average.',
+        primaryKeyword: 'new roof cost franklin tn',
+        aeoQuestion: 'How much does a new roof cost in Franklin, Tennessee?',
+        why: 'Your highest-volume uncovered question, and the one assistants currently answer with somebody else’s numbers.',
+      },
+      {
+        title: 'Does Tennessee homeowners insurance cover hail damage to a roof?',
+        angle: 'What is and is not covered, and what to photograph before you call.',
+        primaryKeyword: 'insurance hail damage roof tennessee',
+        aeoQuestion: 'Will my insurance pay for a hail-damaged roof in Tennessee?',
+        why: 'High intent and specific to your storm season — a direct answer wins the citation.',
+      },
+      {
+        title: 'Metal roof vs shingles in the Tennessee climate',
+        angle: 'Compare on humidity, summer heat and hail, not on price alone.',
+        primaryKeyword: 'metal roof vs shingles tennessee',
+        aeoQuestion: 'Is a metal roof better than shingles in Tennessee?',
+        why: 'A comparison question assistants like to answer, and one you can answer locally.',
+      },
+      {
+        title: 'How to pay for a roof: financing options for Franklin homeowners',
+        angle: 'Walk through each route honestly, including the ones you do not offer.',
+        primaryKeyword: 'roof financing options',
+        aeoQuestion: 'How can I finance a new roof?',
+        why: 'You have no financing page; this covers the gap and the search at once.',
+      },
+      {
+        title: 'How long does a roof last in Middle Tennessee?',
+        angle: 'Lifespan by material, adjusted for local sun and storm exposure.',
+        primaryKeyword: 'how long does a roof last',
+        aeoQuestion: 'How long should a roof last in Tennessee?',
+        why: 'Broad question, and a locally-qualified answer beats a generic one.',
+      },
+      {
+        title: 'Seven signs your roof needs repair before winter',
+        angle: 'What a homeowner can see from the ground, with photographs.',
+        primaryKeyword: 'signs roof needs repair',
+        aeoQuestion: 'How do I know if my roof needs repairing?',
+        why: 'Seasonal, shareable, and it brings people in before the emergency.',
+      },
+      {
+        title: 'What to do in the first 24 hours after storm damage',
+        angle: 'An ordered checklist — safety, documentation, then the call.',
+        primaryKeyword: 'emergency roof repair after storm',
+        aeoQuestion: 'What should I do if a storm damages my roof?',
+        why: 'Urgent queries convert best, and a step-by-step answer is what assistants quote.',
+      },
+      {
+        title: 'Do roofers clean gutters too? What is and is not included',
+        angle: 'Set the boundary plainly and say what you do bundle.',
+        primaryKeyword: 'do roofers clean gutters',
+        aeoQuestion: 'Do roofing companies also clean gutters?',
+        why: 'A discovered question nothing on your site currently answers.',
+      },
+      {
+        title: 'How to choose a roofing contractor in Franklin: eight questions to ask',
+        angle: 'Give the questions that expose a bad contractor, including ones about you.',
+        primaryKeyword: 'how to choose a roofing contractor',
+        aeoQuestion: 'How do I find a good roofer near me?',
+        why: 'Targets the “who repairs roofs in Franklin TN” question you already rank for.',
+      },
+      {
+        title: 'Roof replacement, start to finish: what the week actually looks like',
+        angle: 'Day by day, including noise, driveway access and cleanup.',
+        primaryKeyword: 'roof replacement process',
+        aeoQuestion: 'What happens during a roof replacement?',
+        why: 'Removes the main hesitation before booking, and nothing on the site covers it.',
+      },
+    ],
+    generatedAt: daysAgo(5),
   };
 }
 
@@ -330,6 +522,9 @@ export function buildSeed(): DashboardData {
     createdAt: daysAgo(38),
     getCitedAt: daysAgo(31),
     lastAudit: seedAudit(),
+    industry: 'Roofing contractor',
+    location: 'Franklin, TN',
+    profileSource: 'schema',
   };
 
   const groups: FaqGroup[] = [];
@@ -414,7 +609,15 @@ export function buildSeed(): DashboardData {
     subscriptionSince: daysAgo(31),
   };
 
-  return { user, sites: [site], groups, faqs, questions, tracking };
+  return {
+    user,
+    sites: [site],
+    groups,
+    faqs,
+    questions,
+    tracking,
+    contentPlans: [seedContentPlan(site.id)],
+  };
 }
 
 export function emptyTracking(siteId: string): SiteTracking {

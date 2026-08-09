@@ -92,6 +92,49 @@ export type CrawledPage = {
   ms: number;
 };
 
+/**
+ * What one page is about, kept for the Content page.
+ *
+ * `CrawledPage` proves a page was read; this says what was on it. The crawl
+ * already parses all of this — titles, headings, JSON-LD — and until now threw
+ * every bit of it away when the request ended, which meant the one thing a
+ * customer most wants to know ("which of my pages have FAQs?") couldn't be
+ * answered without crawling the site again.
+ *
+ * Every list here is capped. A hundred pages of unbounded headings would put
+ * megabytes into localStorage, and the tail of a heading list has never decided
+ * what a page is for.
+ */
+export type PageContent = {
+  /** Post-redirect URL — the address the page actually lives at. */
+  url: string;
+  title: string;
+  /** h1–h3 text, first 8. */
+  headings: string[];
+  /** How many of those headings read as questions. */
+  questionHeadings: number;
+  hasFaqSchema: boolean;
+  /** Questions lifted from FAQPage markup, first 10. */
+  faqQuestions: string[];
+  wordCount: number;
+};
+
+/**
+ * Who the business is and where it works.
+ *
+ * `source` is here because the three ways we can know this are not equally
+ * trustworthy, and the UI has to be able to say which one it used. Schema is
+ * the business's own statement; inferred is our reading of their homepage and
+ * can be wrong; manual is the customer correcting us, and must therefore
+ * survive every later run.
+ */
+export type BusinessProfile = {
+  name: string | null;
+  industry: string | null;
+  location: string | null;
+  source: 'schema' | 'inferred' | 'manual';
+};
+
 export type AuditReport = {
   depth: AuditDepth;
   url: string;
@@ -113,6 +156,19 @@ export type AuditReport = {
       "that's what we had budget for". */
   stoppedBecause: 'budget' | 'time' | 'exhausted';
   checkedAt: string;
+
+  /*
+    Optional, and deliberately so — see isAuditReport below.
+
+    A quick run reads one page and produces one entry; a full run produces one
+    per page read. A report stored before this existed has none at all, which
+    the Content page reads as "run a full audit" rather than as an error.
+  */
+  pages?: PageContent[];
+  /** From the site's own Organization/LocalBusiness markup, when it has any. */
+  profile?: BusinessProfile;
+  /** Entry-page text, capped — what an LLM reads when there's no markup. */
+  profileHint?: string;
 };
 
 /**
@@ -125,6 +181,12 @@ export type AuditReport = {
  *
  * Deliberately structural rather than a version number: the thing that matters
  * is whether the fields the renderer reads are there.
+ *
+ * ⚠️ Only assert fields the report CANNOT render without. `pages`, `profile`
+ * and `profileHint` are absent from every report written before they existed,
+ * and this guard runs against stored data on every load — asserting them would
+ * silently delete the last audit of every customer who has one, to add a page
+ * they hadn't asked for. Anything optional stays out of this list.
  */
 export function isAuditReport(value: unknown): value is AuditReport {
   if (!value || typeof value !== 'object') return false;

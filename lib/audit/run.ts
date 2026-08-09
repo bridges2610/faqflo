@@ -14,12 +14,16 @@ import { seoChecks } from './checks/seo';
 import { structureChecks } from './checks/structure';
 import { technicalChecks } from './checks/technical';
 import {
+  allPages,
   fetchPageSet,
   fetchQuick,
   type CrawlBudget,
+  type FetchedPage,
   type FetchFailure,
   type PageSet,
 } from './fetcher';
+import { isQuestion, schemaNodes } from './parse';
+import { businessProfile, profileHint } from './profile';
 import { buildPillars, overallScore } from './score';
 import {
   QUICK_FINDING_IDS,
@@ -27,6 +31,7 @@ import {
   type AuditReport,
   type Finding,
   type Opportunity,
+  type PageContent,
 } from './types';
 
 export type RunOptions = {
@@ -103,7 +108,83 @@ export async function runAudit(entryUrl: string, options: RunOptions): Promise<A
       skipped: set.skipped,
       stoppedBecause: set.stoppedBecause,
       checkedAt: new Date().toISOString(),
+      /*
+        What the Content page reasons over.
+
+        Carried on the report rather than recomputed later because the HTML is
+        gone the moment this function returns — this is the only point at which
+        the parsed pages still exist.
+      */
+      pages: allPages(set).map(toContent),
+      profile: businessProfile(set),
+      profileHint: profileHint(set.entry),
     },
+  };
+}
+
+/** Caps: the tail of a heading list has never decided what a page is for. */
+const MAX_HEADINGS = 8;
+const MAX_FAQ_QUESTIONS = 10;
+
+const FAQ_TYPE = /^(FAQPage|QAPage|Question)$/;
+
+/**
+ * The questions a page's FAQ markup actually asks.
+ *
+ * `schemaTypes` already tells us a page HAS FAQ markup; this reads what's in
+ * it. That distinction matters on the Content page: "your services page has
+ * FAQs" is a tick, but showing which questions it answers is what tells someone
+ * whether the right ones are covered.
+ *
+ * Handles both shapes in the wild — `mainEntity` as an array of Questions, and
+ * a bare Question node — since plugins emit both and a missed one reads as
+ * "no FAQs here", the same as having none.
+ */
+function faqQuestions(page: FetchedPage): string[] {
+  const nodes = schemaNodes(page.facts.schemaRaw);
+  const out: string[] = [];
+
+  for (const node of nodes) {
+    const type = node['@type'];
+    const types = Array.isArray(type) ? type : [type];
+    if (!types.some((t) => typeof t === 'string' && FAQ_TYPE.test(t))) continue;
+
+    const entities = Array.isArray(node.mainEntity)
+      ? node.mainEntity
+      : node.mainEntity
+        ? [node.mainEntity]
+        : [node];
+
+    for (const entity of entities) {
+      if (!entity || typeof entity !== 'object') continue;
+      const name = (entity as Record<string, unknown>).name;
+      if (typeof name === 'string' && name.trim()) out.push(name.trim());
+      if (out.length >= MAX_FAQ_QUESTIONS) return out;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * A fetched page, reduced to what survives the request.
+ *
+ * The counterpart to toCrawled() in the fetcher: that one keeps proof the page
+ * was read, this one keeps what was on it.
+ */
+function toContent(page: FetchedPage): PageContent {
+  const headings = page.facts.headings.filter((h) => h.level <= 3);
+
+  return {
+    url: page.finalUrl,
+    title: page.facts.title ?? '',
+    headings: headings.slice(0, MAX_HEADINGS).map((h) => h.text),
+    // Counted across every heading, not just the ones we kept — this is a
+    // measure of the page, and truncating it would understate long pages.
+    questionHeadings: headings.filter((h) => isQuestion(h.text)).length,
+    hasFaqSchema: page.facts.schemaTypes.some((t) => FAQ_TYPE.test(t)),
+    faqQuestions: faqQuestions(page),
+    wordCount: page.facts.wordCount,
   };
 }
 

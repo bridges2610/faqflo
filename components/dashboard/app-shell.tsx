@@ -11,6 +11,7 @@ import {
   ChartIcon,
   CloseIcon,
   FaqIcon,
+  DocIcon,
   GlobeIcon,
   HomeIcon,
   MenuIcon,
@@ -28,12 +29,16 @@ type NavItem = {
 
 /* The loop, in order: audit → discover → generate → publish → track. The nav
    is the product's shape, so someone who has never read the marketing page can
-   still tell what this thing does from the sidebar alone. */
+   still tell what this thing does from the sidebar alone.
+
+   Content sits after Answers: it's what you do once the questions you already
+   have are answered — the pages you're missing, and what to write next. */
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Overview', Icon: HomeIcon },
   { href: '/dashboard/audit', label: 'Audit', Icon: AeoIcon },
   { href: '/dashboard/questions', label: 'Questions', Icon: SearchIcon },
   { href: '/dashboard/faqs', label: 'Answers', Icon: FaqIcon },
+  { href: '/dashboard/content', label: 'Content', Icon: DocIcon },
   { href: '/dashboard/publish', label: 'Publish', Icon: SetupIcon },
   { href: '/dashboard/tracking', label: 'Tracking', Icon: ChartIcon },
   { href: '/dashboard/sites', label: 'Sites', Icon: GlobeIcon },

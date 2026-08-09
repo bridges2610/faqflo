@@ -104,6 +104,18 @@ export function canPublish(site: Site | null): boolean {
   return hasGetCited(site);
 }
 
+/**
+ * The content plan: which pages the site is missing, and what to write next.
+ *
+ * Get Cited rather than free, for a reason that isn't only commercial — it is
+ * built on the full crawl. A free audit reads exactly one page, and a
+ * must-have-pages table derived from the home page alone would report every
+ * other page as missing. The gate keeps the feature from lying.
+ */
+export function canContent(site: Site | null): boolean {
+  return hasGetCited(site);
+}
+
 /** Citation tracking is the subscription, and only the subscription. */
 export function canTrack(user: User | null): boolean {
   return hasStayCited(user);

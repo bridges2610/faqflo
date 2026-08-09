@@ -26,6 +26,7 @@ import { contentHash, normalizePath } from './export';
 import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
 import type {
+  ContentPlan,
   DashboardData,
   DiscoveredQuestion,
   FaqEntry,
@@ -77,11 +78,18 @@ function normalise(data: DashboardData): DashboardData {
     sites: (data.sites ?? []).map((site) => ({
       ...site,
       lastAudit: isAuditReport(site.lastAudit) ? site.lastAudit : null,
+      // Added after v4 shipped. Backfilled rather than key-bumped: a missing
+      // industry is a field we don't know yet, not a payload we can't read,
+      // and bumping would throw away every site, group and answer to add it.
+      industry: site.industry ?? null,
+      location: site.location ?? null,
+      profileSource: site.profileSource ?? null,
     })),
     groups: data.groups ?? [],
     faqs: data.faqs ?? [],
     questions: data.questions ?? [],
     tracking: (data.tracking ?? []).map(normaliseTracking),
+    contentPlans: data.contentPlans ?? [],
   };
 }
 
@@ -165,6 +173,21 @@ export async function updateUser(patch: Partial<User>): Promise<DashboardData> {
 
 export type NewSite = { name: string; domain: string };
 
+/**
+ * What can be changed about a site after it exists.
+ *
+ * Wider than `NewSite` because the profile fields aren't things anyone types
+ * when adding a site — they arrive later, from the audit, from an inference, or
+ * from the customer correcting one of those. `profileSource` travels with them
+ * so the caller states where the value came from rather than this function
+ * guessing; only that lets `manual` mean "a person decided this".
+ */
+export type SitePatch = Partial<NewSite> & {
+  industry?: string | null;
+  location?: string | null;
+  profileSource?: Site['profileSource'];
+};
+
 export async function createSite(input: NewSite): Promise<DashboardData> {
   const data = requireData('createSite');
   const site: Site = {
@@ -174,6 +197,9 @@ export async function createSite(input: NewSite): Promise<DashboardData> {
     createdAt: now(),
     getCitedAt: null,
     lastAudit: null,
+    industry: null,
+    location: null,
+    profileSource: null,
   };
 
   // A site with no group has nowhere to put an answer, so it gets one for its
@@ -197,7 +223,7 @@ export async function createSite(input: NewSite): Promise<DashboardData> {
   });
 }
 
-export async function updateSite(id: string, patch: Partial<NewSite>): Promise<DashboardData> {
+export async function updateSite(id: string, patch: SitePatch): Promise<DashboardData> {
   const data = requireData('updateSite');
   return write({
     ...data,
@@ -207,10 +233,19 @@ export async function updateSite(id: string, patch: Partial<NewSite>): Promise<D
             ...s,
             ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
             ...(patch.domain !== undefined ? { domain: normalizeDomain(patch.domain) } : {}),
+            ...(patch.industry !== undefined ? { industry: trimmedOrNull(patch.industry) } : {}),
+            ...(patch.location !== undefined ? { location: trimmedOrNull(patch.location) } : {}),
+            ...(patch.profileSource !== undefined ? { profileSource: patch.profileSource } : {}),
           }
         : s,
     ),
   });
+}
+
+/** Empty is the same as unknown here — a blank industry isn't a value. */
+function trimmedOrNull(value: string | null): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }
 
 export async function deleteSite(id: string): Promise<DashboardData> {
@@ -224,6 +259,7 @@ export async function deleteSite(id: string): Promise<DashboardData> {
     faqs: data.faqs.filter((f) => !groupIds.has(f.groupId)),
     questions: data.questions.filter((q) => q.siteId !== id),
     tracking: data.tracking.filter((t) => t.siteId !== id),
+    contentPlans: data.contentPlans.filter((c) => c.siteId !== id),
   });
 }
 
@@ -251,6 +287,23 @@ export async function saveAudit(siteId: string, report: SiteAudit): Promise<Dash
   return write({
     ...data,
     sites: data.sites.map((s) => (s.id === siteId ? { ...s, lastAudit: report } : s)),
+  });
+}
+
+/* ------------------------------------------------------------- content --- */
+
+/**
+ * Store the generated content plan, replacing any previous one.
+ *
+ * One per site rather than a history: a plan is the current answer to "what
+ * should I write next", and a list of superseded answers is a worse version of
+ * that question. Regenerating overwrites.
+ */
+export async function saveContentPlan(plan: ContentPlan): Promise<DashboardData> {
+  const data = requireData('saveContentPlan');
+  return write({
+    ...data,
+    contentPlans: [...data.contentPlans.filter((c) => c.siteId !== plan.siteId), plan],
   });
 }
 
@@ -510,4 +563,9 @@ export function questionsForSite(data: DashboardData, siteId: string): Discovere
 
 export function trackingForSite(data: DashboardData, siteId: string) {
   return data.tracking.find((t) => t.siteId === siteId) ?? emptyTracking(siteId);
+}
+
+/** Null rather than an empty plan — "not generated yet" is a state the UI shows. */
+export function contentPlanForSite(data: DashboardData, siteId: string): ContentPlan | null {
+  return data.contentPlans.find((c) => c.siteId === siteId) ?? null;
 }

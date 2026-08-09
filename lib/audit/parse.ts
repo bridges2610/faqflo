@@ -41,14 +41,58 @@ export type PageFacts = {
   tableCount: number;
 };
 
+const NAMED_ENTITIES: Record<string, string> = {
+  nbsp: ' ',
+  amp: '&',
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  rsquo: '’',
+  lsquo: '‘',
+  rdquo: '”',
+  ldquo: '“',
+  hellip: '…',
+  mdash: '—',
+  ndash: '–',
+  middot: '·',
+  times: '×',
+};
+
+/**
+ * Turn HTML entities back into the characters a person would read.
+ *
+ * One pass with a callback rather than a chain of `.replace()` calls, for two
+ * reasons. A chain can't handle numeric entities without listing every one, and
+ * WordPress emits them constantly — `&#8217;` for an apostrophe, `&#8230;` for
+ * an ellipsis, `&#039;` where a chain matching `&#39;` sees nothing. And a chain
+ * that decodes `&amp;` before the rest double-decodes `&amp;#39;` into an
+ * apostrophe that was never there.
+ *
+ * This matters beyond tidiness: these strings become finding evidence, page
+ * titles on screen, and prompt text. "Your Home&#039;s Siding" reads as broken
+ * software to a customer and as noise to a model.
+ *
+ * Unknown entities are left alone — a literal `&foo;` is likelier to be real
+ * text than something we should silently drop.
+ */
 function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+  return value.replace(/&(#\d+|#[xX][0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g, (match, body: string) => {
+    if (body.startsWith('#')) {
+      const code =
+        body[1] === 'x' || body[1] === 'X'
+          ? Number.parseInt(body.slice(2), 16)
+          : Number.parseInt(body.slice(1), 10);
+      // Reject non-characters rather than emitting U+FFFD into a title.
+      if (!Number.isFinite(code) || code <= 0 || code > 0x10ffff) return match;
+      try {
+        return String.fromCodePoint(code);
+      } catch {
+        return match;
+      }
+    }
+    return NAMED_ENTITIES[body.toLowerCase()] ?? match;
+  });
 }
 
 function stripTags(html: string): string {
