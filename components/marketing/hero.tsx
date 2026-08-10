@@ -83,7 +83,7 @@ export function Hero() {
           <h1 className="mt-6 text-[2.75rem] leading-[1.05] text-balance sm:text-[3.5rem]">
             Get your business{' '}
             <span className="relative inline-block whitespace-nowrap">
-              <span className="text-brand-gradient">cited by AI</span>
+              <span className="text-brand-gradient">found on AI</span>
               <Underline className="text-accent absolute -bottom-2 left-0 h-4 w-full sm:-bottom-3 sm:h-5" />
             </span>
           </h1>
