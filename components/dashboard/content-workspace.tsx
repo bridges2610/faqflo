@@ -286,8 +286,10 @@ export function ContentWorkspace() {
       const res = await fetch('/api/dashboard/content', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // The site id, not the domain — the server reads the domain off the
+        // row it owns rather than off whatever a caller names.
         body: JSON.stringify({
-          domain: site.domain,
+          siteId: site.id,
           industry: knownIndustry,
           location: knownLocation,
           hint: site.lastAudit?.profileHint ?? '',

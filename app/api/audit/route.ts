@@ -3,8 +3,15 @@ import type { FetchFailure } from '@/lib/audit/fetcher';
 import { runAudit } from '@/lib/audit/run';
 import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import type { AuditDepth } from '@/lib/audit/types';
-import { AUDIT_TIME_BUDGET_MS, MAX_AUDIT_PAGES } from '@/lib/audit/limits';
-import { AUDIT_FULL_RATE_LIMIT, AUDIT_RATE_LIMIT, checkRateLimit, clientIp } from '@/lib/rate-limit';
+import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
+import { currentUser, siteForUser } from '@/lib/auth/dal';
+import { canRunFullAudit, pageBudgetFor } from '@/lib/auth/entitlements';
+import {
+  AUDIT_FULL_RATE_LIMIT,
+  AUDIT_RATE_LIMIT,
+  checkRateLimit,
+  limitKey,
+} from '@/lib/rate-limit';
 
 /*
   The AI-visibility audit.
@@ -16,14 +23,19 @@ import { AUDIT_FULL_RATE_LIMIT, AUDIT_RATE_LIMIT, checkRateLimit, clientIp } fro
   it's meant to sell. The dashboard fills that pillar from real tracking data
   when the account has a subscription; nothing else fills it at all.
 
-  ⚠️ THIS ROUTE IS NOT AUTHENTICATED.
+  TWO CALLERS, TWO RULES — this is the only route with a split personality.
 
-  Same position as /api/dashboard/generate: there is no session to check yet.
-  A `full` run makes roughly eight outbound requests, so it gets its own,
-  stricter daily bucket on top of the per-IP limit, and every URL — including
-  the ones discovered inside the fetched HTML — passes the SSRF guard. Those
-  are cost controls, not authorization. Gating on a real session is the auth
-  stage's first job.
+  `quick` is the free check on the marketing page. It stays open to anonymous
+  callers on purpose: the site promises "Free · No signup" in five places, and
+  it reads one page, which is a cheap thing to give away. IP-limited, as before.
+
+  `full` is the paid crawl. It now requires a session, a `siteId` the caller
+  actually owns, and Get Cited on that site — and the page budget is computed
+  HERE from the site row rather than read from the request. That last part is
+  the fix for what this file used to admit: "the dashboard sends
+  pageBudgetFor(site) and an arbitrary caller can send whatever it likes."
+  A hundred pages is a hundred outbound requests to somebody else's server, so
+  who may ask for that is not a client-side decision.
 */
 
 function fail(message: string, status: number) {
@@ -85,30 +97,52 @@ export async function POST(request: Request) {
     return fail('Invalid request body.', 400);
   }
 
-  const { url: input, depth: rawDepth, maxPages } = (body ?? {}) as Record<string, unknown>;
+  const { url: input, depth: rawDepth, siteId } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof input !== 'string') return fail('A web address is required.', 400);
   const depth: AuditDepth = rawDepth === 'full' ? 'full' : 'quick';
 
   /*
-    The page budget, clamped.
+    Who is asking, and what may they have?
 
-    There is no session here, so this cannot enforce the customer's actual tier
-    — the dashboard sends `pageBudgetFor(site)` and an arbitrary caller can send
-    whatever it likes. What the clamp does do is bound the blast radius: nobody
-    gets more than the paid ceiling, so the worst case is a known number of
-    outbound requests rather than an unbounded one. Per-tier enforcement belongs
-    with auth, alongside gating this route at all.
+    `maxPages` is no longer read from the body at all. For a quick run the
+    budget is one page by definition; for a full run it comes from the site row
+    via pageBudgetFor(). There is no path left where a caller states its own
+    allowance.
   */
-  const requested = typeof maxPages === 'number' && Number.isFinite(maxPages) ? maxPages : 1;
-  const pageBudget = Math.max(1, Math.min(Math.floor(requested), MAX_AUDIT_PAGES));
+  const user = await currentUser();
+  let pageBudget = 1;
 
-  const ip = clientIp(request.headers);
-  const withinQuick = checkRateLimit(`audit:${ip}`, AUDIT_RATE_LIMIT);
-  const withinFull = depth === 'full' ? checkRateLimit(`audit-full:${ip}`, AUDIT_FULL_RATE_LIMIT) : true;
+  if (depth === 'full') {
+    if (!user) {
+      return fail('Sign in to run a full audit.', 401);
+    }
+    if (typeof siteId !== 'string' || !siteId) {
+      return fail('A full audit needs a site.', 400);
+    }
+
+    const site = await siteForUser(siteId, user.id);
+    /*
+      404, not 403. Confirming that a site id exists but belongs to somebody
+      else tells an attacker their guess was right; "no such site of yours" is
+      true either way and says nothing.
+    */
+    if (!site) return fail('No such site on your account.', 404);
+
+    if (!canRunFullAudit(site)) {
+      return fail('A full audit is part of Get Cited for this site.', 403);
+    }
+
+    pageBudget = pageBudgetFor(site);
+  }
+
+  const key = limitKey(user?.id ?? null, request.headers);
+  const withinQuick = checkRateLimit(`audit:${key}`, AUDIT_RATE_LIMIT);
+  const withinFull =
+    depth === 'full' ? checkRateLimit(`audit-full:${key}`, AUDIT_FULL_RATE_LIMIT) : true;
 
   if (!withinQuick || !withinFull) {
-    return fail("That's the checks for today on this connection. They reset at midnight UTC.", 429);
+    return fail("That's the checks for today. They reset at midnight UTC.", 429);
   }
 
   const checked = checkPublicHttpUrl(input);

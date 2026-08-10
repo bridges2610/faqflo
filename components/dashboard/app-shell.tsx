@@ -18,7 +18,7 @@ import {
   SearchIcon,
   SetupIcon,
 } from './nav-icons';
-import { EntitlementSwitcher } from './plan-badge';
+import { AccountMenu } from './account-menu';
 import { SiteSwitcher } from './site-switcher';
 
 type NavItem = {
@@ -186,9 +186,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               {!loading && <SiteSwitcher />}
             </div>
 
-            <div className="flex items-center gap-3">
-              <EntitlementSwitcher />
-            </div>
+            <div className="flex items-center gap-3">{!loading && <AccountMenu />}</div>
           </div>
         </header>
 

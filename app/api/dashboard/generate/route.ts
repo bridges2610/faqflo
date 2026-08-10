@@ -9,27 +9,19 @@ import {
   MAX_FAQ_COUNT_PAID,
   type Faq,
 } from '@/lib/faq';
-import { checkRateLimit, clientIp, DASHBOARD_RATE_LIMIT } from '@/lib/rate-limit';
+import { currentUser } from '@/lib/auth/dal';
+import { checkRateLimit, DASHBOARD_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
 
 /*
   Generation for the dashboard: same model and same schema as the free route,
   at the paid ceiling (MAX_FAQ_COUNT_PAID) and a much higher daily limit.
 
-  ⚠️ THIS ROUTE IS NOT AUTHENTICATED YET.
+  Authenticated. The rule this file has always stated is now enforced rather
+  than deferred: there is no `plan` field read from the request body, because
+  "a client that tells the server which tier it is on is not authorization —
+  it's a bypass with extra steps." Tier comes from the account row.
 
-  There is no session to check — the dashboard's "signed-in user" lives in
-  localStorage. So this endpoint trusts whoever calls it, and the per-IP limit
-  below is the only thing keeping it from being an open, unmetered Claude
-  endpoint that anyone can bill to this API key.
-
-  Two things follow, and neither is optional:
-
-  1. Gating this on a real session is the FIRST task of the auth stage, before
-     anything else in the dashboard is wired to a backend.
-  2. There is deliberately no `plan` field read from the request body. A client
-     that tells the server which tier it is on is not authorization — it's a
-     bypass with extra steps, and it would read as security while providing
-     none.
+  The paid ceiling is granted by the session, not by the caller asking for it.
 */
 
 const MODEL = 'claude-haiku-4-5';
@@ -39,11 +31,11 @@ function fail(message: string, status: number) {
 }
 
 export async function POST(request: Request) {
-  if (!checkRateLimit(`dash:${clientIp(request.headers)}`, DASHBOARD_RATE_LIMIT)) {
-    return fail(
-      "You've hit today's generation limit for this connection. It resets at midnight UTC.",
-      429,
-    );
+  const user = await currentUser();
+  if (!user) return fail('Sign in to generate answers.', 401);
+
+  if (!checkRateLimit(`dash:${limitKey(user.id, request.headers)}`, DASHBOARD_RATE_LIMIT)) {
+    return fail("You've hit today's generation limit. It resets at midnight UTC.", 429);
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

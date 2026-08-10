@@ -514,18 +514,32 @@ function seedContentPlan(siteId: string): ContentPlan {
   };
 }
 
-export function buildSeed(): DashboardData {
-  const site: Site = {
-    id: newId('site'),
-    name: 'Summit Roofing',
-    domain: 'summitroofing.com',
-    createdAt: daysAgo(38),
-    getCitedAt: daysAgo(31),
-    lastAudit: seedAudit(),
-    industry: 'Roofing contractor',
-    location: 'Franklin, TN',
-    profileSource: 'schema',
-  };
+/**
+ * The demo data, for a site that already exists.
+ *
+ * ⚠️ DEVELOPMENT ONLY. It used to run automatically for any browser with no
+ * stored data, which — once accounts existed — would have meant every new
+ * customer's first sight of the product was somebody else's roofing company,
+ * with a paid subscription they had not bought. Now it is a button, and it
+ * fills in around a real site rather than inventing one.
+ *
+ * It no longer returns a `user` or a `sites` array, because it cannot: those
+ * are Postgres rows. It seeds only what still lives in the browser, hung off
+ * whichever site id it is given.
+ */
+export type SeedLocalData = {
+  groups: FaqGroup[];
+  faqs: FaqEntry[];
+  questions: DiscoveredQuestion[];
+  tracking: SiteTracking[];
+  contentPlans: ContentPlan[];
+  audits: Record<string, AuditReport>;
+};
+
+export function buildSeed(siteId: string): SeedLocalData {
+  // Stands in for the real row's domain in the seeded competitor table. The
+  // actual site may be called anything; this only has to be consistent.
+  const site = { id: siteId, domain: 'summitroofing.com' };
 
   const groups: FaqGroup[] = [];
   const faqs: FaqEntry[] = [];
@@ -601,22 +615,15 @@ export function buildSeed(): DashboardData {
     },
   ];
 
-  const user: User = {
-    id: newId('user'),
-    name: 'Beau Bridges',
-    email: 'beau@coastalpanda.com',
-    subscription: 'stay_cited',
-    subscriptionSince: daysAgo(31),
-  };
-
   return {
-    user,
-    sites: [site],
     groups,
     faqs,
     questions,
     tracking,
     contentPlans: [seedContentPlan(site.id)],
+    // The seeded audit, hung off the real site id — audits are keyed by site
+    // in local storage now rather than living on the site object.
+    audits: { [site.id]: seedAudit() },
   };
 }
 

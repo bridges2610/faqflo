@@ -1,7 +1,20 @@
 import { NextResponse } from 'next/server';
 import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
+import { currentUser } from '@/lib/auth/dal';
 import { MAX_CONTENT_CHARS } from '@/lib/faq';
+import { checkRateLimit, FETCH_URL_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
 
+/*
+  Fetch a page and hand back its readable text, for the dashboard generator.
+
+  ⚠️ This route previously had NO rate limit and NO authentication — it did not
+  import the limiter at all. That made it a general-purpose fetch proxy anyone
+  could point at any public address, from our servers and our IP: an
+  unmetered way to make somebody else's traffic look like ours. The SSRF guard
+  stopped it reaching private networks, which is a different problem.
+
+  Both are fixed here. It is a dashboard tool, so it wants a session anyway.
+*/
 const FETCH_TIMEOUT_MS = 10_000;
 
 function fail(message: string, status = 400) {
@@ -36,6 +49,13 @@ function extractText(html: string): string {
 }
 
 export async function POST(request: Request) {
+  const user = await currentUser();
+  if (!user) return fail('Sign in to read a page.', 401);
+
+  if (!checkRateLimit(`fetch-url:${limitKey(user.id, request.headers)}`, FETCH_URL_RATE_LIMIT)) {
+    return fail("That's the page reads for today. They reset at midnight UTC.", 429);
+  }
+
   let body: unknown;
   try {
     body = await request.json();

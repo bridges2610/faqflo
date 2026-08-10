@@ -29,9 +29,25 @@ export function SiteNav() {
           ))}
         </ul>
 
-        <ButtonLink href="/#audit" size="sm" arrow>
-          Check my site
-        </ButtonLink>
+        {/*
+          Until accounts existed, nothing on the marketing site linked to the
+          app at all — /dashboard was reachable only by typing it. "Sign in" is
+          a quiet text link rather than a second button because the primary
+          action here is still the free check: the people who already have an
+          account know what they came for, and the ones who don't shouldn't be
+          asked to choose between two buttons.
+        */}
+        <div className="flex items-center gap-4 sm:gap-5">
+          <Link
+            href="/sign-in"
+            className="text-slate hover:text-primary text-sm font-medium transition-colors duration-150"
+          >
+            Sign in
+          </Link>
+          <ButtonLink href="/#audit" size="sm" arrow>
+            Check my site
+          </ButtonLink>
+        </div>
       </nav>
     </header>
   );

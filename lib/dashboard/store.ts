@@ -22,6 +22,8 @@
  */
 
 import { isAuditReport } from '@/lib/audit/types';
+import { createClient as supabaseBrowser } from '@/lib/supabase/client';
+import type { SiteRow } from '@/lib/supabase/types';
 import { contentHash, normalizePath } from './export';
 import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
@@ -37,10 +39,41 @@ import type {
   User,
 } from './types';
 
-// v4: site.lastAudit went from a three-check summary to the full audit report.
-// (v3 moved answers from site-scoped to group-scoped.) An older payload can't
-// be read into these types, so the key moves rather than the data migrating.
-const STORAGE_KEY = 'faqflo.dashboard.v4';
+/*
+  v5: accounts arrived.
+
+  `user` and `sites` no longer live here at all — they are rows in Postgres,
+  because the server has to be able to check who you are and what you have
+  bought, and it cannot do that against a browser's localStorage. What remains
+  local is everything the server does not yet need to police: groups, answers,
+  discovered questions, tracking and content plans.
+
+  The key is namespaced by account id. Before this, one browser had one
+  dashboard; now two people can sign into the same browser, and an unnamespaced
+  key would hand the second one the first one's answers.
+
+  (v4: site.lastAudit became the full audit report. v3: answers moved from
+  site-scoped to group-scoped.)
+*/
+const STORAGE_PREFIX = 'faqflo.dashboard.v5';
+
+function storageKey(userId: string): string {
+  return `${STORAGE_PREFIX}.${userId}`;
+}
+
+/**
+ * Who this browser session is acting as.
+ *
+ * Module-scoped because every mutation below returns the whole snapshot and so
+ * needs to know which account's local half to merge — threading a user id
+ * through forty call sites would change every component for no behavioural
+ * gain. Set by loadDashboard() and by nothing else.
+ *
+ * It is safe only because this module is client-only and one tab is one
+ * account: signing out navigates away and unmounts the provider, which is what
+ * clears it. `assertClient` is what keeps that promise true.
+ */
+let activeUserId: string | null = null;
 
 function assertClient(fn: string): void {
   if (typeof window === 'undefined') {
@@ -48,14 +81,36 @@ function assertClient(fn: string): void {
   }
 }
 
-function read(): DashboardData | null {
-  const raw = window.localStorage.getItem(STORAGE_KEY);
-  if (!raw) return null;
+/**
+ * The parts of the snapshot that still live in the browser.
+ *
+ * `audits` is keyed by site id rather than hanging off the site object, because
+ * sites are Postgres rows now and the report is not one of their columns. A
+ * report is a large blob only its own account reads; moving it to the database
+ * buys nothing until it needs to be shared across devices, which is the next
+ * migration rather than this one.
+ */
+type LocalData = Omit<DashboardData, 'user' | 'sites'> & {
+  audits: Record<string, SiteAudit>;
+};
+
+const EMPTY_LOCAL: LocalData = {
+  groups: [],
+  faqs: [],
+  questions: [],
+  tracking: [],
+  contentPlans: [],
+  audits: {},
+};
+
+function readLocal(userId: string): LocalData {
+  const raw = window.localStorage.getItem(storageKey(userId));
+  if (!raw) return EMPTY_LOCAL;
   try {
-    return normalise(JSON.parse(raw) as DashboardData);
+    return normaliseLocal(JSON.parse(raw) as LocalData);
   } catch {
-    window.localStorage.removeItem(STORAGE_KEY);
-    return null;
+    window.localStorage.removeItem(storageKey(userId));
+    return EMPTY_LOCAL;
   }
 }
 
@@ -72,24 +127,25 @@ function read(): DashboardData | null {
  * Dropping beats coercing: a partial report shown as though it were whole would
  * put numbers on screen that nothing measured.
  */
-function normalise(data: DashboardData): DashboardData {
+function normaliseLocal(data: LocalData): LocalData {
+  /*
+    Stored audits are still dropped rather than coerced when they no longer
+    match the report shape — a partial report shown as though it were whole
+    would put numbers on screen that nothing measured. The Audit page offers to
+    run a fresh one.
+  */
+  const audits: Record<string, SiteAudit> = {};
+  for (const [siteId, report] of Object.entries(data.audits ?? {})) {
+    if (isAuditReport(report)) audits[siteId] = report;
+  }
+
   return {
-    ...data,
-    sites: (data.sites ?? []).map((site) => ({
-      ...site,
-      lastAudit: isAuditReport(site.lastAudit) ? site.lastAudit : null,
-      // Added after v4 shipped. Backfilled rather than key-bumped: a missing
-      // industry is a field we don't know yet, not a payload we can't read,
-      // and bumping would throw away every site, group and answer to add it.
-      industry: site.industry ?? null,
-      location: site.location ?? null,
-      profileSource: site.profileSource ?? null,
-    })),
     groups: data.groups ?? [],
     faqs: data.faqs ?? [],
     questions: data.questions ?? [],
     tracking: (data.tracking ?? []).map(normaliseTracking),
     contentPlans: data.contentPlans ?? [],
+    audits,
   };
 }
 
@@ -138,35 +194,116 @@ function normaliseTracking(raw: SiteTracking): SiteTracking {
   };
 }
 
+/**
+ * Persist the local half and hand back the whole snapshot.
+ *
+ * `user` and the site rows are deliberately NOT written: they came from
+ * Postgres, and a browser that can write its own copy of them is a browser
+ * deciding its own entitlements again. Each site's `lastAudit` IS local, so it
+ * is lifted out into the audits map on the way past.
+ */
 function write(data: DashboardData): DashboardData {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const audits: Record<string, SiteAudit> = {};
+  for (const site of data.sites) {
+    if (site.lastAudit) audits[site.id] = site.lastAudit;
+  }
+
+  const local: LocalData = {
+    groups: data.groups,
+    faqs: data.faqs,
+    questions: data.questions,
+    tracking: data.tracking,
+    contentPlans: data.contentPlans,
+    audits,
+  };
+
+  window.localStorage.setItem(storageKey(requireUserId('write')), JSON.stringify(local));
   return data;
 }
 
-function requireData(fn: string): DashboardData {
+function requireUserId(fn: string): string {
   assertClient(fn);
-  const data = read();
-  if (!data) throw new Error(`${fn} called before the dashboard was loaded.`);
-  return data;
+  if (!activeUserId) throw new Error(`${fn} called before the dashboard was loaded.`);
+  return activeUserId;
 }
+
+/** Server rows plus local data, joined on site id. One shape for every caller. */
+function assemble(user: User, sites: Site[], local: LocalData): DashboardData {
+  return {
+    user,
+    sites: sites.map((site) => ({ ...site, lastAudit: local.audits[site.id] ?? null })),
+    groups: local.groups,
+    faqs: local.faqs,
+    questions: local.questions,
+    tracking: local.tracking,
+    contentPlans: local.contentPlans,
+  };
+}
+
+/** The snapshot as it stands right now. */
+function requireData(fn: string): DashboardData {
+  const userId = requireUserId(fn);
+  if (!serverHalf) throw new Error(`${fn} called before the dashboard was loaded.`);
+
+  return assemble(serverHalf.user, serverHalf.sites, readLocal(userId));
+}
+
+/**
+ * The rows that came from Postgres, held so a mutation can return a complete
+ * snapshot without re-querying everything. Their `lastAudit` is always null —
+ * it is joined on in assemble() — so there is one place that knows where an
+ * audit lives.
+ */
+let serverHalf: { user: User; sites: Site[] } | null = null;
 
 function now(): string {
   return new Date().toISOString();
 }
 
-export async function loadDashboard(): Promise<DashboardData> {
+/**
+ * Assemble the dashboard for a signed-in account.
+ *
+ * ⚠️ There is no `?? buildSeed()` here any more, and that absence is the point.
+ * It used to mean any fresh browser silently became a fully-entitled account
+ * with an active subscription — fine for a demo with no accounts, indefensible
+ * once real ones exist. A new account now starts empty, which is the truth.
+ *
+ * The seed is still reachable for local development; see seedLocalData().
+ */
+export async function loadDashboard(user: User, sites: Site[]): Promise<DashboardData> {
   assertClient('loadDashboard');
-  return read() ?? write(buildSeed());
+
+  activeUserId = user.id;
+  serverHalf = { user, sites };
+
+  return assemble(user, sites, readLocal(user.id));
 }
 
-export async function resetDashboard(): Promise<DashboardData> {
-  assertClient('resetDashboard');
-  return write(buildSeed());
+/**
+ * Replace the local half with the demo fixture.
+ *
+ * Development only, and it says so on the button. It writes groups, answers,
+ * questions and tracking for whichever sites the account actually has — it
+ * cannot invent sites any more, because those are rows now.
+ */
+export async function seedLocalData(): Promise<DashboardData> {
+  const data = requireData('seedLocalData');
+  const site = data.sites[0];
+  if (!site) return data;
+
+  return write({ ...data, ...buildSeed(site.id) });
 }
 
-export async function updateUser(patch: Partial<User>): Promise<DashboardData> {
-  const data = requireData('updateUser');
-  return write({ ...data, user: { ...data.user, ...patch } });
+/**
+ * Forget this account's local data.
+ *
+ * Not called on sign-out: the data is the customer's work, and silently
+ * deleting it because they signed out on a shared laptop would be worse than
+ * leaving it. Exposed so a "clear my local data" control can exist.
+ */
+export async function clearLocalData(): Promise<void> {
+  const userId = requireUserId('clearLocalData');
+  window.localStorage.removeItem(storageKey(userId));
 }
 
 /* ---------------------------------------------------------------- sites --- */
@@ -188,25 +325,89 @@ export type SitePatch = Partial<NewSite> & {
   profileSource?: Site['profileSource'];
 };
 
+/*
+  Sites are rows now.
+
+  Every function below writes to Postgres and then re-reads, rather than
+  patching the in-memory list and hoping. It costs a round trip and buys the
+  guarantee that what the UI shows is what the database has — which matters
+  because these rows also carry `get_cited_at`, and a screen that disagrees
+  with the server about what you have paid for is a support ticket.
+
+  Row-level security means none of these can touch another account's site even
+  if the filter were wrong, and the column grants mean none of them can write
+  an entitlement even if we asked.
+*/
+
+/**
+ * DB row → the shape the app renders.
+ *
+ * `lastAudit` is always null here; assemble() joins the stored report on by
+ * site id. Keeping the null in one place means nothing downstream has to guess
+ * whether a site it was handed has had its audit attached yet.
+ */
+export function toSite(row: SiteRow): Site {
+  return {
+    id: row.id,
+    name: row.name,
+    domain: row.domain,
+    createdAt: row.created_at,
+    getCitedAt: row.get_cited_at,
+    lastAudit: null,
+    industry: row.industry,
+    location: row.location,
+    profileSource: row.profile_source,
+  };
+}
+
+/** Re-read every site and rebuild the snapshot around it. */
+async function refreshSites(fn: string): Promise<DashboardData> {
+  const userId = requireUserId(fn);
+  if (!serverHalf) throw new Error(`${fn} called before the dashboard was loaded.`);
+
+  const supabase = supabaseBrowser();
+  const { data: rows, error } = await supabase
+    .from('sites')
+    .select('*')
+    .eq('user_id', serverHalf.user.id)
+    .order('created_at', { ascending: true });
+
+  if (error) throw new Error(error.message);
+
+  const sites = ((rows as SiteRow[] | null) ?? []).map(toSite);
+  serverHalf = { user: serverHalf.user, sites };
+
+  // assemble() rejoins each audit from local storage, so a rename doesn't lose
+  // the report attached to the site being renamed.
+  return assemble(serverHalf.user, sites, readLocal(userId));
+}
+
 export async function createSite(input: NewSite): Promise<DashboardData> {
   const data = requireData('createSite');
-  const site: Site = {
-    id: newId('site'),
-    name: input.name.trim(),
-    domain: normalizeDomain(input.domain),
-    createdAt: now(),
-    getCitedAt: null,
-    lastAudit: null,
-    industry: null,
-    location: null,
-    profileSource: null,
-  };
+  const supabase = supabaseBrowser();
+
+  const { data: row, error } = await supabase
+    .from('sites')
+    .insert({
+      user_id: data.user.id,
+      name: input.name.trim(),
+      domain: normalizeDomain(input.domain),
+    })
+    .select()
+    .single<SiteRow>();
+
+  if (error) {
+    // 23505 is Postgres' unique_violation — here, the (user_id, domain) index.
+    // The form checks for this too, but only the constraint sees a second tab.
+    if (error.code === '23505') throw new Error('That domain is already on your account.');
+    throw new Error(error.message);
+  }
 
   // A site with no group has nowhere to put an answer, so it gets one for its
   // home page immediately. The customer renames it or adds more.
   const group: FaqGroup = {
     id: newId('grp'),
-    siteId: site.id,
+    siteId: row.id,
     name: 'Home page',
     path: '/',
     position: 0,
@@ -215,31 +416,40 @@ export async function createSite(input: NewSite): Promise<DashboardData> {
     publishedHash: null,
   };
 
+  const next = await refreshSites('createSite');
   return write({
-    ...data,
-    sites: [...data.sites, site],
-    groups: [...data.groups, group],
-    tracking: [...data.tracking, emptyTracking(site.id)],
+    ...next,
+    groups: [...next.groups, group],
+    tracking: [...next.tracking, emptyTracking(row.id)],
   });
 }
 
 export async function updateSite(id: string, patch: SitePatch): Promise<DashboardData> {
   const data = requireData('updateSite');
-  return write({
-    ...data,
-    sites: data.sites.map((s) =>
-      s.id === id
-        ? {
-            ...s,
-            ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-            ...(patch.domain !== undefined ? { domain: normalizeDomain(patch.domain) } : {}),
-            ...(patch.industry !== undefined ? { industry: trimmedOrNull(patch.industry) } : {}),
-            ...(patch.location !== undefined ? { location: trimmedOrNull(patch.location) } : {}),
-            ...(patch.profileSource !== undefined ? { profileSource: patch.profileSource } : {}),
-          }
-        : s,
-    ),
-  });
+  const supabase = supabaseBrowser();
+
+  /*
+    Only the columns a signed-in user is granted UPDATE on. Sending
+    `get_cited_at` here would not quietly succeed — the grant refuses it — but
+    building the object without it makes the intent legible at the call site
+    rather than only in the migration.
+  */
+  const update: Record<string, string | null> = {};
+  if (patch.name !== undefined) update.name = patch.name.trim();
+  if (patch.domain !== undefined) update.domain = normalizeDomain(patch.domain);
+  if (patch.industry !== undefined) update.industry = trimmedOrNull(patch.industry);
+  if (patch.location !== undefined) update.location = trimmedOrNull(patch.location);
+  if (patch.profileSource !== undefined) update.profile_source = patch.profileSource;
+
+  if (Object.keys(update).length === 0) return data;
+
+  const { error } = await supabase.from('sites').update(update).eq('id', id);
+  if (error) {
+    if (error.code === '23505') throw new Error('That domain is already on your account.');
+    throw new Error(error.message);
+  }
+
+  return write(await refreshSites('updateSite'));
 }
 
 /** Empty is the same as unknown here — a blank industry isn't a value. */
@@ -250,44 +460,55 @@ function trimmedOrNull(value: string | null): string | null {
 
 export async function deleteSite(id: string): Promise<DashboardData> {
   const data = requireData('deleteSite');
-  const groupIds = new Set(data.groups.filter((g) => g.siteId === id).map((g) => g.id));
+  const supabase = supabaseBrowser();
+
+  const { error } = await supabase.from('sites').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+
+  const next = await refreshSites('deleteSite');
+
+  // The row is gone; its local children have to follow, or they linger as
+  // groups belonging to a site that no longer exists.
+  const groupIds = new Set(next.groups.filter((g) => g.siteId === id).map((g) => g.id));
 
   return write({
-    ...data,
-    sites: data.sites.filter((s) => s.id !== id),
-    groups: data.groups.filter((g) => g.siteId !== id),
-    faqs: data.faqs.filter((f) => !groupIds.has(f.groupId)),
-    questions: data.questions.filter((q) => q.siteId !== id),
-    tracking: data.tracking.filter((t) => t.siteId !== id),
-    contentPlans: data.contentPlans.filter((c) => c.siteId !== id),
+    ...next,
+    groups: next.groups.filter((g) => g.siteId !== id),
+    faqs: next.faqs.filter((f) => !groupIds.has(f.groupId)),
+    questions: next.questions.filter((q) => q.siteId !== id),
+    tracking: next.tracking.filter((t) => t.siteId !== id),
+    contentPlans: next.contentPlans.filter((c) => c.siteId !== id),
   });
 }
+
+/*
+  setGetCited() and setSubscription() are gone.
+
+  They existed so the demo entitlement switcher could grant Get Cited and Stay
+  Cited from the browser, which was defensible only while entitlements lived in
+  localStorage and nothing server-side believed them. Both columns are now
+  writable by the service role alone — see the GRANTs in
+  supabase/migrations/0001 — so a client-side setter could not work even if it
+  were still here, and having one would suggest it should.
+
+  Stripe's webhook writes them, in the next stage.
+*/
 
 /**
- * Grant or revoke Get Cited for one site.
+ * Keep the latest audit so the page shows its findings when you come back.
  *
- * In production this is written by the payment webhook, never by the client —
- * a browser that can grant its own entitlements has no entitlements. It exists
- * here because the entitlement currently lives in localStorage anyway, and the
- * UI labels the control as a demo action.
+ * Still local. An audit report is a large JSON blob that only its own account
+ * ever reads, and moving it to Postgres buys nothing until it is shared or
+ * queried across devices — which is the next migration, not this one.
  */
-export async function setGetCited(id: string, granted: boolean): Promise<DashboardData> {
-  const data = requireData('setGetCited');
-  return write({
-    ...data,
-    sites: data.sites.map((s) =>
-      s.id === id ? { ...s, getCitedAt: granted ? (s.getCitedAt ?? now()) : null } : s,
-    ),
-  });
-}
-
-/** Keep the latest audit so the page shows its findings when you come back. */
 export async function saveAudit(siteId: string, report: SiteAudit): Promise<DashboardData> {
   const data = requireData('saveAudit');
-  return write({
-    ...data,
-    sites: data.sites.map((s) => (s.id === siteId ? { ...s, lastAudit: report } : s)),
-  });
+  const sites = data.sites.map((s) => (s.id === siteId ? { ...s, lastAudit: report } : s));
+
+  // Held on the server half too, so the next mutation's snapshot keeps it.
+  if (serverHalf) serverHalf = { ...serverHalf, sites };
+
+  return write({ ...data, sites });
 }
 
 /* ------------------------------------------------------------- content --- */

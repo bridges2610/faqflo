@@ -1,15 +1,19 @@
 /**
- * Per-IP daily rate limit for the free generator.
+ * Daily rate limits, keyed by account where there is one and IP where there
+ * isn't.
  *
- * KNOWN LIMITATION — carried over from the Express version deliberately.
+ * KNOWN LIMITATION — still an in-process Map. On Vercel each serverless
+ * instance has its own copy and instances are recycled constantly, so the
+ * real-world limit is looser than the numbers suggest and resets
+ * unpredictably. It is a speed bump, not a control.
  *
- * This is an in-process Map. On Vercel each serverless instance has its own
- * copy and instances are recycled constantly, so the real-world limit is looser
- * than RATE_LIMIT suggests and resets unpredictably. It is a speed bump, not a
- * control.
- *
- * When Supabase lands in the next stage this moves into a table and becomes a
- * real limit. Left as-is until then so this stage changes one thing at a time.
+ * What changed with auth is what it's protecting, not how well it works. It
+ * used to be the ONLY thing between a stranger and an unmetered Claude
+ * endpoint — the gated routes now check a real session first, so this has gone
+ * from the security boundary to a cost control, which is all a speed bump was
+ * ever fit to be. The genuinely anonymous routes (the free generator and the
+ * quick audit) still lean on it alone, which is why it should still move into
+ * a Postgres table with a proper window.
  */
 
 export const RATE_LIMIT = 3;
@@ -54,6 +58,17 @@ export const AUDIT_FULL_RATE_LIMIT = 4;
  */
 export const CONTENT_RATE_LIMIT = 10;
 
+/**
+ * Ceiling for reading a page into the generator.
+ *
+ * Generous, because it is a step inside a normal working session rather than
+ * an end in itself — someone writing FAQs for six pages hits it six times in a
+ * row legitimately. It exists because the route had no limit at all, which
+ * made it a free fetch proxy: cheap for us per call, but pointed at somebody
+ * else's server, from our address, as many times as anyone liked.
+ */
+export const FETCH_URL_RATE_LIMIT = 60;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 
@@ -83,4 +98,16 @@ export function clientIp(headers: Headers): string {
   const forwarded = headers.get('x-forwarded-for');
   if (forwarded) return forwarded.split(',')[0].trim();
   return headers.get('x-real-ip') ?? 'unknown';
+}
+
+/**
+ * Who this request counts against.
+ *
+ * An account id when we have one, the IP otherwise. Keying a signed-in route
+ * by IP charges an office of twenty people to one bucket and lets one person
+ * with a phone reset theirs at will; neither is what the limit is for. The
+ * `user:` / `ip:` prefixes keep the two namespaces from ever colliding.
+ */
+export function limitKey(userId: string | null, headers: Headers): string {
+  return userId ? `user:${userId}` : `ip:${clientIp(headers)}`;
 }

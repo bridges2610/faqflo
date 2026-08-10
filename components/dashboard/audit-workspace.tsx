@@ -7,7 +7,10 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScoreDial } from '@/components/ui/score-dial';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canRunFullAudit, pageBudgetFor } from '@/lib/dashboard/plans';
+// pageBudgetFor is no longer imported here: the budget is the server's
+// decision now, and a client-side copy of it would only ever be a guess about
+// what the server was going to do.
+import { canRunFullAudit } from '@/lib/dashboard/plans';
 import { opportunities, visibilityFindings } from '@/lib/dashboard/audit-context';
 import { timeAgo } from '@/lib/dashboard/format';
 import { useCopy } from '@/lib/dashboard/use-copy';
@@ -238,10 +241,16 @@ export function AuditWorkspace() {
       const res = await fetch('/api/audit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        /*
+          `maxPages` is gone. The server derives the page budget from the site
+          row, because a client that states its own allowance isn't stating
+          anything the server should believe — and a hundred pages is a hundred
+          requests to somebody else's host.
+        */
         body: JSON.stringify({
           url: site.domain,
           depth: full ? 'full' : 'quick',
-          maxPages: pageBudgetFor(site),
+          siteId: site.id,
         }),
       });
       const crawl = (await res.json()) as AuditReport | { error: string };

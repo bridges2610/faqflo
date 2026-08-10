@@ -59,7 +59,10 @@ const PLANS: Plan[] = [
     price: { kind: 'oneTime', amount: 129 },
     blurb: 'The one-off job of getting set up properly.',
     cta: 'Get set up',
-    href: '/#audit',
+    // The paid plans start with an account. Checkout itself is the Stripe
+    // stage; until then this lands people in the product rather than back at
+    // the free check they have probably already run.
+    href: '/sign-up',
     featured: true,
     note: 'Start here',
     features: [
@@ -77,7 +80,7 @@ const PLANS: Plan[] = [
     price: { kind: 'subscription', monthly: 29, annualTotal: 290 },
     blurb: 'Because being cited once is not the same as staying cited.',
     cta: 'Keep me cited',
-    href: '/#audit',
+    href: '/sign-up',
     featured: false,
     note: null,
     features: [

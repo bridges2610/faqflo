@@ -2,22 +2,22 @@ import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
 import type { PageContent } from '@/lib/audit/types';
 import { buildContentPrompt, CONTENT_SCHEMA, TOPIC_COUNT, type ContentGeneration } from '@/lib/content';
-import { checkRateLimit, clientIp, CONTENT_RATE_LIMIT } from '@/lib/rate-limit';
+import { currentUser, siteForUser } from '@/lib/auth/dal';
+import { canContent } from '@/lib/auth/entitlements';
+import { checkRateLimit, CONTENT_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
 
 /*
   The content plan: the pages this industry expects, and ten things to write.
 
-  ⚠️ THIS ROUTE IS NOT AUTHENTICATED YET.
+  Authenticated, and the most expensive call in the app at roughly a sixth of a
+  dollar per run — which is why it takes a `siteId` and looks the site up,
+  rather than taking the `domain` string it used to. A domain in a request body
+  is an instruction to spend money on whatever the caller names; a site id
+  checked against `user_id` is a claim we can refuse.
 
-  Same position as /api/dashboard/generate: there is no session to check, so the
-  per-IP limit below is the only thing between a stranger and an unmetered
-  Claude endpoint billed to this key. Gating on a real session is the auth
-  stage's first job, and there is deliberately no `plan` or tier field read from
-  the body — a client that declares its own entitlement is a bypass with extra
-  steps.
-
-  This one is worth more care than the FAQ routes: it is the most expensive call
-  in the app, at roughly a sixth of a dollar per run.
+  The rule this route has always stated still holds and is now enforceable:
+  there is no `plan` or tier field read from the body. Entitlement comes from
+  the row, via lib/auth/entitlements.ts.
 */
 
 /*
@@ -56,11 +56,13 @@ function isPageContent(value: unknown): value is PageContent {
 }
 
 export async function POST(request: Request) {
-  if (!checkRateLimit(`content:${clientIp(request.headers)}`, CONTENT_RATE_LIMIT)) {
-    return fail(
-      "That's the content plans for today on this connection. They reset at midnight UTC.",
-      429,
-    );
+  // Identity before anything else — including before the rate limit, so the
+  // limit can be charged to the account rather than to a shared office IP.
+  const user = await currentUser();
+  if (!user) return fail('Sign in to build a content plan.', 401);
+
+  if (!checkRateLimit(`content:${limitKey(user.id, request.headers)}`, CONTENT_RATE_LIMIT)) {
+    return fail("That's the content plans for today. They reset at midnight UTC.", 429);
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -75,11 +77,21 @@ export async function POST(request: Request) {
     return fail('Invalid request body.', 400);
   }
 
-  const { domain, industry, location, hint, pages } = (body ?? {}) as Record<string, unknown>;
+  const { siteId, industry, location, hint, pages } = (body ?? {}) as Record<string, unknown>;
 
-  if (typeof domain !== 'string' || !domain.trim()) {
+  if (typeof siteId !== 'string' || !siteId) {
     return fail('A site is required.', 400);
   }
+
+  // The domain comes off the row, not the request. This is the whole point of
+  // the change: we spend money on a site the caller demonstrably owns.
+  const site = await siteForUser(siteId, user.id);
+  if (!site) return fail('No such site on your account.', 404);
+
+  if (!canContent(site)) {
+    return fail('The content plan is part of Get Cited for this site.', 403);
+  }
+
   if (!Array.isArray(pages) || pages.length === 0) {
     return fail('Run a full audit first — there are no pages to plan from.', 400);
   }
@@ -106,7 +118,7 @@ export async function POST(request: Request) {
         {
           role: 'user',
           content: buildContentPrompt({
-            domain: domain.trim(),
+            domain: site.domain,
             industry: typeof industry === 'string' && industry.trim() ? industry.trim() : null,
             location: typeof location === 'string' && location.trim() ? location.trim() : null,
             hint: typeof hint === 'string' ? hint : '',

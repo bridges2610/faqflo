@@ -24,7 +24,7 @@ import { StatTile } from './stat-tile';
 type NextAction = { title: string; body: string; href: string; cta: string } | null;
 
 export function OverviewWorkspace() {
-  const { site, sites, groups, faqs, faqsIn, questions, tracking, data, user, resetDemo } =
+  const { site, sites, groups, faqs, faqsIn, questions, tracking, data, user, seedDemoData } =
     useDashboard();
 
   if (!site || !data) {
@@ -278,15 +278,19 @@ export function OverviewWorkspace() {
           </Card>
         </div>
 
-        {/* DEMO ONLY — goes with the rest of the mock layer. */}
         <Card tone="cloud" className="flex flex-wrap items-center justify-between gap-4 p-5">
           <p className="text-slate text-sm">
-            {sites.length} {sites.length === 1 ? 'site' : 'sites'} on this account. Demo data lives
-            in this browser only.
+            {sites.length} {sites.length === 1 ? 'site' : 'sites'} on this account. Your answers,
+            questions and tracking are stored in this browser for now.
           </p>
-          <Button size="sm" variant="ghost" onClick={resetDemo}>
-            Reset demo data
-          </Button>
+          {/* Development affordance: fills the local half with the demo
+              fixture so the populated screens can be seen. It can no longer
+              grant an entitlement or invent a site — both are rows. */}
+          {process.env.NODE_ENV === 'development' && (
+            <Button size="sm" variant="ghost" onClick={seedDemoData}>
+              Fill with demo data
+            </Button>
+          )}
         </Card>
       </div>
     </>

@@ -21,7 +21,7 @@ import { SiteForm } from './site-form';
   blocked — the money is per site, so a cap would only cost us customers.
 */
 function SiteRow({ id }: { id: string }) {
-  const { sites, site, selectSite, removeSite, data, setGetCited } = useDashboard();
+  const { sites, site, selectSite, removeSite, data } = useDashboard();
   const [confirming, setConfirming] = useState(false);
 
   const row = sites.find((s) => s.id === id);
@@ -69,15 +69,10 @@ function SiteRow({ id }: { id: string }) {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* DEMO ONLY — in production a payment webhook writes this, never the
-            browser. Goes with the rest of the mock entitlement layer. */}
-        <button
-          onClick={() => setGetCited(row.id, !setUp)}
-          className="text-slate hover:text-navy border-line rounded-full border px-3 py-1 text-xs transition-colors duration-150"
-        >
-          {setUp ? 'Revoke Get Cited (demo)' : 'Grant Get Cited (demo)'}
-        </button>
-
+        {/* The grant/revoke buttons that used to sit here are gone. Get Cited
+            is a column the browser has no UPDATE grant on, so the control
+            could only ever have failed silently. Buying it is the Stripe
+            stage; until then, set get_cited_at in the SQL editor. */}
         {!isCurrent && (
           <button
             onClick={() => selectSite(row.id)}

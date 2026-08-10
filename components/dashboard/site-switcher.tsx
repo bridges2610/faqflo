@@ -16,7 +16,9 @@ export function SiteSwitcher() {
 
   if (!site) {
     return (
-      <Link href="/dashboard/setup" className="text-primary text-sm font-medium">
+      // Was /dashboard/setup, a route that has never existed — so an account
+      // with no sites clicked "Add your first site" and got a 404.
+      <Link href="/dashboard/sites" className="text-primary text-sm font-medium">
         Add your first site →
       </Link>
     );

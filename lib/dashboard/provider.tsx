@@ -67,21 +67,41 @@ type Ctx = {
   moveFaqToGroup: (id: string, groupId: string) => Promise<void>;
   coverQuestion: (id: string) => Promise<void>;
 
-  /** Demo-only entitlement controls — see the switcher in the header. */
-  setGetCited: (siteId: string, granted: boolean) => Promise<void>;
-  setSubscription: (subscription: Subscription) => Promise<void>;
-  resetDemo: () => Promise<void>;
+  /**
+   * Fill the local half with demo data. Development only.
+   *
+   * What used to be `resetDemo`. It can no longer conjure a site or a
+   * subscription — those are rows — so it decorates whichever site is selected.
+   */
+  seedDemoData: () => Promise<void>;
 };
 
 const DashboardContext = createContext<Ctx | null>(null);
 
-export function DashboardProvider({ children }: { children: React.ReactNode }) {
+/**
+ * Dashboard state, rooted in a real account.
+ *
+ * `user` and `sites` arrive as props from the (app) layout, which read them
+ * server-side after checking the session. That ordering matters twice over:
+ * the identity is established before any of this renders rather than being
+ * asked for afterwards, and the first paint already knows how many sites there
+ * are instead of flashing an empty dashboard at someone who has three.
+ */
+export function DashboardProvider({
+  user,
+  sites,
+  children,
+}: {
+  user: User;
+  sites: Site[];
+  children: React.ReactNode;
+}) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [siteId, setSiteId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    store.loadDashboard().then((loaded) => {
+    store.loadDashboard(user, sites).then((loaded) => {
       if (cancelled) return;
       setData(loaded);
       setSiteId(loaded.sites[0]?.id ?? null);
@@ -89,7 +109,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+    /*
+      Keyed on the account and the site list the server sent. Re-running when
+      the account changes is the thing that keeps one browser signing in as two
+      people honest — the store re-points at the other account's namespaced
+      storage rather than serving the first one's answers to the second.
+    */
+  }, [user, sites]);
 
   /* Every mutation funnels through here so there is exactly one place that
      writes state, and the selected site can never point at a deleted row. */
@@ -177,9 +203,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     moveFaqToGroup: (id, groupId) => apply(() => store.moveFaqToGroup(id, groupId)),
     coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
 
-    setGetCited: (id, granted) => apply(() => store.setGetCited(id, granted)),
-    setSubscription: (subscription) => apply(() => store.updateUser({ subscription })),
-    resetDemo: () => apply(() => store.resetDashboard()),
+    seedDemoData: () => apply(() => store.seedLocalData()),
   };
 
   return <DashboardContext.Provider value={value}>{children}</DashboardContext.Provider>;
