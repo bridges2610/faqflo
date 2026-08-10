@@ -217,7 +217,7 @@ function ProfileLine({
 }
 
 export function ContentWorkspace() {
-  const { site, contentPlan, saveContentPlan, renameSite } = useDashboard();
+  const { site, user, contentPlan, saveContentPlan, renameSite } = useDashboard();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -236,7 +236,7 @@ export function ContentWorkspace() {
     );
   }
 
-  if (!canContent(site)) {
+  if (!canContent(site, user)) {
     return (
       <>
         <PageHeader title="Content" description={description} />

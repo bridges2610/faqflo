@@ -19,6 +19,60 @@ import { PlanBadge } from './plan-badge';
   by antivirus scanners following links in email, and by the browser's own
   speculative loading — all of which would sign people out at random.
 */
+/**
+ * Cancel, change card, switch plan, download invoices — all on Stripe's side.
+ *
+ * Shown to everyone rather than only to customers who have bought something.
+ * Knowing which is which would mean either threading the Stripe customer id
+ * through the provider or firing a request every time the menu opens, and the
+ * route already answers honestly when there is nothing to manage. A clear
+ * sentence beats a control that silently isn't there.
+ */
+function ManageBilling() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function open() {
+    setError(null);
+    setBusy(true);
+
+    try {
+      const res = await fetch('/api/stripe/portal', { method: 'POST' });
+      const data = (await res.json()) as { url?: string; error?: string };
+
+      if (!res.ok || !data.url) {
+        setError(data.error ?? 'Could not open billing.');
+        setBusy(false);
+        return;
+      }
+      // Busy stays set — the browser is navigating to Stripe.
+      window.location.href = data.url;
+    } catch {
+      setError('Could not reach the server.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={open}
+        disabled={busy}
+        className="text-slate hover:text-navy w-full text-left text-sm font-medium transition-colors duration-150 disabled:opacity-50"
+      >
+        {busy ? 'Opening…' : 'Manage billing'}
+      </button>
+      {error && (
+        <p role="alert" className="text-error-ink mt-2 text-xs leading-relaxed">
+          {error}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function AccountMenu() {
   const { user } = useDashboard();
   const [open, setOpen] = useState(false);
@@ -82,7 +136,11 @@ export function AccountMenu() {
             <PlanBadge />
           </div>
 
-          <form action={signOut} className="border-line mt-4 border-t pt-3">
+          <div className="border-line mt-4 border-t pt-3">
+            <ManageBilling />
+          </div>
+
+          <form action={signOut} className="border-line mt-3 border-t pt-3">
             <button
               type="submit"
               role="menuitem"

@@ -5,7 +5,7 @@ import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import type { AuditDepth } from '@/lib/audit/types';
 import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canRunFullAudit, pageBudgetFor } from '@/lib/auth/entitlements';
+import { canRunFullAudit, hasGetCited, pageBudgetFor } from '@/lib/auth/entitlements';
 import {
   AUDIT_FULL_RATE_LIMIT,
   AUDIT_RATE_LIMIT,
@@ -129,11 +129,22 @@ export async function POST(request: Request) {
     */
     if (!site) return fail('No such site on your account.', 404);
 
-    if (!canRunFullAudit(site)) {
-      return fail('A full audit is part of Get Cited for this site.', 403);
+    /*
+      Two different refusals wearing one status code would be a bad experience:
+      "you never bought this" and "your 30 days are up" need different next
+      steps, and only one of them is a purchase of Get Cited. See
+      lib/auth/entitlements.ts for why the window exists.
+    */
+    if (!canRunFullAudit(site, user)) {
+      return fail(
+        hasGetCited(site)
+          ? 'Your Get Cited window has ended for this site. Stay Cited keeps audits running.'
+          : 'A full audit is part of Get Cited for this site.',
+        403,
+      );
     }
 
-    pageBudget = pageBudgetFor(site);
+    pageBudget = pageBudgetFor(site, user);
   }
 
   const key = limitKey(user?.id ?? null, request.headers);

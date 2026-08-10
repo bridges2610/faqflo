@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { PAGE_BUDGET } from '@/lib/dashboard/plans';
+import { GET_CITED_WINDOW_DAYS, PAGE_BUDGET } from '@/lib/dashboard/plans';
 import type { ProfileRow, SiteRow } from '@/lib/supabase/types';
 
 /**
@@ -23,7 +23,7 @@ import type { ProfileRow, SiteRow } from '@/lib/supabase/types';
  * state — which is the distinction lib/audit/limits.ts:4 draws.
  */
 
-/** Get Cited is one-time and belongs to a SITE. */
+/** Get Cited is one-time and belongs to a SITE. Permanent — never expires. */
 export function hasGetCited(site: SiteRow | null): boolean {
   return Boolean(site?.get_cited_at);
 }
@@ -33,20 +33,59 @@ export function hasStayCited(user: ProfileRow | null): boolean {
   return user?.subscription === 'stay_cited';
 }
 
-export function canRunFullAudit(site: SiteRow | null): boolean {
-  return hasGetCited(site);
+/**
+ * Bought, and still inside the 30-day window.
+ *
+ * ⚠️ The clock is the SERVER'S. plans.ts computes the same thing from the
+ * browser's clock to decide what to render, and a browser clock can be set to
+ * anything — which is exactly why this file exists and why the routes call
+ * this copy rather than trusting a flag from the client.
+ */
+export function getCitedActive(site: SiteRow | null): boolean {
+  if (!site?.get_cited_at) return false;
+
+  const expiry = new Date(site.get_cited_at);
+  expiry.setDate(expiry.getDate() + GET_CITED_WINDOW_DAYS);
+  return expiry.getTime() > Date.now();
 }
 
-export function canContent(site: SiteRow | null): boolean {
-  return hasGetCited(site);
+/**
+ * May this site do work that costs us money right now?
+ *
+ * Every generating capability below is this predicate under a different name,
+ * kept as separate one-liners so they stay obvious to diff against their twins
+ * in plans.ts. Stay Cited is account-wide, so it re-opens a site whose own
+ * window has closed — the upgrade path, and the reason these take `user` too.
+ */
+export function canGenerate(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return hasStayCited(user) || getCitedActive(site);
 }
 
-export function canDiscover(site: SiteRow | null): boolean {
-  return hasGetCited(site);
+export function canRunFullAudit(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return canGenerate(site, user);
+}
+
+export function canContent(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return canGenerate(site, user);
+}
+
+export function canDiscover(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return canGenerate(site, user);
 }
 
 export function canRegenerate(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return hasStayCited(user) || hasGetCited(site);
+  return canGenerate(site, user);
+}
+
+/**
+ * The publish-ready export. Permanent, and NOT gated on the window.
+ *
+ * The one capability here that deliberately outlives the subscription: it
+ * hands back work already paid for rather than commissioning new work. See the
+ * longer note in lib/dashboard/plans.ts.
+ */
+export function canPublish(site: SiteRow | null): boolean {
+  return hasGetCited(site);
 }
 
 /**
@@ -56,7 +95,10 @@ export function canRegenerate(site: SiteRow | null, user: ProfileRow | null): bo
  * clamp it to the paid ceiling, which its own comment admitted "cannot enforce
  * the customer's actual tier". A free site asking for a hundred pages got a
  * hundred pages' worth of outbound requests to somebody else's server.
+ *
+ * Follows the window rather than the purchase: an expired site asking for a
+ * hundred pages is the same outbound cost as a free one.
  */
-export function pageBudgetFor(site: SiteRow | null): number {
-  return hasGetCited(site) ? PAGE_BUDGET.paid : PAGE_BUDGET.free;
+export function pageBudgetFor(site: SiteRow | null, user: ProfileRow | null): number {
+  return canGenerate(site, user) ? PAGE_BUDGET.paid : PAGE_BUDGET.free;
 }

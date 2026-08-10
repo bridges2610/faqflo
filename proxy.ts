@@ -118,10 +118,26 @@ export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   if (!signedIn && PROTECTED.some((p) => path.startsWith(p))) {
+    /*
+      Where they were headed, INCLUDING the query string.
+
+      This used to send only `path`. Two things went wrong with that, and the
+      second is why it was invisible: clone() carries the original params over
+      to the sign-in URL, so `/dashboard/checkout/start?domain=acme.com` became
+      `/sign-in?domain=acme.com&next=/dashboard/checkout/start` — the domain was
+      still on screen, and still lost the moment sign-in redirected. The buyer
+      was then asked for a web address they had already typed on the home page.
+
+      So: capture the search before clearing it, clear it so the sign-in URL
+      carries nothing it doesn't need, and put the whole destination in `next`.
+      safeNext() in lib/auth/origin.ts permits a query string and still refuses
+      anything that isn't a same-origin path, so this widens no hole.
+    */
+    const destination = path + request.nextUrl.search;
     const target = request.nextUrl.clone();
     target.pathname = '/sign-in';
-    // So the sign-in page can send them back where they were headed.
-    target.searchParams.set('next', path);
+    target.search = '';
+    target.searchParams.set('next', destination);
     return NextResponse.redirect(target);
   }
 

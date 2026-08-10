@@ -20,7 +20,7 @@ import { UpgradeCard } from './upgrade-card';
   into Generate.
 */
 export function DiscoverWorkspace() {
-  const { site, questions, faqs, coverQuestion } = useDashboard();
+  const { site, user, questions, faqs, coverQuestion } = useDashboard();
 
   if (!site) {
     return (
@@ -35,7 +35,7 @@ export function DiscoverWorkspace() {
     );
   }
 
-  if (!canDiscover(site)) {
+  if (!canDiscover(site, user)) {
     return (
       <>
         <PageHeader title="Questions" description="What people ask AI about your category." />

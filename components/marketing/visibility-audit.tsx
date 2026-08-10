@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Underline } from '@/components/ui/doodle';
 import { ScoreDial } from '@/components/ui/score-dial';
@@ -188,6 +188,26 @@ export function VisibilityAudit() {
                 See what it covers →
               </a>
             </p>
+
+            {/*
+              The domain they just scanned, carried into checkout.
+
+              This is the step that makes buying one click instead of three:
+              they have already typed their address, so asking again on the
+              other side of sign-up is asking them to repeat themselves at the
+              exact moment they are deciding whether to pay. encodeURIComponent
+              because the value came from a text field, not from us.
+            */}
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <ButtonLink
+                href={`/dashboard/checkout/start?domain=${encodeURIComponent(result.domain)}`}
+                size="md"
+                arrow
+              >
+                Get {result.domain} set up
+              </ButtonLink>
+              <span className="text-slate text-xs">$129 once · includes 30 days full access</span>
+            </div>
           </Card>
         )}
       </div>

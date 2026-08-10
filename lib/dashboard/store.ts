@@ -24,6 +24,7 @@
 import { isAuditReport } from '@/lib/audit/types';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
 import type { SiteRow } from '@/lib/supabase/types';
+import { normalizeDomain } from './domain';
 import { contentHash, normalizePath } from './export';
 import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
@@ -528,13 +529,13 @@ export async function saveContentPlan(plan: ContentPlan): Promise<DashboardData>
   });
 }
 
-export function normalizeDomain(input: string): string {
-  return input
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\//, '')
-    .replace(/\/.*$/, '');
-}
+/*
+  Moved to lib/dashboard/domain.ts so server code can import it without pulling
+  in this module's browser Supabase client. Re-exported here because the site
+  form already imports it from this path, and a pure function does not care
+  which door it came through.
+*/
+export { normalizeDomain };
 
 /* --------------------------------------------------------------- groups --- */
 

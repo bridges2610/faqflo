@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import type { PageContent } from '@/lib/audit/types';
 import { buildContentPrompt, CONTENT_SCHEMA, TOPIC_COUNT, type ContentGeneration } from '@/lib/content';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canContent } from '@/lib/auth/entitlements';
+import { canContent, hasGetCited } from '@/lib/auth/entitlements';
 import { checkRateLimit, CONTENT_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
 
 /*
@@ -88,8 +88,13 @@ export async function POST(request: Request) {
   const site = await siteForUser(siteId, user.id);
   if (!site) return fail('No such site on your account.', 404);
 
-  if (!canContent(site)) {
-    return fail('The content plan is part of Get Cited for this site.', 403);
+  if (!canContent(site, user)) {
+    return fail(
+      hasGetCited(site)
+        ? 'Your Get Cited window has ended for this site. Stay Cited keeps content plans coming.'
+        : 'The content plan is part of Get Cited for this site.',
+      403,
+    );
   }
 
   if (!Array.isArray(pages) || pages.length === 0) {

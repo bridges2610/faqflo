@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Wordmark } from '@/components/ui/wordmark';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { hasStayCited } from '@/lib/dashboard/plans';
+import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
 import {
   AeoIcon,
   ChartIcon,
@@ -74,6 +74,50 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
         );
       })}
     </nav>
+  );
+}
+
+/**
+ * The countdown, on every page rather than only where a lock appears.
+ *
+ * A deadline that is only visible on the screen it will break is a deadline
+ * you meet by accident. Seven days is late enough not to nag from day one and
+ * early enough to be a decision rather than an interruption.
+ *
+ * Shown once the window has ended too — at that point it is the explanation
+ * for why things stopped, and without it the product just looks broken.
+ */
+function WindowNotice() {
+  const { site, user } = useDashboard();
+
+  // A subscriber's sites do not expire, so there is nothing to count down to.
+  if (!site || hasStayCited(user) || !hasGetCited(site)) return null;
+
+  const left = getCitedDaysLeft(site);
+  if (left === null || left > 7) return null;
+
+  const ended = left <= 0;
+
+  return (
+    <div
+      className={`mb-6 rounded-xl border p-4 ${
+        ended ? 'border-line bg-cloud' : 'border-accent bg-accent-soft'
+      }`}
+    >
+      <p className="text-navy text-sm font-semibold">
+        {ended
+          ? `Your Get Cited window for ${site.name} has ended`
+          : `${left} ${left === 1 ? 'day' : 'days'} left on Get Cited for ${site.name}`}
+      </p>
+      <p className="text-slate mt-1 text-sm leading-relaxed">
+        {ended
+          ? 'Everything already made is still yours — the audit, the answers and the export. Stay Cited starts them running again.'
+          : 'After that you keep everything made so far, and new audits pause. Stay Cited keeps them running across every site.'}{' '}
+        <Link href="/dashboard/tracking" className="text-primary hover:text-primary-hover font-semibold">
+          See Stay Cited →
+        </Link>
+      </p>
+    </div>
   );
 }
 
@@ -191,7 +235,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 sm:py-10">
-          <div className="mx-auto max-w-5xl">{loading ? <ShellSkeleton /> : children}</div>
+          <div className="mx-auto max-w-5xl">
+            {loading ? (
+              <ShellSkeleton />
+            ) : (
+              <>
+                <WindowNotice />
+                {children}
+              </>
+            )}
+          </div>
         </main>
       </div>
     </div>

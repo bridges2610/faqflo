@@ -59,10 +59,16 @@ const PLANS: Plan[] = [
     price: { kind: 'oneTime', amount: 129 },
     blurb: 'The one-off job of getting set up properly.',
     cta: 'Get set up',
-    // The paid plans start with an account. Checkout itself is the Stripe
-    // stage; until then this lands people in the product rather than back at
-    // the free check they have probably already run.
-    href: '/sign-up',
+    /*
+      Straight at checkout, not at /sign-up.
+
+      This used to land people in the dashboard, where they had to go hunting
+      for a locked feature to find a buy button — a detour through the product
+      on the way to paying for it. The page is protected, so an arrival who is
+      not signed in gets sign-in first and comes back automatically. The
+      scanned domain, if there is one, is appended by the home page audit.
+    */
+    href: '/dashboard/checkout/start',
     featured: true,
     note: 'Start here',
     features: [
@@ -72,15 +78,27 @@ const PLANS: Plan[] = [
       'A complete answer-first FAQ set, written to be quoted',
       'Publish-ready HTML for your own site',
       'Entity schema and llms.txt',
-      'One site, yours to keep',
+      // ⚠️ Both halves of the deal, stated before the card rather than
+      // discovered on day 31. Everything MADE is permanent; the running of new
+      // audits is what ends. Selling "yours to keep" and then stopping audits
+      // without having said so is a chargeback.
+      '30 days of full access — everything you make stays yours for good',
     ],
   },
   {
     name: 'Stay Cited',
     price: { kind: 'subscription', monthly: 29, annualTotal: 290 },
     blurb: 'Because being cited once is not the same as staying cited.',
-    cta: 'Keep me cited',
-    href: '/sign-up',
+    /*
+      Points at Get Cited, deliberately.
+
+      Stay Cited watches whether the answers Get Cited wrote are being picked
+      up, so subscribing first buys a monthly report on an empty set. The
+      checkout API refuses it with a 409 either way — this is so nobody has to
+      meet that error to find out.
+    */
+    cta: 'Start with Get Cited',
+    href: '/dashboard/checkout/start',
     featured: false,
     note: null,
     features: [
@@ -89,6 +107,7 @@ const PLANS: Plan[] = [
       'Questions you are not being cited for, fed back into new answers',
       'Alerts when a citation appears or disappears',
       'Unlimited regeneration',
+      'Keeps every site on your account running',
     ],
   },
 ];
@@ -131,7 +150,9 @@ function PriceBlock({ price }: { price: Price }) {
           </span>
           <span className="text-slate text-sm">once</span>
         </p>
-        <p className="text-slate mt-1.5 h-4 text-xs leading-4">Per site · not a subscription</p>
+        <p className="text-slate mt-1.5 h-4 text-xs leading-4">
+          Per site · includes 30 days of full access
+        </p>
       </div>
     );
   }
@@ -242,9 +263,13 @@ export function PricingTeaser() {
           ))}
         </div>
 
-        <p className="text-slate mt-8 text-center text-sm">
-          Stay Cited builds on Get Cited — one sets your answers up properly, the other watches
-          whether the AI engines pick them up.
+        {/* The order and the cut-off, in one sentence, on the page where the
+            decision is made. Everything downstream enforces this; if the copy
+            and the enforcement ever disagree, the copy is the promise. */}
+        <p className="text-slate mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed">
+          Get Cited comes first — it writes your answers and gives you 30 days to work with them.
+          Everything it makes is yours permanently, including the export. Stay Cited is what keeps
+          new audits and fresh answers coming after that, across every site on your account.
         </p>
       </div>
     </section>

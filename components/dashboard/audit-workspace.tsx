@@ -231,7 +231,7 @@ export function AuditWorkspace() {
     );
   }
 
-  const full = canRunFullAudit(site);
+  const full = canRunFullAudit(site, user);
 
   async function run() {
     if (!site) return;
