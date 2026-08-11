@@ -18,6 +18,10 @@ const COLUMNS = [
       { href: '/#aeo', label: "What's AEO" },
     ],
   },
+  {
+    heading: 'Company',
+    links: [{ href: '/about', label: 'About' }],
+  },
 ];
 
 export function SiteFooter() {
@@ -33,7 +37,9 @@ export function SiteFooter() {
             </p>
           </div>
 
-          <div className="flex gap-14">
+          {/* Wraps rather than overflowing: three columns at a 3.5rem gap no
+              longer fit side by side on a narrow phone. */}
+          <div className="flex flex-wrap gap-x-14 gap-y-8">
             {COLUMNS.map((col) => (
               <div key={col.heading}>
                 <h2 className="font-display text-navy mb-3 text-sm font-bold">{col.heading}</h2>
