@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ButtonLink } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
+import { NavAccountLink } from './nav-account-link';
 
 const LINKS = [
   { href: '/#how', label: 'How it works' },
@@ -31,19 +32,20 @@ export function SiteNav() {
 
         {/*
           Until accounts existed, nothing on the marketing site linked to the
-          app at all — /dashboard was reachable only by typing it. "Sign in" is
-          a quiet text link rather than a second button because the primary
-          action here is still the free check: the people who already have an
-          account know what they came for, and the ones who don't shouldn't be
-          asked to choose between two buttons.
+          app at all — /dashboard was reachable only by typing it. It is a quiet
+          text link rather than a second button because the primary action here
+          is still the free check: the people who already have an account know
+          what they came for, and the ones who don't shouldn't be asked to
+          choose between two buttons.
+
+          It says "Dashboard" to somebody already signed in, decided in the
+          browser so these pages stay prerendered — see NavAccountLink. The
+          button beside it does NOT change: a returning customer landing here
+          often wants to run the free check on another site, and taking that
+          away would leave the page with nothing to do.
         */}
         <div className="flex items-center gap-4 sm:gap-5">
-          <Link
-            href="/sign-in"
-            className="text-slate hover:text-primary text-sm font-medium transition-colors duration-150"
-          >
-            Sign in
-          </Link>
+          <NavAccountLink />
           <ButtonLink href="/#audit" size="sm" arrow>
             Check my site
           </ButtonLink>
