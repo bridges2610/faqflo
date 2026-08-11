@@ -14,11 +14,18 @@ import { FIELD, FieldLabel } from './auth-card';
  * It rides along in the signup metadata and the database trigger reads it, so
  * an email account and a Google account end up with the same shape of profile.
  */
-export function SignUpForm() {
+export function SignUpForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signUpWithEmail, NO_ERROR);
 
   return (
     <form action={formAction} className="space-y-4">
+      {/* Where to land afterwards — for this form that means the link in the
+          confirmation email, not an immediate redirect, since there is no
+          session until it is clicked. Validated server-side by safeNext(): a
+          hidden field is user-editable, so it can't be trusted from here.
+          Mirrors sign-in-form.tsx. */}
+      {next && <input type="hidden" name="next" value={next} />}
+
       <label className="block">
         <FieldLabel>Your name</FieldLabel>
         <input className={FIELD} type="text" name="name" autoComplete="name" required />

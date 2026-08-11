@@ -135,7 +135,19 @@ export async function proxy(request: NextRequest) {
     */
     const destination = path + request.nextUrl.search;
     const target = request.nextUrl.clone();
-    target.pathname = '/sign-in';
+
+    /*
+      Which form they meet depends on why they are here.
+
+      Buying is overwhelmingly a new-customer action, so someone arriving at
+      checkout without an account is shown the one that creates one. Everything
+      else — a bookmarked /dashboard/audit, a link from an email — is a person
+      who already has an account and wants back in.
+
+      Both pages link to each other carrying `next`, so guessing wrong costs a
+      click rather than the purchase.
+    */
+    target.pathname = path.startsWith('/dashboard/checkout/') ? '/sign-up' : '/sign-in';
     target.search = '';
     target.searchParams.set('next', destination);
     return NextResponse.redirect(target);

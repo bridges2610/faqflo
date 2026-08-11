@@ -75,14 +75,39 @@ export async function signUpWithEmail(
   const supabase = await createClient();
   const origin = await siteOrigin();
 
+  /*
+    The destination has to survive a round trip through an email client.
+
+    Someone signing up mid-purchase came here from checkout, carrying the
+    domain they scanned on the home page. There is no session yet, so we cannot
+    redirect them anywhere — the only thing that will bring them back is the
+    link in the confirmation mail, which means the destination has to be baked
+    into that link or it is gone.
+
+    Re-validated with safeNext() even though the page already did: this arrives
+    from a hidden form field, which anybody can edit.
+  */
+  const next = safeNext(field(formData, 'next') || null, '');
+  const callback = next
+    ? `${origin}/auth/callback?next=${encodeURIComponent(next)}`
+    : `${origin}/auth/callback`;
+
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      // Where the confirmation link lands. Until it's clicked there is no
-      // session, which is what makes "verify before access" true rather than
-      // merely displayed.
-      emailRedirectTo: `${origin}/auth/callback`,
+      /*
+        Where the confirmation link lands. Until it's clicked there is no
+        session, which is what makes "verify before access" true rather than
+        merely displayed.
+
+        ⚠️ Supabase SILENTLY IGNORES a value that is not in the project's
+        redirect allow-list and falls back to Site URL. Nothing errors — the
+        customer just lands on the home page instead of checkout. If that
+        happens, the allow-list is what to check, not this line. `/**` matches
+        a query string; `/*` does not.
+      */
+      emailRedirectTo: callback,
       // Read by the signup trigger in supabase/migrations/0001, so an email
       // account gets a name the same way a Google one does.
       data: { full_name: name },
@@ -91,7 +116,8 @@ export async function signUpWithEmail(
 
   if (error) return { error: humanise(error.message) };
 
-  redirect('/check-email');
+  // Carried so /check-email's way back doesn't strand somebody mid-purchase.
+  redirect(next ? `/check-email?next=${encodeURIComponent(next)}` : '/check-email');
 }
 
 /* ------------------------------------------------------------- sign in --- */

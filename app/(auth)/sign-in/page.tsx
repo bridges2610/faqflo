@@ -23,7 +23,18 @@ export default async function SignInPage({
     <AuthCard
       title="Sign in"
       intro="Pick up where you left off."
-      footer={<>New here? <AuthLink href="/sign-up">Create an account</AuthLink></>}
+      footer={
+        <>
+          New here?{' '}
+          {/* ⚠️ Carries `next`. Without it this link was where the email
+              sign-up path died: a first-time buyer arrived here mid-purchase,
+              clicked through to create an account, and silently lost both the
+              checkout destination and the domain they had just scanned. */}
+          <AuthLink href={next ? `/sign-up?next=${encodeURIComponent(next)}` : '/sign-up'}>
+            Create an account
+          </AuthLink>
+        </>
+      }
     >
       {/* Errors handed back by /auth/callback — an expired link, or Google
           refused. Shown above everything because it explains why you're here. */}

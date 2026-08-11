@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AuthCard, AuthLink } from '@/components/auth/auth-card';
+import { safeNext } from '@/lib/auth/origin';
 
 export const metadata: Metadata = { title: 'Check your email' };
 
@@ -13,10 +14,16 @@ export const metadata: Metadata = { title: 'Check your email' };
 export default async function CheckEmailPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string }>;
+  searchParams: Promise<{ reset?: string; next?: string }>;
 }) {
-  const { reset } = await searchParams;
-  const isReset = reset === '1';
+  const params = await searchParams;
+  const isReset = params.reset === '1';
+
+  // The way back keeps the destination, so somebody who gives up on the email
+  // and signs in another way still resumes their purchase rather than landing
+  // on an empty dashboard.
+  const next = safeNext(params.next, '');
+  const backToSignIn = next ? `/sign-in?next=${encodeURIComponent(next)}` : '/sign-in';
 
   return (
     <AuthCard
@@ -28,7 +35,7 @@ export default async function CheckEmailPage({
             'If that address has an account, we have sent it a link for setting a new password. It expires in an hour.'
           : 'We have sent you a link. Click it and you will be signed in — until then the account is not active.'
       }
-      footer={<AuthLink href="/sign-in">Back to sign in</AuthLink>}
+      footer={<AuthLink href={backToSignIn}>Back to sign in</AuthLink>}
     >
       <p className="text-slate text-sm leading-relaxed">
         Nothing yet? Give it a minute, then check your spam folder — confirmation mail lands

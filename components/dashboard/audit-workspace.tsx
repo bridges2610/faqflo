@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -10,7 +11,7 @@ import { useDashboard } from '@/lib/dashboard/provider';
 // pageBudgetFor is no longer imported here: the budget is the server's
 // decision now, and a client-side copy of it would only ever be a guess about
 // what the server was going to do.
-import { canRunFullAudit } from '@/lib/dashboard/plans';
+import { PAGE_BUDGET, canRunFullAudit } from '@/lib/dashboard/plans';
 import { opportunities, visibilityFindings } from '@/lib/dashboard/audit-context';
 import { timeAgo } from '@/lib/dashboard/format';
 import { useCopy } from '@/lib/dashboard/use-copy';
@@ -211,12 +212,53 @@ function FindingRow({ finding }: { finding: Finding }) {
   );
 }
 
-export function AuditWorkspace() {
+export function AuditWorkspace({ justPurchased = false }: { justPurchased?: boolean }) {
   const { site, user, data, tracking, groups, saveAudit } = useDashboard();
   /** null means "nothing run this session" — the stored report is the fallback. */
   const [fresh, setFresh] = useState<AuditReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const router = useRouter();
+
+  /*
+    Landing here straight from Stripe.
+
+    Somebody who has just paid $129 for an audit should not have to ask for it.
+    The banner survives in state rather than reading the prop, because the URL
+    is cleaned a moment later and a banner that vanished on its own would look
+    like a glitch.
+  */
+  const [showPurchased] = useState(justPurchased);
+
+  /*
+    ⚠️ THIS SPENDS MONEY, SO IT IS GUARDED THREE TIMES.
+
+    A full audit is up to a hundred requests to somebody else's server plus an
+    LLM pass. Firing it from a page load is only defensible because they just
+    bought exactly this, and only if it can happen precisely once:
+
+      1. `autoRan` — a ref, not state, so React's double-invoked effects in
+         development cannot start two crawls.
+      2. the site check — the provider hydrates client-side, so `site` is null
+         on first paint and running then would audit nothing.
+      3. router.replace BEFORE run() — strips ?purchased= immediately, so a
+         refresh mid-crawl cannot start a second one. The server's
+         AUDIT_FULL_RATE_LIMIT is a backstop, not the plan.
+  */
+  const autoRan = useRef(false);
+
+  useEffect(() => {
+    if (!justPurchased || autoRan.current) return;
+    if (!site || !data) return;
+
+    autoRan.current = true;
+    router.replace('/dashboard/audit');
+    void run();
+    // `run` is a hoisted declaration recreated each render; the ref above is
+    // the real guard, so listing it here would only re-arm what it prevents.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [justPurchased, site, data, router]);
 
   if (!site || !data) {
     return (
@@ -322,6 +364,21 @@ export function AuditWorkspace() {
       />
 
       <div className="space-y-5">
+        {/* The receipt, where the thing they bought actually is. Kept after the
+            URL is cleaned so it does not blink out — see showPurchased above. */}
+        {showPurchased && (
+          <div className="border-accent bg-accent-soft rounded-xl border p-4">
+            <p className="text-navy text-sm font-semibold">
+              You&rsquo;re set up — {site.name} is unlocked
+            </p>
+            <p className="text-slate mt-1 text-sm leading-relaxed">
+              {busy
+                ? `Running your first full audit now. It reads up to ${PAGE_BUDGET.paid} pages, so give it a moment.`
+                : 'The full audit, the questions people ask AI, the content plan and the publish-ready export are all yours for the next 30 days. Everything you make stays yours for good.'}
+            </p>
+          </div>
+        )}
+
         {error && (
           <p role="alert" className="text-error-ink text-sm">
             {error}
