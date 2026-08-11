@@ -109,6 +109,87 @@ async function grantGetCited(siteId: string, userId: string): Promise<void> {
   if (error) throw new Error(`Failed to grant Get Cited for site ${siteId}: ${error.message}`);
 }
 
+/* ------------------------------------------------------------- revocation --- */
+
+/** What a revocation did, so the caller can log something true. */
+export type Revocation =
+  | { status: 'revoked'; siteId: string }
+  | { status: 'ignored'; reason: string };
+
+/**
+ * Take Get Cited back after a full refund or a chargeback.
+ *
+ * The hard part is not the write, it is knowing WHOSE. A charge knows about
+ * money and nothing about sites, so the only honest route back is the Checkout
+ * Session that produced it — which carries the `userId` and `siteId` we stamped
+ * at checkout, after proving ownership.
+ *
+ * ⚠️ That indirection is the security property, not an inconvenience to
+ * optimise away. Anything closer to hand — a customer id, an email on the
+ * charge — would be identity inferred from a payment object rather than a fact
+ * we established, and this runs with the service-role client, which is bound by
+ * nothing.
+ *
+ * Deliberately narrow: `get_cited` only. Stay Cited is written by
+ * applySubscription() from subscription events, and a refunded invoice is not a
+ * cancellation — Stripe will say so itself if the subscription actually ends.
+ * Two writers for one field is the thing that note warns about.
+ */
+export async function revokeForPaymentIntent(paymentIntentId: string): Promise<Revocation> {
+  const sessions = await stripe().checkout.sessions.list({
+    payment_intent: paymentIntentId,
+    limit: 1,
+  });
+
+  const session = sessions.data[0];
+  if (!session) {
+    return { status: 'ignored', reason: `no checkout session for ${paymentIntentId}` };
+  }
+
+  const product = session.metadata?.product;
+  const userId = session.metadata?.userId;
+  const siteId = session.metadata?.siteId;
+
+  if (product !== 'get_cited') {
+    return { status: 'ignored', reason: `not a Get Cited purchase (${product ?? 'no product'})` };
+  }
+  if (!userId || !siteId) {
+    return { status: 'ignored', reason: 'session metadata is missing userId or siteId' };
+  }
+
+  await revokeGetCited(siteId, userId);
+  return { status: 'revoked', siteId };
+}
+
+/**
+ * Clear the purchase. The exact mirror of grantGetCited, including its guards.
+ *
+ * Scoped by BOTH id and owner: the service-role client bypasses row-level
+ * security, so that `eq('user_id', …)` is not a second opinion on top of a
+ * policy — it is the only thing standing between a bad id and a stranger's row.
+ *
+ * `.not('get_cited_at', 'is', null)` is the idempotence, matching the
+ * `.is('get_cited_at', null)` on the grant: the first call clears it, every
+ * retry matches nothing. Stripe redelivers for up to three days.
+ *
+ * Nulling rather than flagging is deliberate. It restores the row to exactly
+ * the state it had before the purchase, which means the customer can buy again
+ * — checkPurchasable() 409s on a non-null `get_cited_at`, so a "refunded" flag
+ * would leave them permanently unable to repurchase the thing they refunded.
+ */
+async function revokeGetCited(siteId: string, userId: string): Promise<void> {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from('sites')
+    .update({ get_cited_at: null })
+    .eq('id', siteId)
+    .eq('user_id', userId)
+    .not('get_cited_at', 'is', null);
+
+  if (error) throw new Error(`Failed to revoke Get Cited for site ${siteId}: ${error.message}`);
+}
+
 /**
  * Set the account's subscription from a Stripe subscription object.
  *
