@@ -42,16 +42,48 @@ export async function POST(request: Request) {
   */
   const raw = await request.text();
 
+  /*
+    ⚠️ Resolved BEFORE the try, and this placement is the whole point.
+
+    It used to be an argument to constructEventAsync() inside the catch below,
+    which meant a missing STRIPE_WEBHOOK_SECRET and a forged request came back
+    identically: 400, "Invalid signature." Those are opposite problems. One is
+    a stranger poking at the endpoint and can be ignored; the other is a
+    production deploy where EVERY purchase takes the customer's money and
+    grants nothing — and it looks exactly like the harmless one.
+
+    That is not a theoretical worry: probing the deployed endpoint from outside
+    could not distinguish them, so a broken deploy would have looked healthy.
+
+    So: our fault is a 500, their fault is a 400. Stripe retries either way, but
+    the dashboard now shows which of us to go and fix.
+  */
+  let client: Stripe;
+  let secret: string;
+  try {
+    // BOTH of them. stripe() throws on a missing STRIPE_SECRET_KEY exactly as
+    // webhookSecret() does on a missing signing secret, so leaving either one
+    // inside the verification try reopens the same hole.
+    client = stripe();
+    secret = webhookSecret();
+  } catch (err) {
+    console.error('Stripe webhook is not configured:', err instanceof Error ? err.message : err);
+    return NextResponse.json({ error: 'Webhook is not configured.' }, { status: 500 });
+  }
+
   let event: Stripe.Event;
   try {
     // The async variant: identical result, but it does not require a
     // synchronous crypto implementation, so it keeps working if this ever
     // moves off the Node runtime.
-    event = await stripe().webhooks.constructEventAsync(raw, signature, webhookSecret());
+    event = await client.webhooks.constructEventAsync(raw, signature, secret);
   } catch (err) {
-    // A failure here is either a misconfigured secret or a forgery, and from
-    // the outside those look the same. Log and refuse; never fall through to
-    // processing an unverified payload.
+    /*
+      Now unambiguous: the secret exists, so this is a signature that does not
+      match it — a forgery, or a secret from the wrong environment (the test
+      `stripe listen` value deployed to production is the classic). Log and
+      refuse; never fall through to processing an unverified payload.
+    */
     console.error('Stripe signature verification failed:', err instanceof Error ? err.message : err);
     return NextResponse.json({ error: 'Invalid signature.' }, { status: 400 });
   }

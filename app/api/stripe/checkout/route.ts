@@ -55,6 +55,26 @@ export async function POST(request: Request) {
     if (err instanceof Stripe.errors.StripeConnectionError) {
       return fail("Couldn't reach Stripe. Check your connection and try again.", 502);
     }
+    /*
+      The switch-to-live failure, named.
+
+      Test and live are separate namespaces: a price id or customer id from one
+      simply does not exist in the other. Stripe reports that as
+      `resource_missing` — "No such price" — which reads like a typo in an id
+      rather than a key from the wrong mode, and costs an afternoon.
+
+      Two ways to arrive here after going live: STRIPE_PRICE_* still holding
+      test ids, or a profile still holding a stripe_customer_id created in test
+      mode (that column is reused rather than recreated, so it survives the
+      switch and poisons the account until it is cleared).
+    */
+    if (err instanceof Stripe.errors.StripeInvalidRequestError && err.code === 'resource_missing') {
+      console.error('Stripe resource_missing — test/live mismatch?', err.message);
+      return fail(
+        'That price or customer does not exist in this Stripe account. This usually means a test-mode id is configured against a live-mode key (or the reverse).',
+        500,
+      );
+    }
     if (err instanceof Stripe.errors.StripeError) {
       console.error('Stripe error creating checkout session:', err.type, err.message);
       return fail('Stripe returned an error. Please try again.', 502);

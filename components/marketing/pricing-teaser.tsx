@@ -6,8 +6,14 @@ import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
 
 /*
-  ⚠️ PLACEHOLDER PRICES. Starting points to test, not researched numbers. Set
-  the real figures before launch; they also have to match the Stripe prices.
+  ⚠️ THESE FIGURES ARE NOT DERIVED FROM STRIPE, AND STRIPE DOES NOT READ THEM.
+
+  Stripe charges whatever ITS price object says. This file is copy. If the two
+  disagree, a customer is quoted one number and billed another — so a price
+  change is always two edits: here, and the price in the Stripe dashboard
+  (whose id lives in STRIPE_PRICE_* rather than in code, so the amount can move
+  without a deploy). Test mode and live mode have SEPARATE price objects, so a
+  change made in one does not follow into the other.
 
   The structure is the decision, not the dollars: a one-time fee for the
   discrete "get me set up" job, and a subscription for the continuous "keep me

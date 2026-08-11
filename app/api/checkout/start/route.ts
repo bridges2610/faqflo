@@ -64,6 +64,16 @@ export async function POST(request: Request) {
     if (err instanceof Stripe.errors.StripeConnectionError) {
       return fail("Couldn't reach Stripe. Check your connection and try again.", 502);
     }
+    // The test/live mismatch. Same reasoning as the sibling route — this is the
+    // path the pricing page uses, so it is the one a launch is most likely to
+    // hit first. See app/api/stripe/checkout/route.ts for the full note.
+    if (err instanceof Stripe.errors.StripeInvalidRequestError && err.code === 'resource_missing') {
+      console.error('Stripe resource_missing — test/live mismatch?', err.message);
+      return fail(
+        'That price or customer does not exist in this Stripe account. This usually means a test-mode id is configured against a live-mode key (or the reverse).',
+        500,
+      );
+    }
     if (err instanceof Stripe.errors.StripeError) {
       console.error('Stripe error starting checkout:', err.type, err.message);
       return fail('Stripe returned an error. Please try again.', 502);
