@@ -43,6 +43,15 @@ export async function fulfilCheckoutSession(sessionId: string): Promise<Fulfilme
     similar complete Checkout and settle later, so a session can exist, look
     finished to the customer, and still not be money yet. Those come back
     later as checkout.session.async_payment_succeeded.
+
+    ⚠️ DENY-LIST, NOT AN ALLOW-LIST, AND THAT IS LOAD-BEARING.
+
+    PaymentStatus is 'paid' | 'unpaid' | 'no_payment_required'. The third one
+    is what a 100%-off promotion code produces, and Get Cited accepts promotion
+    codes (see allow_promotion_codes in lib/stripe/checkout.ts). Testing for
+    `=== 'unpaid'` grants it; the tempting "tightening" to `!== 'paid'` would
+    silently refuse every fully-discounted redemption — the code would appear
+    to work, the customer would be charged nothing, and nothing would unlock.
   */
   if (session.payment_status === 'unpaid') return { status: 'pending' };
 

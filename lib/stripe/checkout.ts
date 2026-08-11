@@ -47,6 +47,26 @@ export async function createCheckoutSession(
     line_items: [{ price: priceFor(purchase), quantity: 1 }],
 
     /*
+      The "Add promotion code" field on Stripe's hosted page.
+
+      Get Cited only. Stay Cited is left without it deliberately — a percentage
+      off a subscription repeats every month unless the coupon says otherwise,
+      so discounting recurring revenue is a decision to make on purpose rather
+      than inherit from a flag that happened to be on. Adding it there later is
+      this same line with the condition removed.
+
+      ⚠️ The codes themselves live in Stripe, not here. Create a Coupon, then a
+      Promotion Code on it (the coupon is the discount; the promotion code is
+      the string a customer types). They exist per MODE — codes made in test
+      mode do not work in live, exactly like prices.
+
+      ⚠️ Mutually exclusive with `discounts`. If a coupon ever needs applying
+      automatically, that field replaces this one — passing both is an error,
+      not a merge.
+    */
+    ...(purchase.product === 'get_cited' ? { allow_promotion_codes: true } : {}),
+
+    /*
       How fulfilment finds its way home.
 
       The webhook arrives with nothing but the session, so everything needed to
