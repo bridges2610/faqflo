@@ -1,6 +1,8 @@
 import 'server-only';
 
 import type Stripe from 'stripe';
+import { trySendEmail } from '@/lib/email/client';
+import { setUpEmail } from '@/lib/email/templates';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from './client';
 
@@ -64,7 +66,23 @@ export async function fulfilCheckoutSession(sessionId: string): Promise<Fulfilme
     const siteId = session.metadata?.siteId;
     if (!siteId) return { status: 'ignored', reason: 'get_cited session without siteId' };
 
-    await grantGetCited(siteId, userId);
+    const newlyGranted = await grantGetCited(siteId, userId);
+
+    /*
+      The confirmation email, only on the call that actually granted.
+
+      This function runs at least twice per purchase — the return page for
+      speed, the webhook for reliability — so gating on `newlyGranted` is the
+      difference between one email and two. Awaited rather than fired and
+      forgotten because the webhook may be torn down the moment it responds,
+      and trySendEmail() cannot throw, so waiting costs latency and nothing else.
+
+      ⚠️ The status returned below stays 'granted' either way. It answers
+      "does this customer own it?", which is what the return page needs to
+      decide where to send them — not "did anything change just now".
+    */
+    if (newlyGranted) await announceSetUp(siteId, userId, session.id);
+
     return { status: 'granted', product: 'get_cited' };
   }
 
@@ -84,7 +102,7 @@ export async function fulfilCheckoutSession(sessionId: string): Promise<Fulfilme
 }
 
 /**
- * Mark a site as bought.
+ * Mark a site as bought. Returns whether THIS call was the one that did it.
  *
  * Scoped by BOTH id and owner. The service-role client bypasses row-level
  * security, so this `eq('user_id', …)` is not a second opinion on top of a
@@ -95,18 +113,76 @@ export async function fulfilCheckoutSession(sessionId: string): Promise<Fulfilme
  * `is('get_cited_at', null)` makes the write idempotent: the first call sets
  * the timestamp, every retry matches nothing and changes nothing. Without it a
  * redelivered event would push the purchase date forward each time.
+ *
+ * ⚠️ The RETURN VALUE is what makes the confirmation email sendable exactly
+ * once. Fulfilment runs at least twice for every purchase — the return page
+ * and the webhook, sometimes concurrently — and both would otherwise have
+ * equal claim to "this was a successful purchase, send the email". Only the
+ * row count can settle it, so `.select()` turns the idempotent write into an
+ * answer rather than a silent no-op.
  */
-async function grantGetCited(siteId: string, userId: string): Promise<void> {
+async function grantGetCited(siteId: string, userId: string): Promise<boolean> {
   const supabase = createAdminClient();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('sites')
     .update({ get_cited_at: new Date().toISOString() })
     .eq('id', siteId)
     .eq('user_id', userId)
-    .is('get_cited_at', null);
+    .is('get_cited_at', null)
+    .select('id');
 
   if (error) throw new Error(`Failed to grant Get Cited for site ${siteId}: ${error.message}`);
+
+  return (data?.length ?? 0) > 0;
+}
+
+/**
+ * Tell the customer their site is set up.
+ *
+ * Reads the name and email back rather than taking them from the Stripe
+ * session: the session's customer details are whatever they typed into
+ * checkout, and the account is the thing that actually owns the entitlement.
+ * They are usually the same and occasionally not.
+ *
+ * ⚠️ CANNOT THROW, AND THAT IS LOAD-BEARING.
+ *
+ * The webhook claims each event BEFORE handling it, so an exception here would
+ * return 500, Stripe would retry, and the retry would be discarded as a
+ * duplicate — the purchase would be granted and the log would say it failed.
+ * Worse, this is the last step of a flow where money has already moved. Mail
+ * is a courtesy; it does not get a vote on whether payment succeeded.
+ */
+async function announceSetUp(siteId: string, userId: string, sessionId: string): Promise<void> {
+  try {
+    const supabase = createAdminClient();
+
+    const [{ data: profile }, { data: site }] = await Promise.all([
+      supabase.from('profiles').select('email, name').eq('id', userId).maybeSingle<{
+        email: string;
+        name: string | null;
+      }>(),
+      supabase.from('sites').select('name').eq('id', siteId).maybeSingle<{ name: string }>(),
+    ]);
+
+    if (!profile?.email || !site?.name) {
+      console.error(`No profile or site for the set-up email (user ${userId}, site ${siteId}).`);
+      return;
+    }
+
+    await trySendEmail(
+      {
+        to: profile.email,
+        ...setUpEmail(profile.name, site.name),
+        // Keyed on the checkout session, so the same purchase can never send
+        // twice even if the database guard is somehow bypassed.
+        idempotencyKey: `setup-${sessionId}`,
+      },
+      'set-up email',
+    );
+  } catch (err) {
+    console.error('Set-up email failed (the purchase itself is unaffected):', err);
+  }
 }
 
 /* ------------------------------------------------------------- revocation --- */
