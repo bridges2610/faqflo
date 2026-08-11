@@ -80,9 +80,16 @@ export function SiteFooter() {
             for them anyway. flex-wrap so the two don't collide on a phone. */}
         <div className="border-line text-slate mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-6 text-xs">
           <span>&copy; {new Date().getFullYear()} FaqFlo. Made by Tenichi.</span>
-          <Link href="/privacy" className="hover:text-primary transition-colors duration-150">
-            Privacy Policy
-          </Link>
+          {/* Grouped, not two more children of the justify-between row — three
+              siblings would spread copyright / Privacy / Terms edge to edge. */}
+          <span className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <Link href="/privacy" className="hover:text-primary transition-colors duration-150">
+              Privacy Policy
+            </Link>
+            <Link href="/terms" className="hover:text-primary transition-colors duration-150">
+              Terms &amp; Conditions
+            </Link>
+          </span>
         </div>
       </div>
     </footer>
