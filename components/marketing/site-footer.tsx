@@ -28,7 +28,14 @@ export function SiteFooter() {
   return (
     <footer className="border-line border-t bg-white">
       <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
-        <div className="flex flex-col gap-10 sm:flex-row sm:justify-between">
+        {/*
+          Four even-ish tracks rather than brand-left / links-right. With
+          justify-between the whole link group got pushed against the right
+          edge and bunched there, which only got worse as columns were added.
+          The brand takes 1.5fr — about 20rem, the width its blurb already
+          asks for — and the three link columns split the rest evenly.
+        */}
+        <div className="flex flex-col gap-10 sm:grid sm:grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] sm:gap-10">
           <div className="max-w-xs">
             <Wordmark />
             <p className="text-slate mt-4 text-sm leading-relaxed">
@@ -37,9 +44,17 @@ export function SiteFooter() {
             </p>
           </div>
 
-          {/* Wraps rather than overflowing: three columns at a 3.5rem gap no
-              longer fit side by side on a narrow phone. */}
-          <div className="flex flex-wrap gap-x-14 gap-y-8">
+          {/*
+            sm:contents dissolves this wrapper into the grid above, so each
+            column gets its own track instead of all three sharing one. Below
+            sm it stays a real box: a wrapping row under the blurb, which is
+            what phones already had — without it they'd each become a stacked
+            block and the footer would grow a screenful taller.
+
+            Safe on a plain div: the display:contents accessibility bug only
+            ever affected elements carrying an implicit ARIA role.
+          */}
+          <div className="flex flex-wrap gap-x-14 gap-y-8 sm:contents">
             {COLUMNS.map((col) => (
               <div key={col.heading}>
                 <h2 className="font-display text-navy mb-3 text-sm font-bold">{col.heading}</h2>
