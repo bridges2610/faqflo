@@ -17,7 +17,7 @@ export default function Blog() {
       <div className="mx-auto max-w-184">
         <Badge tone="cyan">Blog</Badge>
         <h1 className="mt-5 text-[2.25rem] text-balance sm:text-[2.75rem]">
-          Notes on getting quoted
+          Let&rsquo;s get you found on AI
         </h1>
         <p className="text-slate mt-5 text-lg leading-relaxed">
           What changed in search, what the answer engines actually read, and how small businesses
