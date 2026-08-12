@@ -1,0 +1,44 @@
+{/* SAMPLE POST — scaffolding to prove the template works. Edit it, or delete
+    the file and drop its import from lib/blog/posts.ts. */}
+
+export const meta = {
+  slug: 'why-ai-cant-read-your-faqs',
+  title: 'Why AI can’t read your FAQ accordion',
+  date: '2026-08-10',
+  excerpt:
+    'Those tidy dropdown FAQs on your site? There is a good chance the assistants you want quoting you cannot see a single word of them.',
+};
+
+Most FAQ plugins do the same thing. You install one, fill in your questions, and get a neat
+accordion that expands when someone clicks. It looks professional. It probably cost you money. And
+to an AI crawler, it is very often a blank space.
+
+## What actually happens when a crawler visits
+
+A browser does two things with a web page: it downloads the HTML, then it runs the JavaScript
+that fills in the rest. Most FAQ widgets rely on that second step — the answers aren’t in the page
+you download, they’re painted in afterwards by a script.
+
+The crawlers behind AI answers mostly skip that second step. They take the HTML, read what is in
+it, and move on. If your answers only exist after JavaScript runs, they were never there to be read.
+
+> You paid for content that is invisible to the exact thing you were trying to reach.
+
+## How to tell, in about thirty seconds
+
+- Open your FAQ page, right-click, and choose “View page source”.
+- Press Cmd/Ctrl+F and search for a distinctive phrase from one of your answers.
+- If the phrase isn’t there, the answer isn’t in your HTML — and a crawler won’t find it either.
+
+That view-source trick is the honest version of the test, because it shows you the document as it
+arrived rather than the page after your browser has finished assembling it. Inspect Element will
+happily show you content that a crawler never sees.
+
+## What to do instead
+
+Put the answers in the page. Not in a script, not in an embed that loads from somewhere else, not
+inside an iframe — as text, in your own HTML, on your own domain. It is less exciting than a widget
+with animations, and it is the entire difference between being quotable and being invisible.
+
+If you want to know where your site stands right now, [the free visibility check](/#audit) reads
+your page the way a crawler does and tells you what it found.
