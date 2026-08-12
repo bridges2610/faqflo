@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { buildFaqHtml, publishState } from '@/lib/dashboard/export';
+import { buildPasteBlock, publishState } from '@/lib/dashboard/export';
 import { canPublish } from '@/lib/dashboard/plans';
 import { useCopy } from '@/lib/dashboard/use-copy';
 import type { FaqEntry, FaqGroup } from '@/lib/dashboard/types';
@@ -103,14 +103,17 @@ function CopyHtmlButton({ group, faqs }: { group: FaqGroup; faqs: FaqEntry[] }) 
   const { site } = useDashboard();
   const { copied, copy } = useCopy();
 
-  const html = buildFaqHtml(group, faqs);
+  // The same block Publish hands over, schema included. Copying only the HTML
+  // here would make this the one route to a half-paste that still lets the
+  // group be marked published.
+  const html = site ? buildPasteBlock(site, group, faqs) : '';
   const allowed = canPublish(site);
 
   if (!allowed) {
     return (
       <Link
         href="/dashboard/publish"
-        aria-label={`Copying HTML for ${group.name} needs Get Cited`}
+        aria-label={`Copying the code for ${group.name} needs Get Cited`}
         title="Get Cited unlocks the export for this site"
         className="text-slate hover:text-primary hover:bg-cloud rounded-md p-1.5 transition-colors duration-150"
       >
@@ -127,10 +130,10 @@ function CopyHtmlButton({ group, faqs }: { group: FaqGroup; faqs: FaqEntry[] }) 
         !html
           ? `Nothing published in ${group.name} to copy`
           : copied
-            ? `HTML for ${group.name} copied`
-            : `Copy HTML for ${group.name}`
+            ? `Code for ${group.name} copied`
+            : `Copy the code for ${group.name}`
       }
-      title={!html ? 'Publish an answer first' : 'Copy the answer HTML'}
+      title={!html ? 'Publish an answer first' : 'Copy the answers and schema'}
       className={`rounded-md p-1.5 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 ${
         copied ? 'text-success-ink' : 'text-slate hover:text-primary hover:bg-cloud'
       }`}

@@ -10,6 +10,7 @@ import { timeAgo } from '@/lib/dashboard/format';
 import {
   buildFaqHtml,
   buildLlmsTxt,
+  buildPasteBlock,
   buildSchemaBlock,
   groupUrl,
   PLACEMENT_NOTES,
@@ -17,6 +18,7 @@ import {
 } from '@/lib/dashboard/export';
 import type { FaqGroup, Site } from '@/lib/dashboard/types';
 import { EmptyState } from './empty-state';
+import { CopyIcon, TickIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
 
@@ -52,11 +54,15 @@ function CopyBlock({
           <h3 className="text-navy text-[0.9375rem] font-semibold">{title}</h3>
           <p className="text-slate mt-0.5 text-sm leading-relaxed">{description}</p>
         </div>
+        {/* Icon plus label, matching the icon-only copy buttons elsewhere in
+            the dashboard. The tick replaces the old '✓' character — same
+            confirmation, drawn on the same grid as everything else. */}
         <button
           onClick={() => copy(code)}
-          className="text-primary hover:text-primary-hover shrink-0 text-sm font-medium transition-colors duration-150"
+          className="text-primary hover:text-primary-hover inline-flex shrink-0 items-center gap-1.5 text-sm font-medium transition-colors duration-150"
         >
-          {copied ? 'Copied ✓' : 'Copy'}
+          {copied ? <TickIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
+          {copied ? 'Copied' : 'Copy'}
         </button>
       </div>
 
@@ -125,8 +131,8 @@ function GroupSection({ site, group }: { site: Site; group: FaqGroup }) {
 
       {state === 'never' && (
         <p className="text-slate mt-3 text-sm leading-relaxed">
-          None of this counts until the HTML is actually on the page. Paste both blocks, then tell
-          us it&rsquo;s live so we can start watching for citations.
+          None of this counts until the HTML is actually on the page. Paste the block, then tell us
+          it&rsquo;s live so we can start watching for citations.
         </p>
       )}
 
@@ -139,17 +145,54 @@ function GroupSection({ site, group }: { site: Site; group: FaqGroup }) {
       {html && (
         <>
           <CopyBlock
-            title="The answers"
-            description="Paste this into the page where the answers should appear. Plain semantic HTML — it picks up your site's own styling."
-            code={html}
-            language="HTML"
+            title="The code"
+            description="Paste this once, where the answers should appear. Plain semantic HTML that picks up your site's own styling, with the schema that identifies your business underneath it."
+            code={buildPasteBlock(site, group, faqs)}
+            language="HTML + JSON-LD"
           />
-          <CopyBlock
-            title="The schema"
-            description="Paste this on the same page, anywhere. It tells a machine which text is a question, which is the answer, and which business they belong to."
-            code={schema}
-            language="JSON-LD"
-          />
+
+          {/*
+            The split is still available, just not the default.
+
+            Two cases genuinely need it: a builder that strips <script> from
+            its HTML field, and Wix, where the note below says to paste the
+            answers into a native text section as text — which a script tag
+            can't survive.
+          */}
+          <details className="group mt-5">
+            <summary className="text-slate hover:text-primary flex cursor-pointer list-none items-center gap-1.5 text-sm transition-colors duration-150 [&::-webkit-details-marker]:hidden">
+              <span
+                className="text-slate/60 transition-transform duration-200 group-open:rotate-90"
+                aria-hidden="true"
+              >
+                ▸
+              </span>
+              Need them separately?
+            </summary>
+
+            <p className="text-slate mt-2 pl-5 text-sm leading-relaxed">
+              Only if your builder strips the <code className="text-navy font-mono text-xs">
+                &lt;script&gt;
+              </code>{' '}
+              tag, or you&rsquo;re pasting the answers into a plain text section. Otherwise the one
+              block above is the whole job.
+            </p>
+
+            <div className="pl-5">
+              <CopyBlock
+                title="The answers"
+                description="Paste this into the page where the answers should appear. Plain semantic HTML — it picks up your site's own styling."
+                code={html}
+                language="HTML"
+              />
+              <CopyBlock
+                title="The schema"
+                description="Paste this on the same page, anywhere. It tells a machine which text is a question, which is the answer, and which business they belong to."
+                code={schema}
+                language="JSON-LD"
+              />
+            </div>
+          </details>
         </>
       )}
     </Card>
@@ -262,11 +305,30 @@ export function PublishWorkspace() {
             ))}
           </ul>
 
-          <p className="border-line text-slate mt-5 border-t pt-4 text-xs leading-relaxed">
-            Not sure whether yours wraps embeds in an iframe? Load the published page, view source,
-            and search for one of your questions. If the text isn&rsquo;t there, a crawler
-            can&rsquo;t see it either — put the answers in a native text section instead.
-          </p>
+          <div className="border-line mt-5 space-y-3 border-t pt-4">
+            {/*
+              The block ships no CSS so it inherits the customer's typography,
+              which is right on any theme that styles its own headings — and
+              silently wrong on a site whose reset zeroes margins, where it
+              lands as a wall of text. The classes exist for exactly that case;
+              until now nothing in the product mentioned they were there.
+            */}
+            <p className="text-slate text-xs leading-relaxed">
+              The block carries no styling of its own, so it takes on your site&rsquo;s fonts and
+              spacing. If your theme strips default margins and it lands looking cramped, style it
+              from your own stylesheet:{' '}
+              <code className="text-navy font-mono text-xs">.faqflo-faqs</code> wraps the block, with{' '}
+              <code className="text-navy font-mono text-xs">.faqflo-item</code>,{' '}
+              <code className="text-navy font-mono text-xs">.faqflo-question</code> and{' '}
+              <code className="text-navy font-mono text-xs">.faqflo-answer</code> inside it.
+            </p>
+
+            <p className="text-slate text-xs leading-relaxed">
+              Not sure whether yours wraps embeds in an iframe? Load the published page, view
+              source, and search for one of your questions. If the text isn&rsquo;t there, a crawler
+              can&rsquo;t see it either — put the answers in a native text section instead.
+            </p>
+          </div>
         </Card>
       </div>
     </>

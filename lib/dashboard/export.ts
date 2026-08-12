@@ -57,6 +57,15 @@ export function buildFaqHtml(group: FaqGroup, faqs: FaqEntry[]): string {
 
   const headingId = `faqflo-heading-${group.id}`;
 
+  /*
+    A blank line between items, and after the heading.
+
+    Purely for the human reading it. This is code somebody pastes into their
+    own page and will later have to find again to replace, so the question
+    boundaries should be obvious at a glance rather than one undifferentiated
+    wall. HTML collapses whitespace between elements, so it changes nothing
+    about how the page renders or what a crawler extracts.
+  */
   const items = entries
     .map(
       (f) => `  <div class="faqflo-item">
@@ -64,10 +73,11 @@ export function buildFaqHtml(group: FaqGroup, faqs: FaqEntry[]): string {
     <p class="faqflo-answer">${escapeHtml(f.answer)}</p>
   </div>`,
     )
-    .join('\n');
+    .join('\n\n');
 
   return `<section class="faqflo-faqs" aria-labelledby="${headingId}">
   <h2 id="${headingId}">Frequently asked questions</h2>
+
 ${items}
 </section>`;
 }
@@ -116,9 +126,41 @@ export function buildSchemaJson(site: Site, group: FaqGroup, faqs: FaqEntry[]): 
   return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2);
 }
 
-/** The schema wrapped in the script tag it's pasted as. */
+/**
+ * The schema wrapped in the script tag it's pasted as.
+ *
+ * `<` is escaped to its < form, which JSON reads as the same character and
+ * an HTML parser cannot read as a tag at all. Without it an answer containing
+ * the literal text `</script>` closes this element early: the schema is
+ * truncated to invalid JSON, and the remainder spills onto the customer's page
+ * as visible text. Rare, but it is their page, and JSON.stringify does not
+ * escape `/` on its own.
+ */
 export function buildSchemaBlock(site: Site, group: FaqGroup, faqs: FaqEntry[]): string {
-  return `<script type="application/ld+json">\n${buildSchemaJson(site, group, faqs)}\n</script>`;
+  const json = buildSchemaJson(site, group, faqs).replace(/</g, '\\u003c');
+
+  return `<script type="application/ld+json">\n${json}\n</script>`;
+}
+
+/*
+  Both halves as one paste.
+
+  They were two copy blocks once, which read as a choice and wasn't one: the
+  schema describes answers at a URL, so it is only ever correct on the page
+  those answers are on. Worse, contentHash below covers question and answer
+  text alone — the same fingerprint for both blocks — so somebody who pasted
+  the HTML, skipped the schema and marked the group published got told it was
+  up to date. The interface offered a distinction the stored state could not
+  represent.
+
+  Answers first, script after. The visible text is what earns the citation, so
+  it leads and survives a truncated paste; the schema is a label on top of it.
+*/
+export function buildPasteBlock(site: Site, group: FaqGroup, faqs: FaqEntry[]): string {
+  const html = buildFaqHtml(group, faqs);
+  if (!html) return '';
+
+  return `${html}\n\n${buildSchemaBlock(site, group, faqs)}`;
 }
 
 /**
