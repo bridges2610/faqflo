@@ -1,0 +1,62 @@
+export const meta = {
+  slug: 'why-faq-plugins-arent-a-good-idea',
+  title: 'Why Using a FAQ Plugin Isn’t a Good Idea',
+  date: '2026-08-12',
+  excerpt:
+    'It looks great to your visitors. It’s invisible to the AI you’re trying to reach.',
+  image: '/blog/featured-faq-plugin.png',
+  // Describes the illustration rather than repeating the headline, which is
+  // already the page's h1 immediately below it.
+  imageAlt:
+    'A mock AI answer to “Who offers 24/7 emergency plumbing in Denver?” naming Summit Plumbing Co., with summitplumbingco.com listed underneath as the source and a green “Cited” badge.',
+};
+
+It looks great to your visitors. It’s invisible to the AI you’re trying to reach.
+
+Installing a FAQ plugin feels like the obvious move. A few clicks, a slick little accordion on your
+page, questions that expand when you tap them. Done. It looks professional, and your visitors can
+find answers fast.
+
+So here’s the uncomfortable part: the [AI answer engines](/blog/what-is-aeo) you actually want to
+impress — ChatGPT, Perplexity, Google’s AI Overviews — usually can’t see a word of it.
+
+## The problem is JavaScript
+
+Almost every FAQ plugin renders its answers with JavaScript. When a human opens your page, their
+browser runs that JavaScript, the answers appear, and everything looks perfect.
+
+AI crawlers don’t work that way. They generally grab the raw HTML of your page and move on — they
+don’t sit around running JavaScript like a browser does. So when a FAQ plugin waits until after
+page load to inject your answers, those answers simply aren’t in the HTML the crawler reads. Your
+best content — the exact Q&A an AI would love to quote — is there for people and gone for machines.
+
+You end up with a FAQ that looks great in a demo and gets you cited exactly zero times.
+
+## “But it has SEO schema built in”
+
+A lot of plugins advertise FAQ schema, and that used to earn you those expandable rich results in
+Google. [Google retired FAQ rich results](/seo-guide) for most sites. So the headline reason many
+plugins existed is gone — and the schema they inject client-side often can’t be read anyway, for
+the same JavaScript reason.
+
+Nice widget. Wrong job.
+
+## What actually gets you cited
+
+The fix isn’t fancy. Your answers need to live as real, crawlable HTML on your own domain — plain
+text that’s in the page the moment it loads, no JavaScript required to reveal it. That’s the
+version an answer engine can read, trust, and quote, with the citation pointing back to you.
+
+A pretty accordion for your human visitors is fine on top of that. Just don’t let it be the only
+place your answers exist, because that’s the version the AI never sees.
+
+## Where FaqFlo comes in
+
+This is exactly the gap [FaqFlo](/#try) closes. Instead of a plugin that traps your answers behind
+JavaScript, FaqFlo gives you clean, crawlable Q&A HTML you paste straight onto your own site —
+answers built to be quoted, on your domain, visible to the crawlers from the first byte. Then it
+tracks whether you’re actually starting to show up in AI answers over time.
+
+A FAQ plugin optimizes for the visitor who’s already on your page. FaqFlo optimizes for the
+customer who’s still asking an AI which business to pick — and
+[makes sure the answer is you](/#audit).

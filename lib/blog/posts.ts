@@ -1,3 +1,4 @@
+import * as faqPlugins from '@/content/posts/why-faq-plugins-arent-a-good-idea.mdx';
 import * as whatIsAeo from '@/content/posts/what-is-aeo.mdx';
 import * as whyAiCantRead from '@/content/posts/why-ai-cant-read-your-faqs.mdx';
 import * as peopleStoppedClicking from '@/content/posts/people-stopped-clicking.mdx';
@@ -38,7 +39,9 @@ export type Post = {
     later without touching the template. */
 export const AUTHOR = 'Beau';
 
-const MODULES = [whatIsAeo, whyAiCantRead, peopleStoppedClicking, faqRichResults];
+/* Order matters only for posts sharing a date: the sort below is stable, so
+   same-day posts keep the order they appear in here. */
+const MODULES = [faqPlugins, whatIsAeo, whyAiCantRead, peopleStoppedClicking, faqRichResults];
 
 /*
   Why a runtime check when PostMeta is a type.
