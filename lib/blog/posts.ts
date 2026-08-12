@@ -1,3 +1,4 @@
+import * as whatIsAeo from '@/content/posts/what-is-aeo.mdx';
 import * as whyAiCantRead from '@/content/posts/why-ai-cant-read-your-faqs.mdx';
 import * as peopleStoppedClicking from '@/content/posts/people-stopped-clicking.mdx';
 import * as faqRichResults from '@/content/posts/faq-rich-results-are-gone.mdx';
@@ -37,7 +38,7 @@ export type Post = {
     later without touching the template. */
 export const AUTHOR = 'Beau';
 
-const MODULES = [whyAiCantRead, peopleStoppedClicking, faqRichResults];
+const MODULES = [whatIsAeo, whyAiCantRead, peopleStoppedClicking, faqRichResults];
 
 /*
   Why a runtime check when PostMeta is a type.
