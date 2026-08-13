@@ -23,6 +23,10 @@ export function PostFaq({ items }: { items: { q: string; a: string }[] }) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
+          // The < escape is Next's recommended guard for JSON-LD: it stops
+          // a "</script>" inside any answer from closing the tag early. Every
+          // answer here is a static literal today, but the array is the kind of
+          // thing that eventually gets fed from elsewhere.
           __html: JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'FAQPage',
@@ -31,7 +35,7 @@ export function PostFaq({ items }: { items: { q: string; a: string }[] }) {
               name: item.q,
               acceptedAnswer: { '@type': 'Answer', text: item.a },
             })),
-          }),
+          }).replace(/</g, '\\u003c'),
         }}
       />
 

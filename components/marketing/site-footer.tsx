@@ -15,7 +15,7 @@ const COLUMNS = [
     heading: 'Learn',
     links: [
       { href: '/blog', label: 'Blog' },
-      { href: '/seo-guide', label: 'AI SEO guide' },
+      { href: '/seo-guide', label: 'SEO guide' },
       { href: '/#aeo', label: "What's AEO" },
     ],
   },
