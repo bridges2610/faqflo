@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ButtonLink } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
 import { NavAccountLink } from './nav-account-link';
+import { MobileNav } from './mobile-nav';
 
 const LINKS = [
   { href: '/#how', label: 'How it works' },
@@ -9,6 +10,21 @@ const LINKS = [
   { href: '/#pricing', label: 'Pricing' },
   { href: '/#faq', label: 'FAQ' },
   { href: '/seo-guide', label: 'Guide' },
+];
+
+/*
+  Two more links, mobile only.
+
+  Blog and About are footer links on desktop, where the footer is a known
+  gesture away. On a phone the footer is the far end of a very long scroll, and
+  the drawer is the only navigation there is — so it carries the fuller map.
+  The desktop row is left at five: seven is where a horizontal strip of links
+  starts to crowd, and a vertical drawer has room the strip does not.
+*/
+const MOBILE_LINKS = [
+  ...LINKS,
+  { href: '/blog', label: 'Blog' },
+  { href: '/about', label: 'About' },
 ];
 
 export function SiteNav() {
@@ -32,23 +48,27 @@ export function SiteNav() {
 
         {/*
           Until accounts existed, nothing on the marketing site linked to the
-          app at all — /dashboard was reachable only by typing it. It is a quiet
-          text link rather than a second button because the primary action here
-          is still the free check: the people who already have an account know
-          what they came for, and the ones who don't shouldn't be asked to
-          choose between two buttons.
+          app at all — /dashboard was reachable only by typing it. It stays a
+          quiet text link rather than a button: it is for people who already
+          know what they came for, not an ask made of first-time visitors.
 
           It says "Dashboard" to somebody already signed in, decided in the
-          browser so these pages stay prerendered — see NavAccountLink. The
-          button beside it does NOT change: a returning customer landing here
-          often wants to run the free check on another site, and taking that
-          away would leave the page with nothing to do.
+          browser so these pages stay prerendered — see NavAccountLink.
+
+          Both of these are desktop-only. Below md they live at the foot of the
+          drawer instead (see MobileNav), leaving the mobile header as just the
+          wordmark and the menu button — the button in particular was the thing
+          crowding a 375px row, and the hero CTA sits a few hundred pixels
+          below it anyway.
         */}
         <div className="flex items-center gap-4 sm:gap-5">
-          <NavAccountLink />
-          <ButtonLink href="/#audit" size="sm" arrow>
-            Check my site
-          </ButtonLink>
+          <div className="hidden items-center gap-4 sm:gap-5 md:flex">
+            <NavAccountLink />
+            <ButtonLink href="/#audit" size="sm" arrow>
+              Check my site
+            </ButtonLink>
+          </div>
+          <MobileNav links={MOBILE_LINKS} />
         </div>
       </nav>
     </header>

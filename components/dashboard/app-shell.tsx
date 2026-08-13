@@ -4,17 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Wordmark } from '@/components/ui/wordmark';
+import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
 import {
   AeoIcon,
   ChartIcon,
-  CloseIcon,
   FaqIcon,
   DocIcon,
   GlobeIcon,
   HomeIcon,
-  MenuIcon,
   SearchIcon,
   SetupIcon,
 } from './nav-icons';

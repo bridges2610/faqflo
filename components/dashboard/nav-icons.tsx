@@ -96,21 +96,8 @@ export function ChartIcon({ className = '' }: IconProps) {
   );
 }
 
-export function MenuIcon({ className = '' }: IconProps) {
-  return (
-    <svg {...BASE} className={className}>
-      <path d="M3.5 6h13M3.5 10h13M3.5 14h13" />
-    </svg>
-  );
-}
-
-export function CloseIcon({ className = '' }: IconProps) {
-  return (
-    <svg {...BASE} className={className}>
-      <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" />
-    </svg>
-  );
-}
+// MenuIcon and CloseIcon used to sit here. The marketing header needed them
+// too, so they live in components/ui/icons.tsx now — import them from there.
 
 export function PlusIcon({ className = '' }: IconProps) {
   return (
