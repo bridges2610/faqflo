@@ -1,8 +1,5 @@
 import * as faqPlugins from '@/content/posts/why-faq-plugins-arent-a-good-idea.mdx';
 import * as whatIsAeo from '@/content/posts/what-is-aeo.mdx';
-import * as whyAiCantRead from '@/content/posts/why-ai-cant-read-your-faqs.mdx';
-import * as peopleStoppedClicking from '@/content/posts/people-stopped-clicking.mdx';
-import * as faqRichResults from '@/content/posts/faq-rich-results-are-gone.mdx';
 
 /*
   The post registry.
@@ -41,7 +38,7 @@ export const AUTHOR = 'Beau';
 
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
-const MODULES = [faqPlugins, whatIsAeo, whyAiCantRead, peopleStoppedClicking, faqRichResults];
+const MODULES = [faqPlugins, whatIsAeo];
 
 /*
   Why a runtime check when PostMeta is a type.
