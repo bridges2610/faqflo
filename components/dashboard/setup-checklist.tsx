@@ -3,6 +3,7 @@
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/check';
+import { Meter } from './meter';
 import type { SetupStep } from '@/lib/dashboard/worklist';
 
 /*
@@ -37,7 +38,7 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
             global -0.02em is tuned for large display headings and reads as
             cramped and heavy at card-title size. */}
         <h2 className="text-[0.9375rem] font-bold tracking-normal">Getting set up</h2>
-        <p className="text-slate font-mono text-xs tracking-wide tabular-nums">
+        <p className="text-slate font-mono text-[0.6875rem] tracking-wide tabular-nums uppercase">
           {done} of {steps.length} done
         </p>
       </div>
@@ -45,15 +46,7 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
       {/* Progress as a bar as well as a count. The bar is decoration; the count
           beside it is what actually carries the meaning, since a length is not
           readable to somebody using a screen reader. */}
-      <div className="bg-cloud mt-3 h-1.5 overflow-hidden rounded-full" aria-hidden="true">
-        {/* Solid primary, not the brand gradient. This screen keeps to one
-            accent — a gradient here would be the only one on the page and
-            would read as decoration rather than as a measurement. */}
-        <div
-          className="bg-primary h-full rounded-full transition-all duration-500"
-          style={{ width: `${(done / steps.length) * 100}%` }}
-        />
-      </div>
+      <Meter className="mt-3" value={(done / steps.length) * 100} />
 
       <ol className="mt-5 space-y-4">
         {steps.map((step, i) => {

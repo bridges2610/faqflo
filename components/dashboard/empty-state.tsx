@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
+import { SectionTitle } from './section-title';
 
 /**
  * What a panel shows before there's anything in it.
@@ -19,7 +20,7 @@ export function EmptyState({
 }) {
   return (
     <Card tone="cloud" className="px-6 py-12 text-center">
-      <h3 className="text-lg">{title}</h3>
+      <SectionTitle as="h3">{title}</SectionTitle>
       <p className="text-slate mx-auto mt-2 max-w-md text-[0.9375rem] leading-relaxed">{body}</p>
       {action && <div className="mt-6 flex justify-center">{action}</div>}
     </Card>

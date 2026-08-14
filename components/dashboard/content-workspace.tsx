@@ -8,12 +8,13 @@ import { matchMustHave, type MustHaveResult } from '@/lib/content';
 import { canContent } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import type { ArticleTopic, ContentPlan, MustHavePage } from '@/lib/dashboard/types';
-import { CopyIcon, TickIcon } from './nav-icons';
+import { CopyIcon, DocIcon, FaqIcon, SearchIcon, TickIcon } from './nav-icons';
+import { MetricTile } from './metric-tile';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
-import { StatTile } from './stat-tile';
 import { UpgradeCard } from './upgrade-card';
 import { OPPORTUNITY_TABS, WorkspaceTabs } from './workspace-tabs';
+import { SectionTitle } from './section-title';
 
 /*
   Content: the pages this kind of business is expected to have, and what to
@@ -396,26 +397,34 @@ export function ContentWorkspace() {
       )}
 
       <div className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-3">
-          <StatTile
+        {/* One divided card, matching the dashboard home and Results. */}
+        <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          <MetricTile
             label="Pages expected"
+            icon={<DocIcon className="h-3.5 w-3.5" />}
+            tint="bg-primary-soft text-primary"
             value={matched.length}
-            hint={`For a ${contentPlan.industry.toLowerCase()}`}
+            footer={`For a ${contentPlan.industry.toLowerCase()}`}
           />
-          <StatTile
+          {/* Neutral, not red. Zero missing is the good outcome, and a tile
+              must not change meaning with its value. */}
+          <MetricTile
             label="You're missing"
+            icon={<SearchIcon className="h-3.5 w-3.5" />}
             value={matched.length - present.length}
-            hint={present.length === matched.length ? 'Nothing missing' : 'Worth adding'}
+            footer={present.length === matched.length ? 'Nothing missing' : 'Worth adding'}
           />
-          <StatTile
+          <MetricTile
             label="Answering questions"
+            icon={<FaqIcon className="h-3.5 w-3.5" />}
+            tint="bg-success/12 text-success-ink"
             value={`${withAnswers.length} of ${present.length}`}
-            hint="Pages with Q&A markup"
+            footer="Pages with Q&A markup"
           />
-        </div>
+        </Card>
 
         <Card className="p-5 sm:p-7">
-          <h2 className="text-navy text-lg font-bold">The pages your industry expects</h2>
+          <SectionTitle>The pages your industry expects</SectionTitle>
           <p className="text-slate mt-1 text-sm leading-relaxed">
             Matched against the pages we read. A page with no answers on it still can&apos;t be
             quoted, which is why that&apos;s called out separately from missing.
@@ -427,8 +436,8 @@ export function ContentWorkspace() {
           </ul>
         </Card>
 
-        <div>
-          <h2 className="text-navy text-lg font-bold">Worth writing next</h2>
+        <Card className="p-5 sm:p-7">
+          <SectionTitle>Worth writing next</SectionTitle>
           <p className="text-slate mt-1 text-sm leading-relaxed">
             Ten articles aimed at what people ask about{' '}
             {contentPlan.location ? `${contentPlan.industry.toLowerCase()} in ${contentPlan.location}` : contentPlan.industry.toLowerCase()}.
@@ -438,7 +447,7 @@ export function ContentWorkspace() {
               <TopicCard key={t.title} topic={t} />
             ))}
           </ul>
-        </div>
+        </Card>
       </div>
     </>
   );

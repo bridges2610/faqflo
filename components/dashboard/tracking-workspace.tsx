@@ -10,9 +10,12 @@ import { ENGINES } from '@/lib/dashboard/types';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
+import { MetricTile } from './metric-tile';
+import { Meter } from './meter';
+import { AeoIcon, ChartIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
-import { StatTile } from './stat-tile';
 import { UpgradeCard } from './upgrade-card';
+import { SectionTitle } from './section-title';
 
 /*
   Tracking — the differentiator, and the reason the subscription exists.
@@ -73,7 +76,7 @@ export function TrackingWorkspace() {
   if (daily.length === 0) {
     return (
       <>
-        <PageHeader title="Results" description={`What the engines say about ${site.domain}.`} />
+        <PageHeader title="Results" description={`What the engines say about ${site.name}.`} />
         <EmptyState
           title="Citation tracking isn’t running yet"
           body="This is the part we’re building next: asking ChatGPT, Perplexity and Google AI Overviews your questions on a schedule and recording who they name. Your subscription is keeping every site on your account generating in the meantime, and you’ll be told the moment tracking goes live."
@@ -99,19 +102,46 @@ export function TrackingWorkspace() {
         description={`What ChatGPT, Perplexity and Google AI Overviews say when asked about ${site.name}.`}
       />
 
-      <div className="space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatTile label="Cited" value={cited} hint={`of ${latest.length} checks`} />
-          <StatTile label="Named, not linked" value={mentioned} hint="mentioned without a source" />
-          <StatTile label="Citation rate" value={`${citationRate.toFixed(0)}%`} hint="of checks" />
-          <StatTile label="Not in the answer" value={absent} hint="someone else was" />
-        </div>
+      {/* One card, four cells, hairline dividers — the same row the dashboard
+          home uses. Four separate cards read as four competing things. */}
+      <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-4">
+        <MetricTile
+          label="Cited"
+          icon={<ChartIcon className="h-3.5 w-3.5" />}
+          tint="bg-success/12 text-success-ink"
+          value={cited}
+          footer={`of ${latest.length} checks`}
+        />
+        <MetricTile
+          label="Named, not linked"
+          icon={<SearchIcon className="h-3.5 w-3.5" />}
+          tint="bg-accent-soft text-teal-ink"
+          value={mentioned}
+          footer="mentioned without a source"
+        />
+        <MetricTile
+          label="Citation rate"
+          icon={<AeoIcon className="h-3.5 w-3.5" />}
+          tint="bg-primary-soft text-primary"
+          value={`${citationRate.toFixed(0)}%`}
+          footer="of checks"
+        />
+        <MetricTile
+          label="Not in the answer"
+          icon={<GlobeIcon className="h-3.5 w-3.5" />}
+          value={absent}
+          footer="someone else was"
+        />
+      </Card>
 
-        <CitationChart daily={daily} />
+      {/* Main column and rail. The chart and the share-of-voice are the
+          content; the uncited list and the budget are what you act on. */}
+      <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+        <div className="space-y-5">
+          <CitationChart daily={daily} />
 
-        <div className="grid items-start gap-5 lg:grid-cols-2">
           <Card className="p-5 sm:p-7">
-            <h2 className="text-lg">Who gets cited</h2>
+            <SectionTitle>Who gets cited</SectionTitle>
             <p className="text-slate mt-1 text-sm">
               Across every check we ran for {site.name}&rsquo;s questions.
             </p>
@@ -134,21 +164,22 @@ export function TrackingWorkspace() {
                         {c.citations}
                       </p>
                     </div>
-                    <div className="bg-cloud mt-1.5 h-2 overflow-hidden rounded-full">
-                      <div
-                        className={`h-full rounded-full ${c.isYou ? 'bg-primary' : 'bg-line'}`}
-                        style={{ width: `${Math.max(2, (c.citations / top) * 100)}%` }}
-                      />
-                    </div>
+                    <Meter
+                      className="mt-1.5"
+                      value={(c.citations / top) * 100}
+                      tone={c.isYou ? 'primary' : 'line'}
+                    />
                   </li>
                 );
               })}
             </ul>
           </Card>
+        </div>
 
-          <Card className="p-5 sm:p-7">
+        <div className="mt-5 space-y-5 lg:mt-0">
+          <Card className="p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg">Not cited for</h2>
+              <SectionTitle>Not cited for</SectionTitle>
               <Badge tone="cyan">{uncited.length}</Badge>
             </div>
             <p className="text-slate mt-1 text-sm">
@@ -184,7 +215,6 @@ export function TrackingWorkspace() {
               </ul>
             )}
           </Card>
-        </div>
 
         {/* The budget, in the unit that's actually bought.
 
@@ -196,7 +226,7 @@ export function TrackingWorkspace() {
             other. */}
         {tracking && (
           <Card tone="cloud" className="p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
               <div className="min-w-0">
                 <p className="text-navy text-sm font-semibold">
                   {formatNumber(tracking.promptsTracked)} of {formatNumber(tracking.promptCap)}{' '}
@@ -211,20 +241,16 @@ export function TrackingWorkspace() {
                   {tracking.runsPerPeriod} times · resets {timeUntil(tracking.periodResetsAt)}
                 </p>
               </div>
-              <div className="bg-line h-2 w-40 overflow-hidden rounded-full">
-                <div
-                  className="bg-primary h-full rounded-full"
-                  style={{ width: `${Math.min(100, usedPct)}%` }}
-                />
-              </div>
+              <Meter className="mt-3" value={usedPct} />
             </div>
           </Card>
         )}
-
-        <p className="text-slate text-center text-xs">
-          Engines checked: {ENGINES.join(' · ')}
-        </p>
+        </div>
       </div>
+
+      <p className="text-slate mt-6 text-center text-xs">
+        Engines checked: {ENGINES.join(' · ')}
+      </p>
     </>
   );
 }

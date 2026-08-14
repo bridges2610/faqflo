@@ -13,6 +13,7 @@ import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { PlusIcon, TrashIcon } from './nav-icons';
 import { SiteForm } from './site-form';
+import { SectionTitle } from './section-title';
 
 /*
   Sites.
@@ -127,7 +128,7 @@ export function SitesWorkspace() {
       <Card className="p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg">Your sites</h2>
+            <SectionTitle>Your sites</SectionTitle>
             <Badge tone="neutral">{sites.length}</Badge>
           </div>
           <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)}>

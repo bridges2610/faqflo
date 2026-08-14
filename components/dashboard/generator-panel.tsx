@@ -15,6 +15,7 @@ import {
 } from '@/lib/faq';
 import type { FaqGroup } from '@/lib/dashboard/types';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { SectionTitle } from './section-title';
 
 /*
   The dashboard generator.
@@ -120,7 +121,7 @@ export function GeneratorPanel({
   return (
     <Card className="p-5 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg">Generate FAQs</h2>
+        <SectionTitle>Generate FAQs</SectionTitle>
 
         {/* Same segmented control as the homepage generator and the pricing
             billing toggle — one input-switching idiom across the product. */}

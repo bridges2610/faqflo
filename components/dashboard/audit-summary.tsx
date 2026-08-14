@@ -17,8 +17,11 @@ import {
 } from '@/lib/audit/plain';
 import { scoreBand } from '@/lib/audit/score';
 import type { ActionItem, AuditReport, Finding } from '@/lib/audit/types';
+import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import type { Site } from '@/lib/dashboard/types';
 import { ChevronIcon, CopyIcon, TickIcon } from './nav-icons';
+import { MicroLabel } from './micro-label';
+import { SectionTitle } from './section-title';
 
 /*
   The audit for someone who doesn't want an audit.
@@ -83,18 +86,27 @@ function Collapsible({
 function ProblemRow({ finding }: { finding: Finding }) {
   return (
     <li className="flex gap-3 py-3.5">
+      {/*
+        ⚠️ THE WORD IS THE SIGNAL. THE COLOUR IS THE SECOND COPY OF IT.
+
+        This used to be a red-or-cyan dot with the only distinguishing text in
+        an `sr-only` span marked `print:not-sr-only`. So a screen-reader user
+        and a printed page both got "Fix"/"Check", and a sighted colourblind
+        reader looking at the screen got nothing — red and cyan at 2px are the
+        same dot. Colour was carrying the whole meaning, which is exactly what
+        score-dial.tsx refuses to do and what every status colour in this
+        dashboard is required not to do.
+      */}
       <span
-        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-          finding.status === 'fail' ? 'bg-error' : 'bg-accent'
+        className={`mt-0.5 shrink-0 rounded-pill px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase ${
+          finding.status === 'fail'
+            ? 'bg-error/12 text-error-ink'
+            : 'bg-accent-soft text-teal-ink'
         }`}
-        aria-hidden="true"
-      />
-      <p className="text-slate text-[0.9375rem] leading-relaxed">
-        <span className="sr-only print:not-sr-only print:mr-1 print:font-semibold">
-          {finding.status === 'fail' ? 'Fix:' : 'Check:'}
-        </span>
-        {plainFor(finding)}
-      </p>
+      >
+        {finding.status === 'fail' ? 'Fix' : 'Check'}
+      </span>
+      <p className="text-slate text-[0.9375rem] leading-relaxed">{plainFor(finding)}</p>
     </li>
   );
 }
@@ -202,8 +214,13 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
       */}
       <div className="hidden print:block">
         <h1>What this means for {site.name}</h1>
+        {/* The domain only when the name isn't already it — this is the one
+            artefact a customer keeps, and "letsroof.com / letsroof.com" on it
+            is the stutter people notice. */}
         <p>
-          {site.domain} · checked {checkedOn}
+          {isNamedAfterDomain(site.name, site.domain)
+            ? `Checked ${checkedOn}`
+            : `${site.domain} · checked ${checkedOn}`}
         </p>
       </div>
 
@@ -232,7 +249,7 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
       {working.length > 0 && (
         <Card className="p-5 sm:p-7">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg">What&rsquo;s already working</h2>
+            <SectionTitle>What&rsquo;s already working</SectionTitle>
             <Badge tone="success">{working.length}</Badge>
           </div>
           {/* The summary instead of the list, with the list one click away.
@@ -255,7 +272,7 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
       {problems.length > 0 && (
         <Card className="p-5 sm:p-7">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-lg">What&rsquo;s holding you back</h2>
+            <SectionTitle>What&rsquo;s holding you back</SectionTitle>
             <Badge tone="neutral">{problems.length}</Badge>
           </div>
           <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
@@ -274,10 +291,10 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
       {/* Do these next ------------------------------------------------------ */}
       {report.actions.length > 0 && (
         <Card className="border-primary p-5 sm:p-7">
-          <p className="text-primary font-mono text-xs tracking-wide uppercase">
+          <MicroLabel tone="primary">
             Do these {report.actions.length} things
-          </p>
-          <h2 className="mt-3 text-lg">Where to start</h2>
+          </MicroLabel>
+          <SectionTitle className="mt-3">Where to start</SectionTitle>
           <p className="text-slate mt-1 text-sm">
             In order. The first one is worth more than the rest put together.
           </p>

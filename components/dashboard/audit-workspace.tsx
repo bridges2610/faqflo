@@ -25,6 +25,8 @@ import { AuditSummary } from './audit-summary';
 import { TaskRow } from './task-row';
 import { AUDIT_TABS, WorkspaceTabs } from './workspace-tabs';
 import { UpgradeCard } from './upgrade-card';
+import { MicroLabel } from './micro-label';
+import { SectionTitle } from './section-title';
 
 /*
   The audit.
@@ -112,7 +114,13 @@ function PillarCard({ pillar }: { pillar: ReturnType<typeof buildPillars>[number
               </span>
             </span>
             <span className="text-slate mt-0.5 block text-xs">{blurb}</span>
-            <span className="bg-cloud mt-2 block h-1.5 w-full overflow-hidden rounded-full">
+            {/* Not <Meter> — this sits inside the disclosure <button>, and a
+                div is not valid phrasing content there. Same height, same
+                track colour, same aria-hidden as Meter; see meter.tsx. */}
+            <span
+              className="bg-cloud mt-2 block h-1.5 w-full overflow-hidden rounded-full"
+              aria-hidden="true"
+            >
               <span
                 className={`block h-full rounded-full ${barColour}`}
                 style={{ width: `${pillar.score ?? 0}%` }}
@@ -406,10 +414,10 @@ export function AuditWorkspace({
               <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
                 <ScoreDial score={shown.score} />
                 <div className="min-w-0 text-center sm:text-left">
-                  <p className="text-slate font-mono text-xs tracking-wide uppercase">
+                  <MicroLabel>
                     {shown.domain}
-                  </p>
-                  <h2 className="mt-2 text-xl">{band?.label}</h2>
+                  </MicroLabel>
+                  <SectionTitle className="mt-2">{band?.label}</SectionTitle>
                   <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">{band?.summary}</p>
                   <p className="text-slate mt-3 text-xs leading-relaxed">
                     Based on {shown.scoredCount} checks across {shown.crawled.length}{' '}
@@ -422,10 +430,10 @@ export function AuditWorkspace({
 
             {shown.actions.length > 0 && (
               <Card className="border-primary p-5 sm:p-7">
-                <p className="text-primary font-mono text-xs tracking-wide uppercase">
+                <MicroLabel tone="primary">
                   Do these {shown.actions.length} things this week
-                </p>
-                <h2 className="mt-3 text-lg">Your plan, in order</h2>
+                </MicroLabel>
+                <SectionTitle className="mt-3">Your plan, in order</SectionTitle>
                 <p className="text-slate mt-1 text-sm">
                   Ranked by what each one is worth against how long it takes. The points are what
                   the score above would gain.
@@ -449,7 +457,7 @@ export function AuditWorkspace({
 
             {shown.opportunities.length > 0 && (
               <Card className="p-5 sm:p-7">
-                <h2 className="text-lg">Opportunities</h2>
+                <SectionTitle>Opportunities</SectionTitle>
                 <p className="text-slate mt-1 text-sm">
                   From your own answers and tracking, not the crawl.
                 </p>
@@ -485,7 +493,7 @@ export function AuditWorkspace({
                 stopped — otherwise every count above reads as site-wide. */}
             <Card tone="cloud" className="p-5">
               <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <p className="text-slate font-mono text-xs tracking-wide uppercase">Pages read</p>
+                <MicroLabel>Pages read</MicroLabel>
                 <p className="text-slate text-xs">
                   {shown.crawled.length} of {Math.max(shown.discovered, shown.crawled.length)} found
                   {shown.stoppedBecause === 'budget' && ' · stopped at the page budget'}
@@ -512,9 +520,9 @@ export function AuditWorkspace({
 
               {shown.skipped.length > 0 && (
                 <>
-                  <p className="text-slate mt-4 font-mono text-xs tracking-wide uppercase">
+                  <MicroLabel className="mt-4">
                     Not scanned, best first
-                  </p>
+                  </MicroLabel>
                   <ul className="mt-2 max-h-40 space-y-1 overflow-auto">
                     {shown.skipped.slice(0, 10).map((u) => (
                       <li key={u} className="text-slate font-mono text-xs break-all opacity-70">

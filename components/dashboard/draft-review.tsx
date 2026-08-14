@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/check';
 import type { Faq } from '@/lib/faq';
+import { SectionTitle } from './section-title';
 
 /*
   Review step between generating and saving.
@@ -46,7 +47,7 @@ export function DraftReview({
     <Card className="border-primary p-5 sm:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg">Review before saving</h2>
+          <SectionTitle>Review before saving</SectionTitle>
           <p className="text-slate mt-1 text-sm">
             {kept.length} of {candidates.length} selected, going into{' '}
             <span className="text-navy font-semibold">{destination}</span>. Untick anything you

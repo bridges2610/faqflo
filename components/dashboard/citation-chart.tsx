@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { ENGINES, type CitationDay, type Engine } from '@/lib/dashboard/types';
+import { SectionTitle } from './section-title';
 
 /*
   Citations per engine over time.
@@ -61,7 +62,7 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
     <Card className="p-5 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg">Citations over time</h2>
+          <SectionTitle>Citations over time</SectionTitle>
           <p className="text-slate mt-1 text-sm">
             Questions where your domain was named as a source, per engine, over the last{' '}
             {daily.length} days.

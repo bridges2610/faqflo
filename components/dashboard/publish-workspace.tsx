@@ -22,6 +22,7 @@ import { CopyIcon, TickIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
 import { ANSWER_TABS, WorkspaceTabs } from './workspace-tabs';
+import { SectionTitle } from './section-title';
 
 /*
   Publish: the copy-paste export, one section per group.
@@ -98,7 +99,7 @@ function GroupSection({ site, group }: { site: Site; group: FaqGroup }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-            <h2 className="text-lg">{group.name}</h2>
+            <SectionTitle>{group.name}</SectionTitle>
             {state === 'current' && <Badge tone="success">Up to date</Badge>}
             {state === 'stale' && <Badge tone="neutral">Out of date</Badge>}
             {state === 'never' && <Badge tone="neutral">Not pasted yet</Badge>}
@@ -269,7 +270,7 @@ export function PublishWorkspace() {
             so it lists every group under its own heading. */}
         {groups.length > 0 && (
           <Card className="p-5 sm:p-7">
-            <h2 className="text-lg">llms.txt</h2>
+            <SectionTitle>llms.txt</SectionTitle>
             <p className="text-slate mt-1 text-sm leading-relaxed">
               One file for the whole site, covering every group. Save it as{' '}
               <code className="text-navy font-mono text-xs">llms.txt</code> at the root of{' '}
@@ -286,7 +287,7 @@ export function PublishWorkspace() {
         )}
 
         <Card className="p-5 sm:p-7">
-          <h2 className="text-lg">Where it goes</h2>
+          <SectionTitle>Where it goes</SectionTitle>
           <p className="text-slate mt-1 text-sm leading-relaxed">
             Every builder has somewhere to put raw HTML. Find yours below.
           </p>

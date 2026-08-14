@@ -23,6 +23,7 @@ import {
 } from './nav-icons';
 import { FaqRow } from './faq-row';
 import { GroupForm } from './group-form';
+import { SectionTitle } from './section-title';
 
 type Filter = 'all' | 'published' | 'draft';
 
@@ -241,7 +242,7 @@ export function GroupCard({
           />
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <h2 className="text-lg">{group.name}</h2>
+              <SectionTitle>{group.name}</SectionTitle>
               <Badge tone={state.tone}>{state.label}</Badge>
             </span>
             <span className="text-slate mt-1 block text-sm">

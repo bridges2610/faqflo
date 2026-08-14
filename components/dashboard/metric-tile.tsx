@@ -3,11 +3,18 @@ import Link from 'next/link';
 /*
   One figure in the row across the top of the dashboard.
 
-  ⚠️ NOT StatTile, and not a variant of it. StatTile's `delta` is documented as
-  "a percentage against the previous period" and renders "Up 12%". The headline
-  figure here is a visibility score and its movement is in POINTS — passing 9 to
-  StatTile would print "Up 9%", which is a different and untrue claim. Two
-  contracts, two components; StatTile stays as it is for Tracking and Content.
+  This replaced StatTile, which it now completely subsumes.
+
+  The two coexisted briefly because StatTile carried a `delta` prop documented
+  as "a percentage against the previous period" — and a score that moves by 9
+  points is not up 9%. It turned out `delta` was never passed at any of
+  StatTile's seven call sites; that branch had never rendered. With the one
+  genuine difference gone, keeping two components meant keeping two answers to
+  "how do I show a number", so StatTile was deleted and its call sites on
+  Results and Pages & topics moved here.
+
+  `change` takes an explicit `unit` for that reason. Whatever a caller passes is
+  printed as-is, so nothing can imply a percentage it did not measure.
 
   The row is one card with dividers rather than four separate cards, so these
   are cells and carry no border or shadow of their own.
@@ -80,7 +87,7 @@ export function MetricTile({
 
           {/* In words as well as sign. A bare ▲ carries no meaning for anyone
               who can't distinguish the colour, and none at all in print — the
-              same reasoning as stat-tile.tsx. */}
+              same reasoning as the deltas on the audit page. */}
           {change && change.amount !== 0 && (
             <span
               className={`text-[0.6875rem] font-semibold ${up ? 'text-success-ink' : 'text-error-ink'}`}

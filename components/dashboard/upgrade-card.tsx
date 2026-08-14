@@ -11,6 +11,7 @@ import {
 } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { LockIcon } from './nav-icons';
+import { SectionTitle } from './section-title';
 
 /**
  * What a locked feature shows instead of nothing.
@@ -140,7 +141,7 @@ export function UpgradeCard({
           <LockIcon className="h-4.5 w-4.5" />
         </span>
         <div className="min-w-0">
-          <h3 className="text-base leading-snug">{heading}</h3>
+          <SectionTitle as="h3">{heading}</SectionTitle>
           <p className="text-slate mt-1.5 text-sm leading-relaxed">{explain}</p>
           <p className="text-slate mt-3 text-sm">
             <span className="text-navy font-semibold">{target.label}</span> · {target.price}

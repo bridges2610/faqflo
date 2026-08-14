@@ -12,6 +12,8 @@ import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
 import { OPPORTUNITY_TABS, WorkspaceTabs } from './workspace-tabs';
+import { MicroLabel } from './micro-label';
+import { SectionTitle } from './section-title';
 
 /*
   Opportunities: the questions people put to assistants about this business, and
@@ -129,7 +131,8 @@ export function DiscoverWorkspace() {
 
       <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
 
-      <div className="space-y-5">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+        <div className="space-y-5">
         {error && (
           <p role="alert" className="text-error-ink text-sm">
             {error}
@@ -159,7 +162,7 @@ export function DiscoverWorkspace() {
           <Card className="p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-3">
-                <h2 className="text-lg">Questions to answer</h2>
+                <SectionTitle>Questions to answer</SectionTitle>
                 <Badge tone="neutral">
                   {questions.length - uncovered.length} of {questions.length} answered
                 </Badge>
@@ -191,13 +194,17 @@ export function DiscoverWorkspace() {
           </Card>
         )}
 
+        </div>
+
+        {/* The rail: what drafting one of these actually leads to. */}
         {uncovered.length > 0 && (
-          <Card tone="cloud" className="p-5 sm:p-7">
-            <p className="text-slate font-mono text-xs tracking-wide uppercase">Where this goes</p>
-            <h3 className="mt-3 text-lg">
+          <div className="mt-5 lg:mt-0">
+          <Card tone="cloud" className="p-5">
+            <MicroLabel>Where this goes</MicroLabel>
+            <SectionTitle as="h3" className="mt-3">
               {uncovered.length} {uncovered.length === 1 ? 'question has' : 'questions have'} no
               answer on your site
-            </h3>
+            </SectionTitle>
             <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
               Drafting one puts it in your answers as a blank, waiting for you to write it in your
               own words. Publish it, paste the export onto your page, and it becomes something an
@@ -207,6 +214,7 @@ export function DiscoverWorkspace() {
               Go to Answers
             </ButtonLink>
           </Card>
+          </div>
         )}
       </div>
     </>
