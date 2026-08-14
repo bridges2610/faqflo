@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { buildPasteBlock, publishState } from '@/lib/dashboard/export';
 import { canPublish } from '@/lib/dashboard/plans';
+import { FaqCapReached } from '@/lib/dashboard/store';
 import { useCopy } from '@/lib/dashboard/use-copy';
 import type { FaqEntry, FaqGroup } from '@/lib/dashboard/types';
 import {
@@ -44,11 +45,25 @@ function ManualForm({ groupId, onDone }: { groupId: string; onDone: () => void }
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     if (!question.trim() || !answer.trim()) return;
     setSaving(true);
-    await addFaqs(groupId, [{ question, answer, status: 'draft', source: 'manual' }]);
+    setError(null);
+    try {
+      await addFaqs(groupId, [{ question, answer, status: 'draft', source: 'manual' }]);
+    } catch (err) {
+      // Keep what they typed on screen — this one was written by hand, and
+      // clearing the form on a cap error would throw away their work.
+      setError(
+        err instanceof FaqCapReached
+          ? `This site can hold ${err.cap} answers on the free tier. Get Cited removes the limit.`
+          : 'That answer could not be saved. Please try again.',
+      );
+      setSaving(false);
+      return;
+    }
     setSaving(false);
     onDone();
   }
@@ -86,6 +101,11 @@ function ManualForm({ groupId, onDone }: { groupId: string; onDone: () => void }
           Cancel
         </Button>
       </div>
+      {error && (
+        <p role="alert" className="text-error-ink mt-3 text-sm leading-relaxed">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

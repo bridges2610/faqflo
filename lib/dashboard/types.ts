@@ -130,13 +130,29 @@ export type FaqEntry = {
   updatedAt: string;
 };
 
-/** A question people put to AI, surfaced by Discover. */
+/**
+ * A question people put to AI, surfaced by Discover.
+ *
+ * ⚠️ `volume` was required, was described as "rough monthly ask volume across
+ * the engines we sample", and was rendered as "About 480 asks a month". No such
+ * measurement exists anywhere in this product — there is no keyword provider and
+ * no engine sampling — and the only values it ever held came from a hand-written
+ * demo fixture. It is optional now, nothing writes it, and nothing renders it.
+ *
+ * It is kept rather than deleted only so a stored snapshot from before this
+ * change still parses. If a real volume source is ever wired up, make it
+ * required again in the same commit that starts populating it.
+ */
 export type DiscoveredQuestion = {
   id: string;
   siteId: string;
   question: string;
-  /** Rough monthly ask volume across the engines we sample. */
-  volume: number;
+  /** @deprecated Never measured. See the note above. Do not render. */
+  volume?: number;
+  /** One sentence on why answering this would help this business get cited. */
+  why?: string;
+  /** What the asker is after — pricing, service, trust, logistics, problem. */
+  intent?: string;
   /** Whether an existing published answer already covers it. */
   covered: boolean;
   addedAt: string;

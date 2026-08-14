@@ -14,6 +14,7 @@ import {
   type Tone,
 } from '@/lib/faq';
 import type { FaqGroup } from '@/lib/dashboard/types';
+import { useDashboard } from '@/lib/dashboard/provider';
 
 /*
   The dashboard generator.
@@ -48,6 +49,7 @@ export function GeneratorPanel({
   onTargetChange: (id: string) => void;
   disabled?: boolean;
 }) {
+  const { site } = useDashboard();
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
@@ -93,10 +95,14 @@ export function GeneratorPanel({
 
     setBusy(true);
     try {
+      /* siteId comes from context rather than a prop, for the same reason
+         UpgradeCard reads it there: this panel already renders inside the
+         selected site's workspace, and the server needs it to check the
+         entitlement. A prop would be one more chance to pass the wrong one. */
       const res = await fetch('/api/dashboard/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content, count, tone, language }),
+        body: JSON.stringify({ content, count, tone, language, siteId: site?.id }),
       });
       const data = (await res.json()) as { faqs?: Faq[]; error?: string };
       if (!res.ok || !data.faqs) {

@@ -240,7 +240,16 @@ function path(url: string): string {
   }
 }
 
-const EFFORT_COST: Record<ActionItem['effort'], number> = {
+/**
+ * What each effort band costs, for impact-over-effort ranking.
+ *
+ * Exported so lib/dashboard/worklist.ts can rank product tasks — "your live
+ * copy is out of date", "three drafts have no answer" — on the same scale as
+ * audit fixes. Those two lists are merged into one before the customer sees
+ * them, and two lists ranked by different arithmetic do not merge into a
+ * meaningful order.
+ */
+export const EFFORT_COST: Record<ActionItem['effort'], number> = {
   '2 minutes': 1,
   '15 minutes': 2,
   'an hour': 4,

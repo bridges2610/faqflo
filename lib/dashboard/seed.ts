@@ -118,15 +118,65 @@ const SEED_GROUPS: SeedGroup[] = [
   },
 ];
 
-const SEED_QUESTIONS: { q: string; volume: number; covered: boolean }[] = [
-  { q: 'who repairs roofs in Franklin TN', volume: 480, covered: true },
-  { q: 'emergency roof repair near me', volume: 390, covered: true },
-  { q: 'how much does a new roof cost in Tennessee', volume: 320, covered: false },
-  { q: 'does insurance cover hail damage to a roof', volume: 260, covered: true },
-  { q: 'metal roof vs shingles which is better', volume: 210, covered: false },
-  { q: 'roof financing options for homeowners', volume: 170, covered: false },
-  { q: 'how long does a roof last', volume: 140, covered: false },
-  { q: 'do roofers clean gutters too', volume: 90, covered: false },
+/*
+  Shaped like what the discovery route actually returns, so the demo shows the
+  real screen rather than a version of it.
+
+  The old fixture carried a `volume` per question — 480, 390, 320 — which the UI
+  rendered as "About 480 asks a month". Nothing measures that, so the field is
+  gone from the model and from here. Questions are also phrased as a person
+  talks to an assistant now, in full sentences, because that is what the prompt
+  asks for and a demo that disagrees with the product is a misleading demo.
+*/
+const SEED_QUESTIONS: { q: string; why: string; intent: string; covered: boolean }[] = [
+  {
+    q: 'Who repairs roofs in Franklin, TN?',
+    why: 'The plainest version of the question a customer with a leak asks first, and the one where being named decides who gets called.',
+    intent: 'service',
+    covered: true,
+  },
+  {
+    q: 'Can someone come out today for an emergency roof repair?',
+    why: 'Urgency questions convert immediately — whoever the assistant names is usually the only one contacted.',
+    intent: 'logistics',
+    covered: true,
+  },
+  {
+    q: 'How much does a new roof cost in Tennessee?',
+    why: 'You publish real ranges and most competitors publish none, so a specific answer here is easy to quote.',
+    intent: 'pricing',
+    covered: false,
+  },
+  {
+    q: 'Does home insurance cover hail damage to a roof?',
+    why: 'Answering the insurance question builds trust before the sales conversation, and you handle these claims already.',
+    intent: 'problem',
+    covered: true,
+  },
+  {
+    q: 'Is a metal roof better than shingles?',
+    why: 'A comparison you can answer from real jobs in this climate rather than in general terms.',
+    intent: 'service',
+    covered: false,
+  },
+  {
+    q: 'Are there financing options for a roof replacement?',
+    why: 'Cost is the usual reason a job stalls, and you offer terms your site does not currently mention.',
+    intent: 'pricing',
+    covered: false,
+  },
+  {
+    q: 'How long should a roof last before it needs replacing?',
+    why: 'The question people ask before they are ready to buy — answering it is how you are the name they remember later.',
+    intent: 'problem',
+    covered: false,
+  },
+  {
+    q: 'Do roofers clean gutters as part of the job?',
+    why: 'A small scope question that decides between two quotes, and yours includes it.',
+    intent: 'service',
+    covered: false,
+  },
 ];
 
 /* Other people's domains only. The customer's own domain must never appear
@@ -444,7 +494,7 @@ function seedContentPlan(siteId: string): ContentPlan {
         angle: 'Real local ranges by roof size and material, not a national average.',
         primaryKeyword: 'new roof cost franklin tn',
         aeoQuestion: 'How much does a new roof cost in Franklin, Tennessee?',
-        why: 'Your highest-volume uncovered question, and the one assistants currently answer with somebody else’s numbers.',
+        why: 'One of the questions you don’t answer, and the one assistants currently answer with somebody else’s numbers.',
       },
       {
         title: 'Does Tennessee homeowners insurance cover hail damage to a roof?',
@@ -582,7 +632,8 @@ export function buildSeed(siteId: string): SeedLocalData {
     id: newId('q'),
     siteId: site.id,
     question: q.q,
-    volume: q.volume,
+    why: q.why,
+    intent: q.intent,
     covered: q.covered,
     addedAt: daysAgo(10 - i),
   }));

@@ -9,19 +9,24 @@ import {
   MAX_FAQ_COUNT_PAID,
   type Faq,
 } from '@/lib/faq';
-import { currentUser } from '@/lib/auth/dal';
+import { currentUser, siteForUser } from '@/lib/auth/dal';
+import { canRegenerate, hasGetCited } from '@/lib/auth/entitlements';
 import { checkRateLimit, DASHBOARD_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
 
 /*
   Generation for the dashboard: same model and same schema as the free route,
   at the paid ceiling (MAX_FAQ_COUNT_PAID) and a much higher daily limit.
 
-  Authenticated. The rule this file has always stated is now enforced rather
-  than deferred: there is no `plan` field read from the request body, because
-  "a client that tells the server which tier it is on is not authorization —
-  it's a bypass with extra steps." Tier comes from the account row.
+  There is no `plan` field read from the request body, because "a client that
+  tells the server which tier it is on is not authorization — it's a bypass with
+  extra steps." Tier comes from the account row.
 
-  The paid ceiling is granted by the session, not by the caller asking for it.
+  ⚠️ This route used to check the session and nothing else, while its own
+  comment claimed tier "is now enforced". It wasn't — canRegenerate was never
+  imported — so any signed-in free account could POST here and receive the full
+  paid ceiling of twelve answers. It now takes a siteId and gates on the same
+  predicate every other generating feature defers to. A model call costs money;
+  the whole point of canGenerate is that nothing spends it for free.
 */
 
 const MODEL = 'claude-haiku-4-5';
@@ -50,10 +55,29 @@ export async function POST(request: Request) {
     return fail('Invalid request body.', 400);
   }
 
-  const { content, count, tone, language } = (body ?? {}) as Record<string, unknown>;
+  const { content, count, tone, language, siteId } = (body ?? {}) as Record<string, unknown>;
 
   if (typeof content !== 'string' || content.trim().length < 10) {
     return fail('Content is required and must be at least 10 characters.', 400);
+  }
+
+  if (typeof siteId !== 'string' || !siteId) {
+    return fail('Generating answers needs a site.', 400);
+  }
+
+  /* 404 rather than 403 for a site that isn't theirs — matching /api/audit.
+     Telling a stranger that an id exists but isn't theirs is an answer they
+     didn't earn. */
+  const site = await siteForUser(siteId, user.id);
+  if (!site) return fail('No such site on your account.', 404);
+
+  if (!canRegenerate(site, user)) {
+    return fail(
+      hasGetCited(site)
+        ? 'Your Get Cited window has ended for this site. Stay Cited keeps answers coming.'
+        : 'Writing answers is part of Get Cited for this site.',
+      403,
+    );
   }
 
   const client = new Anthropic({ apiKey });

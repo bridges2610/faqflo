@@ -16,7 +16,7 @@
  * true, if drier, and it means a newly added check is never silently blank.
  */
 
-import type { ActionItem, AuditReport, CheckStatus, Finding } from './types';
+import type { ActionItem, AuditReport, CheckStatus, Finding, PillarId } from './types';
 
 type PlainEntry = string | ((f: Finding) => string);
 
@@ -355,6 +355,301 @@ export function isHiddenInSummary(finding: Finding): boolean {
   return typeof entry === 'string' && entry === '';
 }
 
+/*
+  The passing checks worth saying out loud, most load-bearing first.
+
+  Not every pass is interesting. "Your site is served over HTTPS" is true and
+  nobody's day is improved by hearing it, whereas "the AI assistants are allowed
+  to read your site" is the whole ballgame. This list is the order of what
+  actually matters, and the summary names the top few that passed rather than
+  reciting all twenty.
+
+  Deliberately the mirror of verdict()'s severity cascade: the same checks, in
+  roughly the same order of consequence, said as wins instead of faults.
+
+  Each one is a sentence of its own, in two halves: what is true, and what that
+  buys them. The second half is the whole reason to name it — "your questions
+  are labelled" means nothing to somebody who does not already know why that
+  matters, and telling them is the difference between a report and help.
+*/
+const WINS: { id: string; phrase: string; so: string }[] = [
+  {
+    id: 'crawlers',
+    phrase: 'The AI assistants are allowed in',
+    so: 'so they can come and read your pages whenever they like',
+  },
+  {
+    id: 'raw-html',
+    phrase: 'Your words sit right there in the page',
+    so: 'which means they can actually read them',
+  },
+  {
+    id: 'qa-markup',
+    phrase: 'Your questions are labelled',
+    so: 'so a machine can tell which answer belongs to which',
+  },
+  {
+    id: 'question-headings',
+    phrase: 'You ask questions the way your customers ask them',
+    so: 'so the wording lines up with what people really type',
+  },
+  {
+    id: 'org-schema',
+    phrase: 'Your business is named properly in the code',
+    so: 'so an assistant knows who to credit',
+  },
+  {
+    id: 'answer-first',
+    phrase: 'Your answers come straight after the question',
+    so: 'which is exactly the shape an assistant likes to quote',
+  },
+  {
+    id: 'specificity',
+    phrase: 'Your answers use real numbers instead of vague claims',
+    so: 'and that is what makes them worth repeating',
+  },
+  {
+    id: 'title',
+    phrase: 'Every page says what it is',
+    so: 'so nothing gets mistaken for something else',
+  },
+  {
+    id: 'identity-pages',
+    phrase: 'You have the about and contact pages people look for',
+    so: 'which is how anyone checks you are a real business',
+  },
+  {
+    id: 'contactable',
+    phrase: 'People can find how to reach you',
+    so: 'which sounds obvious until you see how many sites hide it',
+  },
+  {
+    id: 'sitemap',
+    phrase: 'You have a sitemap',
+    so: 'so crawlers are told where everything lives instead of guessing',
+  },
+  {
+    id: 'https',
+    phrase: 'Your site is served securely',
+    so: 'which everything else quietly depends on',
+  },
+];
+
+/*
+  ⚠️ READING-LEVEL TARGET FOR EVERYTHING COMPOSED BELOW: under grade 7
+  (Flesch-Kincaid). This page is read by the owner of a roofing company, not by
+  someone who knows what a canonical tag is.
+
+  In practice the words were never the problem — the vocabulary here already
+  scored 4.7–7.0. Sentence LENGTH is. Anything over about fifteen words a
+  sentence pushes the grade up on its own, so the rule of thumb is: one idea per
+  sentence, and split a list into sentences rather than joining it with commas.
+
+  This is a floor on clarity, not a licence to lose accuracy. If a sentence can
+  only be shortened by making it vaguer, leave it long and say why.
+*/
+
+const NUMBER_WORDS = [
+  'zero',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+];
+
+/**
+ * Small numbers as words, the way a person writing to another person does.
+ *
+ * "One thing needs fixing" reads like someone talking; "1 thing needs fixing"
+ * reads like a form. Values are unchanged, so these still match the count on
+ * the badge beside the heading.
+ */
+function num(n: number): string {
+  return n < NUMBER_WORDS.length ? NUMBER_WORDS[n] : String(n);
+}
+
+function capitalise(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+}
+
+/** How many of the top WINS count as "the hard part" rather than hygiene. */
+const HARD_PART = 3;
+
+/**
+ * The paragraph above "What's already working".
+ *
+ * Composed by rule from the findings, exactly like verdict() below and for the
+ * same reason: it can only ever name a strength the audit actually found. It
+ * exists because a list of twenty ticks is something people scroll past — this
+ * says how much is right and which of it carries the most weight, before the
+ * list is even opened.
+ *
+ * It opens with the real count rather than a word like "most" or "a fair
+ * amount". A band has to be tuned, reads as an opinion, and is the kind of thing
+ * a customer argues with; "14 of them came back right" is checkable against the
+ * list directly underneath it. Counted with the same isHiddenInSummary() filter
+ * the list uses, so the two can never disagree.
+ *
+ * ⚠️ The wins are separate SENTENCES, not a comma-joined list. That one change
+ * is most of the reading level: joined, the same three phrases made a 19-word
+ * sentence; split, they are three sentences of six.
+ */
+export function strengths(report: AuditReport): string {
+  const shown = report.pillars.flatMap((p) => p.findings).filter((f) => !isHiddenInSummary(f));
+  const passing = shown.filter((f) => f.status === 'pass');
+  const problems = shown.filter((f) => f.status === 'fail' || f.status === 'warn');
+  const total = passing.length + problems.length;
+
+  const counted = `We checked ${num(total)} ${total === 1 ? 'thing' : 'things'} on your site`;
+  const lead =
+    problems.length === 0
+      ? // "Every one came back right" of a single check reads as a joke.
+        `${counted}, and ${total === 1 ? 'it came' : 'every one of them came'} back right.`
+      : `${counted}, and ${num(passing.length)} of them ${
+          passing.length === 1 ? 'is' : 'are'
+        } already right.`;
+
+  const wins = WINS.filter((w) => passing.some((f) => f.id === w.id)).slice(0, 3);
+
+  /* Nothing on the priority list passed, so there is no honest way to say which
+     of these matters most — the passes are all the quiet hygiene ones. Better
+     to hand over the list than to promote something that isn't a highlight. */
+  if (wins.length === 0) {
+    // No editorial. "None of it needs your attention" is true of passing checks
+    // but reads as "none of it matters", which is the opposite of the point.
+    return `${lead} They’re the quieter sort of check rather than the headline ones, but they all came back clean. Open the list below if you’d like to see them.`;
+  }
+
+  /* "And" on the last one, so three sentences read as a list rather than as
+     three unrelated statements. */
+  const named = wins
+    .map((w, i) => {
+      const body = `${w.phrase}, ${w.so}.`;
+      return i > 0 && i === wins.length - 1 ? `And ${body.charAt(0).toLowerCase()}${body.slice(1)}` : body;
+    })
+    .join(' ');
+
+  /* Only claim the hard part is done when one of the top few actually passed.
+     A site whose only wins are HTTPS and page titles has not done the hard
+     part, and saying so would be the kind of flattery that costs you trust the
+     moment they read the next section. */
+  const bigWin = WINS.slice(0, HARD_PART).some((w) => wins.includes(w));
+
+  return bigWin
+    ? `${lead} ${named} That’s the hard part, and you’ve already done it.`
+    : `${lead} ${named} They’re worth knowing about before you read the rest.`;
+}
+
+/*
+  What each pillar is about, for someone who does not work in this.
+
+  The labels in lib/audit/types.ts — "Content structure & answerability",
+  "Citation & source readiness" — are written for the technical view, and are
+  exactly the register this page exists to avoid.
+*/
+const PILLAR_PLAIN: Record<PillarId, string> = {
+  technical: 'letting the AI read your pages at all',
+  structure: 'how your answers are laid out',
+  seo: 'the basics search engines look for',
+  citation: 'saying who you are',
+  authority: 'looking like a business people can trust',
+  visibility: 'showing up in AI answers',
+};
+
+/**
+ * The paragraph above "What's holding you back".
+ *
+ * ⚠️ THIS MUST NOT RESTATE THE VERDICT. The card at the top of the page already
+ * names the single biggest problem and what it costs, and the reader has just
+ * read it two inches above. This answers the questions that one doesn't: how
+ * many, what kind, how bad, and what to do about it. If both open with the same
+ * claim, both look worse.
+ *
+ * `fail` and `warn` are counted separately because they are different things.
+ * "7 problems" reads as a disaster; "3 need fixing and 4 are worth a look" is
+ * the same finding and an accurate one.
+ */
+export function holdingBack(report: AuditReport): string {
+  const shown = report.pillars.flatMap((p) => p.findings).filter((f) => !isHiddenInSummary(f));
+  const fails = shown.filter((f) => f.status === 'fail');
+  const warns = shown.filter((f) => f.status === 'warn');
+  const problems = [...fails, ...warns];
+
+  /* Defensive. The caller only renders this section when there is something in
+     it, but a "0 things are worth a look" sentence is the kind of thing that
+     escapes the moment somebody reuses the function somewhere else. */
+  if (problems.length === 0) return '';
+
+  const fixing = `${num(fails.length)} ${fails.length === 1 ? 'thing needs' : 'things need'} fixing`;
+  const looking = `${num(warns.length)} ${warns.length === 1 ? 'thing is' : 'things are'} worth a look`;
+  const more = `${warns.length === 1 ? 'one more is' : `${num(warns.length)} more are`} worth a look`;
+
+  const lead = capitalise(
+    fails.length && warns.length
+      ? `${fixing}, and ${more}.`
+      : fails.length
+        ? `${fixing}.`
+        : `${looking}.`,
+  );
+
+  /*
+    The theme. Weighted by the findings' own weights rather than by count, so
+    one heavy problem outranks three trivial ones — the same arithmetic the
+    score uses. Only stated when a single pillar really does dominate; below
+    that it would be a claim about a pattern that isn't there.
+  */
+  const byPillar = new Map<PillarId, number>();
+  for (const f of problems) byPillar.set(f.pillar, (byPillar.get(f.pillar) ?? 0) + f.weight);
+
+  const totalWeight = [...byPillar.values()].reduce((a, b) => a + b, 0);
+  const [topPillar, topWeight] = [...byPillar.entries()].sort((a, b) => b[1] - a[1])[0] ?? [];
+
+  const theme =
+    topPillar && totalWeight > 0 && topWeight / totalWeight >= 0.4
+      ? problems.length === 1
+        ? ` It comes down to ${PILLAR_PLAIN[topPillar]}.`
+        : // "Most of them" of exactly two is a strange way to say "both".
+          problems.length === 2
+          ? ` Both come down to the same thing: ${PILLAR_PLAIN[topPillar]}.`
+          : ` Most of them come down to the same thing: ${PILLAR_PLAIN[topPillar]}.`
+      : problems.length > 2
+        ? ' They’re spread across a few different areas rather than piling up in one place.'
+        : '';
+
+  /*
+    Proportional to what was actually found. A site with a hard failure must not
+    be told nothing here is serious.
+
+    Both clauses compare items against each other, so neither can be said of a
+    single problem — "some matter more than others" of one thing is nonsense.
+
+    Note what this deliberately does NOT say: that any of it is easy. Effort
+    ranges from two minutes to an hour, it is on the customer's own site, and
+    the one thing worse than a long list is a long list you were told would be
+    quick.
+  */
+  const weight =
+    problems.length === 1
+      ? fails.length
+        ? ' It’s worth doing before anything else on the site.'
+        : ' It’s not urgent, so there’s no rush.'
+      : fails.length
+        ? ' Some matter more than others, and you don’t have to do it all at once.'
+        : ' None of it is urgent, so you can take these in your own time.';
+
+  const pointer =
+    problems.length > 1
+      ? ' We’ve put the list in order, so whatever costs you the most sits right at the top.'
+      : '';
+
+  return `${lead}${theme}${weight}${pointer}`;
+}
+
 /**
  * The opening paragraph.
  *
@@ -362,6 +657,11 @@ export function isHiddenInSummary(finding: Finding): boolean {
  * describe a problem the audit didn't find. It names the single biggest thing
  * standing in the way and what that costs — because the one thing a busy owner
  * reads is the first two sentences.
+ *
+ * ⚠️ The cascade order is load-bearing and every clause names a real finding.
+ * These were shortened to bring the whole view under grade 7 — one idea per
+ * sentence, dashes and semicolons broken into full stops — and NO CLAIM
+ * CHANGED. Shorten further only the same way.
  */
 export function verdict(report: AuditReport): string {
   const all = report.pillars.flatMap((p) => p.findings);
@@ -373,31 +673,31 @@ export function verdict(report: AuditReport): string {
   const scanned = `We looked at ${pages} ${pages === 1 ? 'page' : 'pages'} of your site the way an AI assistant would.`;
 
   if (failing('crawlers') || failing('googlebot')) {
-    return `${scanned} Your site is turning the AI assistants away at the door — its settings tell them not to read it. Until that changes, nothing you publish can be quoted, however good it is. It’s a two-minute fix and it’s the only thing worth doing first.`;
+    return `${scanned} Your site turns them away at the door — its settings tell them not to read it. Until that changes, nothing you publish can be quoted, however good it is. It’s a two-minute fix, and it’s the only thing worth doing first.`;
   }
 
   if (failing('raw-html')) {
-    return `${scanned} They saw an empty page. Your site puts its content together in the visitor’s browser, and the systems behind AI answers don’t wait for that — so as far as they’re concerned, there’s nothing on your site at all. That’s the thing to fix before anything else.`;
+    return `${scanned} They saw an empty page. Your site builds its content in the visitor’s browser, and the systems behind AI answers don’t wait for that. So as far as they can tell, there’s nothing on your site at all. That’s the one to fix before anything else.`;
   }
 
   if (failing('noindex')) {
-    return `${scanned} One setting on your site is telling search engines to leave it out entirely. Everything else here is academic while that’s switched on.`;
+    return `${scanned} One setting is quietly telling search engines to leave your site out altogether. Nothing else on this page matters much while that’s switched on.`;
   }
 
   if (failing('qa-markup') && failing('question-headings')) {
-    return `${scanned} They can read it — but nothing on it is written as a question with an answer underneath. When one of your customers asks an assistant about what you do, there’s nothing on your site to match against, so it answers with somebody else. This is the gap that costs you the most, and it’s the one FaqFlo is built to close.`;
+    return `${scanned} They can read it — but nothing on it is written as a question with an answer underneath. So when a customer asks an assistant about what you do, there’s nothing on your site to match against, and it answers with somebody else instead. This is the gap that costs you the most, and it’s the one we’re built to close.`;
   }
 
   if (failing('org-schema')) {
-    return `${scanned} They can read it, but nothing on it says which business these answers belong to. An assistant can repeat what you wrote and credit somebody else — you do the work, someone else gets named.`;
+    return `${scanned} They can read it, but nothing tells them which business these answers belong to. An assistant can repeat what you wrote and credit somebody else entirely. You do the work, and someone else gets the name check.`;
   }
 
   if (shaky('qa-markup') || shaky('answer-first')) {
-    return `${scanned} The foundations are sound: they can reach your site and read it. What’s missing is shape — your answers aren’t laid out as questions with a direct reply underneath, which is the form assistants actually quote.`;
+    return `${scanned} The foundations are sound — they can reach your site and read it. What’s missing is shape. Your answers aren’t laid out as questions with a direct reply underneath, and that’s the form assistants actually quote.`;
   }
 
   if (report.score >= 85) {
-    return `${scanned} It’s in good shape — readable, identifiable and structured the way assistants like. From here it’s about depth: more of the questions your customers ask, answered better than anyone else answers them.`;
+    return `${scanned} It’s in good shape. Assistants can read it, tell whose it is, and find their way around. From here it’s about depth — answering more of the questions your customers ask, and answering them better than anyone else does.`;
   }
 
   return `${scanned} Nothing is badly broken, but several small things are each costing you a little. The list below is in the order worth doing them.`;

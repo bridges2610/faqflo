@@ -17,9 +17,14 @@ import { Check } from '@/components/ui/check';
 
   The structure is the decision, not the dollars: a one-time fee for the
   discrete "get me set up" job, and a subscription for the continuous "keep me
-  cited" job. Tracking costs us money every month it runs — repeatedly asking
+  cited" job. Tracking will cost us money every month it runs — repeatedly asking
   ChatGPT, Perplexity and Google what they say about a customer — so it can only
   be funded by recurring revenue. One-time money cannot pay a forever cost.
+
+  ⚠️ Tracking is NOT LIVE. Nothing in this product queries an answer engine yet.
+  It is listed with `soon: true` rather than a tick, and lib/dashboard/plans.ts
+  says the same thing in the app. If you build it, both change together — that
+  file carries the matching warning.
 
   The three tiers are no longer the same kind of thing, so `price` is a union
   rather than a monthly figure with nulls in it. That's what stops a one-time
@@ -33,6 +38,17 @@ type Price =
   // a year displays as $24.17/month, and storing 24.17 would bill $290.04.
   | { kind: 'subscription'; monthly: number; annualTotal: number };
 
+/*
+  A feature is either shipping or it isn't, and the card has to be able to say
+  which. `soon` exists because Stay Cited's headline — citation tracking — is
+  genuinely not built: there is no engine-querying code in the product. Listing
+  it with a tick alongside things that work would be selling it as live.
+
+  Ticked features must all be real today. If you find yourself wanting to tick
+  something aspirational, mark it `soon` instead.
+*/
+type Feature = { label: string; soon?: boolean };
+
 type Plan = {
   name: string;
   price: Price;
@@ -41,7 +57,7 @@ type Plan = {
   href: string;
   featured: boolean;
   note: string | null;
-  features: string[];
+  features: Feature[];
 };
 
 const PLANS: Plan[] = [
@@ -54,10 +70,10 @@ const PLANS: Plan[] = [
     featured: false,
     note: null,
     features: [
-      'Quick AI-visibility score',
-      'Is your content readable without JavaScript',
-      'Are AI crawlers allowed in',
-      'FAQ generator, capped',
+      { label: 'Quick AI-visibility score' },
+      { label: 'Is your content readable without JavaScript' },
+      { label: 'Are AI crawlers allowed in' },
+      { label: 'FAQ generator, capped' },
     ],
   },
   {
@@ -78,17 +94,20 @@ const PLANS: Plan[] = [
     featured: true,
     note: 'Start here',
     features: [
-      'Full audit, including whether AI cites you today',
-      'The questions people actually ask AI in your category',
-      'The pages your industry expects, and which of yours are missing',
-      'A complete answer-first FAQ set, written to be quoted',
-      'Publish-ready HTML for your own site',
-      'Entity schema and llms.txt',
+      // "including whether AI cites you today" was here and is not true — the
+      // visibility pillar is `locked` at weight 0 on every audit, because
+      // nothing asks the engines anything. See tracking, below.
+      { label: 'Full audit — 44 checks across your whole site' },
+      { label: 'The questions people actually ask AI in your category' },
+      { label: 'The pages your industry expects, and which of yours are missing' },
+      { label: 'A complete answer-first FAQ set, written to be quoted' },
+      { label: 'Publish-ready HTML for your own site' },
+      { label: 'Entity schema and llms.txt' },
       // ⚠️ Both halves of the deal, stated before the card rather than
       // discovered on day 31. Everything MADE is permanent; the running of new
       // audits is what ends. Selling "yours to keep" and then stopping audits
       // without having said so is a chargeback.
-      '30 days of full access — everything you make stays yours for good',
+      { label: '30 days of full access — everything you make stays yours for good' },
     ],
   },
   {
@@ -107,13 +126,24 @@ const PLANS: Plan[] = [
     href: '/dashboard/checkout/start',
     featured: false,
     note: null,
+    /*
+      Reordered so the real things come first and the unbuilt thing is marked.
+
+      What this subscription genuinely does today is re-open generation for
+      every site on the account once its 30-day window closes — permanently.
+      That is worth $29 on its own and it is what the card now leads on.
+      Tracking is the reason the product exists and it is still being built.
+    */
     features: [
-      'Citation tracking across ChatGPT, Perplexity and Google AI Overviews',
-      'Monthly re-audit as your site changes',
-      'Questions you are not being cited for, fed back into new answers',
-      'Alerts when a citation appears or disappears',
-      'Unlimited regeneration',
-      'Keeps every site on your account running',
+      { label: 'Keeps every site on your account running after its 30 days' },
+      { label: 'Re-audit any site whenever it changes — no limit' },
+      { label: 'Unlimited regeneration, and unlimited answers kept per site' },
+      { label: 'Everything Get Cited unlocks, on every site you add' },
+      {
+        label: 'Citation tracking across ChatGPT, Perplexity and Google AI Overviews',
+        soon: true,
+      },
+      { label: 'Alerts when a citation appears or disappears', soon: true },
     ],
   },
 ];
@@ -259,9 +289,26 @@ export function PricingTeaser() {
 
               <ul className="mt-7 space-y-3">
                 {plan.features.map((feature) => (
-                  <li key={feature} className="text-slate flex gap-2.5 text-sm">
-                    <Check className="text-primary mt-[0.35rem] shrink-0" />
-                    {feature}
+                  <li key={feature.label} className="text-slate flex gap-2.5 text-sm">
+                    {/* A tick means it works. Anything still being built gets a
+                        hollow dot and says so, so the two can't be skim-read as
+                        the same promise. */}
+                    {feature.soon ? (
+                      <span
+                        className="border-line mt-[0.42rem] h-2.5 w-2.5 shrink-0 rounded-full border-2"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Check className="text-primary mt-[0.35rem] shrink-0" />
+                    )}
+                    <span className={feature.soon ? 'text-slate/70' : undefined}>
+                      {feature.label}
+                      {feature.soon && (
+                        <span className="bg-cloud text-slate border-line ml-2 rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap">
+                          Coming soon
+                        </span>
+                      )}
+                    </span>
                   </li>
                 ))}
               </ul>

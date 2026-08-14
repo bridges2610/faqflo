@@ -22,11 +22,12 @@
  */
 
 import { isAuditReport } from '@/lib/audit/types';
+import { questionKey } from '@/lib/questions';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
-import type { SiteRow } from '@/lib/supabase/types';
+import type { AuditRunRow, SiteRow } from '@/lib/supabase/types';
 import { normalizeDomain } from './domain';
 import { contentHash, normalizePath } from './export';
-import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
+import { faqCapFor, STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
 import type {
   ContentPlan,
@@ -641,8 +642,46 @@ export type NewFaq = {
   language?: FaqEntry['language'];
 };
 
+/**
+ * Thrown when a free site is already holding as many answers as it may keep.
+ *
+ * A distinct class rather than a string so the caller can tell "you've hit the
+ * cap, here is the upgrade" apart from a genuine failure.
+ */
+export class FaqCapReached extends Error {
+  constructor(readonly cap: number) {
+    super(`This site can hold ${cap} answers on the free tier.`);
+    this.name = 'FaqCapReached';
+  }
+}
+
+/*
+  ⚠️ The cap is enforced here, and here only.
+
+  faqCapFor() and FREE_FAQ_CAP existed for a long time with no caller, so a free
+  site could accumulate unlimited answers — the cap was documented, priced, and
+  not actually applied anywhere.
+
+  It is keyed to hasGetCited rather than the 30-day window on purpose: this
+  limits what may be KEPT, and shrinking it on day 31 would mean refusing to
+  store answers somebody already paid to have written. What stops at day 31 is
+  writing new ones, which is canRegenerate's job, on the server.
+
+  Counted per SITE, not per group, because that is the unit Get Cited is sold in.
+*/
 export async function createFaqs(groupId: string, entries: NewFaq[]): Promise<DashboardData> {
   const data = requireData('createFaqs');
+
+  const group = data.groups.find((g) => g.id === groupId);
+  if (group) {
+    const site = data.sites.find((s) => s.id === group.siteId) ?? null;
+    const cap = faqCapFor(site);
+    if (Number.isFinite(cap)) {
+      const held = faqsForSite(data, group.siteId).length;
+      if (held + entries.length > cap) throw new FaqCapReached(cap);
+    }
+  }
+
   const start = data.faqs.filter((f) => f.groupId === groupId).length;
   const stamp = now();
 
@@ -737,6 +776,47 @@ export async function moveFaqToGroup(id: string, groupId: string): Promise<Dashb
   });
 }
 
+/* -------------------------------------------------------- audit history --- */
+
+/**
+ * Past runs for a site, newest first.
+ *
+ * Read straight from Postgres rather than from the local snapshot, because this
+ * is the one part of a customer's audit data that is NOT in localStorage — and
+ * that is the point of it. A trend that lived in the browser would restart every
+ * time they cleared their cache or opened the dashboard on a different device,
+ * which is exactly the failure that made the old single stored report useless
+ * for showing progress.
+ *
+ * ⚠️ Quick and full runs are returned together and MUST be filtered by depth
+ * before being compared. A quick run scores 3 findings across 2 pillars; a full
+ * run scores ~40 across 6. Charting both on one line shows a cliff that never
+ * happened to the customer's site.
+ */
+export async function auditHistory(siteId: string, limit = 12): Promise<AuditRunRow[]> {
+  assertClient('auditHistory');
+
+  const { data, error } = await supabaseBrowser()
+    .from('audit_runs')
+    .select('id, site_id, user_id, score, scored_count, depth, pillar_scores, checked_at')
+    .eq('site_id', siteId)
+    .order('checked_at', { ascending: false })
+    .limit(limit);
+
+  /*
+    Swallowed rather than thrown. History is a nice-to-have on a screen whose
+    real job is the worklist — if the table is missing because the migration
+    hasn't been applied yet, or the read fails, the dashboard should render
+    without a trend rather than not render.
+  */
+  if (error) {
+    console.error('Could not read audit history:', error.message);
+    return [];
+  }
+
+  return (data ?? []) as AuditRunRow[];
+}
+
 /* ------------------------------------------------------------ questions --- */
 
 export async function markQuestionCovered(id: string): Promise<DashboardData> {
@@ -747,20 +827,71 @@ export async function markQuestionCovered(id: string): Promise<DashboardData> {
   });
 }
 
+/**
+ * Store a freshly discovered set, replacing whatever was there for this site.
+ *
+ * Replace rather than append, for the same reason the content plan is one per
+ * site: a second run produces a differently-worded version of the same list,
+ * and appending would leave the customer scrolling through near-duplicates
+ * deciding which one to trust.
+ *
+ * Questions the customer has already dealt with survive it. A question marked
+ * covered represents work done, and discarding that on a re-run would ask them
+ * to do it again — so covered rows are carried over and matched by key so the
+ * new list doesn't re-propose them.
+ *
+ * ⚠️ No volume. Nothing measures it. See the note on DiscoveredQuestion.
+ */
+export type NewQuestion = { question: string; why?: string; intent?: string };
+
 export async function addQuestions(
   siteId: string,
-  questions: { question: string; volume: number }[],
+  questions: NewQuestion[],
 ): Promise<DashboardData> {
   const data = requireData('addQuestions');
-  const created: DiscoveredQuestion[] = questions.map((q) => ({
-    id: newId('q'),
-    siteId,
-    question: q.question,
-    volume: q.volume,
-    covered: false,
-    addedAt: now(),
-  }));
-  return write({ ...data, questions: [...data.questions, ...created] });
+
+  const kept = data.questions.filter((q) => q.siteId === siteId && q.covered);
+  const keptKeys = new Set(kept.map((q) => questionKey(q.question)));
+
+  const created: DiscoveredQuestion[] = questions
+    .filter((q) => q.question.trim() && !keptKeys.has(questionKey(q.question)))
+    .map((q) => ({
+      id: newId('q'),
+      siteId,
+      question: q.question.trim(),
+      why: q.why?.trim() || undefined,
+      intent: q.intent,
+      covered: false,
+      addedAt: now(),
+    }));
+
+  const others = data.questions.filter((q) => q.siteId !== siteId);
+  return write({ ...data, questions: [...others, ...kept, ...created] });
+}
+
+/**
+ * Re-check which discovered questions the site now answers.
+ *
+ * Called after a discovery run and whenever answers change. Matching is on the
+ * normalised question text — the customer rarely publishes the question in
+ * exactly the words the model proposed.
+ */
+export async function recheckCoverage(siteId: string): Promise<DashboardData> {
+  const data = requireData('recheckCoverage');
+  const published = new Set(
+    faqsForSite(data, siteId)
+      .filter((f) => f.status === 'published' && f.answer.trim())
+      .map((f) => questionKey(f.question)),
+  );
+
+  return write({
+    ...data,
+    questions: data.questions.map((q) =>
+      q.siteId === siteId && !q.covered && published.has(questionKey(q.question))
+        ? { ...q, covered: true }
+        : q,
+    ),
+  });
 }
 
 /* ------------------------------------------------------------- selectors --- */
@@ -779,8 +910,22 @@ export function faqsForSite(data: DashboardData, siteId: string): FaqEntry[] {
   return data.faqs.filter((f) => groupIds.has(f.groupId));
 }
 
+/**
+ * Unanswered first, then newest.
+ *
+ * This used to sort by `volume` descending, which ordered the list by a number
+ * nobody measured. Unanswered-first is the order that matches what the screen
+ * is for: the questions with no answer are the whole point, and a customer
+ * scrolling past twenty answered ones to reach them is a customer who stops
+ * scrolling.
+ */
 export function questionsForSite(data: DashboardData, siteId: string): DiscoveredQuestion[] {
-  return data.questions.filter((q) => q.siteId === siteId).sort((a, b) => b.volume - a.volume);
+  return data.questions
+    .filter((q) => q.siteId === siteId)
+    .sort((a, b) => {
+      if (a.covered !== b.covered) return a.covered ? 1 : -1;
+      return b.addedAt.localeCompare(a.addedAt);
+    });
 }
 
 export function trackingForSite(data: DashboardData, siteId: string) {

@@ -47,8 +47,8 @@ export function TrackingWorkspace() {
         <PageHeader title="Tracking" description="Whether AI is actually citing you." />
         <UpgradeCard
           entitlement="stay_cited"
-          title="Citation tracking"
-          body="We ask ChatGPT, Perplexity and Google AI Overviews your questions on a schedule and record who they name. You see whether your answers are landing, who is being cited instead, and which questions to write next."
+          title="Stay Cited"
+          body="Keeps every site on your account generating once its 30 days are up — new audits and unlimited answers. Citation tracking, which asks the engines your questions and records who they name, is what we are building next; it is not running yet."
         />
       </>
     );
@@ -57,14 +57,27 @@ export function TrackingWorkspace() {
   const daily = tracking?.daily ?? [];
   const latest = tracking?.latest ?? [];
 
+  /*
+    ⚠️ Nothing produces this data yet.
+
+    There is no code in this repo that queries ChatGPT, Perplexity or Google AI
+    Overviews — no API route, no scheduler, no write path. `emptyTracking()`
+    returns zeros and the only thing that has ever filled `daily` is the
+    dev-only demo fixture.
+
+    So this state says so. It used to read "the first round runs within a day of
+    your answers going live", which is a schedule nobody set. A subscriber
+    waiting on a run that will never happen is a refund; telling them plainly is
+    the cheaper and more honest outcome.
+  */
   if (daily.length === 0) {
     return (
       <>
-        <PageHeader title="Tracking" description={`Citations for ${site.domain}.`} />
+        <PageHeader title="Results" description={`What the engines say about ${site.domain}.`} />
         <EmptyState
-          title="No checks yet"
-          body="The first round runs within a day of your answers going live. There is nothing to see until an engine has been asked."
-          action={<ButtonLink href="/dashboard/publish">Check your export is live</ButtonLink>}
+          title="Citation tracking isn’t running yet"
+          body="This is the part we’re building next: asking ChatGPT, Perplexity and Google AI Overviews your questions on a schedule and recording who they name. Your subscription is keeping every site on your account generating in the meantime, and you’ll be told the moment tracking goes live."
+          action={<ButtonLink href="/dashboard/faqs">Work on your answers</ButtonLink>}
         />
       </>
     );

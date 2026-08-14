@@ -21,10 +21,14 @@ import { supabaseEnv } from './env';
  *      published, and the key is total access to the database.
  *   2. SUPABASE_SERVICE_ROLE_KEY must NEVER gain a NEXT_PUBLIC_ prefix. That
  *      prefix is what inlines a value into the browser bundle.
- *   3. Import it from Stripe webhook/checkout code and nowhere else. If a
- *      route needs data on behalf of a user, use lib/supabase/server.ts and
- *      let RLS do its job — reaching for this instead turns a policy bug into
- *      a data breach rather than an error message.
+ *   3. Import it only where a table has no INSERT/UPDATE grant for
+ *      `authenticated` BY DESIGN. Today that is two places: Stripe
+ *      webhook/checkout code, and the audit-history write in
+ *      app/api/audit/route.ts (`audit_runs` is select-only for customers, so a
+ *      browser cannot record a run that never happened). If a route needs data
+ *      on behalf of a user, use lib/supabase/server.ts and let RLS do its job —
+ *      reaching for this instead turns a policy bug into a data breach rather
+ *      than an error message.
  *   4. Never filter by a user id taken from a request body. RLS is not there
  *      to catch the mistake any more; the `eq()` in your query IS the boundary.
  *

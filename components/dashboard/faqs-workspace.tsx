@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { FaqCapReached } from '@/lib/dashboard/store';
 import type { Faq } from '@/lib/faq';
 import { DraftReview } from './draft-review';
 import { EmptyState } from './empty-state';
@@ -11,6 +12,7 @@ import { GroupCard } from './group-card';
 import { GroupForm } from './group-form';
 import { PageHeader } from './page-header';
 import { PlusIcon } from './nav-icons';
+import { ANSWER_TABS, WorkspaceTabs } from './workspace-tabs';
 
 /*
   The Answers screen: generate → review → manage, grouped by the page each set
@@ -29,6 +31,7 @@ export function FaqsWorkspace() {
   const [addingGroup, setAddingGroup] = useState(false);
   /** Group that should open itself — just created, or just written into. */
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const [capError, setCapError] = useState<string | null>(null);
 
   if (!site) {
     return (
@@ -49,17 +52,34 @@ export function FaqsWorkspace() {
   async function save(kept: Faq[], status: 'draft' | 'published') {
     if (!activeGroupId) return;
     setSaving(true);
-    await addFaqs(
-      activeGroupId,
-      kept.map((f) => ({
-        question: f.q,
-        answer: f.a,
-        status,
-        source: 'generated' as const,
-        tone: meta?.tone,
-        language: meta?.language,
-      })),
-    );
+    setCapError(null);
+
+    try {
+      await addFaqs(
+        activeGroupId,
+        kept.map((f) => ({
+          question: f.q,
+          answer: f.a,
+          status,
+          source: 'generated' as const,
+          tone: meta?.tone,
+          language: meta?.language,
+        })),
+      );
+    } catch (err) {
+      /* The free tier's keep-limit. Caught rather than left to reject: the
+         candidates are still on screen and still worth keeping, so the customer
+         needs to be told which ones didn't fit rather than watching a save
+         silently do nothing. */
+      setCapError(
+        err instanceof FaqCapReached
+          ? `${site?.name ?? 'This site'} can hold ${err.cap} answers on the free tier, and saving these would go over. Get Cited removes the limit — everything already written stays.`
+          : 'Those answers could not be saved. Please try again.',
+      );
+      setSaving(false);
+      return;
+    }
+
     setSaving(false);
     setCandidates(null);
     setMeta(null);
@@ -82,7 +102,16 @@ export function FaqsWorkspace() {
         }
       />
 
+      <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
+
       <div className="space-y-5">
+        {capError && (
+          <div role="alert" className="border-line bg-cloud rounded-xl border p-4">
+            <p className="text-navy text-sm font-semibold">Not enough room to save these</p>
+            <p className="text-slate mt-1 text-sm leading-relaxed">{capError}</p>
+          </div>
+        )}
+
         {addingGroup && (
           <GroupForm
             siteId={site.id}

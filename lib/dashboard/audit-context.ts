@@ -112,7 +112,10 @@ export function opportunities(data: DashboardData, site: Site): Opportunity[] {
     out.push({
       id: 'uncovered-questions',
       title: `${uncovered.length} questions people ask that you don't answer`,
-      detail: `Top of the list: "${uncovered[0].question}" — roughly ${uncovered[0].volume.toLocaleString()} asks a month.`,
+      /* The "asks a month" figure that used to close this sentence was fixture
+         data — nothing measures ask volume. The question itself is the useful
+         part, and it is real. */
+      detail: `Top of the list: "${uncovered[0].question}"`,
       href: '/dashboard/questions',
     });
   }

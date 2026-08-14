@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/auth/actions';
 import { useDashboard } from '@/lib/dashboard/provider';
@@ -74,7 +75,7 @@ function ManageBilling() {
 }
 
 export function AccountMenu() {
-  const { user } = useDashboard();
+  const { user, seedDemoData } = useDashboard();
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
 
@@ -136,9 +137,44 @@ export function AccountMenu() {
             <PlanBadge />
           </div>
 
+          {/* Sites moved here out of the sidebar. It is somewhere you go once,
+              when you add a site — not one of the five places worth checking —
+              and it sits with billing because both are account settings rather
+              than work. */}
           <div className="border-line mt-4 border-t pt-3">
+            <Link
+              href="/dashboard/sites"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="text-slate hover:text-navy block text-sm font-medium transition-colors duration-150"
+            >
+              Your sites
+            </Link>
+          </div>
+
+          <div className="border-line mt-3 border-t pt-3">
             <ManageBilling />
           </div>
+
+          {/* Development affordance, moved off the Overview when that became a
+              worklist. It fills the local half with the demo fixture so the
+              populated screens can be seen; it cannot grant an entitlement or
+              invent a site, because both are Postgres rows. */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="border-line mt-3 border-t pt-3">
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  void seedDemoData();
+                  setOpen(false);
+                }}
+                className="text-slate hover:text-navy w-full text-left text-sm font-medium transition-colors duration-150"
+              >
+                Fill with demo data
+              </button>
+            </div>
+          )}
 
           <form action={signOut} className="border-line mt-3 border-t pt-3">
             <button

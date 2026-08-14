@@ -21,6 +21,7 @@ import { EmptyState } from './empty-state';
 import { CopyIcon, TickIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
+import { ANSWER_TABS, WorkspaceTabs } from './workspace-tabs';
 
 /*
   Publish: the copy-paste export, one section per group.
@@ -223,6 +224,7 @@ export function PublishWorkspace() {
           title="Publish"
           description={`The crawlable HTML for ${site.domain}, ready to paste.`}
         />
+        <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
         <UpgradeCard
           entitlement="get_cited"
           siteName={site.name}
@@ -249,6 +251,8 @@ export function PublishWorkspace() {
           ) : null
         }
       />
+
+      <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
 
       <div className="space-y-5">
         {groups.length === 0 ? (

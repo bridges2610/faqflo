@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { FaqCapReached } from '@/lib/dashboard/store';
 
 /*
   "Draft an answer" from anywhere that surfaces a question — Discover, Tracking.
@@ -29,10 +30,22 @@ export function DraftIntoGroup({
   const [picking, setPicking] = useState(false);
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function draft(groupId: string) {
     setBusy(true);
-    await addFaqs(groupId, [{ question, answer: '', status: 'draft', source: 'discovered' }]);
+    setError(null);
+    try {
+      await addFaqs(groupId, [{ question, answer: '', status: 'draft', source: 'discovered' }]);
+    } catch (err) {
+      // The free keep-limit. This control sits in a table row, so the message
+      // has to be short — the full explanation lives on the Answers screen.
+      setError(
+        err instanceof FaqCapReached ? `Free tier holds ${err.cap} answers` : 'Could not draft',
+      );
+      setBusy(false);
+      return;
+    }
     await onDrafted?.();
     setBusy(false);
     setDone(true);
@@ -40,6 +53,14 @@ export function DraftIntoGroup({
 
   if (done) return <Badge tone="success">Drafted</Badge>;
   if (groups.length === 0) return null;
+
+  if (error) {
+    return (
+      <span role="alert" className="text-error-ink text-xs">
+        {error}
+      </span>
+    );
+  }
 
   if (groups.length === 1) {
     return (

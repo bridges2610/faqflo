@@ -109,11 +109,20 @@ export const ENTITLEMENTS: Record<
     blurb:
       'The full audit, the complete answer set, and the publish-ready export for this site — plus 30 days to work with them.',
   },
+  /*
+    ⚠️ The blurb leads on what this ACTUALLY does today, which is re-open
+    generation across every site once its 30-day window closes. Citation
+    tracking is the reason the subscription exists and is not built yet — there
+    is no engine-querying code anywhere in this repo — so it is named as coming
+    rather than sold as running. Anything here that promises a scheduled check
+    is a promise nothing in the codebase can keep.
+  */
   stay_cited: {
     label: 'Stay Cited',
     price: '$29/month',
     scope: 'account',
-    blurb: 'Citation tracking, monthly re-audits, and the gap loop across your sites.',
+    blurb:
+      'Keeps every site on your account generating after its 30 days — new audits and unlimited answers, for as long as you keep it. Citation tracking is coming.',
   },
 };
 

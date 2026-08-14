@@ -7,16 +7,7 @@ import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
-import {
-  AeoIcon,
-  ChartIcon,
-  FaqIcon,
-  DocIcon,
-  GlobeIcon,
-  HomeIcon,
-  SearchIcon,
-  SetupIcon,
-} from './nav-icons';
+import { AeoIcon, ChartIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { SiteSwitcher } from './site-switcher';
 
@@ -26,26 +17,58 @@ type NavItem = {
   Icon: (props: { className?: string }) => React.ReactElement;
 };
 
-/* The loop, in order: audit → discover → generate → publish → track. The nav
-   is the product's shape, so someone who has never read the marketing page can
-   still tell what this thing does from the sidebar alone.
+/*
+  Five destinations, named after what the customer wants rather than which
+  stage of our pipeline produces it.
 
-   Content sits after Answers: it's what you do once the questions you already
-   have are answered — the pages you're missing, and what to write next. */
+  This used to be eight, one per step of the loop — audit, discover, generate,
+  publish, track, plus sites — on the reasoning that the sidebar teaches the
+  product. It does, but it teaches OUR shape, and the person reading it runs a
+  roofing company. Eight destinations is also eight places to check, most of
+  which are empty most of the time.
+
+  What merged, and why the pairs are pairs rather than one screen each:
+
+    Answers       = /faqs + /publish     writing them, then getting them onto
+                                         the page. Same object, two verbs.
+    Opportunities = /questions + /content what you haven't answered, and what
+                                         you haven't written. Both are gaps.
+
+  ⚠️ NO ROUTE MOVED. Audit actions deep-link to /dashboard/faqs#<groupId>,
+  /dashboard/publish and /dashboard/questions; GroupCard links to
+  /dashboard/publish#<groupId>; checkout returns to /dashboard/audit and
+  /dashboard/tracking with a ?purchased flag. The absorbed routes keep their
+  URLs and gain a WorkspaceTabs strip, so every one of those still lands.
+
+  Sites left the sidebar for the account menu. It is where you go once, when you
+  add a site — not a place to check.
+*/
 const NAV: NavItem[] = [
-  { href: '/dashboard', label: 'Overview', Icon: HomeIcon },
-  { href: '/dashboard/audit', label: 'Audit', Icon: AeoIcon },
-  { href: '/dashboard/questions', label: 'Questions', Icon: SearchIcon },
+  { href: '/dashboard', label: 'Home', Icon: HomeIcon },
+  { href: '/dashboard/audit', label: 'Your site', Icon: AeoIcon },
   { href: '/dashboard/faqs', label: 'Answers', Icon: FaqIcon },
-  { href: '/dashboard/content', label: 'Content', Icon: DocIcon },
-  { href: '/dashboard/publish', label: 'Publish', Icon: SetupIcon },
-  { href: '/dashboard/tracking', label: 'Tracking', Icon: ChartIcon },
-  { href: '/dashboard/sites', label: 'Sites', Icon: GlobeIcon },
+  { href: '/dashboard/questions', label: 'Opportunities', Icon: SearchIcon },
+  { href: '/dashboard/tracking', label: 'Results', Icon: ChartIcon },
 ];
 
-/** Overview owns the exact path; the rest own their subtree. */
+/*
+  Which nav item owns which routes.
+
+  Prefix matching alone no longer works: /dashboard/publish belongs to Answers
+  and /dashboard/content belongs to Opportunities, and neither shares a prefix
+  with the item that owns it. Without this the tab strip would highlight a
+  section while the sidebar highlighted nothing.
+*/
+const OWNS: Record<string, string[]> = {
+  '/dashboard/faqs': ['/dashboard/publish'],
+  '/dashboard/questions': ['/dashboard/content'],
+};
+
+/** Home owns the exact path; the rest own their subtree, plus anything above. */
 function isActive(pathname: string, href: string): boolean {
-  return href === '/dashboard' ? pathname === href : pathname.startsWith(href);
+  if (href === '/dashboard') return pathname === href;
+  if (pathname.startsWith(href)) return true;
+  return (OWNS[href] ?? []).some((owned) => pathname.startsWith(owned));
 }
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
@@ -139,11 +162,14 @@ function PlanFooter() {
         {setUp} of {sites.length} {sites.length === 1 ? 'site' : 'sites'} set up
       </p>
       <p className="text-slate mt-1 text-xs leading-relaxed">
-        {tracking ? 'Stay Cited is active' : 'Tracking is off'}
+        {tracking ? 'Stay Cited is active' : 'No subscription'}
       </p>
       {!tracking && (
+        /* Straight to checkout, not out to /#pricing. Sending a signed-in
+           customer back to the marketing site to buy means they land on a page
+           written for strangers and have to find their way back in. */
         <Link
-          href="/#pricing"
+          href="/dashboard/checkout/start"
           className="text-primary hover:text-primary-hover mt-3 inline-block text-xs font-semibold"
         >
           Add Stay Cited →

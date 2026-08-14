@@ -109,11 +109,16 @@ export function citationChecks(set: PageSet): Finding[] {
       id: 'sources',
       pillar: P,
       label: 'Cites anything outside itself',
-      status: external.size >= 3 ? 'pass' : external.size >= 1 ? 'warn' : 'warn',
+      /* Was `external.size >= 1 ? 'warn' : 'warn'` — both arms identical, so the
+         check could never fail no matter how isolated a site was. A site with
+         zero outbound links is a different finding from one with two. */
+      status: external.size >= 3 ? 'pass' : external.size >= 1 ? 'warn' : 'fail',
       detail:
         external.size >= 3
           ? `${external.size} outbound links. Pages that cite sources read as researched rather than promotional.`
-          : 'Almost no outbound links. Citing a standard, a supplier or a regulator is a cheap credibility signal.',
+          : external.size >= 1
+            ? `Only ${external.size} outbound ${external.size === 1 ? 'link' : 'links'}. Citing a standard, a supplier or a regulator is a cheap credibility signal.`
+            : 'No outbound links at all. A page that references nothing outside itself reads as promotional, and assistants weigh corroborated sources more heavily.',
       weight: 1,
     });
   }

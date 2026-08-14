@@ -59,6 +59,17 @@ export const AUDIT_FULL_RATE_LIMIT = 4;
 export const CONTENT_RATE_LIMIT = 10;
 
 /**
+ * Ceiling for question discovery.
+ *
+ * Same model and roughly the same context as the content plan, so the same
+ * reasoning applies: a set of questions is discovered once per site and then
+ * worked through. Ten a day is ten sites' worth. Regenerating repeatedly on one
+ * site produces a slightly different list each time rather than a better one,
+ * which is a good reason to make it inconvenient.
+ */
+export const QUESTIONS_RATE_LIMIT = 10;
+
+/**
  * Ceiling for reading a page into the generator.
  *
  * Generous, because it is a step inside a normal working session rather than

@@ -66,6 +66,10 @@ type Ctx = {
   moveFaq: (id: string, direction: 'up' | 'down') => Promise<void>;
   moveFaqToGroup: (id: string, groupId: string) => Promise<void>;
   coverQuestion: (id: string) => Promise<void>;
+  /** Store a discovered set for a site, replacing the previous one. */
+  addQuestions: (siteId: string, questions: store.NewQuestion[]) => Promise<void>;
+  /** Re-mark questions the site now publishes an answer to. */
+  recheckCoverage: (siteId: string) => Promise<void>;
 
   /**
    * Fill the local half with demo data. Development only.
@@ -202,6 +206,8 @@ export function DashboardProvider({
     moveFaq: (id, direction) => apply(() => store.moveFaq(id, direction)),
     moveFaqToGroup: (id, groupId) => apply(() => store.moveFaqToGroup(id, groupId)),
     coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
+    addQuestions: (siteId, qs) => apply(() => store.addQuestions(siteId, qs)),
+    recheckCoverage: (siteId) => apply(() => store.recheckCoverage(siteId)),
 
     seedDemoData: () => apply(() => store.seedLocalData()),
   };

@@ -39,3 +39,21 @@ export type SiteWritable = Pick<
   SiteRow,
   'name' | 'domain' | 'industry' | 'location' | 'profile_source'
 >;
+
+/**
+ * One completed audit, kept so a score can become a trend.
+ *
+ * SELECT-only for `authenticated` — rows are written by the service role from
+ * app/api/audit/route.ts. See supabase/migrations/0005_audit_runs.sql.
+ */
+export type AuditRunRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  score: number;
+  scored_count: number;
+  /** Quick and full runs are not comparable — never plot them on one line. */
+  depth: 'quick' | 'full';
+  pillar_scores: Record<string, number>;
+  checked_at: string;
+};

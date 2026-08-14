@@ -14,13 +14,16 @@ import { useDashboard } from '@/lib/dashboard/provider';
 import { PAGE_BUDGET, canRunFullAudit } from '@/lib/dashboard/plans';
 import { opportunities, visibilityFindings } from '@/lib/dashboard/audit-context';
 import { timeAgo } from '@/lib/dashboard/format';
-import { useCopy } from '@/lib/dashboard/use-copy';
+import { taskFromAction } from '@/lib/dashboard/worklist';
 import { buildActionPlan } from '@/lib/audit/actions';
 import { buildPillars, overallScore, pillarBand, scoreBand } from '@/lib/audit/score';
 import { PILLARS, type AuditReport, type CheckStatus, type Finding } from '@/lib/audit/types';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
-import { ChevronIcon, CopyIcon, TickIcon } from './nav-icons';
+import { ChevronIcon } from './nav-icons';
+import { AuditSummary } from './audit-summary';
+import { TaskRow } from './task-row';
+import { AUDIT_TABS, WorkspaceTabs } from './workspace-tabs';
 import { UpgradeCard } from './upgrade-card';
 
 /*
@@ -72,55 +75,6 @@ function StatusIcon({ status }: { status: CheckStatus }) {
       )}
       {status === 'na' && <path d="M4 8h8" />}
     </svg>
-  );
-}
-
-/** One item from the plan. The button is the point. */
-function ActionRow({ item, index }: { item: ReturnType<typeof buildActionPlan>[number]; index: number }) {
-  const { copied, copy } = useCopy();
-
-  return (
-    <li className="flex gap-4 py-4">
-      <span className="bg-primary-soft text-primary font-display mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-extrabold">
-        {index + 1}
-      </span>
-
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h3 className="text-navy text-[0.9375rem] leading-snug font-semibold">{item.what}</h3>
-          {item.impact !== null && <Badge tone="success">+{item.impact} points</Badge>}
-          <span className="text-slate text-xs">{item.effort}</span>
-        </div>
-        <p className="text-slate mt-1 text-sm leading-relaxed">{item.why}</p>
-
-        {item.action.kind === 'link' && (
-          <ButtonLink href={item.action.href} size="sm" variant="ghost" className="mt-3">
-            {item.action.label}
-          </ButtonLink>
-        )}
-
-        {item.action.kind === 'copy' && (
-          <div className="mt-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => copy(item.action.kind === 'copy' ? item.action.snippet : '')}
-              >
-                {copied ? <TickIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
-                {copied ? 'Copied' : item.action.label}
-              </Button>
-              <span className="text-slate text-xs">{item.action.where}</span>
-            </div>
-            <pre className="bg-navy mt-2 max-h-32 overflow-auto rounded-lg p-3">
-              <code className="font-mono text-[0.6875rem] leading-relaxed whitespace-pre text-white/90">
-                {item.action.snippet}
-              </code>
-            </pre>
-          </div>
-        )}
-      </div>
-    </li>
   );
 }
 
@@ -212,7 +166,23 @@ function FindingRow({ finding }: { finding: Finding }) {
   );
 }
 
-export function AuditWorkspace({ justPurchased = false }: { justPurchased?: boolean }) {
+export type AuditView = 'plain' | 'technical';
+
+export function AuditWorkspace({
+  justPurchased = false,
+  view = 'plain',
+}: {
+  justPurchased?: boolean;
+  /**
+   * Which reading of the report to show.
+   *
+   * Defaults to plain, and that is the decision: this page's own note says most
+   * people opening an audit want the answer rather than the evidence, and the
+   * person paying for it runs a roofing company, not an SEO agency. The
+   * technical view is one click away and keeps everything it always had.
+   */
+  view?: AuditView;
+}) {
   const { site, user, data, tracking, groups, saveAudit } = useDashboard();
   /** null means "nothing run this session" — the stored report is the fallback. */
   const [fresh, setFresh] = useState<AuditReport | null>(null);
@@ -353,15 +323,30 @@ export function AuditWorkspace({ justPurchased = false }: { justPurchased?: bool
 
   return (
     <>
-      <PageHeader
-        title="Audit"
-        description={`What an AI crawler sees when it reads ${site.domain} — and what to do about it.`}
-        action={
-          <Button size="sm" onClick={run} disabled={busy}>
-            {busy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}
-          </Button>
-        }
-      />
+      {/* Wrapped rather than passed a className, because PageHeader takes none.
+          Hidden in print: it sits outside .print-report, so it would otherwise
+          come out as unstyled furniture above the report — and the plain view
+          carries its own print masthead. */}
+      <div className="print:hidden">
+        <PageHeader
+          title="Your site"
+          description={`What an AI crawler sees when it reads ${site.domain} — and what to do about it.`}
+          action={
+            <Button size="sm" onClick={run} disabled={busy}>
+              {busy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}
+            </Button>
+          }
+        />
+
+        {/* No toggle until there is something to read two ways. */}
+        {shown && (
+          <WorkspaceTabs
+            tabs={AUDIT_TABS}
+            label="How to read this audit"
+            activeHref={view === 'technical' ? AUDIT_TABS[1].href : AUDIT_TABS[0].href}
+          />
+        )}
+      </div>
 
       <div className="space-y-5">
         {/* The receipt, where the thing they bought actually is. Kept after the
@@ -399,6 +384,22 @@ export function AuditWorkspace({ justPurchased = false }: { justPurchased?: bool
               </Button>
             }
           />
+        ) : view === 'plain' ? (
+          <>
+            {/* Same report object the technical view renders — passed down
+                rather than read from the store, so the toggle cannot change
+                the score. See the note on AuditSummary. */}
+            <AuditSummary report={shown} site={site} />
+
+            {!full && (
+              <UpgradeCard
+                entitlement="get_cited"
+                siteName={site.name}
+                title="The full audit"
+                body="The free checks are the first three. The full audit reads your other pages too — titles, structure, identity, trust — and turns everything it finds into a ranked plan."
+              />
+            )}
+          </>
         ) : (
           <>
             <Card className="p-5 sm:p-7">
@@ -415,12 +416,6 @@ export function AuditWorkspace({ justPurchased = false }: { justPurchased?: bool
                     {shown.crawled.length === 1 ? 'page' : 'pages'} · {timeAgo(shown.checkedAt)}.
                     Anything we couldn&rsquo;t measure is marked and left out of the score.
                   </p>
-
-                  {/* The way out of the jargon. Prominent, because most people
-                      opening an audit want the answer, not the evidence. */}
-                  <ButtonLink href="/dashboard/audit/summary" size="sm" className="mt-4">
-                    What this means for me →
-                  </ButtonLink>
                 </div>
               </div>
             </Card>
@@ -437,7 +432,7 @@ export function AuditWorkspace({ justPurchased = false }: { justPurchased?: bool
                 </p>
                 <ul className="divide-line mt-3 divide-y">
                   {shown.actions.map((item, i) => (
-                    <ActionRow key={item.id} item={item} index={i} />
+                    <TaskRow key={item.id} task={taskFromAction(item)} index={i} />
                   ))}
                 </ul>
               </Card>

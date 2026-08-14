@@ -13,6 +13,7 @@ import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { StatTile } from './stat-tile';
 import { UpgradeCard } from './upgrade-card';
+import { OPPORTUNITY_TABS, WorkspaceTabs } from './workspace-tabs';
 
 /*
   Content: the pages this kind of business is expected to have, and what to
@@ -240,6 +241,7 @@ export function ContentWorkspace() {
     return (
       <>
         <PageHeader title="Content" description={description} />
+        <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
         <UpgradeCard
           entitlement="get_cited"
           siteName={site.name}
@@ -256,6 +258,7 @@ export function ContentWorkspace() {
     return (
       <>
         <PageHeader title="Content" description={description} />
+        <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
         <EmptyState
           title="Run a full audit first"
           body="This page is built from the pages we read on your site. Run a full audit and they'll be here."
@@ -340,6 +343,7 @@ export function ContentWorkspace() {
     return (
       <>
         <PageHeader title="Content" description={description} />
+        <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
         <EmptyState
           title="Build your content plan"
           body={`We'll read the ${pages.length} page${pages.length === 1 ? '' : 's'} we found on ${site.domain}, work out which pages a business like yours is expected to have, and suggest ten things worth writing.`}
@@ -373,6 +377,8 @@ export function ContentWorkspace() {
           </Button>
         }
       />
+
+      <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
 
       <ProfileLine
         industry={site.industry ?? contentPlan.industry}

@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 import type { FetchFailure } from '@/lib/audit/fetcher';
 import { runAudit } from '@/lib/audit/run';
 import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
@@ -6,6 +6,7 @@ import type { AuditDepth } from '@/lib/audit/types';
 import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
 import { canRunFullAudit, hasGetCited, pageBudgetFor } from '@/lib/auth/entitlements';
+import { createAdminClient } from '@/lib/supabase/admin';
 import {
   AUDIT_FULL_RATE_LIMIT,
   AUDIT_RATE_LIMIT,
@@ -113,6 +114,20 @@ export async function POST(request: Request) {
   const user = await currentUser();
   let pageBudget = 1;
 
+  /*
+    Resolved for BOTH depths when a site id is supplied, not just for full runs.
+
+    A signed-in customer on a free site sends `depth: 'quick'` with their site
+    id, and that run is still their site's score on that day — worth recording,
+    so their history doesn't begin only at the moment they pay. A quick run from
+    the marketing page has no user and no site, and records nothing.
+
+    Ownership still decides everything: an unowned id is null here, which for a
+    full run is a 404 and for a quick run simply means nothing is recorded.
+  */
+  const site =
+    user && typeof siteId === 'string' && siteId ? await siteForUser(siteId, user.id) : null;
+
   if (depth === 'full') {
     if (!user) {
       return fail('Sign in to run a full audit.', 401);
@@ -121,7 +136,6 @@ export async function POST(request: Request) {
       return fail('A full audit needs a site.', 400);
     }
 
-    const site = await siteForUser(siteId, user.id);
     /*
       404, not 403. Confirming that a site id exists but belongs to somebody
       else tells an attacker their guess was right; "no such site of yours" is
@@ -181,6 +195,46 @@ export async function POST(request: Request) {
         checked.url.hostname.replace(/^www\./, ''),
       );
       return fail(message, status);
+    }
+
+    /*
+      Record the run, after the response.
+
+      `after()` rather than an awaited insert: the customer waited up to sixty
+      seconds for the crawl and should not also wait on a write they will never
+      see. Recording history is not part of producing the report — if it fails,
+      the report is still correct and still returned.
+
+      Written with the service-role client because `audit_runs` has no INSERT
+      grant for `authenticated` (see 0005). A browser that can write its own
+      score history can write a history that never happened.
+    */
+    if (user && site) {
+      const report = result.report;
+      after(async () => {
+        try {
+          await createAdminClient()
+            .from('audit_runs')
+            .insert({
+              site_id: site.id,
+              user_id: user.id,
+              score: report.score,
+              scored_count: report.scoredCount,
+              depth: report.depth,
+              // Only pillars that actually produced a score. A null one was not
+              // measured, and storing it as 0 would make the trend claim a
+              // failure where there was no measurement.
+              pillar_scores: Object.fromEntries(
+                report.pillars
+                  .filter((p) => p.score !== null)
+                  .map((p) => [p.id, p.score as number]),
+              ),
+              checked_at: report.checkedAt,
+            });
+        } catch (err) {
+          console.error('Could not record audit run:', err);
+        }
+      });
     }
 
     return NextResponse.json(result.report);

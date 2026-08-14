@@ -1,18 +1,24 @@
 'use client';
 
-import Link from 'next/link';
+import { useId, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/check';
 import { ScoreDial } from '@/components/ui/score-dial';
-import { useDashboard } from '@/lib/dashboard/provider';
 import { useCopy } from '@/lib/dashboard/use-copy';
-import { isHiddenInSummary, plainAction, plainFor, verdict } from '@/lib/audit/plain';
+import {
+  holdingBack,
+  isHiddenInSummary,
+  plainAction,
+  plainFor,
+  strengths,
+  verdict,
+} from '@/lib/audit/plain';
 import { scoreBand } from '@/lib/audit/score';
-import type { ActionItem, Finding } from '@/lib/audit/types';
-import { EmptyState } from './empty-state';
-import { CopyIcon, TickIcon } from './nav-icons';
+import type { ActionItem, AuditReport, Finding } from '@/lib/audit/types';
+import type { Site } from '@/lib/dashboard/types';
+import { ChevronIcon, CopyIcon, TickIcon } from './nav-icons';
 
 /*
   The audit for someone who doesn't want an audit.
@@ -25,6 +31,53 @@ import { CopyIcon, TickIcon } from './nav-icons';
   no model call: the same findings, said differently. If the two pages ever
   disagreed, the plain one would be the one people believed.
 */
+
+/**
+ * A list the reader opens if they want it.
+ *
+ * The paragraph above each of these is the summary; this is the evidence. Both
+ * lists used to be open on arrival, which meant the page led with thirty items
+ * and the two paragraphs explaining them scrolled away.
+ *
+ * ⚠️ THE CONTENT STAYS IN THE DOM WHEN CLOSED. PillarCard and GroupCard both
+ * unmount their bodies; this one must not. This page is a printable deliverable
+ * and window.print() cannot reveal something React never rendered — a customer
+ * printing a collapsed report would get two empty sections. `hidden print:block`
+ * hides it on screen and brings it back for print, which is the masthead's trick
+ * above in reverse.
+ */
+function Collapsible({
+  label,
+  children,
+}: {
+  /** Says what opening it gets you — "Show all 14" beats a bare chevron. */
+  label: string;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls={id}
+        className="text-primary hover:text-primary-hover mt-4 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors duration-150 print:hidden"
+      >
+        <ChevronIcon
+          className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
+        />
+        {open ? 'Hide the list' : label}
+      </button>
+
+      <div id={id} className={open ? 'mt-4' : 'hidden print:mt-4 print:block'}>
+        {children}
+      </div>
+    </>
+  );
+}
 
 /** One thing that's wrong, and what it costs. Worst first. */
 function ProblemRow({ finding }: { finding: Finding }) {
@@ -46,7 +99,15 @@ function ProblemRow({ finding }: { finding: Finding }) {
   );
 }
 
-/** One job from the plan, without the scoring language. */
+/**
+ * One job from the plan, without the scoring language.
+ *
+ * ⚠️ NOT the shared TaskRow, and it must not become it. TaskRow shows
+ * "+N points" and an effort band — the vocabulary of the technical report. This
+ * view exists precisely to say the same job without any of that, via
+ * plainAction(). The two look similar enough that merging them will look like a
+ * tidy-up; it would put the jargon straight back into the plain view.
+ */
 function ActionRow({ item, index }: { item: ActionItem; index: number }) {
   const { copied, copy } = useCopy();
   // The recipe's own wording is written for the technical report; this page
@@ -100,31 +161,18 @@ function ActionRow({ item, index }: { item: ActionItem; index: number }) {
   );
 }
 
-export function AuditSummary() {
-  const { site, data } = useDashboard();
-
-  if (!site || !data) {
-    return (
-      <EmptyState
-        title="Add a site first"
-        body="The summary explains an audit, and an audit needs a site to run against."
-        action={<ButtonLink href="/dashboard/sites">Go to sites</ButtonLink>}
-      />
-    );
-  }
-
-  const report = site.lastAudit;
-
-  if (!report) {
-    return (
-      <EmptyState
-        title="No audit to explain yet"
-        body="Run the audit first and this page will tell you what it found, in plain English."
-        action={<ButtonLink href="/dashboard/audit">Run the audit</ButtonLink>}
-      />
-    );
-  }
-
+/**
+ * The plain reading of one audit.
+ *
+ * ⚠️ Takes the report as a PROP rather than reading site.lastAudit from
+ * context, and that is not a style preference. AuditWorkspace renders
+ * `fresh ?? stored` — the report it just received from the crawl, which for a
+ * moment after a run is newer than what saveAudit() has written back. When the
+ * two views were separate pages nobody could see the difference; as a toggle it
+ * would be a switch that changes the score. One object, passed down, cannot
+ * disagree with itself.
+ */
+export function AuditSummary({ report, site }: { report: AuditReport; site: Site }) {
   const findings = report.pillars.flatMap((p) => p.findings).filter((f) => !isHiddenInSummary(f));
   const working = findings.filter((f) => f.status === 'pass');
   // Fails before warnings: the order people should read them in.
@@ -141,25 +189,28 @@ export function AuditSummary() {
 
   return (
     <div className="print-report space-y-5">
-      {/* Header ------------------------------------------------------------ */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="text-[1.75rem] sm:text-[2rem]">What this means for {site.name}</h1>
-          <p className="text-slate mt-2 text-[0.9375rem]">
-            {site.domain} · checked {checkedOn}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3 print:hidden">
-          <Button size="sm" variant="ghost" onClick={() => window.print()}>
-            Print or save as PDF
-          </Button>
-          <Link
-            href="/dashboard/audit"
-            className="text-primary hover:text-primary-hover text-sm font-semibold"
-          >
-            Full detail →
-          </Link>
-        </div>
+      {/*
+        Masthead, print only.
+
+        On screen the page's own PageHeader is the heading, and a second h1 here
+        would be two top-level headings on one page. In print that header is
+        hidden — see the print:hidden wrapper in audit-workspace — so this takes
+        over, and it has to be the FIRST CHILD of .print-report because that is
+        the position globals.css styles as the masthead (2px navy rule under a
+        20pt title). Only ever one of the two is in the accessibility tree,
+        since display:none removes the other.
+      */}
+      <div className="hidden print:block">
+        <h1>What this means for {site.name}</h1>
+        <p>
+          {site.domain} · checked {checkedOn}
+        </p>
+      </div>
+
+      <div className="flex justify-end print:hidden">
+        <Button size="sm" variant="ghost" onClick={() => window.print()}>
+          Print or save as PDF
+        </Button>
       </div>
 
       {/* The verdict — the one thing to read ------------------------------- */}
@@ -184,14 +235,19 @@ export function AuditSummary() {
             <h2 className="text-lg">What&rsquo;s already working</h2>
             <Badge tone="success">{working.length}</Badge>
           </div>
-          <ul className="print-columns mt-4 space-y-2.5">
-            {working.map((f) => (
-              <li key={f.id} className="flex gap-2.5">
-                <Check className="text-success-ink mt-[0.4rem] shrink-0" />
-                <p className="text-slate text-[0.9375rem] leading-relaxed">{plainFor(f)}</p>
-              </li>
-            ))}
-          </ul>
+          {/* The summary instead of the list, with the list one click away.
+              Twenty ticks in a row is something people scroll past. */}
+          <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{strengths(report)}</p>
+          <Collapsible label={`Show all ${working.length}`}>
+            <ul className="print-columns space-y-2.5">
+              {working.map((f) => (
+                <li key={f.id} className="flex gap-2.5">
+                  <Check className="text-success-ink mt-[0.4rem] shrink-0" />
+                  <p className="text-slate text-[0.9375rem] leading-relaxed">{plainFor(f)}</p>
+                </li>
+              ))}
+            </ul>
+          </Collapsible>
         </Card>
       )}
 
@@ -202,12 +258,16 @@ export function AuditSummary() {
             <h2 className="text-lg">What&rsquo;s holding you back</h2>
             <Badge tone="neutral">{problems.length}</Badge>
           </div>
-          <p className="text-slate mt-1 text-sm">Worst first. You don&rsquo;t have to fix them all.</p>
-          <ul className="divide-line mt-3 divide-y">
-            {problems.map((f) => (
-              <ProblemRow key={f.id} finding={f} />
-            ))}
-          </ul>
+          <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
+            {holdingBack(report)}
+          </p>
+          <Collapsible label={`Show all ${problems.length}`}>
+            <ul className="divide-line divide-y">
+              {problems.map((f) => (
+                <ProblemRow key={f.id} finding={f} />
+              ))}
+            </ul>
+          </Collapsible>
         </Card>
       )}
 
@@ -229,12 +289,12 @@ export function AuditSummary() {
         </Card>
       )}
 
+      {/* The "see the technical detail" link that used to close this is gone —
+          the toggle above the page is that now, and two controls doing one job
+          is one more than anybody needs. */}
       <p className="text-slate text-center text-xs print:mt-8">
         Prepared by FaqFlo from a scan of {report.crawled.length}{' '}
-        {report.crawled.length === 1 ? 'page' : 'pages'} on {checkedOn}.{' '}
-        <Link href="/dashboard/audit" className="text-primary print:hidden">
-          See the technical detail
-        </Link>
+        {report.crawled.length === 1 ? 'page' : 'pages'} on {checkedOn}.
       </p>
     </div>
   );
