@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
 
 /**
@@ -28,9 +29,13 @@ export function SiteSwitcher() {
     return (
       <span className="flex min-w-0 items-baseline gap-2">
         <span className="text-navy truncate text-sm font-semibold">{site.name}</span>
-        <span className="text-slate hidden truncate font-mono text-xs sm:inline">
-          {site.domain}
-        </span>
+        {/* Only when it adds something. A customer who named the site after its
+            domain was getting "letsroof.com  letsroof.com" side by side. */}
+        {!isNamedAfterDomain(site.name, site.domain) && (
+          <span className="text-slate hidden truncate font-mono text-xs sm:inline">
+            {site.domain}
+          </span>
+        )}
       </span>
     );
   }

@@ -30,3 +30,24 @@ export function normalizeDomain(input: string): string {
     .replace(/^https?:\/\//, '')
     .replace(/\/.*$/, '');
 }
+
+/**
+ * Did the customer just name the site after its own domain?
+ *
+ * A site's name is free text typed into the add-site form, and most people type
+ * their domain into it — so "letsroof.com · letsroof.com" is what the header,
+ * the site switcher and the sites list all rendered. This is what lets a caller
+ * print the name and the domain only when they actually differ.
+ *
+ * ⚠️ DELIBERATELY LOOSER THAN normalizeDomain, AND IT MUST STAY DISPLAY-ONLY.
+ * That function keeps `www.` on purpose — the audit fetches exactly the string
+ * it returns, and the (user_id, domain) index treats the two as separate sites.
+ * Here the only question is whether printing both would say the same thing
+ * twice, and "www.letsroof.com" next to "letsroof.com" plainly does. Never use
+ * this to look a site up or to decide whether one already exists.
+ */
+export function isNamedAfterDomain(name: string, domain: string): boolean {
+  const bare = (value: string) => normalizeDomain(value).replace(/^www\./, '');
+  const left = bare(name);
+  return left.length > 0 && left === bare(domain);
+}

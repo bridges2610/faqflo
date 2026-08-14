@@ -250,6 +250,73 @@ export function buildWorklist(input: WorklistInput, limit = 5): Task[] {
   return ranked.slice(0, limit);
 }
 
+export type SetupStep = {
+  id: string;
+  label: string;
+  /** One line on why the step is worth doing, for the one they're on. */
+  why: string;
+  href: string;
+  done: boolean;
+};
+
+/**
+ * Getting a new customer from an empty account to answers on their own site.
+ *
+ * ⚠️ FOUR STEPS, NOT FIVE. The loop reads add site → check it → write answers →
+ * publish them → watch citations, and the fifth is deliberately absent. Nothing
+ * in this product queries an answer engine, so "watch for citations" would be a
+ * box nobody can ever tick — the same promise-with-nothing-behind-it the Stay
+ * Cited copy had to be cleaned up for. It is named on the front page as what is
+ * coming, not as a task.
+ *
+ * Every step is answered from data that already exists. There is no stored
+ * "onboarding complete" flag, and there should not be one: a flag can disagree
+ * with reality, and the thing it would disagree about is already knowable.
+ */
+export function setupSteps(input: WorklistInput & { siteCount: number }): SetupStep[] {
+  const { site, groups, faqs, siteCount } = input;
+  const published = faqs.filter((f) => f.status === 'published' && f.answer.trim());
+
+  const anyLive = groups.some(
+    (g) =>
+      publishState(
+        g,
+        faqs.filter((f) => f.groupId === g.id),
+      ) === 'current',
+  );
+
+  return [
+    {
+      id: 'add-site',
+      label: 'Add your website',
+      why: 'It takes about thirty seconds, and everything else starts from it.',
+      href: '/dashboard/sites',
+      done: siteCount > 0,
+    },
+    {
+      id: 'run-audit',
+      label: 'See what AI can read',
+      why: 'We read your site the way an assistant would and tell you what it found.',
+      href: '/dashboard/audit',
+      done: Boolean(site?.lastAudit),
+    },
+    {
+      id: 'write-answers',
+      label: 'Write your answers',
+      why: 'The questions your customers ask, answered in a way an assistant can quote.',
+      href: '/dashboard/faqs',
+      done: published.length > 0,
+    },
+    {
+      id: 'publish',
+      label: 'Put them on your site',
+      why: 'Nothing can be quoted until it is on your own domain. Copy, paste, done.',
+      href: '/dashboard/publish',
+      done: anyLive,
+    },
+  ];
+}
+
 /**
  * The three facts a business owner actually wants off the front page.
  *

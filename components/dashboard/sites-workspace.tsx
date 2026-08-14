@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { hasGetCited } from '@/lib/dashboard/plans';
 import { publishState } from '@/lib/dashboard/export';
@@ -62,9 +63,15 @@ function SiteRow({ id }: { id: string }) {
           {staleCount === 0 && liveCount > 0 && <Badge tone="success">Published</Badge>}
         </div>
         <p className="text-slate mt-1 text-sm">
-          <span className="font-mono text-xs">{row.domain}</span> · {siteGroups.length}{' '}
-          {siteGroups.length === 1 ? 'group' : 'groups'} · {published} published · added{' '}
-          {timeAgo(row.createdAt)}
+          {/* The name above is already the domain for most customers, who type
+              it into the name field. Repeating it here read as a stutter. */}
+          {!isNamedAfterDomain(row.name, row.domain) && (
+            <>
+              <span className="font-mono text-xs">{row.domain}</span> ·{' '}
+            </>
+          )}
+          {siteGroups.length} {siteGroups.length === 1 ? 'group' : 'groups'} · {published}{' '}
+          published · added {timeAgo(row.createdAt)}
         </p>
       </div>
 

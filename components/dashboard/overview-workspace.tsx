@@ -2,50 +2,78 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ScoreDial } from '@/components/ui/score-dial';
 import { scoreBand } from '@/lib/audit/score';
+import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canTrack } from '@/lib/dashboard/plans';
 import { timeAgo } from '@/lib/dashboard/format';
 import { auditHistory } from '@/lib/dashboard/store';
 import type { AuditRunRow } from '@/lib/supabase/types';
-import { buildWorklist, standing } from '@/lib/dashboard/worklist';
-import { EmptyState } from './empty-state';
+import { buildWorklist, setupSteps, standing } from '@/lib/dashboard/worklist';
+import { MetricTile } from './metric-tile';
+import { AeoIcon, FaqIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
+import { SetupChecklist } from './setup-checklist';
+import { Sparkline } from './sparkline';
 import { TaskRow } from './task-row';
 
 /*
-  The landing screen: a worklist, not a report card.
+  The landing screen.
 
-  What this replaced was four stat tiles, a single hand-picked "do this next"
-  card, and a five-row checklist of our own pipeline (Audit → Questions →
-  Answers → Publish → Track). Two problems with that. The checklist taught the
-  customer our process rather than telling them anything about their site. And
-  the single suggestion came from a bespoke if/else cascade that had nothing to
-  do with the properly ranked action plan sitting on the Audit page — so the
-  answer to "what next?" depended on which screen you were looking at.
+  This went through a gradient-banner phase and came back out of it. The band
+  made a working screen look like the marketing site, and it was covering for
+  the real problem underneath: six identical full-width rectangles stacked down
+  the page. Density, alignment and real data are what make a tool look finished
+  — not the brand's decoration carried across from pages meant to sell.
 
-  Now there is one ranked list, built by lib/dashboard/worklist.ts from both the
-  audit's findings and the state of the account, and it is the first thing on
-  the page. Standing comes above it in one line, because "where do I stand" is
-  the question that makes the list make sense — not a dashboard of its own.
-
-  Everything below the list is deliberately thin. A front page that shows six
-  panels is a front page nobody reads to the bottom of.
+  So: a row of figures at the top, then a main column holding the one list that
+  matters, then a rail of supporting context. Cohesion with the marketing site
+  now comes only from shared tokens — same navy, same slate, same radii, same
+  type scale.
 */
+
+/**
+ * Time-of-day greeting.
+ *
+ * ⚠️ Reads a client clock, which is normally a hydration bug — see the note in
+ * lib/dashboard/format.ts about dates. Safe HERE specifically: AppShell renders
+ * its skeleton until the store resolves in an effect, so this never renders
+ * during SSR and there is no server output to disagree with. Moving it
+ * somewhere that renders on the server would break that.
+ */
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
+/**
+ * The dot beside the score band.
+ *
+ * Thresholds match scoreBand() in lib/audit/score.ts so the colour and the word
+ * can never disagree — a "Strong" label next to an amber dot is worse than no
+ * dot at all. Cyan is a fill here, which is the only way --color-accent may be
+ * used.
+ */
+function bandDot(score: number): string {
+  if (score >= 85) return 'bg-success';
+  if (score >= 60) return 'bg-accent';
+  return 'bg-error';
+}
+
 export function OverviewWorkspace() {
   const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
 
   /*
-    Past runs, for the "and it moved" line.
+    Past runs, for the trend.
 
     Fetched here rather than in the provider because it is the one piece of
     dashboard data that is not in the local snapshot, only this screen wants it,
     and it must never block the worklist from rendering. A failed or empty read
-    simply means no trend line — see auditHistory().
+    simply means no sparkline — see auditHistory().
   */
   const [history, setHistory] = useState<AuditRunRow[]>([]);
 
@@ -60,184 +88,259 @@ export function OverviewWorkspace() {
     };
   }, [site]);
 
+  const report = site?.lastAudit ?? null;
+  const input = { report, site: site ?? null, user, groups, faqs, questions };
+  const steps = setupSteps({ ...input, siteCount: sites.length });
+  const firstName = data?.user.name.split(' ')[0] ?? '';
+
+  /*
+    A brand-new account gets no metric row.
+
+    Four cells reading "—" is worse than no row at all: it fills the top of the
+    screen with the shape of information while telling them nothing. The
+    checklist is the whole page until there is something to measure.
+  */
   if (!site || !data) {
     return (
       <>
         <PageHeader
           title="Welcome to FaqFlo"
-          description="Add your website and we’ll tell you what AI can and can’t see."
+          description="Add your website and we’ll read it the way ChatGPT and Perplexity would, then tell you plainly what they can and can’t see."
         />
-        <EmptyState
-          title="Nothing set up yet"
-          body="Add a site and FaqFlo has something to check, answer for, and keep an eye on. It takes about thirty seconds."
-          action={<ButtonLink href="/dashboard/sites">Add your site</ButtonLink>}
-        />
+        <SetupChecklist steps={steps} />
       </>
     );
   }
 
-  const report = site.lastAudit;
-  const input = { report, site, user, groups, faqs, questions };
   const tasks = buildWorklist(input);
   const state = standing(input);
-
   const band = report ? scoreBand(report.score) : null;
   const cited = tracking?.latest.filter((c) => c.outcome === 'cited').length ?? 0;
   const checks = tracking?.latest.length ?? 0;
 
   /*
-    The previous comparable run.
+    ⚠️ SAME DEPTH ONLY, and this is where that rule is enforced for both the
+    delta and the sparkline.
 
-    ⚠️ Same depth only. A quick run scores 3 findings across 2 pillars and a
-    full run scores ~40 across 6, so "you went from 62 to 41" between the two
-    would describe a change in what we measured, not a change to their site.
-    `history[0]` is this run, so the comparison starts at index 1.
+    A quick run scores 3 findings across 2 pillars; a full run scores ~40 across
+    6. Charting them on one line draws a cliff that never happened to the
+    customer's site. Sparkline itself can't see `depth`, so it has to be done
+    here — reversed at the end because the query returns newest first and a
+    trend line reads oldest to newest.
   */
-  const previous = report
-    ? history.filter((r) => r.depth === report.depth && r.checked_at !== report.checkedAt)[0]
-    : undefined;
+  const comparable = report ? history.filter((r) => r.depth === report.depth) : [];
+  const trend = [...comparable].reverse().map((r) => r.score);
+  const previous = comparable.find((r) => r.checked_at !== report?.checkedAt);
   const movement = report && previous ? report.score - previous.score : null;
+
+  const pagesWithFaq = report?.pages?.filter((p) => p.hasFaqSchema).length ?? 0;
+  const setupDone = steps.every((s) => s.done);
 
   return (
     <>
       <PageHeader
-        title={`Hello, ${data.user.name.split(' ')[0]}`}
-        description={`${site.name} · ${site.domain}`}
+        title={`${greeting()}, ${firstName}`}
+        /* Most people type their domain into the name field, so printing both
+           gave "letsroof.com · letsroof.com". */
+        description={
+          isNamedAfterDomain(site.name, site.domain)
+            ? site.domain
+            : `${site.name} · ${site.domain}`
+        }
+        action={
+          <ButtonLink href="/dashboard/audit" variant="ghost" size="sm">
+            {report ? 'Run a fresh check' : 'Check my site'}
+          </ButtonLink>
+        }
       />
 
-      <div className="space-y-5">
-        {/* Where you stand, in one strip rather than a wall of tiles. */}
-        <Card className="p-5 sm:p-7">
-          {report ? (
-            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:gap-7">
-              {/* The `sm` dial existed and had never been used anywhere. This
-                  is a supporting fact here, not the headline it is on the
-                  audit page, so it gets the smaller one. */}
-              <ScoreDial score={report.score} size="sm" />
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <h2 className="text-lg">{band!.label}</h2>
-                  {/* Movement in words as well as sign — the same reason
-                      StatTile writes "Up 12%" rather than a coloured arrow. */}
-                  {movement !== null && movement !== 0 && (
-                    <Badge tone={movement > 0 ? 'success' : 'neutral'}>
-                      {movement > 0 ? 'Up' : 'Down'} {Math.abs(movement)} since last check
-                    </Badge>
-                  )}
-                  <span className="text-slate text-xs">
-                    {report.scoredCount} checks · {timeAgo(report.checkedAt)}
-                  </span>
-                </div>
-                <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
-                  {band!.summary}
-                </p>
-                {/* ⚠️ "Are they citing you" is answered honestly or not at all.
-                    Nothing queries an engine yet, so a subscriber with no data
-                    is told it is not measured — never shown a zero, which would
-                    read as "nobody is citing you". */}
-                <p className="text-slate mt-2 text-xs">
-                  {canTrack(user) && checks > 0
-                    ? `Cited in ${cited} of ${checks} checks`
-                    : 'Whether AI is citing you: not measured yet'}
-                </p>
+      {/*
+        One card, four cells, hairline dividers — not four floating cards. Four
+        shadows across the top of a page read as four separate things competing;
+        divided cells read as one row of figures, which is what they are.
+      */}
+      <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-4">
+        <MetricTile
+          label="Visibility"
+          icon={<AeoIcon className="h-3.5 w-3.5" />}
+          tint="bg-primary-soft text-primary"
+          value={report ? report.score : '—'}
+          footer={report ? `${band!.label} · ${timeAgo(report.checkedAt)}` : 'not checked yet'}
+          /* Colour beside the band WORD, never instead of it — see the note on
+             MetricTile's `status` prop. */
+          status={report ? bandDot(report.score) : undefined}
+          change={movement !== null ? { amount: movement, unit: 'pts' } : null}
+          chart={<Sparkline values={trend} label="Visibility score" />}
+          href="/dashboard/audit"
+        />
+        <MetricTile
+          label="Pages live"
+          icon={<GlobeIcon className="h-3.5 w-3.5" />}
+          tint="bg-accent-soft text-teal-ink"
+          value={state.totalGroups === 0 ? '—' : `${state.liveGroups}/${state.totalGroups}`}
+          footer={
+            state.staleGroups > 0
+              ? `${state.staleGroups} out of date`
+              : state.totalGroups === 0
+                ? 'nothing set up yet'
+                : 'up to date'
+          }
+          href="/dashboard/publish"
+        />
+        <MetricTile
+          label="Answers"
+          icon={<FaqIcon className="h-3.5 w-3.5" />}
+          tint="bg-success/12 text-success-ink"
+          value={state.published}
+          footer="published and quotable"
+          href="/dashboard/faqs"
+        />
+        {/* Neutral on purpose. Red would read as an alarm, and zero gaps is a
+            good outcome — a tile shouldn't change meaning with its value. */}
+        <MetricTile
+          label="Gaps"
+          icon={<SearchIcon className="h-3.5 w-3.5" />}
+          value={state.unanswered}
+          footer="questions with no answer"
+          href="/dashboard/questions"
+        />
+      </Card>
+
+      {/* Main column and rail. The rail only exists once there is room beside
+          the list; below lg everything stacks in source order, which puts the
+          work above the context. */}
+      <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+        <div className="space-y-5">
+          {/* In the MAIN column, not the rail, and only while it is unfinished.
+              For a new account this is the primary content — a rail would push
+              it below the worklist on a phone, which is exactly the person who
+              needs it first. */}
+          {!setupDone && <SetupChecklist steps={steps} />}
+
+          {tasks.length > 0 ? (
+            <Card className="p-5 sm:p-7">
+              <div className="flex flex-wrap items-baseline justify-between gap-3">
+                <h2 className="text-[0.9375rem] font-bold tracking-normal">Do these next</h2>
+                <p className="text-slate text-xs">Highest payoff for the least work, in order.</p>
               </div>
-            </div>
+              <ul className="divide-line mt-2 divide-y">
+                {tasks.map((task, i) => (
+                  <TaskRow key={task.id} task={task} index={i} />
+                ))}
+              </ul>
+            </Card>
           ) : (
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0">
-                <h2 className="text-lg">You haven’t been checked yet</h2>
+            report && (
+              <Card className="p-5 sm:p-7">
+                <h2 className="text-[0.9375rem] font-bold tracking-normal">Nothing needs you right now</h2>
                 <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
-                  One scan tells you whether an AI crawler can read {site.domain} at all.
+                  Your answers are live and current, and the last check found nothing worth
+                  fixing. Come back after your next round of changes to the site.
                 </p>
-              </div>
-              <ButtonLink href="/dashboard/audit">Check my site</ButtonLink>
-            </div>
+              </Card>
+            )
           )}
-        </Card>
+        </div>
 
-        {/* The list. This is the page. */}
-        {tasks.length > 0 ? (
-          <Card className="border-primary p-5 sm:p-7">
-            <div className="flex flex-wrap items-baseline justify-between gap-3">
-              <h2 className="text-lg">Do these next</h2>
-              <p className="text-slate text-xs">Highest payoff for the least work, in order.</p>
-            </div>
-            <ul className="divide-line mt-2 divide-y">
-              {tasks.map((task, i) => (
-                <TaskRow key={task.id} task={task} index={i} />
-              ))}
+        <div className="mt-5 space-y-5 lg:mt-0">
+          {report && (
+            <Card className="p-5">
+              <h2 className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+                About this site
+              </h2>
+              <dl className="divide-line mt-3 divide-y text-sm">
+                <Row
+                  term="Pages read"
+                  value={`${report.crawled.length} of ${Math.max(report.discovered, report.crawled.length)}`}
+                />
+                <Row
+                  term="With FAQ markup"
+                  value={report.pages ? `${pagesWithFaq} of ${report.pages.length}` : '—'}
+                />
+                <Row term="Industry" value={site.industry ?? 'unknown'} />
+                <Row term="Service area" value={site.location ?? 'unknown'} />
+                <Row
+                  term="AI citations"
+                  /* ⚠️ Honestly or not at all. Nothing queries an engine yet, so
+                     a zero here would read as "nobody is citing you" — which we
+                     have not measured and do not know. */
+                  value={canTrack(user) && checks > 0 ? `${cited} of ${checks}` : 'not measured'}
+                />
+              </dl>
+
+              {/* ⚠️ `inferred` means a model guessed these from the homepage
+                  rather than reading them from the site's own markup, so the UI
+                  has to say which it is. The editor already exists on the
+                  Content page; linking to it keeps the `manual` promise — once
+                  a customer corrects us, no later run overwrites it — in one
+                  place rather than two. */}
+              {site.profileSource === 'inferred' && (
+                <p className="text-slate mt-3 text-xs leading-relaxed">
+                  Industry and area were worked out from your homepage.{' '}
+                  <Link
+                    href="/dashboard/content"
+                    className="text-primary hover:text-primary-hover font-semibold"
+                  >
+                    Correct them →
+                  </Link>
+                </p>
+              )}
+            </Card>
+          )}
+
+          <Card tone="cloud" className="p-5">
+            <h2 className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+              Learn
+            </h2>
+            <ul className="mt-3 space-y-3.5">
+              <LearnLink
+                href="/blog/what-is-aeo"
+                title="What AEO is, in plain English"
+                body="Why being the answer replaced being ranked."
+              />
+              <LearnLink
+                href="/seo-guide"
+                title="SEO in the age of AI answers"
+                body="The fundamentals that still matter, and why."
+              />
             </ul>
-          </Card>
-        ) : (
-          <Card className="p-5 sm:p-7">
-            <h2 className="text-lg">Nothing needs you right now</h2>
-            <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
-              Your answers are live and current, and the audit found nothing worth fixing. Re-check
-              the site after your next round of changes.
+            <p className="text-slate border-line mt-4 border-t pt-3 text-xs leading-relaxed">
+              Citation tracking — asking the engines your questions on a schedule — is what
+              we&rsquo;re building next.
             </p>
-            <ButtonLink href="/dashboard/audit" variant="ghost" size="sm" className="mt-4">
-              Run a fresh check
-            </ButtonLink>
           </Card>
-        )}
-
-        {/* Three facts, phrased as outcomes. Not our pipeline. */}
-        <Card tone="cloud" className="p-5 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Fact
-              value={
-                state.totalGroups === 0 ? '—' : `${state.liveGroups} of ${state.totalGroups}`
-              }
-              label={state.totalGroups === 1 ? 'page live and current' : 'pages live and current'}
-              href="/dashboard/publish"
-              warn={state.staleGroups > 0 ? `${state.staleGroups} out of date` : null}
-            />
-            <Fact
-              value={state.published}
-              label={state.published === 1 ? 'answer published' : 'answers published'}
-              href="/dashboard/faqs"
-            />
-            <Fact
-              value={state.unanswered}
-              label={state.unanswered === 1 ? 'question unanswered' : 'questions unanswered'}
-              href="/dashboard/questions"
-            />
-          </div>
-        </Card>
-
-        {sites.length > 1 && (
-          <p className="text-slate text-center text-xs">
-            {sites.length} sites on this account — switch at the top of the page.
-          </p>
-        )}
+        </div>
       </div>
+
+      {sites.length > 1 && (
+        <p className="text-slate mt-6 text-center text-xs">
+          {sites.length} sites on this account — switch at the top of the page.
+        </p>
+      )}
     </>
   );
 }
 
-/** One outcome, linked to the screen that changes it. */
-function Fact({
-  value,
-  label,
-  href,
-  warn,
-}: {
-  value: string | number;
-  label: string;
-  href: string;
-  warn?: string | null;
-}) {
+/** One term and its value in the site brief. */
+function Row({ term, value }: { term: string; value: string | number }) {
   return (
-    <Link href={href} className="group block">
-      <p className="font-display text-navy group-hover:text-primary text-[1.5rem] leading-none font-extrabold tabular-nums transition-colors duration-150">
-        {value}
-      </p>
-      <p className="text-slate mt-1.5 text-xs">{label}</p>
-      {warn && (
-        <span className="mt-1.5 inline-block">
-          <Badge tone="neutral">{warn}</Badge>
-        </span>
-      )}
-    </Link>
+    <div className="flex items-baseline justify-between gap-4 py-2">
+      <dt className="text-slate">{term}</dt>
+      <dd className="text-navy min-w-0 truncate text-right font-semibold tabular-nums">{value}</dd>
+    </div>
+  );
+}
+
+/** A way into the guides — the only thing in the dashboard that links to them. */
+function LearnLink({ href, title, body }: { href: string; title: string; body: string }) {
+  return (
+    <li>
+      <Link href={href} className="group block">
+        <p className="text-navy group-hover:text-primary text-sm font-semibold transition-colors duration-150">
+          {title} →
+        </p>
+        <p className="text-slate mt-0.5 text-xs leading-relaxed">{body}</p>
+      </Link>
+    </li>
   );
 }
