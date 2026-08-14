@@ -3,7 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FeaturedImage } from '@/components/blog/featured-image';
-import { PostAuthor } from '@/components/blog/post-author';
+import { AuthorBio } from '@/components/marketing/author-bio';
 import { FinalCta } from '@/components/marketing/final-cta';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -95,7 +95,7 @@ export default async function Post({ params }: Params) {
             <span className="bg-line h-4 w-px" aria-hidden="true" />
             <span className="flex items-center gap-2">
               {/* alt="" because the name follows immediately as text — see the
-                  note in post-author.tsx. Left lazy: priority belongs to the
+                  note in author-bio.tsx. Left lazy: priority belongs to the
                   featured image above, and 28px is never the LCP element. */}
               <Image
                 src={AUTHOR_AVATAR}
@@ -119,7 +119,7 @@ export default async function Post({ params }: Params) {
             <Body />
           </div>
 
-          <PostAuthor />
+          <AuthorBio />
 
           {/* The page argues for machine-readable content, so it carries the
               markup for its own. Hand-serialised, matching site-faq.tsx.

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { AuthorBio } from '@/components/marketing/author-bio';
 import { FinalCta } from '@/components/marketing/final-cta';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -705,6 +706,12 @@ export default function SeoGuide() {
                 ))}
               </div>
             </Section>
+
+            {/* Deliberately not in the contents rail. Every entry there is a
+                step in the argument; this is the signature under it — and a
+                guide that spends a section on why machines need to know who is
+                making a claim should say who made these. */}
+            <AuthorBio />
           </article>
 
           {/* The rail. `top-24` clears the sticky nav; `max-h`/`overflow` keep
