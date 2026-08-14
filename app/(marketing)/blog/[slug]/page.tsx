@@ -1,10 +1,19 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FeaturedImage } from '@/components/blog/featured-image';
+import { PostAuthor } from '@/components/blog/post-author';
 import { FinalCta } from '@/components/marketing/final-cta';
 import { Badge } from '@/components/ui/badge';
-import { AUTHOR, formatPostDate, getPost, POSTS } from '@/lib/blog/posts';
+import {
+  AUTHOR,
+  AUTHOR_AVATAR,
+  AUTHOR_BIO,
+  formatPostDate,
+  getPost,
+  POSTS,
+} from '@/lib/blog/posts';
 
 /*
   The single-post template.
@@ -85,12 +94,16 @@ export default async function Post({ params }: Params) {
             </time>
             <span className="bg-line h-4 w-px" aria-hidden="true" />
             <span className="flex items-center gap-2">
-              <span
-                className="bg-primary-soft text-primary font-display flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold"
-                aria-hidden="true"
-              >
-                {AUTHOR.charAt(0)}
-              </span>
+              {/* alt="" because the name follows immediately as text — see the
+                  note in post-author.tsx. Left lazy: priority belongs to the
+                  featured image above, and 28px is never the LCP element. */}
+              <Image
+                src={AUTHOR_AVATAR}
+                alt=""
+                width={28}
+                height={28}
+                className="bg-cloud h-7 w-7 rounded-full object-cover"
+              />
               <span className="text-navy text-sm font-semibold">{AUTHOR}</span>
             </span>
             {/* So a preview is unmistakably a preview. Never reaches
@@ -106,22 +119,38 @@ export default async function Post({ params }: Params) {
             <Body />
           </div>
 
+          <PostAuthor />
+
           {/* The page argues for machine-readable content, so it carries the
-              markup for its own. Hand-serialised, matching site-faq.tsx. */}
+              markup for its own. Hand-serialised, matching site-faq.tsx.
+
+              The author is a full Person rather than a bare name: our own audit
+              grades customer sites on whether structured data identifies who
+              wrote something, so the blog had better pass it. Built from the
+              same constants the visible bio renders from, so the two cannot
+              describe different people. */}
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
+              // Escaping "<" stops a stray "</script>" in the bio from closing
+              // the tag early — the bio is long free text that will get edited.
               __html: JSON.stringify({
                 '@context': 'https://schema.org',
                 '@type': 'BlogPosting',
                 headline: meta.title,
                 description: meta.excerpt,
                 datePublished: meta.date,
-                author: { '@type': 'Person', name: AUTHOR },
+                author: {
+                  '@type': 'Person',
+                  name: AUTHOR,
+                  description: AUTHOR_BIO,
+                  image: `https://www.faqflo.com${AUTHOR_AVATAR}`,
+                  url: 'https://www.faqflo.com/about',
+                },
                 publisher: { '@type': 'Organization', name: 'FaqFlo' },
                 mainEntityOfPage: `https://www.faqflo.com/blog/${meta.slug}`,
                 ...(meta.image ? { image: `https://www.faqflo.com${meta.image}` } : {}),
-              }),
+              }).replace(/</g, '\\u003c'),
             }}
           />
         </article>

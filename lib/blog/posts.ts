@@ -32,9 +32,23 @@ export type Post = {
   default: (props: Record<string, unknown>) => React.JSX.Element;
 };
 
-/** Every post is Beau's today. A per-post override can be added to PostMeta
-    later without touching the template. */
+/*
+  Every post is Beau's today. A per-post override can be added to PostMeta later
+  without touching the template — until there is a second author, an optional
+  meta field would just be scaffolding for someone who doesn't exist.
+
+  The bio and headshot live here beside the name rather than inside the author
+  component, because three places need them: the component, the byline avatar,
+  and the BlogPosting schema. One source, so the visible bio and the structured
+  data can never describe different people.
+
+  Apostrophes are the curly character, not the ASCII one — house convention, and
+  it saves escaping every "I’m" inside a single-quoted string.
+*/
 export const AUTHOR = 'Beau';
+export const AUTHOR_AVATAR = '/headshot/beau-faqflo.jpeg';
+export const AUTHOR_BIO =
+  '👋 Hi, I’m Beau. I’ve spent almost 20 years in marketing — long enough to watch the whole game change more than once. I was there when SEO was the answer, then social, then content, and now the biggest shift yet: people asking AI instead of Googling. Somewhere along the way I got tired of watching good small businesses do everything “right” and still stay invisible to the tools that increasingly decide who gets found. That’s why I built FaqFlo — my mission is to help you grow your business in the modern world of AI, so you become the answer, not just another link nobody clicks.';
 
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
