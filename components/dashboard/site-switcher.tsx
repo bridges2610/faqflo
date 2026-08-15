@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { SiteIcon } from './site-icon';
 
 /**
  * Which site everything else on the page is about.
@@ -26,8 +27,11 @@ export function SiteSwitcher() {
   }
 
   if (sites.length === 1) {
+    // items-center, not items-baseline: an image has no useful baseline, and
+    // the name and domain still line up against each other inside it.
     return (
-      <span className="flex min-w-0 items-baseline gap-2">
+      <span className="flex min-w-0 items-center gap-2">
+        <SiteIcon name={site.name} domain={site.domain} />
         <span className="text-navy truncate text-sm font-semibold">{site.name}</span>
         {/* Only when it adds something. A customer who named the site after its
             domain was getting "letsroof.com  letsroof.com" side by side. */}
@@ -43,6 +47,9 @@ export function SiteSwitcher() {
   return (
     <label className="flex min-w-0 items-center gap-2">
       <span className="sr-only">Site</span>
+      {/* Beside the control, not inside it: an <option> can't hold an image, so
+          this shows the selected site and the select stays native. */}
+      <SiteIcon name={site.name} domain={site.domain} />
       <select
         value={site.id}
         onChange={(e) => selectSite(e.target.value)}
