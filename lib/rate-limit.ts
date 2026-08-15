@@ -80,6 +80,16 @@ export const QUESTIONS_RATE_LIMIT = 10;
  */
 export const FETCH_URL_RATE_LIMIT = 60;
 
+/**
+ * Ceiling for support messages from the Help page.
+ *
+ * Low, because the point is a mailbox and nobody legitimately files ten support
+ * requests before midnight. Note this is one of the few limits the in-process
+ * Map above actually enforces reasonably well: the route requires a session, so
+ * the key is `user:<id>` rather than an IP that changes with the instance.
+ */
+export const CONTACT_RATE_LIMIT = 5;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 

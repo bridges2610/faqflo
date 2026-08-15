@@ -3,15 +3,19 @@ import 'server-only';
 /**
  * The emails this app sends itself.
  *
- * Two, and they do different jobs on purpose. Somebody who signs up and buys
- * straight away already receives four emails inside two minutes — Supabase's
- * confirmation, this welcome, Stripe's receipt, and the set-up note. That is
- * the ceiling. A fifth would be noise, and each of these has to earn its place
- * by saying something the others do not.
+ * Two go to customers, and they do different jobs on purpose. Somebody who
+ * signs up and buys straight away already receives four emails inside two
+ * minutes — Supabase's confirmation, this welcome, Stripe's receipt, and the
+ * set-up note. That is the ceiling. A fifth would be noise, and each of these
+ * has to earn its place by saying something the others do not.
  *
- * Plain template strings rather than a rendering library: two emails, no
- * layout to speak of, and the alternative is a dependency plus a build step
- * for markup that fits on a screen.
+ * The third, `contactEmail`, is the exception that proves the rule: it goes to
+ * US, not to a customer, so it counts against nobody's inbox and follows none
+ * of the conventions below — no `wrap()`, no sign-off, no marketing voice.
+ *
+ * Plain template strings rather than a rendering library: no layout to speak
+ * of, and the alternative is a dependency plus a build step for markup that
+ * fits on a screen.
  */
 
 /** Emails always point at production — a link in an inbox outlives a preview. */
@@ -118,5 +122,62 @@ You have 30 days of full access. After that, everything you have made stays your
 Reply here if you get stuck.
 
 ${SIGN_OFF}`,
+  };
+}
+
+/**
+ * A support request from the dashboard Help page. Goes to us, not to a customer.
+ *
+ * Every field except `topic` and `message` is read server-side from the session
+ * rather than accepted from the request body. Support context that the sender
+ * can edit is worse than no context — it looks authoritative and can be wrong,
+ * and there is nothing here the server cannot look up itself.
+ *
+ * The customer's address rides on the message's `replyTo` rather than only
+ * appearing in the body, so answering is one click instead of a copy-paste.
+ * It is repeated in the body anyway, because a forwarded copy loses the header.
+ */
+export function contactEmail(opts: {
+  topic: string;
+  message: string;
+  name: string | null;
+  email: string;
+  userId: string;
+  subscription: string;
+  domains: string[];
+}): Rendered {
+  const { topic, message, name, email, userId, subscription, domains } = opts;
+
+  const sites = domains.length ? domains.join(', ') : 'none yet';
+  const who = name?.trim() || 'No name';
+
+  const facts: [string, string][] = [
+    ['From', `${who} <${email}>`],
+    ['Topic', topic],
+    ['Plan', subscription],
+    ['Sites', sites],
+    ['User id', userId],
+  ];
+
+  return {
+    // Prefixed so an inbox filter can find these without matching on the body,
+    // and topic-first so a full folder is scannable.
+    subject: `[FaqFlo help] ${topic} — ${email}`,
+    html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#0f172a">
+<table cellpadding="0" cellspacing="0" style="font-size:13px;color:#475569;margin-bottom:20px">
+${facts
+  .map(
+    ([k, v]) =>
+      `<tr><td style="padding:2px 12px 2px 0;color:#94a3b8">${k}</td><td style="padding:2px 0">${escape(v)}</td></tr>`,
+  )
+  .join('\n')}
+</table>
+<div style="white-space:pre-wrap;border-left:3px solid #e2e8f0;padding-left:14px">${escape(message)}</div>
+</div>`,
+    text: `${facts.map(([k, v]) => `${k}: ${v}`).join('\n')}
+
+---
+
+${message}`,
   };
 }

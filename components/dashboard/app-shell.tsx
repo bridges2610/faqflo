@@ -7,7 +7,7 @@ import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
-import { AeoIcon, ChartIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
+import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { SiteSwitcher } from './site-switcher';
 
@@ -179,6 +179,32 @@ function PlanFooter() {
   );
 }
 
+/**
+ * Help, kept out of NAV on purpose.
+ *
+ * The five above are places you go to do work; this is a reference you open
+ * when something isn't behaving. Adding it as a sixth would undo the 8→5
+ * pruning argued for at the top of this file — the sidebar would be teaching
+ * our shape again. So it sits down here with the account card, always
+ * reachable, never competing with the task list.
+ *
+ * ⚠️ Rendered in TWO places — the permanent sidebar and the mobile drawer, both
+ * below. They are separate JSX, not one shared block, so anything added to one
+ * has to be added to the other.
+ */
+function HelpLink({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Link
+      href="/dashboard/help"
+      onClick={onNavigate}
+      className="text-slate hover:text-navy hover:bg-cloud mb-2 flex items-center gap-3 rounded-input px-3 py-2 text-sm transition-colors duration-150"
+    >
+      <DocIcon className="h-4 w-4 shrink-0" />
+      Help
+    </Link>
+  );
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { loading } = useDashboard();
   const pathname = usePathname();
@@ -209,7 +235,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <NavLinks />
           </div>
         </div>
-        <PlanFooter />
+        <div>
+          <HelpLink />
+          <PlanFooter />
+        </div>
       </aside>
 
       {/* Drawer — same nav, below lg */}
@@ -236,7 +265,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <NavLinks onNavigate={() => setDrawerOpen(false)} />
               </div>
             </div>
-            <PlanFooter />
+            <div>
+              <HelpLink onNavigate={() => setDrawerOpen(false)} />
+              <PlanFooter />
+            </div>
           </div>
         </div>
       )}

@@ -31,6 +31,16 @@ export type Email = {
   /** Sent alongside the HTML. Resend derives one if omitted; ours are better. */
   text: string;
   /**
+   * Overrides EMAIL_REPLY_TO for this message only.
+   *
+   * Exists for mail we send to ourselves on a customer's behalf — the contact
+   * form. There the default is actively wrong: it would point replies at our
+   * own inbox, so answering a support request would mean copying the address
+   * out of the body by hand. Every other caller omits this and gets the env
+   * default, which is what they want.
+   */
+  replyTo?: string;
+  /**
    * Resend de-duplicates on this for 24 hours.
    *
    * A second guard, not the first: every caller already refuses to send twice
@@ -92,6 +102,10 @@ function apiKey(): string {
 
 /** Send one email. Throws on any failure; callers decide what that means. */
 export async function sendEmail(email: Email): Promise<string> {
+  // Per-message wins over the env default; falling back to it keeps every
+  // existing caller byte-identical.
+  const replies = email.replyTo || replyTo();
+
   const res = await fetch(ENDPOINT, {
     method: 'POST',
     headers: {
@@ -107,7 +121,7 @@ export async function sendEmail(email: Email): Promise<string> {
       text: email.text,
       // Omitted entirely when unset — Resend rejects an empty string, and a
       // missing key is the documented way to say "no reply-to".
-      ...(replyTo() ? { reply_to: replyTo() } : {}),
+      ...(replies ? { reply_to: replies } : {}),
     }),
   });
 
