@@ -9,6 +9,7 @@ import { useDashboard } from '@/lib/dashboard/provider';
 import { hasGetCited } from '@/lib/dashboard/plans';
 import { publishState } from '@/lib/dashboard/export';
 import { timeAgo } from '@/lib/dashboard/format';
+import { BusinessProfile } from './business-profile';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { PlusIcon, TrashIcon } from './nav-icons';
@@ -21,10 +22,18 @@ import { SectionTitle } from './section-title';
   Get Cited is bought per site, so this is where that fact is visible: each row
   says whether this particular site is set up, and adding a site is never
   blocked — the money is per site, so a cap would only cost us customers.
+
+  This is also where a site's industry and service area are edited. They belong
+  here rather than on Content, which is where the only editor used to live: they
+  describe the business, they are read by the content plan AND by question
+  discovery, and Content's copy of the editor was unreachable until a plan had
+  been generated — so a customer could see "Industry: unknown" on the dashboard
+  with nowhere in the product to go and fix it.
 */
 function SiteRow({ id }: { id: string }) {
-  const { sites, site, selectSite, removeSite, data } = useDashboard();
+  const { sites, site, selectSite, removeSite, renameSite, data } = useDashboard();
   const [confirming, setConfirming] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const row = sites.find((s) => s.id === id);
   if (!row || !data) return null;
@@ -74,6 +83,18 @@ function SiteRow({ id }: { id: string }) {
           {siteGroups.length} {siteGroups.length === 1 ? 'group' : 'groups'} · {published}{' '}
           published · added {timeAgo(row.createdAt)}
         </p>
+
+        {/* Shown even when unset, so the gap is visible next to the button that
+            fixes it. These two fields feed the content plan and question
+            discovery, and a blank pair makes both generic. */}
+        <p className="text-slate mt-1 text-sm">
+          {row.industry ? (
+            <span className="text-navy font-medium">{row.industry}</span>
+          ) : (
+            'Industry not set'
+          )}
+          {row.location ? <> · {row.location}</> : null}
+        </p>
       </div>
 
       <div className="flex items-center gap-3">
@@ -89,6 +110,14 @@ function SiteRow({ id }: { id: string }) {
             Select
           </button>
         )}
+
+        <button
+          onClick={() => setEditing((v) => !v)}
+          aria-expanded={editing}
+          className="text-primary hover:text-primary-hover text-sm font-medium transition-colors duration-150"
+        >
+          {editing ? 'Close' : 'Edit'}
+        </button>
 
         {confirming ? (
           <span className="flex items-center gap-2 text-sm">
@@ -110,6 +139,29 @@ function SiteRow({ id }: { id: string }) {
           </button>
         )}
       </div>
+
+      {/* Full-width, so it wraps onto its own line inside the row's flex.
+          Opened straight into the form — the button above was the affordance,
+          and making someone click "Edit" twice would be silly.
+
+          ⚠️ 'manual' is the point of this control, not a detail: it is what
+          tells a later audit or content plan to leave these values alone. See
+          the guards in audit-workspace.tsx and content-workspace.tsx. */}
+      {editing && (
+        <div className="w-full">
+          <BusinessProfile
+            key={row.id}
+            defaultEditing
+            onDone={() => setEditing(false)}
+            industry={row.industry}
+            location={row.location}
+            source={row.profileSource}
+            onSave={async (industry, location) => {
+              await renameSite(row.id, { industry, location, profileSource: 'manual' });
+            }}
+          />
+        </div>
+      )}
     </li>
   );
 }

@@ -257,8 +257,12 @@ export function OverviewWorkspace() {
                   term="With FAQ markup"
                   value={report.pages ? `${pagesWithFaq} of ${report.pages.length}` : '—'}
                 />
-                <Row term="Industry" value={site.industry ?? 'unknown'} />
-                <Row term="Service area" value={site.location ?? 'unknown'} />
+                {/* "Not set", not "unknown": on a site that has never run a
+                    full audit we did not look and fail — there was nothing to
+                    look at. "Unknown" implied a dead end, which is what this
+                    row used to be. */}
+                <Row term="Industry" value={site.industry ?? 'Not set'} />
+                <Row term="Service area" value={site.location ?? 'Not set'} />
                 <Row
                   term="AI citations"
                   /* ⚠️ Honestly or not at all. Nothing queries an engine yet, so
@@ -268,20 +272,32 @@ export function OverviewWorkspace() {
                 />
               </dl>
 
-              {/* ⚠️ `inferred` means a model guessed these from the homepage
-                  rather than reading them from the site's own markup, so the UI
-                  has to say which it is. The editor already exists on the
-                  Content page; linking to it keeps the `manual` promise — once
-                  a customer corrects us, no later run overwrites it — in one
-                  place rather than two. */}
-              {site.profileSource === 'inferred' && (
+              {/* ⚠️ Where these two values came from changes how much to trust
+                  them, so the UI says which it is — `schema` is the business's
+                  own markup, `inferred` is a model's reading of the homepage.
+
+                  Every state except `manual` links out, including the null one.
+                  That was the bug: the link used to appear only for `inferred`,
+                  so a site that had never had a content plan built showed
+                  "unknown" with nowhere to go — and the editor it pointed at
+                  was itself unreachable until a plan existed.
+
+                  It now points at Sites, which holds the only editor. Keeping
+                  one editor is what keeps the `manual` promise — once a
+                  customer corrects us, no later run overwrites it — in one
+                  place rather than several. */}
+              {site.profileSource !== 'manual' && (
                 <p className="text-slate mt-3 text-xs leading-relaxed">
-                  Industry and area were worked out from your homepage.{' '}
+                  {site.profileSource === 'inferred'
+                    ? 'Industry and area were worked out from your homepage. '
+                    : site.profileSource === 'schema'
+                      ? "Read from your site's own markup. "
+                      : 'Not set yet — adding them makes your content plan and questions specific to your trade. '}
                   <Link
-                    href="/dashboard/content"
+                    href="/dashboard/sites"
                     className="text-primary hover:text-primary-hover font-semibold"
                   >
-                    Correct them →
+                    {site.profileSource === null ? 'Add them →' : 'Edit →'}
                   </Link>
                 </p>
               )}

@@ -191,7 +191,7 @@ export function AuditWorkspace({
    */
   view?: AuditView;
 }) {
-  const { site, user, data, tracking, groups, saveAudit } = useDashboard();
+  const { site, user, data, tracking, groups, saveAudit, renameSite } = useDashboard();
   /** null means "nothing run this session" — the stored report is the fallback. */
   const [fresh, setFresh] = useState<AuditReport | null>(null);
   const [busy, setBusy] = useState(false);
@@ -281,6 +281,36 @@ export function AuditWorkspace({
       const merged = merge(crawl);
       setFresh(merged);
       await saveAudit(site.id, merged);
+
+      /*
+        Keep what the crawl learned about the business.
+
+        businessProfile() reads industry and service area off the site's own
+        LocalBusiness markup on every full crawl, and until now the result was
+        thrown away unless the customer went to Content and generated a plan —
+        so a site that plainly declares `RoofingContractor` still read
+        "Industry: unknown" on the dashboard. Both the content plan and question
+        discovery send these fields to the model, so an empty pair costs
+        specificity in two places.
+
+        `schema` flat, not Content's conditional: this came from markup by
+        definition. A site whose markup names a trade but no `areaServed`
+        leaves location null for the customer to fill in, which is honest —
+        Content's `inferred` is for the different case where a model completed
+        a partial profile.
+
+        ⚠️ Never over a manual one. A customer correcting us is the strongest
+        signal we have, and a re-run quietly reverting it would be the feature
+        arguing with its user. Same guard as content-workspace.tsx.
+      */
+      const profile = crawl.profile;
+      if (site.profileSource !== 'manual' && profile?.industry) {
+        await renameSite(site.id, {
+          industry: profile.industry,
+          location: profile.location,
+          profileSource: 'schema',
+        });
+      }
     } catch {
       setError('Could not run the audit. Check your connection and try again.');
     } finally {

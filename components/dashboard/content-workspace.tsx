@@ -9,6 +9,7 @@ import { canContent } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import type { ArticleTopic, ContentPlan, MustHavePage } from '@/lib/dashboard/types';
 import { CopyIcon, DocIcon, FaqIcon, SearchIcon, TickIcon } from './nav-icons';
+import { BusinessProfile } from './business-profile';
 import { MetricTile } from './metric-tile';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
@@ -131,90 +132,6 @@ function TopicCard({ topic }: { topic: ArticleTopic }) {
         </Button>
       </div>
     </Card>
-  );
-}
-
-/** Industry and area, editable — we may have inferred them, and may be wrong. */
-function ProfileLine({
-  industry,
-  location,
-  source,
-  onSave,
-}: {
-  industry: string | null;
-  location: string | null;
-  source: string | null;
-  onSave: (industry: string, location: string) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [nextIndustry, setNextIndustry] = useState(industry ?? '');
-  const [nextLocation, setNextLocation] = useState(location ?? '');
-  const [saving, setSaving] = useState(false);
-
-  const field =
-    'border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150';
-
-  if (editing) {
-    return (
-      <Card tone="cloud" className="mb-6 p-5">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block">
-            <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-              Industry
-            </span>
-            <input
-              className={field}
-              value={nextIndustry}
-              onChange={(e) => setNextIndustry(e.target.value)}
-              placeholder="Roofing contractor"
-            />
-          </label>
-          <label className="block">
-            <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-              Service area
-            </span>
-            <input
-              className={field}
-              value={nextLocation}
-              onChange={(e) => setNextLocation(e.target.value)}
-              placeholder="Franklin, TN"
-            />
-          </label>
-        </div>
-        <div className="mt-4 flex gap-2">
-          <Button
-            size="sm"
-            disabled={saving}
-            onClick={async () => {
-              setSaving(true);
-              await onSave(nextIndustry, nextLocation);
-              setSaving(false);
-              setEditing(false);
-            }}
-          >
-            {saving ? 'Saving…' : 'Save'}
-          </Button>
-          <Button size="sm" variant="ghost" type="button" onClick={() => setEditing(false)}>
-            Cancel
-          </Button>
-        </div>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="mb-6 flex flex-wrap items-center gap-x-3 gap-y-1.5">
-      <p className="text-slate text-sm">
-        <span className="text-navy font-semibold">{industry || 'Industry not set'}</span>
-        {location ? <> · {location}</> : null}
-      </p>
-      {source === 'inferred' && (
-        <Badge tone="neutral">Worked out from your site — check it</Badge>
-      )}
-      <Button size="sm" variant="ghost" type="button" onClick={() => setEditing(true)}>
-        Edit
-      </Button>
-    </div>
   );
 }
 
@@ -381,7 +298,12 @@ export function ContentWorkspace() {
 
       <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
 
-      <ProfileLine
+      {/* Keyed by site: the editor seeds its inputs from props once, on mount,
+          so without this a switch of site left the previous site's industry
+          sitting in the form. */}
+      <BusinessProfile
+        key={site.id}
+        className="mb-6"
         industry={site.industry ?? contentPlan.industry}
         location={site.location ?? contentPlan.location}
         source={site.profileSource}
