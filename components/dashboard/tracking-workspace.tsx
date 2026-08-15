@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canTrack, engineChecksFor } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
-import { ENGINES, type CitationCheck, type Engine } from '@/lib/dashboard/types';
+import { ENGINES, type CitationCheck, type Engine, type SiteTracking } from '@/lib/dashboard/types';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
@@ -43,11 +43,21 @@ import { SectionTitle } from './section-title';
   what is already stored — so a refresh mid-run, a second tab, or an impatient
   double-click cannot double-spend the allowance.
 */
-function useTrackingRun(siteId: string | undefined, questions: string[], onDone: () => Promise<void>) {
+function useTrackingRun(
+  siteId: string | undefined,
+  questions: string[],
+  onDone: () => Promise<SiteTracking | null>,
+) {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ checked: number; remaining: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
+  /*
+    Its own channel, not a `notes` entry: `notes` renders under the fixed
+    heading "Some engines didn't answer", and this is the opposite problem —
+    the engines answered fine and the database would not give the rows back.
+  */
+  const [unreadable, setUnreadable] = useState<string | null>(null);
 
   async function run() {
     if (!siteId || questions.length === 0) return;
@@ -55,6 +65,7 @@ function useTrackingRun(siteId: string | undefined, questions: string[], onDone:
     setBusy(true);
     setError(null);
     setNotes([]);
+    setUnreadable(null);
     let checked = 0;
 
     try {
@@ -75,9 +86,11 @@ function useTrackingRun(siteId: string | undefined, questions: string[], onDone:
           error?: string;
         };
 
+        // `break`, not `return`: the refresh in `finally` has to happen either
+        // way. See the note there.
         if (!res.ok) {
           setError(payload.error ?? 'That run failed. Please try again.');
-          return;
+          break;
         }
 
         checked += payload.checked ?? 0;
@@ -92,16 +105,55 @@ function useTrackingRun(siteId: string | undefined, questions: string[], onDone:
 
         if (payload.done || !payload.remaining) break;
       }
-
-      await onDone();
     } catch {
       setError('Could not reach the server. Check your connection and try again.');
     } finally {
+      /*
+        ⚠️ REFRESH EVEN WHEN THE RUN FAILED, AND ESPECIALLY THEN.
+
+        A run is several requests, and the ones before the failure already
+        asked the engines, spent the money and stored their rows. Refreshing
+        only on the happy path left those rows sitting in Postgres with the
+        page still showing "you haven't run a check yet" until someone
+        reloaded — the run looked like it had done nothing when it had done
+        most of its work.
+
+        This is the same call the route makes when it reports engine failures
+        instead of throwing (lib/tracking/run.ts): a partial result is a real
+        result. The error still shows; it shows next to whatever we got.
+      */
+      try {
+        const refreshed = await onDone();
+
+        /*
+          ⚠️ THE WRITE SUCCEEDED AND THE READ CAME BACK EMPTY. SAY SO.
+
+          The server told us it checked `checked` questions, so those rows are
+          in Postgres. If reading them back yields nothing, the two disagree,
+          and the page is about to render "you haven't run a check yet" — the
+          most misleading sentence available, because the checks ran and were
+          paid for.
+
+          This is not hypothetical: `citation_checks` grants the browser SELECT
+          under an RLS policy (supabase/migrations/0006), and when that policy
+          is missing PostgREST returns an empty array with no error at all.
+          Nothing downstream can tell that apart from "no data yet", so it has
+          to be caught here, where we know a run just stored rows.
+        */
+        if (checked > 0 && !refreshed) {
+          setUnreadable(
+            `${checked} ${checked === 1 ? 'check' : 'checks'} ran and were saved, but reading them back returned nothing. The results are not lost — the citation_checks read policy is the likely cause.`,
+          );
+        }
+      } catch {
+        // Leave the original error standing rather than replacing it with a
+        // second one about the reload — the first is what went wrong.
+      }
       setBusy(false);
     }
   }
 
-  return { run, busy, progress, error, notes };
+  return { run, busy, progress, error, notes, unreadable };
 }
 
 /*
@@ -191,7 +243,7 @@ export function TrackingWorkspace() {
         <UpgradeCard
           entitlement="stay_cited"
           title="Stay Cited"
-          body="Keeps every site on your account generating once its 30 days are up — new audits and unlimited answers. Citation tracking, which asks the engines your questions and records who they name, is what we are building next; it is not running yet."
+          body="Keeps every site on your account generating once its 30 days are up — new audits and unlimited answers. It also turns this page on: citation tracking puts your questions to ChatGPT, Perplexity and Gemini and records, for each one, whether they cited you, named you without a link, or pointed somewhere else."
         />
       </>
     );
@@ -249,6 +301,11 @@ export function TrackingWorkspace() {
             Some engines didn’t answer — {run.notes.join(' · ')}
           </p>
         )}
+        {run.unreadable && (
+          <p role="alert" className="text-error-ink mt-3 text-center text-xs">
+            {run.unreadable}
+          </p>
+        )}
       </>
     );
   }
@@ -293,7 +350,7 @@ export function TrackingWorkspace() {
         to it.
       </p>
 
-      {(run.error || run.notes.length > 0 || (run.busy && run.progress)) && (
+      {(run.error || run.notes.length > 0 || run.unreadable || (run.busy && run.progress)) && (
         <div className="mb-5">
           {run.busy && run.progress && (
             <p className="text-slate text-sm">
@@ -308,6 +365,11 @@ export function TrackingWorkspace() {
           {run.notes.length > 0 && (
             <p className="text-slate mt-1 text-xs">
               Some engines didn&rsquo;t answer — {run.notes.join(' · ')}
+            </p>
+          )}
+          {run.unreadable && (
+            <p role="alert" className="text-error-ink mt-1 text-xs">
+              {run.unreadable}
             </p>
           )}
         </div>

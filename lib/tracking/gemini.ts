@@ -22,14 +22,74 @@ import {
   queries separately from tokens. It is also the entire point: without it the
   model answers from training data and cites nobody.
 
-  Sources come back as `groundingChunks`, and their `uri` is usually a Vertex
-  redirector rather than the publisher's own address.
+  Sources come back as `groundingChunks`, and their `uri` is always a Vertex
+  redirector rather than the publisher's own address. Recovering the real host
+  from a chunk is the fiddliest part of this file — see resolveHost below, and
+  read it before touching anything about sources.
 */
 
-const MODEL = 'gemini-2.5-flash';
+/**
+ * Small and search-backed: we want the retrieval, not the reasoning.
+ *
+ * ⚠️ THIS PIN GOES STALE AND FAILS LOUDLY WHEN IT DOES. Google retires a model
+ * for *new* keys before old ones, so a version that works on an existing key
+ * answers `404 — "no longer available to new users"` on a freshly minted one.
+ * That is exactly how `gemini-2.5-flash` died here. A 404 from this endpoint
+ * means bump this constant, not that the key is wrong — check with an
+ * ungrounded call, which isolates the model from the grounding quota below.
+ *
+ * ⚠️ A 429 is the other thing entirely: Google Search grounding has zero quota
+ * on the free tier, so every model 200s ungrounded and 429s the moment the
+ * tool is attached. That is a billing setting, not a model choice.
+ */
+const MODEL = 'gemini-3.7-flash';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
-type GroundingChunk = { web?: { uri?: string; domain?: string } };
+type GroundingChunk = { web?: { uri?: string; domain?: string; title?: string } };
+
+/**
+ * A bare hostname and nothing else — no scheme, no path, no spaces.
+ *
+ * The gate on `title` in resolveHost. Requires at least one dot and rejects
+ * anything shaped like prose, which is what tells a host apart from an actual
+ * page title.
+ */
+const HOSTNAME = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+
+/**
+ * The publisher's own address for one grounding chunk, or null.
+ *
+ * ⚠️ RETURNING THE REDIRECTOR IS WORSE THAN RETURNING NOTHING, which is the
+ * whole reason this function exists. `vertexaisearch.cloud.google.com/...` is a
+ * real URL, so cleanSources() keeps it and classify.ts then does two wrong
+ * things with it: our customer's domain can never match it, so a genuine
+ * citation reads as `absent`; and citedInstead() takes the first source that
+ * isn't ours, so the dashboard names Google as the competitor who beat them.
+ * Both are invented figures wearing the costume of a measurement. Dropping the
+ * chunk costs one source; keeping it costs the number its meaning.
+ *
+ * ⚠️ `title` HOLDING A HOSTNAME IS OBSERVED, NOT PROMISED. Google returned
+ * `domain` until 2.5 and stopped; 3.7 sends the host in `title` instead
+ * (measured: 32/32 chunks across four queries, on both v1beta and v1). Nothing
+ * documents that, and a field called `title` may well hold a title again one
+ * day — hence the regex rather than blind trust. If Gemini ever starts
+ * reporting zero sources on answers that plainly cite someone, suspect this
+ * first and log a raw chunk.
+ */
+function resolveHost(chunk: GroundingChunk): string | null {
+  const web = chunk.web;
+  if (!web) return null;
+
+  // Still first: older models send it, and it is the unambiguous one.
+  if (web.domain) return `https://${web.domain}`;
+
+  if (web.title && HOSTNAME.test(web.title)) return `https://${web.title}`;
+
+  // A uri that isn't a redirector is the publisher's own, so it is usable.
+  if (web.uri && !web.uri.includes('vertexaisearch')) return web.uri;
+
+  return null;
+}
 
 export async function askGemini(question: string): Promise<EngineResult> {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -83,18 +143,12 @@ export async function askGemini(question: string): Promise<EngineResult> {
       .join('')
       .trim();
 
-    /*
-      Prefer `domain` over `uri`.
-
-      The uri is typically a vertexaisearch.cloud.google.com redirect, which is
-      a real URL and would pass cleanSources() — and then match nobody's domain,
-      recording every customer as uncited. `domain` is the publisher's actual
-      host, so it is promoted to a URL when present and the redirector is only
-      the fallback.
-    */
-    const urls = (candidate?.groundingMetadata?.groundingChunks ?? []).map((chunk) =>
-      chunk.web?.domain ? `https://${chunk.web.domain}` : chunk.web?.uri,
-    );
+    // Chunks we cannot resolve to a publisher host are dropped rather than
+    // passed on as redirectors — see resolveHost for why that trade is the
+    // right way round.
+    const urls = (candidate?.groundingMetadata?.groundingChunks ?? [])
+      .map(resolveHost)
+      .filter((url): url is string => url !== null);
 
     return {
       ok: true,

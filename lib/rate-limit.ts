@@ -98,13 +98,30 @@ export const CONTACT_RATE_LIMIT = 5;
  * separately from tokens, and OpenAI bills the web search — so this is real
  * money per press, spent on somebody else's infrastructure.
  *
- * Generous enough to finish a full set, because the route runs a bounded slice
- * per call and the client loops: 25 prompts at a handful per call is several
- * requests for one honest run. Low enough that holding the button down is not a
- * business model. When the scheduler lands, most runs stop coming through here
- * at all and this becomes the manual-override allowance it reads like.
+ * ⚠️ THE UNIT IS REQUESTS, BUT THE BUDGET IS RUNS, AND THEY ARE NOT 1:1. One
+ * honest run is several requests — the route asks a bounded slice per call and
+ * the client loops until nothing is left, so a full set at STAY_CITED_PROMPT_CAP
+ * (25) with PROMPTS_PER_RUN (5) is ceil(25 / 5) = 5 requests. This number is
+ * therefore sized as 12 runs × 5 requests:
+ *
+ *     12 runs/day × ceil(25 prompts / 5 per request) = 60
+ *
+ * It was 12, which read as "12 runs" and behaved as barely two — one click
+ * could exhaust the day, and the client's own retry loop is bounded at 12
+ * passes, so a single press could spend the whole allowance by design.
+ *
+ * ⚠️ Not derived by importing PROMPTS_PER_RUN: that lives in lib/tracking/run.ts,
+ * which is `server-only`, and this module must stay importable from anywhere.
+ * The arithmetic is written out instead — if either input moves, redo it here.
+ *
+ * Spend itself is bounded elsewhere and does not depend on this: the route
+ * skips questions already checked today, so repeat presses ask nobody anything.
+ * This limit exists to stop request floods, not to cap the bill. Low enough
+ * that holding the button down is not a business model. When the scheduler
+ * lands, most runs stop coming through here at all and this becomes the
+ * manual-override allowance it reads like.
  */
-export const TRACKING_RATE_LIMIT = 12;
+export const TRACKING_RATE_LIMIT = 60;
 
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();

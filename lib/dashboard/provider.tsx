@@ -41,8 +41,17 @@ type Ctx = {
   faqsIn: (groupId: string) => FaqEntry[];
   questions: DiscoveredQuestion[];
   tracking: SiteTracking | null;
-  /** Re-read tracking from Postgres — call after a run stores new checks. */
-  refreshTracking: () => Promise<void>;
+  /**
+   * Re-read tracking from Postgres — call after a run stores new checks.
+   *
+   * Returns what it read rather than only setting state, so a caller that just
+   * stored rows can tell whether they came back. `null` after a run that
+   * reported checks means the write succeeded and the read did not — see the
+   * guard in components/dashboard/tracking-workspace.tsx. Reading the `tracking`
+   * value off the context instead would race: this resolves before React has
+   * re-rendered with the new state.
+   */
+  refreshTracking: () => Promise<SiteTracking | null>;
   /** The generated content plan for the active site; null until one is made. */
   contentPlan: ContentPlan | null;
 
@@ -173,12 +182,15 @@ export function DashboardProvider({
 
   const loadTracking = useCallback(async (id: string, domain: string) => {
     try {
-      setDbTracking(await store.trackingFromDb(id, domain));
+      const next = await store.trackingFromDb(id, domain);
+      setDbTracking(next);
+      return next;
     } catch (err) {
       // Never fatal. A missing 0006 migration should cost the tracking page,
       // not the whole dashboard.
       console.error('Could not load citation tracking:', err);
       setDbTracking(null);
+      return null;
     }
   }, []);
 
@@ -194,7 +206,8 @@ export function DashboardProvider({
   }, [site, loadTracking]);
 
   const refreshTracking = useCallback(async () => {
-    if (site) await loadTracking(site.id, site.domain);
+    if (!site) return null;
+    return loadTracking(site.id, site.domain);
   }, [site, loadTracking]);
 
   /*

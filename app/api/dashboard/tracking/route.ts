@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
 import { canTrack, hasGetCited } from '@/lib/auth/entitlements';
 import { STAY_CITED_PROMPT_CAP } from '@/lib/dashboard/plans';
+import type { Engine } from '@/lib/dashboard/types';
 import { checkRateLimit, limitKey, TRACKING_RATE_LIMIT } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { checkBatch, PROMPTS_PER_RUN } from '@/lib/tracking/run';
+import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/lib/tracking/run';
 
 /*
   Run citation tracking for one site.
@@ -36,13 +37,29 @@ function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+/**
+ * Key for one question × engine pair.
+ *
+ * ⚠️ NUL as the separator, written as an escape and never as a literal byte.
+ * Questions carry spaces, quotes and punctuation, so a printable delimiter
+ * could in principle collide; a raw NUL in the source would make this file
+ * non-text and silently invisible to `grep`. Same call, and the same reasoning,
+ * as lib/dashboard/store.ts.
+ */
+function pairKey(question: string, engine: Engine): string {
+  return `${question}\u0000${engine}`;
+}
+
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return fail('Sign in to run citation tracking.', 401);
 
-  if (!checkRateLimit(`tracking:${limitKey(user.id, request.headers)}`, TRACKING_RATE_LIMIT)) {
-    return fail("That's the tracking runs for today. They reset at midnight UTC.", 429);
-  }
+  /*
+    ⚠️ THE RATE LIMIT IS CHARGED FURTHER DOWN, NOT HERE — see below the
+    `pending.length === 0` return. A request that turns out to have nothing left
+    to ask spends no money and must cost no allowance, or the customer pays for
+    pressing a button that did nothing. Everything above that point is reads.
+  */
 
   let body: unknown;
   try {
@@ -117,7 +134,7 @@ export async function POST(request: Request) {
 
   const { data: doneRows, error: doneError } = await db
     .from('citation_checks')
-    .select('question')
+    .select('question, engine')
     .eq('site_id', site.id)
     .gte('checked_at', since.toISOString());
 
@@ -126,8 +143,29 @@ export async function POST(request: Request) {
     return fail('Could not read your tracking history. Please try again.', 502);
   }
 
-  const done = new Set((doneRows ?? []).map((r) => r.question as string));
-  const pending = wanted.filter((q) => !done.has(q));
+  /*
+    ⚠️ THE PAIR IS THE UNIT, NOT THE QUESTION.
+
+    Engines fail one at a time — Perplexity answered 429 for twelve of fifteen
+    checks in one real run while the other two were fine. Treating a question as
+    finished because *some* engine answered it stranded those twelve until
+    midnight UTC, on questions the customer had already part-paid for, and the
+    report quietly under-counted that engine with nothing to say it was short.
+
+    So we ask what is missing per question per engine. A re-press fills only the
+    gaps: engines that already answered are not asked again and not billed again,
+    which is the same double-spend guarantee as before, held at a finer grain.
+  */
+  const done = new Set(
+    (doneRows ?? []).map((r) => pairKey(r.question as string, r.engine as Engine)),
+  );
+
+  const pending: QuestionSlice[] = wanted
+    .map((question) => ({
+      question,
+      engines: ALL_ENGINES.filter((engine) => !done.has(pairKey(question, engine))),
+    }))
+    .filter((slice) => slice.engines.length > 0);
 
   if (pending.length === 0) {
     return NextResponse.json({
@@ -137,6 +175,18 @@ export async function POST(request: Request) {
       failures: [],
       done: true,
     });
+  }
+
+  /*
+    Charged here, at the last moment before we spend somebody's money.
+
+    Deliberately after the early return above: repeat presses with nothing
+    pending are free, which is what makes the allowance a budget for real runs
+    rather than for clicks. TRACKING_RATE_LIMIT is sized for the several
+    requests one honest run takes — see the note on the constant.
+  */
+  if (!checkRateLimit(`tracking:${limitKey(user.id, request.headers)}`, TRACKING_RATE_LIMIT)) {
+    return fail("That's the tracking runs for today. They reset at midnight UTC.", 429);
   }
 
   const batch = pending.slice(0, PROMPTS_PER_RUN);

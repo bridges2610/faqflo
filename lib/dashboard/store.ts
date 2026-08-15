@@ -911,11 +911,19 @@ export async function trackingFromDb(
 
     `rows` arrives `checked_at desc`, so the first sighting of a pair is its
     most recent result and later ones are history.
+
+    ⚠️ THE DELIMITER IN THE KEY BELOW MUST STAY AN ESCAPE, NOT A LITERAL BYTE.
+    A NUL is the right separator — questions carry spaces and punctuation, so a
+    printable one could in principle collide — but writing it as a raw byte
+    makes this file non-text: `file` reports the module as `data` and plain
+    `grep` then skips all 1131 lines SILENTLY, reporting no matches rather than
+    an error. That is how it was, and it is a genuinely misleading way to lose
+    an afternoon. The escape compiles to the identical string.
   */
   const seen = new Set<string>();
   const latest: CitationCheck[] = [];
   for (const check of all) {
-    const key = `${check.question} ${check.engine}`;
+    const key = `${check.question}\u0000${check.engine}`;
     if (seen.has(key)) continue;
     seen.add(key);
     latest.push(check);

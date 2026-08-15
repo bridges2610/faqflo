@@ -642,27 +642,34 @@ export function HelpWorkspace({ name }: { name: string | null }) {
           {/* -------------------------------------------------- not built */}
           <Section id="not-yet">
             <Card tone="cloud" className="p-5 sm:p-7">
-              <SectionTitle>Citation tracking isn’t running yet</SectionTitle>
+              <SectionTitle>Citation tracking runs, but you have to press the button</SectionTitle>
               <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
-                This is the part we’re building next: asking ChatGPT, Perplexity and Google AI
-                Overviews your questions on a schedule and recording who they name. It is not
-                running today — there is no scheduler and nothing queries an engine.
+                Tracking is live on <strong>Stay Cited</strong>: it puts your questions to ChatGPT,
+                Perplexity and Gemini and records, for each one, whether they cited you, named you
+                without a link, or pointed somewhere else. What doesn’t exist yet is the{' '}
+                <em>schedule</em> — nothing runs on its own, so a run happens when you start one
+                from the Results page.
               </p>
               <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
-                We’d rather say that plainly than show you a zero. A “0 citations” figure would read
-                as <em>nobody is quoting you</em>, which we haven’t measured and don’t know. It’s
-                the same reason the <strong>AI visibility</strong> pillar in your check shows as{' '}
-                <em>Not checked</em> rather than scoring badly, and why it doesn’t drag your score
-                down.
+                Two things we ask and one we can’t. ChatGPT here is the OpenAI API with web search,
+                and Gemini is the Gemini API with Google Search grounding — close to what the
+                assistants say, but not a recording of a real chat. <strong>Google AI Overviews is
+                absent because it has no API at all</strong>; naming it and reporting a permanent
+                zero would read as <em>you are never cited there</em> rather than{' '}
+                <em>we never looked</em>.
               </p>
               <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
-                If you’re subscribed, Stay Cited is doing its other job in the meantime — keeping
-                every site on your account generating. You’ll be told the moment tracking goes live.
+                Until you’ve run a check, the <strong>AI visibility</strong> pillar shows as{' '}
+                <em>Not checked</em> and doesn’t drag your score down. That’s deliberate: a “0
+                citations” figure would read as <em>nobody is quoting you</em>, which we wouldn’t
+                have measured. Run tracking and the pillar starts scoring off what the engines
+                actually said.
               </p>
             </Card>
             <P className="mt-4">
-              Two smaller things that don’t exist either, so you don’t go looking: alerts when a
-              citation appears or disappears, and any figure claiming how often a question is asked.
+              Three smaller things that don’t exist, so you don’t go looking: a schedule that runs
+              tracking for you, alerts when a citation appears or disappears, and any figure
+              claiming how often a question is asked.
             </P>
           </Section>
 
