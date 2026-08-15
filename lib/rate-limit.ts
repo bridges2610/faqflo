@@ -90,6 +90,22 @@ export const FETCH_URL_RATE_LIMIT = 60;
  */
 export const CONTACT_RATE_LIMIT = 5;
 
+/**
+ * Ceiling for manual citation-tracking runs.
+ *
+ * ⚠️ The most expensive thing a customer can press. One call is a batch of
+ * questions against three search-backed engines — Gemini bills grounding
+ * separately from tokens, and OpenAI bills the web search — so this is real
+ * money per press, spent on somebody else's infrastructure.
+ *
+ * Generous enough to finish a full set, because the route runs a bounded slice
+ * per call and the client loops: 25 prompts at a handful per call is several
+ * requests for one honest run. Low enough that holding the button down is not a
+ * business model. When the scheduler lands, most runs stop coming through here
+ * at all and this becomes the manual-override allowance it reads like.
+ */
+export const TRACKING_RATE_LIMIT = 12;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 

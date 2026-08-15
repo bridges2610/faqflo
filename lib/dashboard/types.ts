@@ -158,8 +158,30 @@ export type DiscoveredQuestion = {
   addedAt: string;
 };
 
-/** The engines we ask, and the only ones the UI may name. */
-export const ENGINES = ['ChatGPT', 'Perplexity', 'Google AIO'] as const;
+/**
+ * The engines we ask, and the only ones the UI may name.
+ *
+ * ⚠️ THESE ARE APIs, NOT THE CONSUMER APPS, AND THE UI SAYS SO.
+ *
+ * "ChatGPT" here is the OpenAI API with its web search tool; "Gemini" is the
+ * Gemini API with Google Search grounding. Neither is byte-identical to what a
+ * person sees typing into chatgpt.com or gemini.google.com — different system
+ * prompt, different retrieval, no personalisation. They are the closest honest
+ * proxy available, and calling them the app would be the same overclaim
+ * components/marketing/pricing-teaser.tsx already stripped out of our own
+ * pricing copy.
+ *
+ * ⚠️ WAS 'Google AIO', AND THAT WAS NOT QUERYABLE. Google AI Overviews has no
+ * API at all — tools that report on it collect Google result pages at scale.
+ * Listing an engine we cannot ask would have made the third line of every chart
+ * permanently zero, which reads as "you are never cited there" rather than "we
+ * never looked". Gemini can actually be asked, so it is what we name.
+ *
+ * These exact strings key the chart's colour map (components/dashboard/
+ * citation-chart.tsx) and the seed fixture. Renaming one means renaming it in
+ * all three places.
+ */
+export const ENGINES = ['ChatGPT', 'Perplexity', 'Gemini'] as const;
 export type Engine = (typeof ENGINES)[number];
 
 /**

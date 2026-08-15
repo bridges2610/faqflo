@@ -41,6 +41,8 @@ type Ctx = {
   faqsIn: (groupId: string) => FaqEntry[];
   questions: DiscoveredQuestion[];
   tracking: SiteTracking | null;
+  /** Re-read tracking from Postgres — call after a run stores new checks. */
+  refreshTracking: () => Promise<void>;
   /** The generated content plan for the active site; null until one is made. */
   contentPlan: ContentPlan | null;
 
@@ -153,10 +155,64 @@ export function DashboardProvider({
     [data, site],
   );
 
-  const tracking = useMemo(
-    () => (data && site ? store.trackingForSite(data, site.id) : null),
-    [data, site],
-  );
+  /*
+    Tracking comes from Postgres, and only from Postgres.
+
+    ⚠️ This is the one slice of dashboard state that is NOT read from the local
+    snapshot, because these rows are evidence: they are written by the service
+    role after a server-side run and `citation_checks` grants the browser SELECT
+    and nothing else. Reading them from localStorage would mean the browser both
+    supplied and displayed the numbers we then feed into the audit score.
+
+    Null means "we have never checked", which the empty state says in words.
+    That is deliberately different from the all-zeros emptyTracking() the local
+    store still returns for a brand-new site — zeros would read as "nobody is
+    citing you", which we have not measured.
+  */
+  const [dbTracking, setDbTracking] = useState<SiteTracking | null>(null);
+
+  const loadTracking = useCallback(async (id: string, domain: string) => {
+    try {
+      setDbTracking(await store.trackingFromDb(id, domain));
+    } catch (err) {
+      // Never fatal. A missing 0006 migration should cost the tracking page,
+      // not the whole dashboard.
+      console.error('Could not load citation tracking:', err);
+      setDbTracking(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!site) {
+      setDbTracking(null);
+      return;
+    }
+    // Cleared first so switching sites can't show the previous site's
+    // citations against this one's name while the read is in flight.
+    setDbTracking(null);
+    void loadTracking(site.id, site.domain);
+  }, [site, loadTracking]);
+
+  const refreshTracking = useCallback(async () => {
+    if (site) await loadTracking(site.id, site.domain);
+  }, [site, loadTracking]);
+
+  /*
+    Postgres first, the local snapshot second.
+
+    ⚠️ THE FALLBACK IS FOR THE DEV SEED, NOT FOR REAL DATA. Nothing writes
+    `data.tracking` except createSite() (which puts an all-zeros
+    emptyTracking() there) and the development-only seed button. So on a real
+    account this resolves to zeros with `daily: []`, which is the honest empty
+    state — and on a seeded dev account it is the fixture, which is the only
+    way to see these screens populated without three API keys and a live run.
+
+    It does not weaken the invariant the 0006 migration is built on. Real
+    checks are service-role writes that the browser may only SELECT; this
+    fallback cannot manufacture one, because nothing in the app writes a
+    non-empty tracking record locally outside development.
+  */
+  const tracking = dbTracking ?? (data && site ? store.trackingForSite(data, site.id) : null);
 
   const contentPlan = useMemo(
     () => (data && site ? store.contentPlanForSite(data, site.id) : null),
@@ -175,6 +231,7 @@ export function DashboardProvider({
     faqsIn,
     questions,
     tracking,
+    refreshTracking,
     contentPlan,
 
     addSite: (input) => apply(() => store.createSite(input)),

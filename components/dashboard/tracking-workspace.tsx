@@ -1,12 +1,14 @@
 'use client';
 
+import Link from 'next/link';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canTrack, engineChecksFor } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
-import { ENGINES } from '@/lib/dashboard/types';
+import { ENGINES, type CitationCheck, type Engine } from '@/lib/dashboard/types';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
@@ -28,13 +30,151 @@ import { SectionTitle } from './section-title';
      buys a finite number of them — a customer who runs out should find out from
      the UI, not from results quietly going stale.
 */
+/*
+  Driving a run from the browser.
+
+  ⚠️ THE CLIENT LOOPS BECAUSE THE SERVER CANNOT. A full period is 25 prompts
+  against three search-backed engines; the route runs a bounded slice per
+  request because this app holds itself to roughly the platform's ~60s ceiling
+  and there is no queue in this project. So the button posts repeatedly until
+  the route reports nothing left, and shows how far it has got.
+
+  The route is idempotent — it works out what has not been checked today from
+  what is already stored — so a refresh mid-run, a second tab, or an impatient
+  double-click cannot double-spend the allowance.
+*/
+function useTrackingRun(siteId: string | undefined, questions: string[], onDone: () => Promise<void>) {
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<{ checked: number; remaining: number } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [notes, setNotes] = useState<string[]>([]);
+
+  async function run() {
+    if (!siteId || questions.length === 0) return;
+
+    setBusy(true);
+    setError(null);
+    setNotes([]);
+    let checked = 0;
+
+    try {
+      // Bounded rather than `while (true)`: a route that kept reporting work
+      // remaining would otherwise bill this customer until they closed the tab.
+      for (let pass = 0; pass < 12; pass++) {
+        const res = await fetch('/api/dashboard/tracking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siteId, questions }),
+        });
+
+        const payload = (await res.json()) as {
+          checked?: number;
+          remaining?: number;
+          done?: boolean;
+          failures?: { engine: string; detail: string }[];
+          error?: string;
+        };
+
+        if (!res.ok) {
+          setError(payload.error ?? 'That run failed. Please try again.');
+          return;
+        }
+
+        checked += payload.checked ?? 0;
+        setProgress({ checked, remaining: payload.remaining ?? 0 });
+
+        // Surfaced rather than swallowed: a run where one engine was
+        // unconfigured produced a real but partial picture, and a low number
+        // with no explanation reads as "nobody cites you".
+        if (payload.failures?.length) {
+          setNotes(payload.failures.map((f) => `${f.engine}: ${f.detail}`));
+        }
+
+        if (payload.done || !payload.remaining) break;
+      }
+
+      await onDone();
+    } catch {
+      setError('Could not reach the server. Check your connection and try again.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { run, busy, progress, error, notes };
+}
+
+/*
+  One entry per question, with the engines that produced that outcome.
+
+  Grouped because a question is checked against every engine, so the raw rows
+  print it once per engine and read as duplication. "Cited by Perplexity and
+  Gemini" is one fact about one question, not two facts.
+
+  ⚠️ The "Not cited for" worklist deliberately does NOT use this. Each of its
+  rows carries a different `citedInstead` — who took the click on that engine —
+  which is the useful part, and each has its own Draft action.
+*/
+type Grouped = { question: string; engines: Engine[]; checkedAt: string };
+
+function groupByQuestion(checks: CitationCheck[]): Grouped[] {
+  const map = new Map<string, Grouped>();
+
+  for (const check of checks) {
+    const entry = map.get(check.question);
+    if (!entry) {
+      map.set(check.question, {
+        question: check.question,
+        engines: [check.engine],
+        checkedAt: check.checkedAt,
+      });
+      continue;
+    }
+    if (!entry.engines.includes(check.engine)) entry.engines.push(check.engine);
+    // Keep the most recent sighting, so "2 days ago" is the freshest evidence
+    // rather than whichever engine happened to be checked first.
+    if (check.checkedAt > entry.checkedAt) entry.checkedAt = check.checkedAt;
+  }
+
+  // Most engines first: a question three engines agree on is stronger evidence
+  // than one a single engine mentioned, and belongs at the top either way.
+  return [...map.values()].sort(
+    (a, b) => b.engines.length - a.engines.length || b.checkedAt.localeCompare(a.checkedAt),
+  );
+}
+
+/** A grouped list of questions — the body of both new outcome cards. */
+function QuestionList({ items }: { items: Grouped[] }) {
+  return (
+    <ul className="divide-line mt-3 divide-y">
+      {items.map((item) => (
+        <li key={item.question} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3.5">
+          <p className="text-navy min-w-0 flex-1 text-[0.9375rem]">{item.question}</p>
+          <p className="text-slate shrink-0 text-xs">
+            {item.engines.join(' · ')} · {timeAgo(item.checkedAt)}
+          </p>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function TrackingWorkspace() {
-  const { site, user, tracking, questions, coverQuestion } = useDashboard();
+  const { site, user, tracking, questions, coverQuestion, refreshTracking } = useDashboard();
+  const run = useTrackingRun(
+    site?.id,
+    // ⚠️ Sent verbatim. The route stores these strings as the tracked prompt,
+    // and the "draft into group" handler below matches a check back to its
+    // discovered question by exact equality — trimming here would break the
+    // loop that marks a question covered, silently.
+    questions.map((q) => q.question),
+    refreshTracking,
+  );
 
   if (!site) {
     return (
       <>
-        <PageHeader title="Tracking" description="Whether AI is actually citing you." />
+        <PageHeader title="Results" description="Whether AI is actually citing you." />
         <EmptyState
           title="Add a site first"
           body="Citations are tracked per site, against that site's domain."
@@ -47,7 +187,7 @@ export function TrackingWorkspace() {
   if (!canTrack(user)) {
     return (
       <>
-        <PageHeader title="Tracking" description="Whether AI is actually citing you." />
+        <PageHeader title="Results" description="Whether AI is actually citing you." />
         <UpgradeCard
           entitlement="stay_cited"
           title="Stay Cited"
@@ -61,27 +201,54 @@ export function TrackingWorkspace() {
   const latest = tracking?.latest ?? [];
 
   /*
-    ⚠️ Nothing produces this data yet.
+    Nothing checked yet.
 
-    There is no code in this repo that queries ChatGPT, Perplexity or Google AI
-    Overviews — no API route, no scheduler, no write path. `emptyTracking()`
-    returns zeros and the only thing that has ever filled `daily` is the
-    dev-only demo fixture.
+    ⚠️ THIS IS "WE HAVE NOT LOOKED", NOT "NOBODY CITES YOU". `tracking` is null
+    until a run has actually stored rows — see trackingFromDb() — precisely so
+    this state can say the first thing rather than showing zeros that read as
+    the second. Zeros here would be a measurement we never took.
 
-    So this state says so. It used to read "the first round runs within a day of
-    your answers going live", which is a schedule nobody set. A subscriber
-    waiting on a run that will never happen is a refund; telling them plainly is
-    the cheaper and more honest outcome.
+    There is no scheduler yet, so the run is a button. When one lands this
+    becomes the state a brand-new site sees for a day rather than the normal
+    way to get data.
   */
   if (daily.length === 0) {
     return (
       <>
         <PageHeader title="Results" description={`What the engines say about ${site.name}.`} />
-        <EmptyState
-          title="Citation tracking isn’t running yet"
-          body="This is the part we’re building next: asking ChatGPT, Perplexity and Google AI Overviews your questions on a schedule and recording who they name. Your subscription is keeping every site on your account generating in the meantime, and you’ll be told the moment tracking goes live."
-          action={<ButtonLink href="/dashboard/faqs">Work on your answers</ButtonLink>}
-        />
+        {questions.length === 0 ? (
+          <EmptyState
+            title="Find some questions first"
+            body="Tracking asks the engines your questions and records who they name. There are none on this site yet — find them on Opportunities and they become the things we watch."
+            action={<ButtonLink href="/dashboard/questions">Find questions</ButtonLink>}
+          />
+        ) : (
+          <EmptyState
+            title="You haven’t run a check yet"
+            body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else. It takes a minute or two.`}
+            action={
+              <Button onClick={run.run} disabled={run.busy}>
+                {run.busy ? 'Checking…' : 'Run the first check'}
+              </Button>
+            }
+          />
+        )}
+
+        {run.progress && run.busy && (
+          <p className="text-slate mt-4 text-center text-sm">
+            {run.progress.checked} checked, {run.progress.remaining} to go…
+          </p>
+        )}
+        {run.error && (
+          <p role="alert" className="text-error-ink mt-4 text-center text-sm">
+            {run.error}
+          </p>
+        )}
+        {run.notes.length > 0 && (
+          <p className="text-slate mt-3 text-center text-xs">
+            Some engines didn’t answer — {run.notes.join(' · ')}
+          </p>
+        )}
       </>
     );
   }
@@ -91,6 +258,11 @@ export function TrackingWorkspace() {
   const absent = latest.filter((c) => c.outcome === 'absent').length;
   const citationRate = latest.length ? (cited / latest.length) * 100 : 0;
 
+  // Grouped for the two read-only lists below; `uncited` stays row-per-engine
+  // because each of its rows names a different domain that took the click.
+  const citedFor = groupByQuestion(latest.filter((c) => c.outcome === 'cited'));
+  const namedFor = groupByQuestion(latest.filter((c) => c.outcome === 'mentioned'));
+
   const uncited = latest.filter((c) => c.outcome === 'absent');
   // The bar tracks prompts — the thing bought — not the checks they cost.
   const usedPct = tracking ? (tracking.promptsTracked / tracking.promptCap) * 100 : 0;
@@ -98,9 +270,48 @@ export function TrackingWorkspace() {
   return (
     <>
       <PageHeader
-        title="Tracking"
-        description={`What ChatGPT, Perplexity and Google AI Overviews say when asked about ${site.name}.`}
+        title="Results"
+        description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
+        action={
+          <Button variant="ghost" size="sm" onClick={run.run} disabled={run.busy}>
+            {run.busy ? 'Checking…' : 'Check now'}
+          </Button>
+        }
       />
+
+      {/* ⚠️ Stated in the open, not in a footnote.
+
+          We query each vendor's API — the OpenAI API with web search, Gemini
+          with Google Search grounding — not chatgpt.com or gemini.google.com.
+          Different system prompt, different retrieval, no personalisation. It
+          is the closest honest proxy that can be measured, and calling it "what
+          ChatGPT told your customer" would be exactly the overclaim this
+          product stripped out of its own pricing page. */}
+      <p className="text-slate mb-5 text-sm leading-relaxed">
+        We ask each engine&rsquo;s API directly, so these are the answers a machine gets rather than
+        a recording of anyone&rsquo;s chat window. Close to what a customer would see, not identical
+        to it.
+      </p>
+
+      {(run.error || run.notes.length > 0 || (run.busy && run.progress)) && (
+        <div className="mb-5">
+          {run.busy && run.progress && (
+            <p className="text-slate text-sm">
+              {run.progress.checked} checked, {run.progress.remaining} to go…
+            </p>
+          )}
+          {run.error && (
+            <p role="alert" className="text-error-ink text-sm">
+              {run.error}
+            </p>
+          )}
+          {run.notes.length > 0 && (
+            <p className="text-slate mt-1 text-xs">
+              Some engines didn&rsquo;t answer — {run.notes.join(' · ')}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* One card, four cells, hairline dividers — the same row the dashboard
           home uses. Four separate cards read as four competing things. */}
@@ -134,11 +345,73 @@ export function TrackingWorkspace() {
         />
       </Card>
 
-      {/* Main column and rail. The chart and the share-of-voice are the
-          content; the uncited list and the budget are what you act on. */}
+      {/* Main column and rail.
+
+          Ordered by whose question it answers: the chart and the two lists
+          below it are about THIS business — is it working, and where is it
+          nearly working. Share-of-voice is context about everyone else, so it
+          comes last. The rail holds the two things you act on. */}
       <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         <div className="space-y-5">
           <CitationChart daily={daily} />
+
+          {/* The positive half, which until now existed only as a number in a
+              tile. This is the screen a subscriber opens to answer "is this
+              working", and a count alone cannot answer it. */}
+          <Card className="p-5 sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle>You&rsquo;re cited for</SectionTitle>
+              <Badge tone="success">{citedFor.length}</Badge>
+            </div>
+            <p className="text-slate mt-1 text-sm">
+              Questions where an engine used your site as a source and linked to you.
+            </p>
+
+            {citedFor.length === 0 ? (
+              // Not a blank. On a site that has run checks this is a finding.
+              <p className="text-slate mt-4 text-sm">
+                Nothing yet. Publishing answers to the questions below is what changes this —
+                an engine can only cite text it can read on your own domain.
+              </p>
+            ) : (
+              <QuestionList items={citedFor} />
+            )}
+          </Card>
+
+          {/* The sharpest finding in the set, and the one that was hardest to
+              act on while it was a bare count: the engine knows who you are
+              and still sent the click somewhere else. */}
+          <Card className="p-5 sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle>Named, but not linked</SectionTitle>
+              <Badge tone="cyan">{namedFor.length}</Badge>
+            </div>
+            <p className="text-slate mt-1 text-sm">
+              An engine named {site.name} in its answer without citing you as the source. It knows
+              who you are — it just sent the click elsewhere.
+            </p>
+
+            {namedFor.length === 0 ? (
+              <p className="text-slate mt-4 text-sm">
+                Nothing here. Every mention we found was linked.
+              </p>
+            ) : (
+              <>
+                <QuestionList items={namedFor} />
+                <p className="text-slate mt-4 text-sm leading-relaxed">
+                  Usually this means the answer isn&rsquo;t on a page the engine can point at.
+                  Check that the block covering these questions is pasted and current on{' '}
+                  <Link
+                    href="/dashboard/publish"
+                    className="text-primary hover:text-primary-hover font-semibold"
+                  >
+                    your published pages
+                  </Link>
+                  .
+                </p>
+              </>
+            )}
+          </Card>
 
           <Card className="p-5 sm:p-7">
             <SectionTitle>Who gets cited</SectionTitle>

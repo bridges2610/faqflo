@@ -78,6 +78,20 @@ export function canRegenerate(site: SiteRow | null, user: ProfileRow | null): bo
 }
 
 /**
+ * Citation tracking — the subscription, and only the subscription.
+ *
+ * ⚠️ NOT an alias of canGenerate, unlike the four above. Get Cited does not buy
+ * this at all, not even inside its 30 days: asking three search-backed engines
+ * 25 questions four times a period is a recurring cost, and a one-off payment
+ * cannot fund a recurring bill. It is the twin of canTrack in plans.ts, and the
+ * only thing standing between a Get Cited customer and an unmetered spend on
+ * somebody else's API.
+ */
+export function canTrack(user: ProfileRow | null): boolean {
+  return hasStayCited(user);
+}
+
+/**
  * The publish-ready export. Permanent, and NOT gated on the window.
  *
  * The one capability here that deliberately outlives the subscription: it

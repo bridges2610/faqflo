@@ -26,7 +26,7 @@ import { SectionTitle } from './section-title';
 const SERIES: Record<Engine, string> = {
   ChatGPT: '#2563EB', // --color-primary
   Perplexity: '#0891B2', // --color-teal-ink
-  'Google AIO': '#7C3AED',
+  Gemini: '#7C3AED',
 };
 
 const W = 720;

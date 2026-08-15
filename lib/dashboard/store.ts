@@ -24,15 +24,20 @@
 import { isAuditReport } from '@/lib/audit/types';
 import { questionKey } from '@/lib/questions';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
-import type { AuditRunRow, SiteRow } from '@/lib/supabase/types';
+import type { AuditRunRow, CitationCheckRow, SiteRow } from '@/lib/supabase/types';
 import { normalizeDomain } from './domain';
 import { contentHash, normalizePath } from './export';
 import { faqCapFor, STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
+import { ENGINES } from './types';
 import type {
+  CitationCheck,
+  CitationDay,
+  CompetitorShare,
   ContentPlan,
   DashboardData,
   DiscoveredQuestion,
+  Engine,
   FaqEntry,
   FaqGroup,
   Site,
@@ -815,6 +820,194 @@ export async function auditHistory(siteId: string, limit = 12): Promise<AuditRun
   }
 
   return (data ?? []) as AuditRunRow[];
+}
+
+/* ----------------------------------------------------- citation tracking --- */
+
+/**
+ * Real tracking for a site, assembled from Postgres.
+ *
+ * Read straight from the database rather than the local snapshot, for the same
+ * reason as auditHistory() and one more: these rows are EVIDENCE. They are
+ * written by the service role after a server-side run, and `citation_checks`
+ * grants the browser SELECT and nothing else — a client that could write its
+ * own citation history could report that ChatGPT cites it daily, into a number
+ * we then put our name to.
+ *
+ * ⚠️ Everything the UI needs is shaped here, because the components do none of
+ * it themselves: `daily` must be ascending, unique and zero-padded YYYY-MM-DD
+ * (the chart splits the string), every row must carry all three engine keys,
+ * and `competitors` must arrive sorted — the meter takes the first row as its
+ * maximum. Getting any of that wrong renders silently wrong rather than
+ * failing.
+ *
+ * Returns null when nothing has ever been checked, so the provider can fall
+ * back to the local snapshot for the dev seed. Either way the tracking page
+ * sees `daily: []` and shows "we have not looked" rather than zeros, which
+ * would read as "nobody is citing you" — a measurement we never took.
+ */
+export async function trackingFromDb(
+  siteId: string,
+  siteDomain: string,
+  days = 30,
+): Promise<SiteTracking | null> {
+  assertClient('trackingFromDb');
+
+  const since = new Date();
+  since.setUTCDate(since.getUTCDate() - (days - 1));
+  since.setUTCHours(0, 0, 0, 0);
+
+  const [checks, prompts] = await Promise.all([
+    supabaseBrowser()
+      .from('citation_checks')
+      .select('id, site_id, question, engine, outcome, cited_instead, checked_at')
+      .eq('site_id', siteId)
+      .gte('checked_at', since.toISOString())
+      .order('checked_at', { ascending: false }),
+    supabaseBrowser().from('tracked_prompts').select('id').eq('site_id', siteId),
+  ]);
+
+  // Swallowed, like the audit history: a missing migration should mean "no
+  // tracking yet", not a dashboard that refuses to render.
+  if (checks.error) {
+    console.error('Could not read citation checks:', checks.error.message);
+    return null;
+  }
+
+  const rows = (checks.data ?? []) as Pick<
+    CitationCheckRow,
+    'id' | 'site_id' | 'question' | 'engine' | 'outcome' | 'cited_instead' | 'checked_at'
+  >[];
+
+  if (rows.length === 0) return null;
+
+  const ours = siteDomain.toLowerCase().replace(/^www\./, '');
+
+  /*
+    Every check in the window. NOT what `latest` becomes — see below.
+
+    This is the raw log: one row per question per engine per run, so a question
+    asked weekly for a month appears four times per engine.
+  */
+  const all: CitationCheck[] = rows.map((r) => ({
+    id: r.id,
+    siteId: r.site_id,
+    question: r.question,
+    engine: r.engine as Engine,
+    outcome: r.outcome,
+    citedInstead: r.cited_instead,
+    checkedAt: r.checked_at,
+  }));
+
+  /*
+    ⚠️ `latest` MEANS THE CURRENT STATE, ONE ROW PER QUESTION PER ENGINE.
+
+    Everything downstream reads it that way: the metric tiles count outcomes off
+    it, `citationRate` divides by its length, and the "Not cited for" worklist
+    renders its rows directly. Handing them the raw log instead would inflate
+    every tile and print the same question once per run — and it would look
+    perfectly correct until a site had run checks on a second day, because the
+    demo fixture is exactly one row per pair.
+
+    `rows` arrives `checked_at desc`, so the first sighting of a pair is its
+    most recent result and later ones are history.
+  */
+  const seen = new Set<string>();
+  const latest: CitationCheck[] = [];
+  for (const check of all) {
+    const key = `${check.question} ${check.engine}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    latest.push(check);
+  }
+
+  /*
+    Daily rollup: one row per day that actually has checks.
+
+    ⚠️ BUILT FROM `all`, NOT `latest`, AND THAT IS NOT INTERCHANGEABLE. The
+    chart is a history — what each day's run found. Deduping first keeps only
+    each pair's most recent result, so a question checked on the 1st and again
+    on the 8th would contribute to the 8th only, and the 1st would silently
+    lose its point. The trend would then always slope up towards today
+    regardless of what actually happened.
+
+    Days with no run are omitted rather than zero-filled. The chart is
+    index-based, so a gap compresses the axis rather than showing a drop to
+    zero — and a zero would claim we asked and found nothing, which is not what
+    happened on a day nobody ran anything.
+  */
+  const byDate = new Map<string, CitationDay>();
+  for (const check of all) {
+    const date = check.checkedAt.slice(0, 10); // ISO is already YYYY-MM-DD
+    let day = byDate.get(date);
+    if (!day) {
+      day = { date, byEngine: blankEngines(), checked: 0 };
+      byDate.set(date, day);
+    }
+    day.checked += 1;
+    if (check.outcome === 'cited') day.byEngine[check.engine] += 1;
+  }
+
+  const daily = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+
+  /*
+    Share of voice, counting each domain once per check.
+
+    From `all` rather than `latest`, matching what CompetitorShare.citations
+    says it is: "times this domain was cited across the checks we ran." A rival
+    named on every run should outrank one named once, and the deduped view
+    cannot express that difference.
+
+    Us on a `cited`, whoever took it otherwise. Sorted descending because the
+    meter divides by the first row — the component does not sort, and an
+    unsorted array draws bars longer than their track.
+  */
+  const tally = new Map<string, number>();
+  for (const check of all) {
+    const domain = check.outcome === 'cited' ? ours : check.citedInstead;
+    if (!domain) continue;
+    tally.set(domain, (tally.get(domain) ?? 0) + 1);
+  }
+
+  const competitors: CompetitorShare[] = [...tally.entries()]
+    .map(([domain, citations]) => ({ domain, citations, isYou: domain === ours }))
+    .sort((a, b) => b.citations - a.citations);
+
+  return {
+    siteId,
+    daily,
+    latest,
+    competitors,
+    // What is being watched, not what has been asked — the prompt is the unit
+    // the customer buys. See the note on SiteTracking.
+    promptsTracked: prompts.data?.length ?? new Set(latest.map((c) => c.question)).size,
+    promptCap: STAY_CITED_PROMPT_CAP,
+    runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
+    // The cost side, so it counts every call actually spent — the raw log, not
+    // the deduped current state. Charging for one check when four ran would
+    // make the quota bar a fiction.
+    checksUsed: all.length,
+    periodResetsAt: periodEnd(),
+  };
+}
+
+function blankEngines(): Record<Engine, number> {
+  return Object.fromEntries(ENGINES.map((e) => [e, 0])) as Record<Engine, number>;
+}
+
+/**
+ * When the current tracking period rolls over.
+ *
+ * Thirty days from now, computed rather than stored — there is no billing
+ * anniversary in the database to key it to yet. ⚠️ It therefore moves every time
+ * the page loads, which is honest enough for a countdown but must NOT become
+ * the thing a quota is enforced against. When enforcement arrives it wants a
+ * real period row, not this.
+ */
+function periodEnd(): string {
+  const end = new Date();
+  end.setUTCDate(end.getUTCDate() + 30);
+  return end.toISOString();
 }
 
 /* ------------------------------------------------------------ questions --- */
