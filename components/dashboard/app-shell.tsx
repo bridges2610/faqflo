@@ -227,8 +227,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-dvh flex-1">
-      {/* Sidebar — permanent from lg up */}
-      <aside className="border-line hidden w-64 shrink-0 flex-col justify-between border-r bg-white p-5 lg:flex">
+      {/*
+        Sidebar — permanent from lg up, and pinned to the viewport.
+
+        ⚠️ `h-dvh` is what keeps the Help link and the account card on screen,
+        and it is easy to mistake for decoration. Without an explicit height the
+        aside is a flex child with the default `align-self: stretch`, so it grows
+        to the height of the DOCUMENT rather than the viewport — and
+        `justify-between` then dutifully pushes the footer to the bottom of a
+        4,000px page, where nobody scrolls to find it. An explicit height opts it
+        out of stretching, because stretch only sizes an item whose cross-size is
+        `auto`.
+
+        `sticky top-0` then holds it there. That relies on no ancestor setting
+        `overflow`: today <body> is `flex min-h-dvh flex-col`, DashboardProvider
+        renders no DOM node at all, and globals.css sets no overflow rule. An
+        `overflow-x-hidden` added to <body> later would break this silently, with
+        the sidebar quietly scrolling away again.
+
+        `overflow-y-auto` is for viewports under ~500px, where the nav plus the
+        footer no longer fit. Sticky and overflow on the SAME element is fine —
+        only an ancestor with overflow breaks stickiness.
+      */}
+      <aside className="border-line sticky top-0 hidden h-dvh w-64 shrink-0 flex-col justify-between overflow-y-auto border-r bg-white p-5 lg:flex">
         <div>
           <Wordmark className="text-[1.25rem]" />
           <div className="mt-8">

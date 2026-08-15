@@ -702,7 +702,13 @@ export function HelpWorkspace({ name }: { name: string | null }) {
         {/* Sticky contents. No scroll-spy — the same deliberate limit /about and
             /seo-guide set, and a plain anchor list needs no JavaScript at all. */}
         <aside className="hidden lg:block">
-          <nav aria-labelledby="toc-heading" className="sticky top-24">
+          {/* Capped and scrollable for the same reason the sidebar is: ten items
+              fit any realistic viewport, but a list that outgrows the screen
+              with no way to reach the end is the failure this guards. */}
+          <nav
+            aria-labelledby="toc-heading"
+            className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto"
+          >
             <p
               id="toc-heading"
               className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase"
