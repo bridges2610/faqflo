@@ -9,6 +9,7 @@ import { useDashboard } from '@/lib/dashboard/provider';
 import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
+import { RunNotice } from './run-notice';
 import { SiteSwitcher } from './site-switcher';
 
 type NavItem = {
@@ -319,6 +320,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <>
                 <WindowNotice />
+                {/* Same slot, same argument as the countdown above: a run that
+                    only reports on the page that started it is one you assume
+                    died when you clicked away. */}
+                <RunNotice />
                 {children}
               </>
             )}

@@ -7,7 +7,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { pillarBand, scoreOf } from '@/lib/audit/score';
 import { visibilityFindings } from '@/lib/dashboard/audit-context';
-import { useDashboard } from '@/lib/dashboard/provider';
+import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
 import {
   canTrack,
@@ -30,6 +30,7 @@ import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
 import { MetricTile } from './metric-tile';
 import { Meter } from './meter';
+import { RunProgress } from './run-progress';
 import { AeoIcon, ChartIcon, ChevronIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
@@ -46,136 +47,6 @@ import { SectionTitle } from './section-title';
      buys a finite number of them — a customer who runs out should find out from
      the UI, not from results quietly going stale.
 */
-/*
-  Driving a run from the browser.
-
-  ⚠️ THE CLIENT LOOPS BECAUSE THE SERVER CANNOT. A full period is 35 prompts
-  against three search-backed engines; the route runs a bounded slice per
-  request because this app holds itself to roughly the platform's ~60s ceiling
-  and there is no queue in this project. So the button posts repeatedly until
-  the route reports nothing left, and shows how far it has got.
-
-  ⚠️ The pass bound below is what caps that loop, and it is not arbitrary: at
-  PROMPTS_PER_RUN (5) a full 35-prompt set needs 7 passes, so 12 leaves room and
-  still stops a route that kept claiming work remaining from billing until the
-  tab closed. Raising the prompt cap past 60 would need this raised with it.
-
-  The route is idempotent — it works out what has not been checked today from
-  what is already stored — so a refresh mid-run, a second tab, or an impatient
-  double-click cannot double-spend the allowance.
-*/
-function useTrackingRun(
-  siteId: string | undefined,
-  questions: string[],
-  onDone: () => Promise<SiteTracking | null>,
-) {
-  const [busy, setBusy] = useState(false);
-  const [progress, setProgress] = useState<{ checked: number; remaining: number } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [notes, setNotes] = useState<string[]>([]);
-  /*
-    Its own channel, not a `notes` entry: `notes` renders under the fixed
-    heading "Some engines didn't answer", and this is the opposite problem —
-    the engines answered fine and the database would not give the rows back.
-  */
-  const [unreadable, setUnreadable] = useState<string | null>(null);
-
-  async function run() {
-    if (!siteId || questions.length === 0) return;
-
-    setBusy(true);
-    setError(null);
-    setNotes([]);
-    setUnreadable(null);
-    let checked = 0;
-
-    try {
-      // Bounded rather than `while (true)`: a route that kept reporting work
-      // remaining would otherwise bill this customer until they closed the tab.
-      for (let pass = 0; pass < 12; pass++) {
-        const res = await fetch('/api/dashboard/tracking', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ siteId, questions }),
-        });
-
-        const payload = (await res.json()) as {
-          checked?: number;
-          remaining?: number;
-          done?: boolean;
-          failures?: { engine: string; detail: string }[];
-          error?: string;
-        };
-
-        // `break`, not `return`: the refresh in `finally` has to happen either
-        // way. See the note there.
-        if (!res.ok) {
-          setError(payload.error ?? 'That run failed. Please try again.');
-          break;
-        }
-
-        checked += payload.checked ?? 0;
-        setProgress({ checked, remaining: payload.remaining ?? 0 });
-
-        // Surfaced rather than swallowed: a run where one engine was
-        // unconfigured produced a real but partial picture, and a low number
-        // with no explanation reads as "nobody cites you".
-        if (payload.failures?.length) {
-          setNotes(payload.failures.map((f) => `${f.engine}: ${f.detail}`));
-        }
-
-        if (payload.done || !payload.remaining) break;
-      }
-    } catch {
-      setError('Could not reach the server. Check your connection and try again.');
-    } finally {
-      /*
-        ⚠️ REFRESH EVEN WHEN THE RUN FAILED, AND ESPECIALLY THEN.
-
-        A run is several requests, and the ones before the failure already
-        asked the engines, spent the money and stored their rows. Refreshing
-        only on the happy path left those rows sitting in Postgres with the
-        page still showing "you haven't run a check yet" until someone
-        reloaded — the run looked like it had done nothing when it had done
-        most of its work.
-
-        This is the same call the route makes when it reports engine failures
-        instead of throwing (lib/tracking/run.ts): a partial result is a real
-        result. The error still shows; it shows next to whatever we got.
-      */
-      try {
-        const refreshed = await onDone();
-
-        /*
-          ⚠️ THE WRITE SUCCEEDED AND THE READ CAME BACK EMPTY. SAY SO.
-
-          The server told us it checked `checked` questions, so those rows are
-          in Postgres. If reading them back yields nothing, the two disagree,
-          and the page is about to render "you haven't run a check yet" — the
-          most misleading sentence available, because the checks ran and were
-          paid for.
-
-          This is not hypothetical: `citation_checks` grants the browser SELECT
-          under an RLS policy (supabase/migrations/0006), and when that policy
-          is missing PostgREST returns an empty array with no error at all.
-          Nothing downstream can tell that apart from "no data yet", so it has
-          to be caught here, where we know a run just stored rows.
-        */
-        if (checked > 0 && !refreshed) {
-          setUnreadable(
-            `${checked} ${checked === 1 ? 'check' : 'checks'} ran and were saved, but reading them back returned nothing. The results are not lost — the citation_checks read policy is the likely cause.`,
-          );
-        }
-      } catch {
-        // Leave the original error standing rather than replacing it with a
-        // second one about the reload — the first is what went wrong.
-      }
-      setBusy(false);
-    }
-  }
-
-  return { run, busy, progress, error, notes, unreadable };
-}
 
 /**
  * A source URL as it should be read: host and path, no query string.
@@ -591,22 +462,27 @@ function useManualQuestion(): {
 }
 
 export function TrackingWorkspace() {
-  const { site, user, tracking, questions, coverQuestion, refreshTracking } = useDashboard();
+  const { site, user, tracking, questions, coverQuestion, trackingRun, runTracking } =
+    useDashboard();
   const [filter, setFilter] = useState<OutcomeFilter>('all');
   const [shown, setShown] = useState(PAGE);
   const more = useFindMore();
   const manual = useManualQuestion();
   const [draft, setDraft] = useState('');
   const [justAdded, setJustAdded] = useState(false);
-  const run = useTrackingRun(
-    site?.id,
-    // ⚠️ Sent verbatim. The route stores these strings as the tracked prompt,
-    // and the "draft into group" handler below matches a check back to its
-    // discovered question by exact equality — trimming here would break the
-    // loop that marks a question covered, silently.
-    questions.map((q) => q.question),
-    refreshTracking,
-  );
+
+  /*
+    The run belongs to the provider, not this page.
+
+    It used to be a hook here, so navigating away unmounted it and the run
+    appeared to die — it did not, but every progress update went to a component
+    that no longer existed. Reading it from context means this page shows the
+    same run the shell strip does, and finds it still going on return.
+  */
+  const run = trackingRun;
+  // A run started against a different site is somebody else's progress as far
+  // as this page is concerned.
+  const runningHere = run.busy && run.siteId === site?.id;
 
   if (!site) {
     return (
@@ -664,18 +540,14 @@ export function TrackingWorkspace() {
             title="You haven’t run a check yet"
             body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else. It takes a minute or two.`}
             action={
-              <Button onClick={run.run} disabled={run.busy}>
-                {run.busy ? 'Checking…' : 'Run the first check'}
+              <Button onClick={runTracking} disabled={run.busy}>
+                {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Run the first check'}
               </Button>
             }
           />
         )}
 
-        {run.progress && run.busy && (
-          <p className="text-slate mt-4 text-center text-sm">
-            {run.progress.checked} checked, {run.progress.remaining} to go…
-          </p>
-        )}
+        {runningHere && <RunProgress run={run} className="mx-auto mt-5 max-w-sm" />}
         {run.error && (
           <p role="alert" className="text-error-ink mt-4 text-center text-sm">
             {run.error}
@@ -853,8 +725,8 @@ export function TrackingWorkspace() {
         title="Results"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
         action={
-          <Button variant="ghost" size="sm" onClick={run.run} disabled={run.busy}>
-            {run.busy ? 'Checking…' : 'Check now'}
+          <Button variant="ghost" size="sm" onClick={runTracking} disabled={run.busy}>
+            {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
           </Button>
         }
       />
@@ -873,13 +745,9 @@ export function TrackingWorkspace() {
         to it.
       </p>
 
-      {(run.error || run.notes.length > 0 || run.unreadable || (run.busy && run.progress)) && (
+      {(run.error || run.notes.length > 0 || run.unreadable || runningHere) && (
         <div className="mb-5">
-          {run.busy && run.progress && (
-            <p className="text-slate text-sm">
-              {run.progress.checked} checked, {run.progress.remaining} to go…
-            </p>
-          )}
+          {runningHere && <RunProgress run={run} className="max-w-sm" />}
           {run.error && (
             <p role="alert" className="text-error-ink text-sm">
               {run.error}

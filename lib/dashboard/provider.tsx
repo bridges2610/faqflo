@@ -10,7 +10,15 @@
  * frame — which is also what it will do against a real network later.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import * as store from './store';
 import type {
   ContentPlan,
@@ -24,6 +32,37 @@ import type {
   Subscription,
   User,
 } from './types';
+
+/**
+ * A tracking run, whether or not one is happening.
+ *
+ * `siteId` is the site the run STARTED against, so a page can tell "your run is
+ * going" from "someone's run is going, but not for the site you're looking at"
+ * — the customer can switch sites mid-run and the run does not follow them.
+ *
+ * `remaining` is null until the first pass returns. That is genuinely unknown,
+ * not zero, and the difference decides whether a progress bar can show a
+ * percentage at all.
+ */
+export type TrackingRun = {
+  busy: boolean;
+  siteId: string | null;
+  checked: number;
+  remaining: number | null;
+  error: string | null;
+  notes: string[];
+  unreadable: string | null;
+};
+
+const IDLE_RUN: TrackingRun = {
+  busy: false,
+  siteId: null,
+  checked: 0,
+  remaining: null,
+  error: null,
+  notes: [],
+  unreadable: null,
+};
 
 type Ctx = {
   loading: boolean;
@@ -52,6 +91,10 @@ type Ctx = {
    * re-rendered with the new state.
    */
   refreshTracking: () => Promise<SiteTracking | null>;
+  /** A tracking run in flight, or the idle shape. Survives navigation. */
+  trackingRun: TrackingRun;
+  /** Start a run for the selected site. A no-op while one is already going. */
+  runTracking: () => Promise<void>;
   /** The generated content plan for the active site; null until one is made. */
   contentPlan: ContentPlan | null;
 
@@ -218,6 +261,157 @@ export function DashboardProvider({
   }, [site, loadTracking]);
 
   /*
+    Driving a tracking run — from here, not from the page that starts it.
+
+    ⚠️ IT LIVES IN THE PROVIDER SO IT SURVIVES NAVIGATION. This used to be a
+    hook inside TrackingWorkspace, so clicking to any other dashboard page
+    unmounted it and every setState became a no-op on a dead component. The loop
+    kept running, the engines kept answering and the rows kept saving — the UI
+    simply lost all trace of it, which reads exactly like a run that stopped.
+    This provider is mounted by app/(app)/layout.tsx, above every page.
+
+    ⚠️ THE CLIENT LOOPS BECAUSE THE SERVER CANNOT. A full period is 35 prompts
+    against three search-backed engines; the route runs a bounded slice per
+    request because this app holds itself to roughly the platform's ~60s ceiling
+    and there is no queue in this project. So it posts repeatedly until the route
+    reports nothing left.
+
+    ⚠️ The pass bound is not arbitrary: at PROMPTS_PER_RUN (5) a full 35-prompt
+    set needs 7 passes, so 12 leaves room and still stops a route that kept
+    claiming work remaining from billing until the tab closed. Raising the prompt
+    cap past 60 would need this raised with it.
+
+    The route is idempotent — it works out what has not been checked today from
+    what is already stored — so a refresh mid-run, a second tab, or an impatient
+    double-click cannot double-spend the allowance.
+  */
+  const [trackingRun, setTrackingRun] = useState<TrackingRun>(IDLE_RUN);
+
+  /*
+    ⚠️ A REF, NOT `trackingRun.busy`. Two overlapping loops would spend the
+    allowance twice, and a boolean read out of a stale closure will not stop the
+    second press — the check and the set have to be synchronous.
+  */
+  const running = useRef(false);
+
+  const runTracking = useCallback(async () => {
+    if (running.current) return;
+
+    /*
+      ⚠️ CAPTURED AT THE START, NOT READ EACH PASS. A run that re-read `site`
+      would follow the customer if they switched sites mid-run and start posting
+      one site's questions against another's id — and the route would accept it,
+      because the questions come from the client by design.
+    */
+    const startedSite = site;
+    const asked = startedSite
+      ? questions.filter((q) => q.siteId === startedSite.id).map((q) => q.question)
+      : [];
+
+    if (!startedSite || asked.length === 0) return;
+
+    running.current = true;
+    setTrackingRun({
+      busy: true,
+      siteId: startedSite.id,
+      checked: 0,
+      remaining: null,
+      error: null,
+      notes: [],
+      unreadable: null,
+    });
+
+    let checked = 0;
+
+    try {
+      for (let pass = 0; pass < 12; pass++) {
+        const res = await fetch('/api/dashboard/tracking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ siteId: startedSite.id, questions: asked }),
+        });
+
+        const payload = (await res.json()) as {
+          checked?: number;
+          remaining?: number;
+          done?: boolean;
+          failures?: { engine: string; detail: string }[];
+          error?: string;
+        };
+
+        // `break`, not `return`: the refresh below has to happen either way.
+        if (!res.ok) {
+          const message = payload.error ?? 'That run failed. Please try again.';
+          setTrackingRun((r) => ({ ...r, error: message }));
+          break;
+        }
+
+        checked += payload.checked ?? 0;
+        const remaining = payload.remaining ?? 0;
+
+        setTrackingRun((r) => ({
+          ...r,
+          checked,
+          remaining,
+          // Surfaced rather than swallowed: a run where one engine was
+          // unconfigured produced a real but partial picture, and a low number
+          // with no explanation reads as "nobody cites you".
+          notes: payload.failures?.length
+            ? payload.failures.map((f) => `${f.engine}: ${f.detail}`)
+            : r.notes,
+        }));
+
+        if (payload.done || !remaining) break;
+      }
+    } catch {
+      setTrackingRun((r) => ({
+        ...r,
+        error: 'Could not reach the server. Check your connection and try again.',
+      }));
+    } finally {
+      /*
+        ⚠️ REFRESH EVEN WHEN THE RUN FAILED, AND ESPECIALLY THEN.
+
+        A run is several requests, and the ones before a failure already asked
+        the engines, spent the money and stored their rows. Refreshing only on
+        the happy path left those rows in Postgres with the page still showing
+        "you haven't run a check yet" until someone reloaded — the run looked
+        like it had done nothing when it had done most of its work.
+      */
+      let refreshed: SiteTracking | null = null;
+      try {
+        refreshed = await loadTracking(startedSite.id, startedSite.domain);
+      } catch {
+        // Leave the original error standing rather than replacing it with a
+        // second one about the reload — the first is what went wrong.
+      }
+
+      /*
+        ⚠️ THE WRITE SUCCEEDED AND THE READ CAME BACK EMPTY. SAY SO.
+
+        The server told us it checked `checked` questions, so those rows are in
+        Postgres. If reading them back yields nothing the two disagree, and the
+        page is about to render "you haven't run a check yet" — the most
+        misleading sentence available, because the checks ran and were paid for.
+
+        Not hypothetical: `citation_checks` grants the browser SELECT under an
+        RLS policy (migration 0006), and when that policy is missing PostgREST
+        returns an empty array with no error at all.
+      */
+      setTrackingRun((r) => ({
+        ...r,
+        busy: false,
+        unreadable:
+          checked > 0 && !refreshed
+            ? `${checked} ${checked === 1 ? 'check' : 'checks'} ran and were saved, but reading them back returned nothing. The results are not lost — the citation_checks read policy is the likely cause.`
+            : r.unreadable,
+      }));
+
+      running.current = false;
+    }
+  }, [site, questions, loadTracking]);
+
+  /*
     Postgres first, the local snapshot second.
 
     ⚠️ THE FALLBACK IS FOR THE DEV SEED, NOT FOR REAL DATA. Nothing writes
@@ -252,6 +446,8 @@ export function DashboardProvider({
     questions,
     tracking,
     refreshTracking,
+    trackingRun,
+    runTracking,
     contentPlan,
 
     addSite: (input) => apply(() => store.createSite(input)),
