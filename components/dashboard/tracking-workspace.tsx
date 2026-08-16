@@ -5,10 +5,25 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { pillarBand, scoreOf } from '@/lib/audit/score';
+import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canTrack, engineChecksFor } from '@/lib/dashboard/plans';
+import { discoverQuestions } from '@/lib/dashboard/discover';
+import {
+  canTrack,
+  DISCOVERED_PROMPT_CAP,
+  engineChecksFor,
+  MANUAL_QUESTION_CAP,
+  STAY_CITED_PROMPT_CAP,
+} from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
-import { ENGINES, type CitationCheck, type Engine, type SiteTracking } from '@/lib/dashboard/types';
+import {
+  ENGINES,
+  MAX_EXCERPT_CHARS,
+  type CitationCheck,
+  type SiteTracking,
+} from '@/lib/dashboard/types';
+import { AnswerText } from './answer-text';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
@@ -33,11 +48,16 @@ import { SectionTitle } from './section-title';
 /*
   Driving a run from the browser.
 
-  ⚠️ THE CLIENT LOOPS BECAUSE THE SERVER CANNOT. A full period is 25 prompts
+  ⚠️ THE CLIENT LOOPS BECAUSE THE SERVER CANNOT. A full period is 35 prompts
   against three search-backed engines; the route runs a bounded slice per
   request because this app holds itself to roughly the platform's ~60s ceiling
   and there is no queue in this project. So the button posts repeatedly until
   the route reports nothing left, and shows how far it has got.
+
+  ⚠️ The pass bound below is what caps that loop, and it is not arbitrary: at
+  PROMPTS_PER_RUN (5) a full 35-prompt set needs 7 passes, so 12 leaves room and
+  still stops a route that kept claiming work remaining from billing until the
+  tab closed. Raising the prompt cap past 60 would need this raised with it.
 
   The route is idempotent — it works out what has not been checked today from
   what is already stored — so a refresh mid-run, a second tab, or an impatient
@@ -156,43 +176,32 @@ function useTrackingRun(
   return { run, busy, progress, error, notes, unreadable };
 }
 
-/*
-  One entry per question, with the engines that produced that outcome.
-
-  Grouped because a question is checked against every engine, so the raw rows
-  print it once per engine and read as duplication. "Cited by Perplexity and
-  Gemini" is one fact about one question, not two facts.
-
-  ⚠️ The "Not cited for" worklist deliberately does NOT use this. Each of its
-  rows carries a different `citedInstead` — who took the click on that engine —
-  which is the useful part, and each has its own Draft action.
-*/
-type Grouped = { question: string; engines: Engine[]; checkedAt: string };
-
-function groupByQuestion(checks: CitationCheck[]): Grouped[] {
-  const map = new Map<string, Grouped>();
-
-  for (const check of checks) {
-    const entry = map.get(check.question);
-    if (!entry) {
-      map.set(check.question, {
-        question: check.question,
-        engines: [check.engine],
-        checkedAt: check.checkedAt,
-      });
-      continue;
-    }
-    if (!entry.engines.includes(check.engine)) entry.engines.push(check.engine);
-    // Keep the most recent sighting, so "2 days ago" is the freshest evidence
-    // rather than whichever engine happened to be checked first.
-    if (check.checkedAt > entry.checkedAt) entry.checkedAt = check.checkedAt;
+/**
+ * A source URL as it should be read: host and path, no query string.
+ *
+ * Keeps the host, unlike prettyUrl below — a source list names other people's
+ * sites, so the domain is the most important part of the line.
+ */
+function displayUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/$/, '');
+    return `${parsed.hostname.replace(/^www\./, '')}${path}`;
+  } catch {
+    return url;
   }
+}
 
-  // Most engines first: a question three engines agree on is stronger evidence
-  // than one a single engine mentioned, and belongs at the top either way.
-  return [...map.values()].sort(
-    (a, b) => b.engines.length - a.engines.length || b.checkedAt.localeCompare(a.checkedAt),
-  );
+/**
+ * Does this excerpt end mid-thought?
+ *
+ * A cheap heuristic, and deliberately so: it decides whether to print a caveat,
+ * never what the data means. Answers stored before the word-boundary cut landed
+ * simply stop at 600 characters, and there is no flag on the row to consult.
+ */
+function looksTruncated(excerpt: string): boolean {
+  const end = excerpt.trimEnd().slice(-1);
+  return excerpt.length >= MAX_EXCERPT_CHARS - 1 && !'.!?"”)'.includes(end);
 }
 
 /**
@@ -212,24 +221,277 @@ function prettyUrl(url: string): string {
   }
 }
 
-/** A grouped list of questions — the body of both new outcome cards. */
-function QuestionList({ items }: { items: Grouped[] }) {
+/**
+ * One row of evidence: what was asked, what came back, and who got the link.
+ *
+ * ⚠️ THE ANSWER TEXT IS THE POINT. Every other surface in this product reports
+ * an outcome; this is the only one that shows the thing the outcome was read
+ * from. `answer_excerpt` has been stored since the first run — 0006 says why in
+ * as many words — and until now nothing displayed it, so "you were not cited"
+ * arrived with no way to check it. Collapsed by default because forty open
+ * answers is not a report; one click away because disbelief is the normal
+ * reaction to a bad number and it deserves an answer.
+ */
+function EvidenceRow({
+  check,
+  action,
+}: {
+  check: CitationCheck;
+  action?: React.ReactNode;
+}) {
+  const tone =
+    check.outcome === 'cited' ? 'success' : check.outcome === 'mentioned' ? 'cyan' : undefined;
+  const label =
+    check.outcome === 'cited' ? 'Cited' : check.outcome === 'mentioned' ? 'Named' : 'Absent';
+
   return (
-    <ul className="divide-line mt-3 divide-y">
-      {items.map((item) => (
-        <li key={item.question} className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3.5">
-          <p className="text-navy min-w-0 flex-1 text-[0.9375rem]">{item.question}</p>
-          <p className="text-slate shrink-0 text-xs">
-            {item.engines.join(' · ')} · {timeAgo(item.checkedAt)}
+    <li className="py-4">
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+        <div className="min-w-0 flex-1">
+          <p className="text-navy text-[0.9375rem]">{check.question}</p>
+          <p className="text-slate mt-1 text-xs">
+            {check.engine} · {timeAgo(check.checkedAt)}
+            {check.sources.length > 0 && (
+              <> · {check.sources.length} {check.sources.length === 1 ? 'source' : 'sources'}</>
+            )}
+            {check.outcome !== 'cited' && check.citedInstead && (
+              <>
+                {' '}
+                · cited <span className="font-mono">{check.citedInstead}</span> instead
+              </>
+            )}
           </p>
-        </li>
-      ))}
-    </ul>
+        </div>
+        <div className="flex shrink-0 items-center gap-3">
+          {tone ? <Badge tone={tone}>{label}</Badge> : <Badge>{label}</Badge>}
+          {action}
+        </div>
+      </div>
+
+      {/* <details> rather than a state hook: forty rows would be forty pieces of
+          state to no benefit, and the browser already knows how to do this. */}
+      <details className="group mt-2">
+        <summary className="text-primary hover:text-primary-hover cursor-pointer list-none text-xs font-semibold">
+          <span className="group-open:hidden">View the answer</span>
+          <span className="hidden group-open:inline">Hide the answer</span>
+        </summary>
+
+        {check.excerpt ? (
+          <div className="border-line mt-2 border-l-2 pl-3">
+            <AnswerText text={check.excerpt} />
+            {looksTruncated(check.excerpt) && (
+              // Rows stored before the clean cut landed end mid-word, and the
+              // rest of the answer was never kept — so it cannot be repaired,
+              // only labelled. Without this the engine looks like it stopped
+              // talking mid-sentence.
+              <p className="text-slate/70 mt-1.5 text-xs">
+                Excerpt — we store the first {MAX_EXCERPT_CHARS} characters of each answer.
+              </p>
+            )}
+          </div>
+        ) : (
+          // Older rows predate the excerpt being stored. Say that, rather than
+          // rendering an empty quote that reads as an engine saying nothing.
+          <p className="text-slate mt-2 text-sm italic">
+            No answer text was stored for this check.
+          </p>
+        )}
+
+        {check.sources.length > 0 && (
+          <ul className="mt-3 space-y-1">
+            {check.sources.map((url) => (
+              <li key={url} className="min-w-0 truncate">
+                {/* Display is cleaned; the href is the stored URL, untouched.
+                    `?utm_source=openai` is the engine tagging its own referral
+                    and makes two links to one page look like two pages — but
+                    the source list is evidence, so what we LINK to stays
+                    exactly what was recorded. */}
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate hover:text-primary font-mono text-xs"
+                >
+                  {displayUrl(url)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+    </li>
   );
+}
+
+type OutcomeFilter = 'all' | 'cited' | 'mentioned' | 'absent';
+
+const FILTERS: { id: OutcomeFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'cited', label: 'Cited' },
+  { id: 'mentioned', label: 'Named' },
+  { id: 'absent', label: 'Absent' },
+];
+
+/** Rows per page. Forty answers at once is a data dump, not a report. */
+const PAGE = 12;
+
+/**
+ * A change since the last run, or nothing at all.
+ *
+ * ⚠️ NOTHING, not "0%" and not "—". A placeholder in the shape of a statistic
+ * gets read as one; an absent delta reads as "no trend yet", which is the true
+ * state of a site that has run checks once.
+ */
+function deltaLabel(delta: number | null): string {
+  if (delta === null) return '';
+  const rounded = Math.round(delta);
+  if (rounded === 0) return ' · no change since the last run';
+  return ` · ${rounded > 0 ? '+' : ''}${rounded}% since the last run`;
+}
+
+/**
+ * Topping the watch list up, from the page that shows what it is worth.
+ *
+ * Lives here rather than only on Opportunities because this is where a customer
+ * learns their coverage is thin — they see fifteen questions answered and a
+ * rival cited on most of them. Sending them to another screen to act on that is
+ * where the thought gets lost.
+ *
+ * ⚠️ APPENDS, unlike the Opportunities button, and passes the current questions
+ * as exclusions. Without the exclusions the model returns much the same list and
+ * every one is discarded as a duplicate — the request would cost a full Opus
+ * call to add nothing.
+ */
+function useFindMore(): {
+  find: () => Promise<void>;
+  busy: boolean;
+  error: string | null;
+  added: number | null;
+  room: number;
+  hasPages: boolean;
+} {
+  const { site, questions, faqs, addQuestions, recheckCoverage } = useDashboard();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [added, setAdded] = useState<number | null>(null);
+
+  const mine = site ? questions.filter((q) => q.siteId === site.id) : [];
+  /*
+    Against the DISCOVERY ceiling, not the plan total.
+
+    Filling to the total is what killed the manual field: one press took every
+    slot and "Add your own question" became "your watch list is full" forever.
+    The manual reserve is held back whether or not it has been used.
+  */
+  const discovered = mine.filter((q) => q.source !== 'manual').length;
+  const room = Math.max(0, DISCOVERED_PROMPT_CAP - discovered);
+  const hasPages = (site?.lastAudit?.pages?.length ?? 0) > 0;
+
+  async function find() {
+    if (!site || room === 0 || busy) return;
+
+    setBusy(true);
+    setError(null);
+    setAdded(null);
+
+    try {
+      const result = await discoverQuestions({
+        site,
+        faqs,
+        exclude: mine.map((q) => q.question),
+      });
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      const before = discovered;
+      await addQuestions(site.id, result.questions, 'append');
+      await recheckCoverage(site.id);
+
+      /*
+        Report what actually landed, not what the model returned. Duplicates are
+        dropped and the cap truncates, so "found 15" after adding 4 would be a
+        number the customer can see is wrong the moment they count the list.
+        Computed from the cap rather than re-reading state, which has not
+        re-rendered yet.
+      */
+      setAdded(Math.min(result.questions.length, room, DISCOVERED_PROMPT_CAP - before));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { find, busy, error, added, room, hasPages };
+}
+
+/**
+ * Typing your own question onto the watch list.
+ *
+ * The model writes good questions about a category; it cannot know the one a
+ * customer's phone actually rings about, or the rival they want to be compared
+ * against. Ten of these, inside the same 25 the plan buys.
+ *
+ * Every refusal is a separate sentence. The store returns WHICH rule stopped
+ * the add precisely so this can say it — one "couldn't add that" covering four
+ * causes is what makes someone press the button again unchanged.
+ */
+function useManualQuestion(): {
+  add: (text: string) => Promise<boolean>;
+  busy: boolean;
+  error: string | null;
+  used: number;
+  room: number;
+  clearError: () => void;
+} {
+  const { site, questions, addManualQuestion } = useDashboard();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mine = site ? questions.filter((q) => q.siteId === site.id) : [];
+  const used = mine.filter((q) => q.source === 'manual').length;
+  const room = Math.min(
+    MANUAL_QUESTION_CAP - used,
+    Math.max(0, STAY_CITED_PROMPT_CAP - mine.length),
+  );
+
+  async function add(text: string): Promise<boolean> {
+    if (!site || busy) return false;
+
+    setBusy(true);
+    setError(null);
+
+    try {
+      const result = await addManualQuestion(site.id, text);
+      if (result.ok) return true;
+
+      setError(
+        {
+          empty: 'Type a question first.',
+          'too-long': 'That is too long for a prompt — trim it to a single question.',
+          duplicate: 'You are already watching that question.',
+          'manual-cap': `You can add ${MANUAL_QUESTION_CAP} of your own. Remove one on Opportunities to make room.`,
+          'prompt-cap': `Your watch list is full at ${STAY_CITED_PROMPT_CAP} prompts.`,
+        }[result.reason],
+      );
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return { add, busy, error, used, room, clearError: () => setError(null) };
 }
 
 export function TrackingWorkspace() {
   const { site, user, tracking, questions, coverQuestion, refreshTracking } = useDashboard();
+  const [filter, setFilter] = useState<OutcomeFilter>('all');
+  const [shown, setShown] = useState(PAGE);
+  const more = useFindMore();
+  const manual = useManualQuestion();
+  const [draft, setDraft] = useState('');
+  const [justAdded, setJustAdded] = useState(false);
   const run = useTrackingRun(
     site?.id,
     // ⚠️ Sent verbatim. The route stores these strings as the tracked prompt,
@@ -351,8 +613,52 @@ export function TrackingWorkspace() {
     only figure here directly comparable between us and a rival, which is
     exactly why it must never be shown without the counts underneath it.
   */
+  /*
+    The headline number, and NOT a new one.
+
+    Competing tools lead with an opaque 0-100. We already have a scored AI
+    visibility pillar — visibilityFindings() turns these very checks into three
+    weighted findings and scoreOf() weighs them — so this reuses that rather
+    than inventing a second scoring system that would disagree with the audit's.
+    The findings render underneath as the explanation, which is the part a bare
+    score cannot give you.
+
+    ⚠️ `null` means locked or not yet measured. It must never render as 0: a
+    zero says "we looked and found nothing", and we did not look.
+  */
+  const visibility = visibilityFindings(user, tracking);
+  const visibilityScore = scoreOf(visibility);
+  const band = pillarBand(visibilityScore);
+
   const appearances = tracking?.sourceAppearances ?? { ours: 0, total: 0 };
   const shareOfVoice = appearances.total ? (appearances.ours / appearances.total) * 100 : 0;
+
+  /*
+    Change since the previous run-day.
+
+    ⚠️ ONLY WHEN THERE ARE TWO RUN-DAYS. Competing tools print a delta beside
+    every metric permanently; with a single day of data any such figure is
+    derived from one point and means nothing. `null` here renders as no delta at
+    all — not a zero, not a dash, nothing — because the honest statement is that
+    there is no trend yet.
+
+    Days with no run are absent from `daily` rather than zero-filled, so "the
+    previous entry" is the previous time we actually looked.
+  */
+  const previousDay = daily.length >= 2 ? daily[daily.length - 2] : null;
+  const latestDay = daily.length >= 2 ? daily[daily.length - 1] : null;
+
+  const deltaOf = (now: number, before: number): number | null => {
+    if (!latestDay || !previousDay) return null;
+    if (before === 0) return now === 0 ? 0 : null; // no baseline to divide by
+    return ((now - before) / before) * 100;
+  };
+
+  const citedDelta = latestDay && previousDay ? deltaOf(latestDay.cited, previousDay.cited) : null;
+  const mentionsDelta =
+    latestDay && previousDay
+      ? deltaOf(latestDay.cited + latestDay.mentioned, previousDay.cited + previousDay.mentioned)
+      : null;
 
   const competitors = tracking?.competitors ?? [];
   const citedPages = tracking?.citedPages ?? [];
@@ -376,12 +682,20 @@ export function TrackingWorkspace() {
   // The meter divides by this, so it has to be the largest bar actually drawn.
   const shareTop = Math.max(...shareRows.map((c) => c.citations), 1);
 
-  // Grouped for the two read-only lists below; `uncited` stays row-per-engine
-  // because each of its rows names a different domain that took the click.
-  const citedFor = groupByQuestion(latest.filter((c) => c.outcome === 'cited'));
-  const namedFor = groupByQuestion(latest.filter((c) => c.outcome === 'mentioned'));
+  /*
+    The evidence table's filter.
 
-  const uncited = latest.filter((c) => c.outcome === 'absent');
+    Row-per-engine rather than grouped by question: each row carries its own
+    answer text, its own source list and its own `citedInstead`, and those are
+    the things being examined. Grouping would have to throw two of the three
+    away to merge them.
+  */
+  const countFor = (id: OutcomeFilter) =>
+    id === 'all' ? latest.length : latest.filter((c) => c.outcome === id).length;
+
+  const filtered =
+    filter === 'all' ? latest : latest.filter((c) => c.outcome === filter);
+  const visible = filtered.slice(0, shown);
   // The bar tracks prompts — the thing bought — not the checks they cost.
   const usedPct = tracking ? (tracking.promptsTracked / tracking.promptCap) * 100 : 0;
 
@@ -436,6 +750,57 @@ export function TrackingWorkspace() {
         </div>
       )}
 
+      {/* The score, with its own reasoning attached.
+
+          A number on its own invites the question "based on what?" and answers
+          nothing. These three findings ARE the score — same weights, same
+          arithmetic — so the card explains itself rather than asking for
+          trust. */}
+      {visibilityScore !== null && (
+        <Card className="mb-5 p-5 sm:p-7">
+          <div className="sm:flex sm:items-start sm:gap-7">
+            <div className="shrink-0">
+              <p className="text-slate text-xs font-semibold tracking-wide uppercase">
+                AI visibility
+              </p>
+              <p className="text-navy mt-1 text-4xl font-semibold tabular-nums">
+                {visibilityScore}
+                <span className="text-slate text-lg font-normal">/100</span>
+              </p>
+              <Badge
+                tone={band === 'good' ? 'success' : band === 'mixed' ? 'cyan' : undefined}
+                className="mt-2"
+              >
+                {band === 'good' ? 'Strong' : band === 'mixed' ? 'Mixed' : 'Low'}
+              </Badge>
+            </div>
+
+            <ul className="divide-line mt-5 flex-1 divide-y sm:mt-0">
+              {visibility.map((f) => (
+                <li key={f.id} className="py-2.5 first:pt-0">
+                  <div className="flex items-baseline gap-2">
+                    <span
+                      aria-hidden
+                      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
+                        f.status === 'pass'
+                          ? 'bg-success'
+                          : f.status === 'warn'
+                            ? 'bg-accent'
+                            : 'bg-error-ink'
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-navy text-sm font-semibold">{f.label}</p>
+                      <p className="text-slate mt-0.5 text-sm leading-relaxed">{f.detail}</p>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Card>
+      )}
+
       {/* One card, four cells, hairline dividers — the same row the dashboard
           home uses. Four separate cards read as four competing things. */}
       <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-4">
@@ -444,7 +809,7 @@ export function TrackingWorkspace() {
           icon={<ChartIcon className="h-3.5 w-3.5" />}
           tint="bg-success/12 text-success-ink"
           value={cited}
-          footer={`of ${latest.length} checks · you were the source`}
+          footer={`of ${latest.length} checks${deltaLabel(citedDelta)} · you were the source`}
         />
         <MetricTile
           label="Mentions"
@@ -453,8 +818,8 @@ export function TrackingWorkspace() {
           value={mentions}
           footer={
             mentioned > 0
-              ? `named at all · ${mentioned} without a link`
-              : 'named at all, linked or not'
+              ? `named at all${deltaLabel(mentionsDelta)} · ${mentioned} without a link`
+              : `named at all, linked or not${deltaLabel(mentionsDelta)}`
           }
         />
         <MetricTile
@@ -511,9 +876,11 @@ export function TrackingWorkspace() {
                           <span className="text-error-ink">no answers stored</span>
                         ) : (
                           <>
-                            <span className="text-success-ink font-semibold">{e.cited} cited</span>
-                            {e.mentioned > 0 && <> · {e.mentioned} named</>} · {e.absent} absent ·
-                            of {e.checked}
+                            <span className="text-success-ink font-semibold">
+                              {(((e.cited + e.mentioned) / e.checked) * 100).toFixed(0)}%
+                            </span>{' '}
+                            name you · {e.cited} cited
+                            {e.mentioned > 0 && <> · {e.mentioned} named</>} · of {e.checked}
                           </>
                         )}
                       </p>
@@ -531,61 +898,101 @@ export function TrackingWorkspace() {
             </Card>
           )}
 
-          {/* The positive half, which until now existed only as a number in a
-              tile. This is the screen a subscriber opens to answer "is this
-              working", and a count alone cannot answer it. */}
+          {/* Every check, filterable — one table instead of three cards.
+
+              ⚠️ THREE CARDS SPLIT THE EVIDENCE BY ANSWER, WHICH IS THE ONE WAY
+              IT SHOULD NOT BE SPLIT. "Cited for", "Named but not linked" and
+              "Not cited for" were three lists of the same rows sliced by
+              outcome, so comparing them meant scrolling between cards, and
+              nothing showed what the engine had actually said. A filter does
+              the slicing without hiding the whole from you. */}
           <Card className="p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <SectionTitle>You&rsquo;re cited for</SectionTitle>
-              <Badge tone="success">{citedFor.length}</Badge>
+              <SectionTitle>Every answer we checked</SectionTitle>
+              <Badge tone="cyan">{latest.length}</Badge>
             </div>
             <p className="text-slate mt-1 text-sm">
-              Questions where an engine used your site as a source and linked to you.
+              One row per question per engine, newest first. Open any of them to read what the
+              engine actually said and which sources it used.
             </p>
 
-            {citedFor.length === 0 ? (
-              // Not a blank. On a site that has run checks this is a finding.
-              <p className="text-slate mt-4 text-sm">
-                Nothing yet. Publishing answers to the questions below is what changes this —
-                an engine can only cite text it can read on your own domain.
-              </p>
-            ) : (
-              <QuestionList items={citedFor} />
-            )}
-          </Card>
-
-          {/* The sharpest finding in the set, and the one that was hardest to
-              act on while it was a bare count: the engine knows who you are
-              and still sent the click somewhere else. */}
-          <Card className="p-5 sm:p-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <SectionTitle>Named, but not linked</SectionTitle>
-              <Badge tone="cyan">{namedFor.length}</Badge>
-            </div>
-            <p className="text-slate mt-1 text-sm">
-              An engine named {site.name} in its answer without citing you as the source. It knows
-              who you are — it just sent the click elsewhere.
-            </p>
-
-            {namedFor.length === 0 ? (
-              <p className="text-slate mt-4 text-sm">
-                Nothing here. Every mention we found was linked.
-              </p>
-            ) : (
-              <>
-                <QuestionList items={namedFor} />
-                <p className="text-slate mt-4 text-sm leading-relaxed">
-                  Usually this means the answer isn&rsquo;t on a page the engine can point at.
-                  Check that the block covering these questions is pasted and current on{' '}
-                  <Link
-                    href="/dashboard/publish"
-                    className="text-primary hover:text-primary-hover font-semibold"
+            <div className="mt-4 flex flex-wrap gap-2">
+              {FILTERS.map((f) => {
+                const count = countFor(f.id);
+                return (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setFilter(f.id)}
+                    aria-pressed={filter === f.id}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                      filter === f.id
+                        ? 'border-primary bg-primary-soft text-primary'
+                        : 'border-line text-slate hover:text-navy'
+                    }`}
                   >
-                    your published pages
-                  </Link>
-                  .
-                </p>
-              </>
+                    {f.label} {count}
+                  </button>
+                );
+              })}
+            </div>
+
+            {visible.length === 0 ? (
+              <p className="text-slate mt-4 text-sm">
+                {filter === 'cited'
+                  ? 'No engine has cited you yet on the questions we watch. Publishing answers is what changes this — an engine can only cite text it can read on your own domain.'
+                  : filter === 'mentioned'
+                    ? 'Nothing here. Every mention we found was linked.'
+                    : 'Nothing in this view.'}
+              </p>
+            ) : (
+              <ul className="divide-line mt-2 divide-y">
+                {visible.map((c) => (
+                  <EvidenceRow
+                    key={c.id}
+                    check={c}
+                    action={
+                      // The loop closing, preserved from the old "Not cited for"
+                      // card: see you weren't cited, write the answer, the
+                      // question stops being open. Only offered where there is
+                      // something to fix.
+                      c.outcome !== 'cited' ? (
+                        <DraftIntoGroup
+                          question={c.question}
+                          onDrafted={async () => {
+                            const match = questions.find((q) => q.question === c.question);
+                            if (match) await coverQuestion(match.id);
+                          }}
+                        />
+                      ) : undefined
+                    }
+                  />
+                ))}
+              </ul>
+            )}
+
+            {visible.length > 0 && shown < filtered.length && (
+              <button
+                type="button"
+                onClick={() => setShown((n) => n + PAGE)}
+                className="text-primary hover:text-primary-hover mt-4 text-sm font-semibold"
+              >
+                Show {Math.min(PAGE, filtered.length - shown)} more of {filtered.length}
+              </button>
+            )}
+
+            {mentioned > 0 && (
+              <p className="text-slate mt-4 text-sm leading-relaxed">
+                Named but not linked usually means the answer isn&rsquo;t on a page the engine can
+                point at. Check that the block covering those questions is pasted and current on{' '}
+                <Link
+                  href="/dashboard/publish"
+                  className="text-primary hover:text-primary-hover font-semibold"
+                >
+                  your published pages
+                </Link>
+                .
+              </p>
             )}
           </Card>
 
@@ -682,44 +1089,10 @@ export function TrackingWorkspace() {
         </div>
 
         <div className="mt-5 space-y-5 lg:mt-0">
-          <Card className="p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <SectionTitle>Not cited for</SectionTitle>
-              <Badge tone="cyan">{uncited.length}</Badge>
-            </div>
-            <p className="text-slate mt-1 text-sm">
-              Questions where an engine named someone else. This is the loop closing — each one is
-              the next answer to write.
-            </p>
-
-            {uncited.length === 0 ? (
-              <p className="text-slate mt-4 text-sm">
-                You were cited or named on every question we checked.
-              </p>
-            ) : (
-              <ul className="divide-line mt-3 divide-y">
-                {uncited.slice(0, 6).map((c) => (
-                  <li key={c.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3.5">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-navy text-sm">{c.question}</p>
-                      <p className="text-slate mt-0.5 text-xs">
-                        {c.engine} cited{' '}
-                        <span className="font-mono">{c.citedInstead ?? 'nobody'}</span> ·{' '}
-                        {timeAgo(c.checkedAt)}
-                      </p>
-                    </div>
-                    <DraftIntoGroup
-                      question={c.question}
-                      onDrafted={async () => {
-                        const match = questions.find((q) => q.question === c.question);
-                        if (match) await coverQuestion(match.id);
-                      }}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+          {/* The old "Not cited for" card stood here. Its rows and its
+              "Draft into group" action both live in the evidence table now —
+              beside the answer text that explains why they are on the list,
+              which the rail was too narrow to ever show. */}
 
         {/* The budget, in the unit that's actually bought.
 
@@ -747,6 +1120,142 @@ export function TrackingWorkspace() {
                 </p>
               </div>
               <Meter className="mt-3" value={usedPct} />
+
+              {/* Widening the sample, from the screen that shows why you'd want
+                  to. Every state below is a different answer to "can I have
+                  more?", and none of them is a disabled button with no reason
+                  given. */}
+              <div className="border-line mt-4 border-t pt-4">
+                {more.room === 0 ? (
+                  // ⚠️ "Discovery is full", NOT "your watch list is full". With
+                  // 25 discovered and no manual questions there are still ten
+                  // slots left, and calling that full would be untrue — and
+                  // would send someone to delete a question they didn't need to.
+                  <p className="text-slate text-xs">
+                    We&rsquo;ve found the {formatNumber(DISCOVERED_PROMPT_CAP)} questions this
+                    plan looks for. You can still add{' '}
+                    {formatNumber(MANUAL_QUESTION_CAP)} of your own below, or retire one on{' '}
+                    <Link
+                      href="/dashboard/questions"
+                      className="text-primary hover:text-primary-hover font-semibold"
+                    >
+                      Opportunities
+                    </Link>{' '}
+                    to look again.
+                  </p>
+                ) : !more.hasPages ? (
+                  // The route rejects an empty page list, so say why here
+                  // rather than spending a round trip to be told.
+                  <p className="text-slate text-xs">
+                    Run a full check of your site first — finding more questions means reading your
+                    pages.
+                  </p>
+                ) : (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={more.find}
+                      disabled={more.busy}
+                      className="w-full"
+                    >
+                      {more.busy ? 'Looking…' : `Find ${more.room} more questions`}
+                    </Button>
+                    <p className="text-slate mt-2 text-xs">
+                      Asks for questions you aren&rsquo;t already watching. They join the list
+                      straight away and are checked on your next run.
+                    </p>
+                  </>
+                )}
+
+                {more.error && (
+                  <p role="alert" className="text-error-ink mt-2 text-xs">
+                    {more.error}
+                  </p>
+                )}
+
+                {more.added !== null && !more.error && (
+                  <p className="text-slate mt-2 text-xs">
+                    {more.added === 0
+                      ? // Not a failure: every suggestion was one we already watch.
+                        'Nothing new came back — the questions found were ones you already track.'
+                      : `Added ${more.added}. They have no results yet — run a check to ask the engines.`}
+                  </p>
+                )}
+              </div>
+
+              {/* Your own question.
+
+                  The model writes good questions about a trade; it cannot know
+                  the one this business is actually asked, or the competitor
+                  they want to be compared against. Sits under "Find more"
+                  because both grow the same list — one by asking a model, one
+                  by asking the person who runs the company. */}
+              <div className="border-line mt-4 border-t pt-4">
+                <p className="text-navy text-sm font-semibold">Add your own question</p>
+
+                {manual.room === 0 ? (
+                  <p className="text-slate mt-1 text-xs">
+                    {manual.used >= MANUAL_QUESTION_CAP
+                      ? `You've added all ${MANUAL_QUESTION_CAP} of your own. Remove one on `
+                      : `Your watch list is full at ${formatNumber(STAY_CITED_PROMPT_CAP)} prompts. Make room on `}
+                    <Link
+                      href="/dashboard/questions"
+                      className="text-primary hover:text-primary-hover font-semibold"
+                    >
+                      Opportunities
+                    </Link>
+                    .
+                  </p>
+                ) : (
+                  <form
+                    className="mt-2"
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const ok = await manual.add(draft);
+                      if (ok) {
+                        setDraft('');
+                        setJustAdded(true);
+                      }
+                    }}
+                  >
+                    <input
+                      value={draft}
+                      onChange={(e) => {
+                        setDraft(e.target.value);
+                        // Clear the last refusal as soon as they change the
+                        // input — leaving it up makes a fixed question look
+                        // like it is still being rejected.
+                        if (manual.error) manual.clearError();
+                        if (justAdded) setJustAdded(false);
+                      }}
+                      placeholder="Who is the best roofer in Nyack?"
+                      aria-label="Add your own question to the watch list"
+                      className="border-line focus:border-primary text-navy placeholder:text-slate/70 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+                    />
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <p className="text-slate text-xs">
+                        {manual.used} of {MANUAL_QUESTION_CAP} of your own
+                      </p>
+                      <Button type="submit" variant="ghost" size="sm" disabled={manual.busy}>
+                        {manual.busy ? 'Adding…' : 'Add'}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+
+                {manual.error && (
+                  <p role="alert" className="text-error-ink mt-2 text-xs">
+                    {manual.error}
+                  </p>
+                )}
+
+                {justAdded && !manual.error && (
+                  <p className="text-slate mt-2 text-xs">
+                    Added. It has no results yet — run a check to ask the engines.
+                  </p>
+                )}
+              </div>
             </div>
           </Card>
         )}

@@ -201,7 +201,16 @@ function seedDaily(days: number): CitationDay[] {
       byEngine[engine] = Math.max(0, Math.round(progress * 6 * bias + Math.random() * 2 - 0.5));
     }
 
-    out.push({ date: dateKey(i), byEngine, checked: 8 });
+    const cited = ENGINES.reduce((n, e) => n + byEngine[e], 0);
+    out.push({
+      date: dateKey(i),
+      byEngine,
+      checked: 8,
+      cited,
+      // A couple named-but-unlinked on the days with any traction, so the
+      // fixture exercises the mentions delta rather than a flat zero.
+      mentioned: cited > 0 ? Math.min(2, Math.round(progress * 2)) : 0,
+    });
   }
 
   return out;
@@ -226,6 +235,17 @@ function seedChecks(siteId: string): CitationCheck[] {
         engine,
         outcome,
         citedInstead: outcome === 'absent' ? COMPETITORS[(qi + ei) % COMPETITORS.length] : null,
+        /*
+          Enough of an answer to exercise the disclosure in the evidence table.
+          Deliberately reads as a fixture rather than as a real model response —
+          a plausible-looking fake answer in a development seed is the kind of
+          thing that ends up quoted in a screenshot as if it were measured.
+        */
+        excerpt: `[seeded fixture, not a real answer] ${engine} response about “${q.q}”.`,
+        sources:
+          outcome === 'cited'
+            ? ['https://example.com/', 'https://competitor.example/guide']
+            : ['https://competitor.example/guide'],
         checkedAt: daysAgo(qi % 4),
       });
     });

@@ -155,6 +155,19 @@ export type DiscoveredQuestion = {
   intent?: string;
   /** Whether an existing published answer already covers it. */
   covered: boolean;
+  /**
+   * Who put this question on the list.
+   *
+   * ⚠️ LOAD-BEARING FOR SURVIVAL, NOT DECORATION. A Discover re-run replaces
+   * the uncovered questions — right for a model's suggestions, which is what a
+   * re-run produces a better version of, and wrong for something a person
+   * typed. addQuestions() keeps `manual` rows through a replace for that reason.
+   *
+   * Optional because rows already in customers' localStorage predate it, and
+   * absent means 'discovered' — those are all model-generated, so the default
+   * is the truth rather than a guess.
+   */
+  source?: 'discovered' | 'manual';
   addedAt: string;
 };
 
@@ -199,8 +212,36 @@ export type CitationCheck = {
   outcome: 'cited' | 'mentioned' | 'absent';
   /** Who got cited instead, when we weren't. */
   citedInstead: string | null;
+  /**
+   * What the engine actually said, capped at MAX_EXCERPT_CHARS below.
+   *
+   * ⚠️ THE EVIDENCE, AND THE ANSWER TO THE ONLY QUESTION THIS PAGE REALLY GETS.
+   * "Why does it say I wasn't cited?" cannot be answered by a count. It was
+   * stored from the first run (see the column comment in 0006) and read by
+   * nothing for just as long — the outcome was shown and the reason for it was
+   * not. Null on older rows, which renders as "not stored" rather than blank.
+   */
+  excerpt: string | null;
+  /** Every source that answer cited, in the engine's own ranking. */
+  sources: string[];
   checkedAt: string;
 };
+
+/**
+ * How much of an answer we keep as evidence.
+ *
+ * Enough to see a mention in context; not the whole answer. This table gets one
+ * row per prompt per engine per run, and full answers would quickly make it the
+ * largest thing in the database — see the column comment in migration 0006.
+ *
+ * ⚠️ Lives in this client-safe module, not in lib/tracking/types.ts, because
+ * BOTH sides need it: the classifier truncates with it on the server, and the
+ * Results page needs it to tell a truncated excerpt from an engine that simply
+ * stopped talking. lib/tracking/types.ts is `server-only`, so a component
+ * importing it from there would pull server code into the browser bundle —
+ * and copying the number instead is how the two quietly stop agreeing.
+ */
+export const MAX_EXCERPT_CHARS = 600;
 
 /** A day's citation counts per engine — the shape of a daily rollup row. */
 export type CitationDay = {
@@ -209,6 +250,10 @@ export type CitationDay = {
   byEngine: Record<Engine, number>;
   /** Questions checked that day, so a rate can be computed honestly. */
   checked: number;
+  /** That day's totals, so a change between run-days can be shown without
+   *  re-deriving them from `byEngine` (which counts citations only). */
+  cited: number;
+  mentioned: number;
 };
 
 export type CompetitorShare = {

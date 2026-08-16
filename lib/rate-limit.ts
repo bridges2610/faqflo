@@ -101,14 +101,17 @@ export const CONTACT_RATE_LIMIT = 5;
  * ⚠️ THE UNIT IS REQUESTS, BUT THE BUDGET IS RUNS, AND THEY ARE NOT 1:1. One
  * honest run is several requests — the route asks a bounded slice per call and
  * the client loops until nothing is left, so a full set at STAY_CITED_PROMPT_CAP
- * (25) with PROMPTS_PER_RUN (5) is ceil(25 / 5) = 5 requests. This number is
- * therefore sized as 12 runs × 5 requests:
+ * (35) with PROMPTS_PER_RUN (5) is ceil(35 / 5) = 7 requests. This number is
+ * therefore sized as 12 runs × 7 requests:
  *
- *     12 runs/day × ceil(25 prompts / 5 per request) = 60
+ *     12 runs/day × ceil(35 prompts / 5 per request) = 84
  *
- * It was 12, which read as "12 runs" and behaved as barely two — one click
- * could exhaust the day, and the client's own retry loop is bounded at 12
- * passes, so a single press could spend the whole allowance by design.
+ * ⚠️ IT IS DERIVED FROM THE PROMPT CAP AND MUST BE REDONE WHEN THAT MOVES. At 25
+ * prompts this was 60; leaving it there after the cap rose to 35 would have cut
+ * a subscriber to eight full runs a day while the constant still claimed twelve.
+ * It was 12 once, which read as "12 runs" and behaved as barely two — one click
+ * could exhaust the day, because the client's own retry loop is bounded at 12
+ * passes and a single press could spend the whole allowance by design.
  *
  * ⚠️ Not derived by importing PROMPTS_PER_RUN: that lives in lib/tracking/run.ts,
  * which is `server-only`, and this module must stay importable from anywhere.
@@ -121,7 +124,7 @@ export const CONTACT_RATE_LIMIT = 5;
  * lands, most runs stop coming through here at all and this becomes the
  * manual-override allowance it reads like.
  */
-export const TRACKING_RATE_LIMIT = 60;
+export const TRACKING_RATE_LIMIT = 84;
 
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();

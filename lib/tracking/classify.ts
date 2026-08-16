@@ -183,6 +183,34 @@ function citedInstead(sources: string[], ours: string): string | null {
   return null;
 }
 
+/**
+ * The stored slice of an answer, cut on a word boundary.
+ *
+ * A bare `slice(0, MAX_EXCERPT_CHARS)` stops mid-word — a real row ends
+ * "**Open n" — which reads as a broken record rather than a deliberate excerpt.
+ * Backing up to the last space and adding an ellipsis costs a few characters and
+ * makes the shortening legible.
+ *
+ * ⚠️ Never longer than MAX_EXCERPT_CHARS: the ellipsis replaces text, it does
+ * not extend past the cap the column was sized for.
+ *
+ * ⚠️ Not retroactive. Rows already stored were cut mid-word and the rest of the
+ * answer was never kept, so they cannot be repaired — the Results page labels
+ * them instead.
+ */
+export function excerptOf(text: string): string {
+  if (text.length <= MAX_EXCERPT_CHARS) return text;
+
+  const cut = text.slice(0, MAX_EXCERPT_CHARS - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+
+  // A 600-character run with no space in it is not prose — keep the hard cut
+  // rather than throwing the whole excerpt away chasing a boundary.
+  const body = lastSpace > MAX_EXCERPT_CHARS / 2 ? cut.slice(0, lastSpace) : cut;
+
+  return `${body.trimEnd()}…`;
+}
+
 export type Classified = {
   outcome: CitationCheck['outcome'];
   citedInstead: string | null;
@@ -202,7 +230,7 @@ export function classify(
 ): Classified {
   const ours = host(site.domain);
 
-  const excerpt = answer.text.slice(0, MAX_EXCERPT_CHARS);
+  const excerpt = excerptOf(answer.text);
 
   // A domain we can't parse can't be matched against anything. Recording
   // `absent` would be a claim we haven't earned, so nothing is claimed: no

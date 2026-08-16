@@ -9,7 +9,7 @@
   ⚠️ ALWAYS aria-hidden, and that is a rule about the CALLER.
 
   Every one of these bars already prints its own number as text beside or above
-  it: "62/100 · 8 checks", "4" next to the competitor, "12 of 25 prompts", "2 of
+  it: "62/100 · 8 checks", "4" next to the competitor, "12 of 35 prompts", "2 of
   4 done". The bar is a second, visual encoding of a figure that is already
   readable, so exposing it to a screen reader would announce the same value
   twice in a vaguer form. If you ever add a Meter with no number next to it,

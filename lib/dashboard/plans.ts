@@ -85,8 +85,33 @@ export function pageBudgetFor(site: Site | null, user: User | null): number {
  * A prompt is one question we watch. What it COSTS is derived from it —
  * engineChecksFor() below — so the cost is visible without being the unit
  * anyone has to reason in.
+ *
+ * ⚠️ THIS TOTAL IS MADE OF TWO PARTS, AND THE SPLIT IS LOAD-BEARING. Questions
+ * arrive two ways: a model proposes them, or the customer types them. When the
+ * total was the only limit, "Find more questions" filled every slot to the cap
+ * and the manual field went permanently dead — one feature made the other
+ * unreachable. Discovery now stops at DISCOVERED_PROMPT_CAP, leaving the manual
+ * allowance reserved whether or not it has been used.
  */
-export const STAY_CITED_PROMPT_CAP = 25;
+export const STAY_CITED_PROMPT_CAP = 35;
+
+/**
+ * How many of those a customer may write themselves.
+ *
+ * Reserved out of the total, not added to it: a hand-written prompt costs the
+ * same three engine calls per run as a proposed one, so it spends the same
+ * allowance. Lives here beside the other caps because this is the file that
+ * says what a plan buys, and because DISCOVERED_PROMPT_CAP is derived from it.
+ */
+export const MANUAL_QUESTION_CAP = 10;
+
+/**
+ * How many the model may propose — the total, less the reserved manual slots.
+ *
+ * ⚠️ Derived, never typed. Three numbers that must agree, written independently,
+ * is how you end up with a discovery ceiling that quietly overruns the plan.
+ */
+export const DISCOVERED_PROMPT_CAP = STAY_CITED_PROMPT_CAP - MANUAL_QUESTION_CAP;
 
 /** How often each tracked prompt is put to the engines. Weekly. */
 export const TRACKING_RUNS_PER_PERIOD = 4;

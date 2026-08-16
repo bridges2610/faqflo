@@ -78,7 +78,14 @@ type Ctx = {
   moveFaqToGroup: (id: string, groupId: string) => Promise<void>;
   coverQuestion: (id: string) => Promise<void>;
   /** Store a discovered set for a site, replacing the previous one. */
-  addQuestions: (siteId: string, questions: store.NewQuestion[]) => Promise<void>;
+  /** `append` tops the list up to the prompt cap; `replace` (default) swaps it. */
+  addQuestions: (
+    siteId: string,
+    questions: store.NewQuestion[],
+    mode?: 'replace' | 'append',
+  ) => Promise<void>;
+  /** A question the customer typed. Resolves to why it was refused, if it was. */
+  addManualQuestion: (siteId: string, question: string) => Promise<store.ManualQuestionResult>;
   /** Re-mark questions the site now publishes an answer to. */
   recheckCoverage: (siteId: string) => Promise<void>;
 
@@ -276,7 +283,20 @@ export function DashboardProvider({
     moveFaq: (id, direction) => apply(() => store.moveFaq(id, direction)),
     moveFaqToGroup: (id, groupId) => apply(() => store.moveFaqToGroup(id, groupId)),
     coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
-    addQuestions: (siteId, qs) => apply(() => store.addQuestions(siteId, qs)),
+    addQuestions: (siteId, qs, mode) => apply(() => store.addQuestions(siteId, qs, mode)),
+    /*
+      Returns the refusal instead of swallowing it.
+
+      `apply` takes a function that always produces new data, and a rejected
+      manual question produces none — so the result is unwrapped here and only
+      the success path is applied. The caller gets the reason, which is the
+      whole point of the discriminated result in the store.
+    */
+    addManualQuestion: async (siteId, question) => {
+      const result = await store.addManualQuestion(siteId, question);
+      if (result.ok) await apply(async () => result.data);
+      return result;
+    },
     recheckCoverage: (siteId) => apply(() => store.recheckCoverage(siteId)),
 
     seedDemoData: () => apply(() => store.seedLocalData()),

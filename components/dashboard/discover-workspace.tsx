@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { discoverQuestions } from '@/lib/dashboard/discover';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canDiscover } from '@/lib/dashboard/plans';
-import type { GeneratedQuestion } from '@/lib/questions';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
@@ -83,33 +83,18 @@ export function DiscoverWorkspace() {
     setBusy(true);
 
     try {
-      const res = await fetch('/api/dashboard/questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          siteId: site.id,
-          industry: site.industry,
-          location: site.location,
-          hint: site.lastAudit?.profileHint ?? '',
-          pages,
-          // Sent so the model doesn't propose things already answered — the
-          // fastest way to look like we never read their site.
-          answered: faqs
-            .filter((f) => f.status === 'published' && f.answer.trim())
-            .map((f) => f.question),
-        }),
-      });
+      // No `exclude`: this button deliberately REPLACES the list, so the model
+      // is free to propose a better-worded version of a question already here.
+      // The Results page passes the current set instead — see discoverQuestions.
+      const result = await discoverQuestions({ site, faqs });
 
-      const payload = (await res.json()) as { questions?: GeneratedQuestion[]; error?: string };
-      if (!res.ok || !payload.questions) {
-        setError(payload.error ?? 'Could not find questions. Please try again.');
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
 
-      await addQuestions(site.id, payload.questions);
+      await addQuestions(site.id, result.questions);
       await recheckCoverage(site.id);
-    } catch {
-      setError('Could not reach the server. Check your connection and try again.');
     } finally {
       setBusy(false);
     }

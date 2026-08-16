@@ -16,7 +16,7 @@ import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/
 
   TWO THINGS ARE LOAD-BEARING HERE.
 
-  1. IT RUNS A SLICE, NOT A PERIOD. A full run is 25 prompts × 3 engines = 75
+  1. IT RUNS A SLICE, NOT A PERIOD. A full run is 35 prompts × 3 engines = 105
      search-backed calls and will not fit in one request; this app holds itself
      to ~60s because that is roughly the platform's ceiling. So the route checks
      whatever has not been checked today, up to PROMPTS_PER_RUN, and reports

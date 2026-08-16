@@ -52,14 +52,12 @@ export type EngineAdapter = (question: string) => Promise<EngineResult>;
 /** Per-call ceiling. An engine that hasn't answered by now costs us the run. */
 export const ENGINE_TIMEOUT_MS = 25_000;
 
-/**
- * How much of the answer to keep as evidence.
- *
- * Enough to see a mention in context; not the whole answer. This table gets one
- * row per prompt per engine per run, and full answers would quickly make it the
- * largest thing in the database.
- */
-export const MAX_EXCERPT_CHARS = 600;
+/*
+  MAX_EXCERPT_CHARS moved to lib/dashboard/types.ts — the Results page needs it
+  too, to tell a truncated excerpt from an engine that stopped talking, and this
+  module is `server-only`. Re-exported so server-side callers here are unchanged.
+*/
+export { MAX_EXCERPT_CHARS } from '@/lib/dashboard/types';
 
 /** Sources beyond this add storage without adding evidence. */
 export const MAX_SOURCES = 20;

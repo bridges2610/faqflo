@@ -11,7 +11,7 @@ import type { EngineAdapter, EngineFailure } from './types';
   One question, every engine, in parallel.
 
   ⚠️ HOW BIG A SLICE CAN RUN IN ONE REQUEST IS THE CONSTRAINT THAT SHAPES THIS
-  WHOLE FEATURE. A full period is 25 prompts × 3 engines = 75 search-backed
+  WHOLE FEATURE. A full period is 35 prompts × 3 engines = 105 search-backed
   calls, and this app self-imposes a ~60s ceiling (lib/audit/limits.ts) because
   that is roughly the platform's. `after()` does not help — it runs after the
   response but inside the same invocation, so it shares the ceiling. There is no
