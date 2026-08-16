@@ -54,7 +54,7 @@ const LOCKED_VISIBILITY: Finding = {
   label: 'Cited in AI answers today',
   status: 'locked',
   detail:
-    'Asking ChatGPT, Perplexity and Gemini what they say about you costs money per question, so it runs with tracking rather than on every audit.',
+    'Asking ChatGPT, Perplexity and Gemini what they say about you costs money per question, so it runs from the Results page rather than on every audit.',
   weight: 0,
 };
 

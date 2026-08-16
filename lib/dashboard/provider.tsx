@@ -19,6 +19,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { trackingPeriod } from './plans';
 import * as store from './store';
 import type {
   ContentPlan,
@@ -232,7 +233,28 @@ export function DashboardProvider({
 
   const loadTracking = useCallback(async (id: string, domain: string) => {
     try {
-      const next = await store.trackingFromDb(id, domain);
+      /*
+        The budget window, derived once here and passed down.
+
+        The provider is the only place holding both the site and the user, and
+        the meter has to count over exactly the window the tracking route
+        enforces — see the note on trackingFromDb's `period`.
+      */
+      /*
+        ⚠️ Looked up by the id passed in, NOT read off the selected `site`.
+        This runs for whichever site was asked for, and reading the selection
+        instead would compute one site's window while counting another's checks
+        the moment someone switches sites mid-load.
+      */
+      const target = sites.find((s) => s.id === id) ?? null;
+
+      const period = trackingPeriod({
+        getCitedAt: target?.getCitedAt ?? null,
+        subscription: user.subscription,
+        subscriptionSince: user.subscriptionSince,
+      });
+
+      const next = await store.trackingFromDb(id, domain, period);
       setDbTracking(next);
       return next;
     } catch (err) {
@@ -242,7 +264,9 @@ export function DashboardProvider({
       setDbTracking(null);
       return null;
     }
-  }, []);
+    // Honest deps: the period depends on the site row and the subscription, so
+    // an empty array here would freeze the first render's answer forever.
+  }, [sites, user]);
 
   useEffect(() => {
     if (!site) {

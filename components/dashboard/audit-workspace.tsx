@@ -330,7 +330,7 @@ export function AuditWorkspace({
     if (!site || !data) return crawl;
 
     const crawlFindings = crawl.pillars.flatMap((p) => p.findings).filter((f) => f.pillar !== 'visibility');
-    const findings = [...crawlFindings, ...visibilityFindings(user, tracking)];
+    const findings = [...crawlFindings, ...visibilityFindings(site, user, tracking)];
     const pillars = buildPillars(findings);
 
     const firstGroup = groups[0];

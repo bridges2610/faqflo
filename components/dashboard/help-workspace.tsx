@@ -701,7 +701,9 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               Your watch list
             </SectionTitle>
             <P className="mt-2">
-              Stay Cited watches <strong>{STAY_CITED_PROMPT_CAP} questions</strong>:{' '}
+              Tracking comes with <strong>Get Cited for 30 days</strong>, and{' '}
+              <strong>Stay Cited</strong> keeps it running after that. Either way you watch{' '}
+              <strong>{STAY_CITED_PROMPT_CAP} questions</strong>:{' '}
               {DISCOVERED_PROMPT_CAP} we find for you, and {MANUAL_QUESTION_CAP} you write
               yourself. Use <strong>Find more questions</strong> for the first and{' '}
               <strong>Add your own question</strong> for the second — the second is for the ones you

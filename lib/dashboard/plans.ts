@@ -20,7 +20,7 @@
  * prevent — see hasGetCited vs getCitedActive below.
  */
 
-import type { DashboardData, Site, Subscription, User } from './types';
+import { ENGINES, type DashboardData, type Site, type Subscription, type User } from './types';
 
 export const FREE_FAQ_CAP = 5;
 
@@ -121,6 +121,113 @@ export function engineChecksFor(promptCap: number, engines: number, runs: number
   return promptCap * engines * runs;
 }
 
+/**
+ * Engine checks one account may spend on one site in a period.
+ *
+ * ⚠️ THIS IS ENFORCED NOW, NOT DECORATIVE. It was displayed on the Results page
+ * for a long time while nothing checked it, which was survivable only because
+ * tracking was subscription-only. Get Cited buys tracking for thirty days on a
+ * single payment, so the ceiling has to be real: without it, a one-off $129 can
+ * fund an unbounded recurring bill on somebody else's API. The old comment on
+ * canTrack was right about the risk and wrong about the remedy.
+ */
+export const TRACKING_CHECKS_PER_PERIOD = engineChecksFor(
+  STAY_CITED_PROMPT_CAP,
+  ENGINES.length,
+  TRACKING_RUNS_PER_PERIOD,
+);
+
+/** The window a tracking budget is counted over. */
+export type TrackingPeriod = { start: Date; end: Date };
+
+/**
+ * Which period a site is currently in, or null if it has no tracking access.
+ *
+ * ⚠️ ANCHORED TO A STORED DATE, NEVER TO `now`. store.ts used to end the period
+ * "thirty days from now", and its own comment warned that this moves every time
+ * the page loads and "must NOT become the thing a quota is enforced against.
+ * When enforcement arrives it wants a real period row." Enforcement has
+ * arrived. The anniversary that comment said did not exist does now:
+ * `profiles.subscription_since` and `sites.get_cited_at` are both stored.
+ *
+ * A rolling window would also make the budget unspendable in a different way —
+ * checks would age out of it one at a time, so a customer at the ceiling would
+ * be let through in dribs rather than told to wait for a date.
+ *
+ * Takes primitives rather than a Site or a SiteRow: the server holds snake_case
+ * database rows and the client holds camelCase models, and this has to be the
+ * same arithmetic on both sides.
+ */
+export function trackingPeriod(input: {
+  getCitedAt: string | null;
+  subscription: Subscription;
+  subscriptionSince: string | null;
+  /** Injected only by tests; production always means "now". */
+  now?: Date;
+}): TrackingPeriod | null {
+  const now = input.now ?? new Date();
+
+  /*
+    Subscribers renew on their billing anniversary, so the budget does too —
+    walking whole months forward from the start until the window contains `now`.
+    Month arithmetic rather than 30-day arithmetic because that is what Stripe
+    bills on, and a budget that reset on a different day from the invoice would
+    be impossible to explain.
+  */
+  if (input.subscription === 'stay_cited' && input.subscriptionSince) {
+    const start = new Date(input.subscriptionSince);
+    if (!Number.isNaN(start.getTime())) {
+      const cursor = new Date(start);
+      while (addMonth(cursor) <= now) cursor.setTime(addMonth(cursor).getTime());
+      return { start: cursor, end: addMonth(cursor) };
+    }
+  }
+
+  /*
+    Get Cited: the thirty-day window IS the period. There is no second one —
+    when it ends, access ends, so a budget that reset inside it would be giving
+    away a second allowance the customer never bought.
+  */
+  if (input.getCitedAt) {
+    const start = new Date(input.getCitedAt);
+    if (!Number.isNaN(start.getTime())) {
+      const end = new Date(start);
+      end.setDate(end.getDate() + GET_CITED_WINDOW_DAYS);
+      if (now < end) return { start, end };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * One calendar month on, clamped — 31 Jan + 1 month is 28/29 Feb, not 3 Mar.
+ *
+ * ⚠️ ENTIRELY IN UTC, AND THAT IS NOT A STYLE CHOICE. Written with local-time
+ * getters this drifted by the machine's offset: a 31 Jan anchor clamped to
+ * 28 Feb *local*, which is 1 March UTC, so the period landed in a different
+ * month depending on where the code ran. Vercel is UTC and a developer's laptop
+ * usually isn't, so the budget would have been enforced over one window in
+ * production and a different one in testing. `checked_at` is stored in UTC and
+ * compared in UTC; the boundary has to be too.
+ */
+function addMonth(date: Date): Date {
+  const next = new Date(date);
+  const day = next.getUTCDate();
+
+  // To the 1st first: setting the month while sitting on the 31st is what makes
+  // "one month after 31 Jan" overflow into March.
+  next.setUTCDate(1);
+  next.setUTCMonth(next.getUTCMonth() + 1);
+  next.setUTCDate(Math.min(day, daysInUtcMonth(next.getUTCFullYear(), next.getUTCMonth())));
+  return next;
+}
+
+/** Day 0 of the next month is the last day of this one. */
+function daysInUtcMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
 export type EntitlementId = 'get_cited' | 'stay_cited';
 
 export const ENTITLEMENTS: Record<
@@ -132,7 +239,7 @@ export const ENTITLEMENTS: Record<
     price: '$129 once',
     scope: 'site',
     blurb:
-      'The full audit, the complete answer set, and the publish-ready export for this site — plus 30 days to work with them.',
+      'The whole platform for this site, for 30 days: the full audit, the answer set, the publish-ready export, and citation tracking across every engine.',
   },
   /*
     ⚠️ THE BLURB LEADS ON TRACKING NOW, BECAUSE IT RUNS. It used to say
@@ -149,7 +256,7 @@ export const ENTITLEMENTS: Record<
     price: '$29/month',
     scope: 'account',
     blurb:
-      'Ask ChatGPT, Perplexity and Gemini your questions and see who they cite — plus every site on your account keeps generating after its 30 days.',
+      'Keeps citation tracking running once the 30 days end, and keeps every site on your account generating — new audits and fresh answers, for as long as you keep it.',
   },
 };
 
@@ -238,9 +345,27 @@ export function canContent(site: Site | null, user: User | null): boolean {
   return canGenerate(site, user);
 }
 
-/** Citation tracking is the subscription, and only the subscription. */
-export function canTrack(user: User | null): boolean {
-  return hasStayCited(user);
+/**
+ * Running a check — Stay Cited, or inside a live Get Cited window.
+ *
+ * ⚠️ Was subscription-only. Get Cited now buys tracking for its 30 days, with
+ * TRACKING_CHECKS_PER_PERIOD as the ceiling that keeps a one-off payment from
+ * funding an unbounded engine bill. Enforced server-side in the tracking route;
+ * this twin only decides what to render. See the fuller note on the server copy
+ * in lib/auth/entitlements.ts.
+ */
+export function canTrack(site: Site | null, user: User | null): boolean {
+  return canGenerate(site, user);
+}
+
+/**
+ * Seeing results already collected. PERMANENT, like canPublish.
+ *
+ * The window governs what may be RUN, never what may be READ — a lapsed
+ * customer keeps the report they paid to collect.
+ */
+export function canViewTracking(site: Site | null, user: User | null): boolean {
+  return hasGetCited(site) || hasStayCited(user);
 }
 
 /** Regenerating an answer set — an LLM call, so it follows the window. */

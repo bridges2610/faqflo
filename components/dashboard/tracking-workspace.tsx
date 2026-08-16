@@ -11,6 +11,7 @@ import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
 import {
   canTrack,
+  canViewTracking,
   DISCOVERED_PROMPT_CAP,
   engineChecksFor,
   MANUAL_QUESTION_CAP,
@@ -497,18 +498,31 @@ export function TrackingWorkspace() {
     );
   }
 
-  if (!canTrack(user)) {
+  /*
+    ⚠️ THE GATE IS canViewTracking, NOT canTrack.
+
+    Someone whose 30 days lapsed keeps the report they paid to collect — the
+    pricing page promises "everything you make stays yours for good", and
+    hiding measurements behind an upgrade card would break that promise on the
+    screen that made it. What the window governs is RUNNING a new check, which
+    spends money; every one of those controls is gated on `canRun` below.
+  */
+  if (!canViewTracking(site, user)) {
     return (
       <>
         <PageHeader title="Results" description="Whether AI is actually citing you." />
         <UpgradeCard
-          entitlement="stay_cited"
-          title="Stay Cited"
-          body="Keeps every site on your account generating once its 30 days are up — new audits and unlimited answers. It also turns this page on: citation tracking puts your questions to ChatGPT, Perplexity and Gemini and records, for each one, whether they cited you, named you without a link, or pointed somewhere else."
+          entitlement="get_cited"
+          siteName={site.name}
+          title="See who the assistants cite"
+          body="Get Cited puts your questions to ChatGPT, Perplexity and Gemini and records, for each one, whether they cited you, named you without a link, or pointed somewhere else — for 30 days, along with the audit, the answers and the export."
         />
       </>
     );
   }
+
+  /* May a new check be started? Separate from whether results may be READ. */
+  const canRun = canTrack(site, user);
 
   const daily = tracking?.daily ?? [];
   const latest = tracking?.latest ?? [];
@@ -540,9 +554,17 @@ export function TrackingWorkspace() {
             title="You haven’t run a check yet"
             body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else. It takes a minute or two.`}
             action={
-              <Button onClick={runTracking} disabled={run.busy}>
-                {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Run the first check'}
-              </Button>
+              canRun ? (
+                <Button onClick={runTracking} disabled={run.busy}>
+                  {runningHere
+                    ? 'Checking…'
+                    : run.busy
+                      ? 'Another check is running'
+                      : 'Run the first check'}
+                </Button>
+              ) : (
+                <ButtonLink href="/dashboard/checkout/start">Renew to run checks</ButtonLink>
+              )
             }
           />
         )}
@@ -604,7 +626,7 @@ export function TrackingWorkspace() {
     ⚠️ `null` means locked or not yet measured. It must never render as 0: a
     zero says "we looked and found nothing", and we did not look.
   */
-  const visibility = visibilityFindings(user, tracking);
+  const visibility = visibilityFindings(site, user, tracking);
   const visibilityScore = scoreOf(visibility);
   const band = pillarBand(visibilityScore);
 
@@ -725,9 +747,15 @@ export function TrackingWorkspace() {
         title="Results"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
         action={
-          <Button variant="ghost" size="sm" onClick={runTracking} disabled={run.busy}>
-            {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
-          </Button>
+          canRun ? (
+            <Button variant="ghost" size="sm" onClick={runTracking} disabled={run.busy}>
+              {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
+            </Button>
+          ) : (
+            <ButtonLink href="/dashboard/checkout/start" variant="ghost" size="sm">
+              Renew to run checks
+            </ButtonLink>
+          )
         }
       />
 
@@ -1150,7 +1178,12 @@ export function TrackingWorkspace() {
                   more?", and none of them is a disabled button with no reason
                   given. */}
               <div className="border-line mt-4 border-t pt-4">
-                {more.room === 0 ? (
+                {!canRun ? (
+                  <p className="text-slate text-xs">
+                    Finding more questions needs an active window — your existing list and results
+                    stay here either way.
+                  </p>
+                ) : more.room === 0 ? (
                   // ⚠️ "Discovery is full", NOT "your watch list is full". With
                   // 25 discovered and no manual questions there are still ten
                   // slots left, and calling that full would be untrue — and
@@ -1218,7 +1251,12 @@ export function TrackingWorkspace() {
               <div className="border-line mt-4 border-t pt-4">
                 <p className="text-navy text-sm font-semibold">Add your own question</p>
 
-                {manual.room === 0 ? (
+                {!canRun ? (
+                  <p className="text-slate text-xs">
+                    You can add your own questions again once the window is open — there would be
+                    nothing to check them with right now.
+                  </p>
+                ) : manual.room === 0 ? (
                   <p className="text-slate mt-1 text-xs">
                     {manual.used >= MANUAL_QUESTION_CAP
                       ? `You've added all ${MANUAL_QUESTION_CAP} of your own. Remove one on `

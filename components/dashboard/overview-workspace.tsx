@@ -265,10 +265,13 @@ export function OverviewWorkspace() {
                 <Row term="Service area" value={site.location ?? 'Not set'} />
                 <Row
                   term="AI citations"
-                  /* ⚠️ Honestly or not at all. Nothing queries an engine yet, so
-                     a zero here would read as "nobody is citing you" — which we
-                     have not measured and do not know. */
-                  value={canTrack(user) && checks > 0 ? `${cited} of ${checks}` : 'not measured'}
+                  /* ⚠️ Honestly or not at all. Without a run behind it a zero
+                     would read as "nobody is citing you", which we would not have
+                     measured. `checks > 0` is what makes this a count rather than
+                     an assumption. */
+                  value={
+                    canTrack(site, user) && checks > 0 ? `${cited} of ${checks}` : 'not measured'
+                  }
                 />
               </dl>
 

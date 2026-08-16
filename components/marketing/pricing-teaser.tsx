@@ -8,6 +8,8 @@ import {
   DISCOVERED_PROMPT_CAP,
   MANUAL_QUESTION_CAP,
   STAY_CITED_PROMPT_CAP,
+  TRACKING_CHECKS_PER_PERIOD,
+  TRACKING_RUNS_PER_PERIOD,
 } from '@/lib/dashboard/plans';
 
 /*
@@ -110,17 +112,19 @@ const PLANS: Plan[] = [
     featured: true,
     note: 'Start here',
     features: [
-      // ⚠️ "including whether AI cites you today" was here and is still not true
-      // ON THIS TIER. Tracking exists now, but it is Stay Cited only, so the
-      // visibility pillar stays `locked` at weight 0 for a Get Cited audit. The
-      // claim moved from impossible to merely wrong-plan, which is no better on
-      // a page where someone is choosing between the two.
+      // ⚠️ Tracking IS included here now, for the 30 days — which is why the
+      // line below can finally be ticked. It went from impossible, to
+      // wrong-plan, to true; check which of those three the product is in
+      // before editing this card again. The ceiling is real
+      // (TRACKING_CHECKS_PER_PERIOD, enforced in the tracking route) and is
+      // what makes a one-off payment safe to sell against a recurring cost.
       { label: 'Full audit — 44 checks across your whole site' },
       { label: 'The questions people actually ask AI in your category' },
       { label: 'The pages your industry expects, and which of yours are missing' },
       { label: 'A complete answer-first FAQ set, written to be quoted' },
       { label: 'Publish-ready HTML for your own site' },
       { label: 'Entity schema and llms.txt' },
+      { label: 'Citation tracking across ChatGPT, Perplexity and Gemini, for the 30 days' },
       // ⚠️ Both halves of the deal, stated before the card rather than
       // discovered on day 31. Everything MADE is permanent; the running of new
       // audits is what ends. Selling "yours to keep" and then stopping audits
@@ -155,7 +159,7 @@ const PLANS: Plan[] = [
       than a typo.
     */
     features: [
-      { label: 'Citation tracking across ChatGPT, Perplexity and Gemini' },
+      { label: 'Citation tracking that keeps running after the 30 days' },
       {
         label: `${STAY_CITED_PROMPT_CAP} questions watched — ${DISCOVERED_PROMPT_CAP} we find for you, ${MANUAL_QUESTION_CAP} you write yourself`,
       },
@@ -164,6 +168,11 @@ const PLANS: Plan[] = [
       { label: 'Keeps every site on your account running after its 30 days' },
       { label: 'Unlimited re-audits, regeneration, and answers kept per site' },
       { label: 'Everything Get Cited unlocks, on every site you add' },
+      // ⚠️ The ceiling, stated where the plan is sold. "Full platform" with a
+      // silent cap is something customers discover AT the cap.
+      {
+        label: `${TRACKING_CHECKS_PER_PERIOD} engine checks a month — every question, every engine, ${TRACKING_RUNS_PER_PERIOD} times`,
+      },
       // ⚠️ Not decoration. Tracking runs when you press the button; without this
       // line a tick beside "citation tracking" implies it watches on its own.
       { label: 'Automatic scheduled checks', soon: true },

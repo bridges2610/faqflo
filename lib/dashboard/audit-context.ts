@@ -29,7 +29,7 @@ const LOCKED: Finding = {
   label: 'Cited in AI answers today',
   status: 'locked',
   detail:
-    'Asking ChatGPT, Perplexity and Gemini what they say about you costs money per question, so it runs with Stay Cited rather than on every audit.',
+    'Asking ChatGPT, Perplexity and Gemini what they say about you costs money per question, so it runs from the Results page rather than on every audit.',
   weight: 0,
 };
 
@@ -40,8 +40,17 @@ const LOCKED: Finding = {
  * modelled, smoothed or extrapolated — "cited 4 times" means four answers we
  * saw with our own eyes.
  */
-export function visibilityFindings(user: User | null, tracking: SiteTracking | null): Finding[] {
-  if (!canTrack(user) || !tracking || tracking.latest.length === 0) return [LOCKED];
+export function visibilityFindings(
+  site: Site | null,
+  user: User | null,
+  tracking: SiteTracking | null,
+): Finding[] {
+  /*
+    ⚠️ `canTrack`, not `canViewTracking`. The pillar scores what a CURRENT
+    check found; a lapsed window keeps its stored results readable on Results,
+    but they should not go on scoring an audit run today.
+  */
+  if (!canTrack(site, user) || !tracking || tracking.latest.length === 0) return [LOCKED];
 
   const checks = tracking.latest;
   const cited = checks.filter((c) => c.outcome === 'cited').length;

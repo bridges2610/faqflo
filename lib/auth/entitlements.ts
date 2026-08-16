@@ -78,17 +78,40 @@ export function canRegenerate(site: SiteRow | null, user: ProfileRow | null): bo
 }
 
 /**
- * Citation tracking — the subscription, and only the subscription.
+ * Running a citation check — the thing that spends money on engines.
  *
- * ⚠️ NOT an alias of canGenerate, unlike the four above. Get Cited does not buy
- * this at all, not even inside its 30 days: asking three search-backed engines
- * 35 questions four times a period is a recurring cost, and a one-off payment
- * cannot fund a recurring bill. It is the twin of canTrack in plans.ts, and the
- * only thing standing between a Get Cited customer and an unmetered spend on
- * somebody else's API.
+ * ⚠️ THIS USED TO BE SUBSCRIPTION-ONLY, AND THE REASON IT CHANGED MATTERS. The
+ * old rule said Get Cited does not buy tracking "not even inside its 30 days",
+ * because asking three search-backed engines 35 questions repeatedly is a
+ * recurring cost and a one-off payment cannot fund a recurring bill. That risk
+ * was real and has not gone away — it is now answered by a METER rather than a
+ * closed door: TRACKING_CHECKS_PER_PERIOD is enforced in the tracking route, so
+ * the ceiling on a Get Cited window is a fixed, priced number of engine calls.
+ *
+ * ⚠️ IF THAT ENFORCEMENT IS EVER REMOVED, THIS MUST GO BACK TO hasStayCited.
+ * The two changed together and only make sense together; an unmetered Get Cited
+ * is exactly the unbounded spend the original comment warned about.
+ *
+ * Viewing past results is a different question — see canViewTracking.
  */
-export function canTrack(user: ProfileRow | null): boolean {
-  return hasStayCited(user);
+export function canTrack(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return canGenerate(site, user);
+}
+
+/**
+ * Seeing citation results that were already collected. PERMANENT.
+ *
+ * The twin of canPublish, and for the same reason: it hands back work already
+ * paid for rather than commissioning new work. A customer whose 30 days lapsed
+ * keeps the report — the pricing page promises "everything you make stays yours
+ * for good", and hiding measurements they paid to collect would contradict that
+ * on the screen that sold it.
+ *
+ * Deliberately `hasGetCited` and not `getCitedActive`: the window governs what
+ * may be RUN, never what may be READ.
+ */
+export function canViewTracking(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return hasGetCited(site) || hasStayCited(user);
 }
 
 /**

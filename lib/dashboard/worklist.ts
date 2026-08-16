@@ -209,7 +209,7 @@ function productTasks(input: WorklistInput): Task[] {
     });
   }
 
-  if (hasGetCited(site) && !canTrack(user) && published.length > 0) {
+  if (hasGetCited(site) && !canTrack(site, user) && published.length > 0) {
     tasks.push({
       id: 'consider-stay-cited',
       what: 'Keep this running after your 30 days',

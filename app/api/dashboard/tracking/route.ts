@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
 import { canTrack, hasGetCited } from '@/lib/auth/entitlements';
-import { STAY_CITED_PROMPT_CAP } from '@/lib/dashboard/plans';
+import {
+  STAY_CITED_PROMPT_CAP,
+  TRACKING_CHECKS_PER_PERIOD,
+  trackingPeriod,
+} from '@/lib/dashboard/plans';
 import type { Engine } from '@/lib/dashboard/types';
 import { checkRateLimit, limitKey, TRACKING_RATE_LIMIT } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -76,11 +80,14 @@ export async function POST(request: Request) {
   // tells an attacker their guess was right.
   if (!site) return fail('No such site on your account.', 404);
 
-  if (!canTrack(user)) {
+  if (!canTrack(site, user)) {
     return fail(
+      // Two different customers. One bought and ran out of window; the other
+      // never bought. Telling the first to "get Get Cited" reads as though we
+      // have forgotten they already did.
       hasGetCited(site)
-        ? 'Citation tracking is part of Stay Cited. Get Cited covers the audit, answers and export for this site.'
-        : 'Citation tracking is part of Stay Cited.',
+        ? 'This site’s 30 days have ended. Your results stay here — Stay Cited starts new checks again.'
+        : 'Citation tracking comes with Get Cited, for 30 days, and continues on Stay Cited.',
       403,
     );
   }
@@ -189,7 +196,64 @@ export async function POST(request: Request) {
     return fail("That's the tracking runs for today. They reset at midnight UTC.", 429);
   }
 
-  const batch = pending.slice(0, PROMPTS_PER_RUN);
+  /*
+    The period budget — the thing that makes a one-off payment safe to sell.
+
+    ⚠️ THIS IS WHAT REPLACED "TRACKING IS SUBSCRIPTION-ONLY". Get Cited buys
+    thirty days of tracking on a single $129, and without a ceiling that is an
+    unbounded recurring bill on somebody else's API — the exact risk the old
+    comment on canTrack described. The allowance was displayed on the Results
+    page for months while nothing enforced it; now it is enforced here, before
+    any engine is asked, and the meter finally means something.
+
+    ⚠️ Counted from a STORED anchor, never a rolling window. trackingPeriod()
+    keys off the subscription anniversary or the Get Cited purchase date. A
+    rolling 30 days would let checks age out one at a time, so a customer at the
+    ceiling would trickle through instead of being told a date.
+  */
+  const period = trackingPeriod({
+    getCitedAt: site.get_cited_at,
+    subscription: user.subscription,
+    subscriptionSince: user.subscription_since,
+  });
+
+  if (!period) {
+    // canTrack passed, so access exists; a missing period means the anchor
+    // columns disagree with it. Refuse rather than spend on an unknown budget.
+    console.error('No tracking period for site', site.id, 'user', user.id);
+    return fail('We could not work out your current tracking period. Please contact support.', 409);
+  }
+
+  const { count: spent, error: spentError } = await db
+    .from('citation_checks')
+    .select('*', { count: 'exact', head: true })
+    .eq('site_id', site.id)
+    .gte('checked_at', period.start.toISOString());
+
+  if (spentError) {
+    console.error('Could not read the period budget:', spentError);
+    return fail('Could not check your remaining allowance. Please try again.', 502);
+  }
+
+  const left = TRACKING_CHECKS_PER_PERIOD - (spent ?? 0);
+  const resets = period.end.toISOString().slice(0, 10);
+
+  if (left <= 0) {
+    return fail(
+      `That's all ${TRACKING_CHECKS_PER_PERIOD} engine checks for this period. The allowance resets on ${resets}.`,
+      429,
+    );
+  }
+
+  /*
+    Trimmed to what is left, not refused outright.
+
+    A customer with thirty checks remaining should get thirty. Each question
+    costs one check per engine, so the budget is divided by the engine count to
+    turn it back into a number of questions.
+  */
+  const affordable = Math.max(1, Math.floor(left / ALL_ENGINES.length));
+  const batch = pending.slice(0, Math.min(PROMPTS_PER_RUN, affordable));
 
   const { outcomes, failures } = await checkBatch(batch, {
     domain: site.domain,

@@ -27,6 +27,7 @@ import { createClient as supabaseBrowser } from '@/lib/supabase/client';
 import type { AuditRunRow, CitationCheckRow, SiteRow } from '@/lib/supabase/types';
 import { normalizeDomain, sourceHost } from './domain';
 import { contentHash, normalizePath } from './export';
+import type { TrackingPeriod } from './plans';
 import {
   DISCOVERED_PROMPT_CAP,
   faqCapFor,
@@ -857,6 +858,16 @@ export async function auditHistory(siteId: string, limit = 12): Promise<AuditRun
 export async function trackingFromDb(
   siteId: string,
   siteDomain: string,
+  /*
+    The budget window the tracking route enforces, or null when the site has no
+    tracking access.
+
+    ⚠️ PASSED IN, NOT COMPUTED HERE. The meter and the enforcement have to be
+    the same arithmetic on the same anchor — two independent counts is how a
+    customer gets refused at "310 of 420". The provider holds the site and the
+    user, so it derives the period once and hands it down.
+  */
+  period: TrackingPeriod | null,
   days = 30,
 ): Promise<SiteTracking | null> {
   assertClient('trackingFromDb');
@@ -1075,28 +1086,20 @@ export async function trackingFromDb(
     // The cost side, so it counts every call actually spent — the raw log, not
     // the deduped current state. Charging for one check when four ran would
     // make the quota bar a fiction.
-    checksUsed: all.length,
-    periodResetsAt: periodEnd(),
+    /*
+      Spent in THIS PERIOD, not in the charted window.
+
+      `all` covers the last 30 days for the chart, which is a different span
+      from a billing period — counting it here would show a number the route
+      does not enforce.
+    */
+    checksUsed: period ? all.filter((c) => c.checkedAt >= period.start.toISOString()).length : 0,
+    periodResetsAt: (period?.end ?? new Date()).toISOString(),
   };
 }
 
 function blankEngines(): Record<Engine, number> {
   return Object.fromEntries(ENGINES.map((e) => [e, 0])) as Record<Engine, number>;
-}
-
-/**
- * When the current tracking period rolls over.
- *
- * Thirty days from now, computed rather than stored — there is no billing
- * anniversary in the database to key it to yet. ⚠️ It therefore moves every time
- * the page loads, which is honest enough for a countdown but must NOT become
- * the thing a quota is enforced against. When enforcement arrives it wants a
- * real period row, not this.
- */
-function periodEnd(): string {
-  const end = new Date();
-  end.setUTCDate(end.getUTCDate() + 30);
-  return end.toISOString();
 }
 
 /* ------------------------------------------------------------ questions --- */
