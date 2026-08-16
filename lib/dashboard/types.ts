@@ -213,9 +213,39 @@ export type CitationDay = {
 
 export type CompetitorShare = {
   domain: string;
-  /** Times this domain was cited across the checks we ran. */
+  /**
+   * Times this domain appeared as a source across the checks we ran.
+   *
+   * ⚠️ THIS COUNTS EVERY SOURCE, NOT ONE PER CHECK. It used to be built from
+   * `cited_instead` — the single domain that took the click when we didn't —
+   * which threw away the rest of each answer's source list: 45 data points out
+   * of 296 on a real site. An engine citing six publishers is six facts about
+   * who is winning, not one.
+   */
   citations: number;
   isYou: boolean;
+};
+
+/**
+ * One of our own URLs, and how often an engine cited it.
+ *
+ * The actionable half of being cited: not "you were cited five times" but
+ * "this page earned them". Full URLs are stored on every check, so this costs
+ * nothing to derive.
+ */
+export type CitedPage = {
+  url: string;
+  citations: number;
+};
+
+/** How one engine answered, across every check in the window. */
+export type EngineBreakdown = {
+  engine: Engine;
+  cited: number;
+  mentioned: number;
+  absent: number;
+  /** Checks run against this engine — the denominator, never assumed equal. */
+  checked: number;
 };
 
 export type SiteTracking = {
@@ -223,6 +253,17 @@ export type SiteTracking = {
   daily: CitationDay[];
   latest: CitationCheck[];
   competitors: CompetitorShare[];
+  /** Our own cited URLs, most-cited first. */
+  citedPages: CitedPage[];
+  /** Per-engine outcome counts, in ENGINES order so the UI reads consistently. */
+  byEngine: EngineBreakdown[];
+  /**
+   * Source appearances in the window: ours, and everyone's.
+   *
+   * Kept as counts rather than a precomputed percentage because share of voice
+   * is meaningless without its denominator — see the tiles, which print both.
+   */
+  sourceAppearances: { ours: number; total: number };
   /**
    * The tracking budget, in the unit the customer actually buys.
    *

@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { sourceHost } from '@/lib/dashboard/domain';
 import type { CitationCheck } from '@/lib/dashboard/types';
 import { MAX_EXCERPT_CHARS, type EngineAnswer } from './types';
 
@@ -21,15 +22,15 @@ import { MAX_EXCERPT_CHARS, type EngineAnswer } from './types';
   the same point, and the dashboard counts them separately.
 */
 
-/** Bare host: no scheme, no `www.`, no port, lowercased. */
-function host(value: string): string | null {
-  try {
-    const url = value.includes('://') ? new URL(value) : new URL(`https://${value}`);
-    return url.hostname.toLowerCase().replace(/^www\./, '');
-  } catch {
-    return null;
-  }
-}
+/*
+  Bare host: no scheme, no `www.`, no port, lowercased.
+
+  Imported rather than defined here so the dashboard's share-of-voice ranking
+  and this classifier cannot disagree about what one publisher is. See the note
+  on sourceHost — a pure module, so pulling it into a `server-only` file drags
+  nothing along with it.
+*/
+const host = sourceHost;
 
 /**
  * Does this source belong to the site?
@@ -94,15 +95,78 @@ function nameIsDistinctive(name: string): boolean {
   return distinctive.length > 0;
 }
 
-function mentionsName(text: string, name: string): boolean {
-  if (!nameIsDistinctive(name)) return false;
+/**
+ * The ways this business might be named in prose.
+ *
+ * ⚠️ A FULL LEGAL NAME IS ALMOST NEVER WHAT AN ASSISTANT WRITES. Matching only
+ * the stored string meant "Segelman Shaw Roofing, Siding & Gutters" had to
+ * appear verbatim — so an answer saying "Segelman Shaw" counted as `absent`,
+ * and the customer was undercounted against their own results.
+ *
+ * ⚠️ EVERY ALIAS STILL GOES THROUGH nameIsDistinctive. This widens what we
+ * recognise, never what we will claim: dropping the trade words from "Roofing
+ * Services" leaves nothing distinctive, so it yields no alias at all rather
+ * than one that matches every roofing answer ever written. The asymmetry below
+ * is the whole point and must survive any edit here.
+ *
+ * The domain brand is included because plenty of businesses are known by it
+ * ("letsroof"), and it is the one name we always have.
+ */
+function aliasesFor(name: string, domain: string): string[] {
+  const out: string[] = [];
+  const add = (value: string) => {
+    const cleaned = value.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (cleaned.length > 2 && nameIsDistinctive(cleaned) && !out.includes(cleaned)) {
+      out.push(cleaned);
+    }
+  };
 
+  add(name);
+
+  /*
+    The distinctive core: the LEADING RUN of words, stopping at the first one
+    that describes a trade.
+
+    "Segelman Shaw Roofing, Siding & Gutters" -> "segelman shaw".
+
+    ⚠️ A leading run, not "every non-generic word". Filtering the whole string
+    would keep "siding" and "gutters" — they are not in GENERIC and never can be,
+    since no list of trade words is complete — and join them into
+    "segelman shaw siding gutters", a phrase nobody writes. The run stops where
+    the business's name stops and the description of its trade begins, which is
+    how English company names are built.
+
+    ⚠️ TWO WORDS MINIMUM. A one-word core would put "Advanced" or "Premier" into
+    the matcher and find them in prose that has nothing to do with this
+    customer. Single-word names are still matched in full and by their domain
+    brand — narrower than we could be, which is the correct direction to err.
+  */
+  const words = name
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const leading: string[] = [];
+  for (const word of words) {
+    if (GENERIC.has(word) || word.length <= 2) break;
+    leading.push(word);
+  }
+  if (leading.length >= 2) add(leading.join(' '));
+
+  // The domain brand, without its TLD.
+  const bare = host(domain);
+  if (bare) add(bare.split('.')[0]);
+
+  return out;
+}
+
+function mentionsName(text: string, name: string, domain: string): boolean {
   // Collapse whitespace on both sides so a line break inside the name in the
   // answer doesn't hide it.
   const haystack = text.toLowerCase().replace(/\s+/g, ' ');
-  const needle = name.toLowerCase().replace(/\s+/g, ' ').trim();
 
-  return needle.length > 0 && haystack.includes(needle);
+  return aliasesFor(name, domain).some((alias) => haystack.includes(alias));
 }
 
 /**
@@ -149,7 +213,7 @@ export function classify(
     return { outcome: 'cited', citedInstead: null, excerpt };
   }
 
-  if (mentionsName(answer.text, site.name)) {
+  if (mentionsName(answer.text, site.name, site.domain)) {
     // Named but not linked. Still worth knowing who took the click.
     return { outcome: 'mentioned', citedInstead: citedInstead(answer.sources, ours), excerpt };
   }

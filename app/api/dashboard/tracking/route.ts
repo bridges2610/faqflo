@@ -193,7 +193,17 @@ export async function POST(request: Request) {
 
   const { outcomes, failures } = await checkBatch(batch, {
     domain: site.domain,
-    name: site.name,
+    /*
+      The name the engines would actually say, falling back to the label.
+
+      `brand_name` is what the audit read off the site's own schema.org markup;
+      `name` is free text from the add-site form, and most people type their
+      domain there. Matching a mention against "Letsroof" when the company is
+      "Segelman Shaw Roofing" finds nothing and records `absent` — undercounting
+      the customer against their own results. The fallback keeps a site that has
+      never been audited working exactly as before.
+    */
+    name: site.brand_name ?? site.name,
   });
 
   /*

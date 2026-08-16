@@ -15,7 +15,9 @@ import {
   ENGINES,
   type CitationCheck,
   type CitationDay,
+  type CitedPage,
   type CompetitorShare,
+  type EngineBreakdown,
   type ContentPlan,
   type DashboardData,
   type DiscoveredQuestion,
@@ -652,12 +654,48 @@ export function buildSeed(siteId: string): SeedLocalData {
     .map(([domain, citations]) => ({ domain, citations, isYou: domain === site.domain }))
     .sort((a, b) => b.citations - a.citations);
 
+  /*
+    The fixture has no `sources` to aggregate — seedChecks() invents outcomes,
+    not answers — so these are derived from what it does have rather than
+    invented separately. `byEngine` is real arithmetic over `latest`;
+    `sourceAppearances` reuses the competitor tally, which is the same shape a
+    real site's would take, just built from one source per check instead of all
+    of them. Enough to render the new sections in development; not a claim about
+    anything.
+  */
+  const byEngine: EngineBreakdown[] = ENGINES.map((engine) => {
+    const mine = latest.filter((c) => c.engine === engine);
+    return {
+      engine,
+      cited: mine.filter((c) => c.outcome === 'cited').length,
+      mentioned: mine.filter((c) => c.outcome === 'mentioned').length,
+      absent: mine.filter((c) => c.outcome === 'absent').length,
+      checked: mine.length,
+    };
+  });
+
+  const oursCited = citedCounts.get(site.domain) ?? 0;
+  const citedPages: CitedPage[] = oursCited
+    ? [
+        { url: `https://${site.domain}/faq`, citations: Math.ceil(oursCited / 2) },
+        { url: `https://${site.domain}/`, citations: Math.floor(oursCited / 2) },
+      ].filter((p) => p.citations > 0)
+    : [];
+
+  const sourceAppearances = {
+    ours: oursCited,
+    total: [...citedCounts.values()].reduce((a, b) => a + b, 0),
+  };
+
   const tracking: SiteTracking[] = [
     {
       siteId: site.id,
       daily: seedDaily(30),
       latest,
       competitors,
+      citedPages,
+      byEngine,
+      sourceAppearances,
       promptsTracked: 12,
       promptCap: STAY_CITED_PROMPT_CAP,
       runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
@@ -684,6 +722,9 @@ export function emptyTracking(siteId: string): SiteTracking {
     daily: [],
     latest: [],
     competitors: [],
+    citedPages: [],
+    byEngine: [],
+    sourceAppearances: { ours: 0, total: 0 },
     promptsTracked: 0,
     promptCap: STAY_CITED_PROMPT_CAP,
     runsPerPeriod: TRACKING_RUNS_PER_PERIOD,

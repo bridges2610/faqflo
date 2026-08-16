@@ -195,6 +195,23 @@ function groupByQuestion(checks: CitationCheck[]): Grouped[] {
   );
 }
 
+/**
+ * A cited URL, shortened to the part that identifies the page.
+ *
+ * The host is already the card's subject and every row repeats it, so the path
+ * is the only distinguishing part. Tracking parameters go too — `?utm_source=openai`
+ * is the engine's own tagging, not something the customer published.
+ */
+function prettyUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    const path = parsed.pathname.replace(/\/$/, '');
+    return path === '' ? parsed.hostname.replace(/^www\./, '') : path;
+  } catch {
+    return url;
+  }
+}
+
 /** A grouped list of questions — the body of both new outcome cards. */
 function QuestionList({ items }: { items: Grouped[] }) {
   return (
@@ -313,7 +330,51 @@ export function TrackingWorkspace() {
   const cited = latest.filter((c) => c.outcome === 'cited').length;
   const mentioned = latest.filter((c) => c.outcome === 'mentioned').length;
   const absent = latest.filter((c) => c.outcome === 'absent').length;
-  const citationRate = latest.length ? (cited / latest.length) * 100 : 0;
+
+  /*
+    Two different numbers that tools conflate, kept apart.
+
+    A CITATION is being used as a source — the engine linked to you. A MENTION
+    is being named at all, linked or not, so it INCLUDES the citations. Reading
+    "mentions" as the unlinked half alone would make the two look like rivals
+    when one contains the other, and a customer comparing our figure to another
+    tool's needs to know which one they are holding.
+  */
+  const mentions = cited + mentioned;
+  const visibilityRate = latest.length ? (mentions / latest.length) * 100 : 0;
+
+  /*
+    Share of voice: our source appearances against every source appearance.
+
+    ⚠️ THE DENOMINATOR IS SOURCE SLOTS, NOT CHECKS. An answer citing six
+    publishers offers six slots and we either hold one or we don't. This is the
+    only figure here directly comparable between us and a rival, which is
+    exactly why it must never be shown without the counts underneath it.
+  */
+  const appearances = tracking?.sourceAppearances ?? { ours: 0, total: 0 };
+  const shareOfVoice = appearances.total ? (appearances.ours / appearances.total) * 100 : 0;
+
+  const competitors = tracking?.competitors ?? [];
+  const citedPages = tracking?.citedPages ?? [];
+  const byEngine = tracking?.byEngine ?? [];
+
+  /*
+    The ranking, trimmed to a readable length.
+
+    A real site draws on 200+ distinct domains, and a list that long is a data
+    dump rather than a finding. Top twelve, plus OUR row appended at its true
+    rank whenever we fall outside it — a share-of-voice board that can silently
+    omit the reader is worse than no board, and "you: 47th" is precisely the
+    fact they came for.
+  */
+  const SHARE_ROWS = 12;
+  const ranked = competitors.map((c, i) => ({ ...c, rank: i + 1 }));
+  const shareRows = ranked.slice(0, SHARE_ROWS);
+  const you = ranked.find((c) => c.isYou);
+  if (you && !shareRows.some((c) => c.isYou)) shareRows.push(you);
+
+  // The meter divides by this, so it has to be the largest bar actually drawn.
+  const shareTop = Math.max(...shareRows.map((c) => c.citations), 1);
 
   // Grouped for the two read-only lists below; `uncited` stays row-per-engine
   // because each of its rows names a different domain that took the click.
@@ -379,31 +440,37 @@ export function TrackingWorkspace() {
           home uses. Four separate cards read as four competing things. */}
       <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-4">
         <MetricTile
-          label="Cited"
+          label="Citations"
           icon={<ChartIcon className="h-3.5 w-3.5" />}
           tint="bg-success/12 text-success-ink"
           value={cited}
-          footer={`of ${latest.length} checks`}
+          footer={`of ${latest.length} checks · you were the source`}
         />
         <MetricTile
-          label="Named, not linked"
+          label="Mentions"
           icon={<SearchIcon className="h-3.5 w-3.5" />}
           tint="bg-accent-soft text-teal-ink"
-          value={mentioned}
-          footer="mentioned without a source"
+          value={mentions}
+          footer={
+            mentioned > 0
+              ? `named at all · ${mentioned} without a link`
+              : 'named at all, linked or not'
+          }
         />
         <MetricTile
-          label="Citation rate"
+          label="Share of voice"
           icon={<AeoIcon className="h-3.5 w-3.5" />}
           tint="bg-primary-soft text-primary"
-          value={`${citationRate.toFixed(0)}%`}
-          footer="of checks"
+          value={`${shareOfVoice.toFixed(1)}%`}
+          // The counts, always. A percentage of an unstated denominator is the
+          // kind of figure this product strips out of its own marketing.
+          footer={`${formatNumber(appearances.ours)} of ${formatNumber(appearances.total)} sources cited`}
         />
         <MetricTile
-          label="Not in the answer"
+          label="Visibility rate"
           icon={<GlobeIcon className="h-3.5 w-3.5" />}
-          value={absent}
-          footer="someone else was"
+          value={`${visibilityRate.toFixed(0)}%`}
+          footer={`of checks name you · ${absent} don’t`}
         />
       </Card>
 
@@ -416,6 +483,53 @@ export function TrackingWorkspace() {
       <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         <div className="space-y-5">
           <CitationChart daily={daily} />
+
+          {/* Per engine.
+
+              The tiles above average the three together, which hides the most
+              useful shape in the data: being cited on one engine and invisible
+              on another is a different problem from being invisible everywhere,
+              and it is fixable. Denominators are per engine and never assumed
+              equal — a run where one engine 429s leaves it genuinely behind. */}
+          {byEngine.some((e) => e.checked > 0) && (
+            <Card className="p-5 sm:p-7">
+              <SectionTitle>By engine</SectionTitle>
+              <p className="text-slate mt-1 text-sm">
+                Where you stand on each one, from the most recent check of every question.
+              </p>
+
+              <ul className="divide-line mt-3 divide-y">
+                {byEngine.map((e) => (
+                  <li key={e.engine} className="py-3.5">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                      <p className="text-navy text-sm font-semibold">{e.engine}</p>
+                      <p className="text-slate text-xs">
+                        {e.checked === 0 ? (
+                          // Not a zero — a gap. Saying "0 citations" for an
+                          // engine we never heard from would be a measurement
+                          // we did not take.
+                          <span className="text-error-ink">no answers stored</span>
+                        ) : (
+                          <>
+                            <span className="text-success-ink font-semibold">{e.cited} cited</span>
+                            {e.mentioned > 0 && <> · {e.mentioned} named</>} · {e.absent} absent ·
+                            of {e.checked}
+                          </>
+                        )}
+                      </p>
+                    </div>
+                    {e.checked > 0 && (
+                      <Meter
+                        className="mt-1.5"
+                        value={((e.cited + e.mentioned) / e.checked) * 100}
+                        tone={e.cited > 0 ? 'primary' : 'line'}
+                      />
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
 
           {/* The positive half, which until now existed only as a number in a
               tile. This is the screen a subscriber opens to answer "is this
@@ -475,39 +589,95 @@ export function TrackingWorkspace() {
             )}
           </Card>
 
+          {/* Which of our own pages earned the citations.
+
+              The actionable half. "You were cited five times" is a score; "this
+              page was cited five times" is an instruction — it says which piece
+              of content is doing the work and therefore what to write more of.
+              Costs nothing to show: the full URLs were already stored on every
+              check. */}
+          {citedPages.length > 0 && (
+            <Card className="p-5 sm:p-7">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <SectionTitle>Pages earning citations</SectionTitle>
+                <Badge tone="success">{citedPages.length}</Badge>
+              </div>
+              <p className="text-slate mt-1 text-sm">
+                The exact URLs engines linked to. More citations than checks is normal — one
+                answer can cite two of your pages.
+              </p>
+
+              <ul className="divide-line mt-3 divide-y">
+                {citedPages.map((page) => (
+                  <li
+                    key={page.url}
+                    className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3.5"
+                  >
+                    <a
+                      href={page.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:text-primary-hover min-w-0 flex-1 truncate text-sm"
+                    >
+                      {prettyUrl(page.url)}
+                    </a>
+                    <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
+                      {page.citations}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
+
+          {/* Share of voice.
+
+              ⚠️ COUNTS EVERY SOURCE IN EVERY ANSWER, not one per check. That is
+              the difference between ranking against the handful of rivals who
+              happened to take first place and ranking against the whole field
+              the engines actually drew from. */}
           <Card className="p-5 sm:p-7">
-            <SectionTitle>Who gets cited</SectionTitle>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle>Who gets cited</SectionTitle>
+              <Badge tone="cyan">{formatNumber(competitors.length)} domains</Badge>
+            </div>
             <p className="text-slate mt-1 text-sm">
-              Across every check we ran for {site.name}&rsquo;s questions.
+              Every source the engines used across {site.name}&rsquo;s questions —{' '}
+              {formatNumber(appearances.total)} citations in all, ranked by how often each domain
+              was drawn on.
             </p>
 
             <ul className="mt-5 space-y-4">
-              {(tracking?.competitors ?? []).map((c) => {
-                const top = Math.max(...(tracking?.competitors ?? []).map((x) => x.citations), 1);
-                return (
-                  <li key={c.domain}>
-                    <div className="flex items-baseline justify-between gap-4">
-                      <p
-                        className={`min-w-0 truncate text-sm ${
-                          c.isYou ? 'text-navy font-semibold' : 'text-slate'
-                        }`}
-                      >
-                        {c.domain}
-                        {c.isYou && ' (you)'}
-                      </p>
-                      <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
-                        {c.citations}
-                      </p>
-                    </div>
-                    <Meter
-                      className="mt-1.5"
-                      value={(c.citations / top) * 100}
-                      tone={c.isYou ? 'primary' : 'line'}
-                    />
-                  </li>
-                );
-              })}
+              {shareRows.map((c) => (
+                <li key={c.domain}>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <p
+                      className={`min-w-0 truncate text-sm ${
+                        c.isYou ? 'text-navy font-semibold' : 'text-slate'
+                      }`}
+                    >
+                      {c.rank}. {c.domain}
+                      {c.isYou && ' (you)'}
+                    </p>
+                    <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
+                      {c.citations}
+                    </p>
+                  </div>
+                  <Meter
+                    className="mt-1.5"
+                    value={(c.citations / shareTop) * 100}
+                    tone={c.isYou ? 'primary' : 'line'}
+                  />
+                </li>
+              ))}
             </ul>
+
+            {competitors.length > shareRows.length && (
+              <p className="text-slate mt-4 text-xs">
+                and {formatNumber(competitors.length - shareRows.length)} more domains cited at
+                least once.
+              </p>
+            )}
           </Card>
         </div>
 

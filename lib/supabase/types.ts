@@ -35,6 +35,14 @@ export type SiteRow = {
   industry: string | null;
   location: string | null;
   profile_source: 'schema' | 'inferred' | 'manual' | null;
+  /**
+   * The business's real name, inferred by the audit — not the display label.
+   *
+   * `name` is what the customer typed, and most people type their domain. This
+   * is what lib/tracking/classify.ts looks for in an answer, so it decides what
+   * counts as a mention. Service-role writes only; see 0007.
+   */
+  brand_name: string | null;
   get_cited_at: string | null;
   created_at: string;
 };

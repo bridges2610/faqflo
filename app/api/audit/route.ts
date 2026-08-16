@@ -6,6 +6,7 @@ import type { AuditDepth } from '@/lib/audit/types';
 import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
 import { canRunFullAudit, hasGetCited, pageBudgetFor } from '@/lib/auth/entitlements';
+import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
   AUDIT_FULL_RATE_LIMIT,
@@ -212,6 +213,39 @@ export async function POST(request: Request) {
     if (user && site) {
       const report = result.report;
       after(async () => {
+        /*
+          The business's real name, for mention matching.
+
+          ⚠️ NOT GATED ON profileIsUsable(). That predicate asks whether we know
+          enough to skip an LLM call — it requires industry AND location — and a
+          site can publish a perfectly good organisation name with neither. Using
+          it here would discard the name we came for.
+
+          Written service-role because `authenticated` has UPDATE on a named
+          column list that excludes this one (0001, 0007). It decides what counts
+          as a mention, so a browser that could set it could manufacture its own
+          visibility score.
+        */
+        const found = report.profile?.name?.trim();
+        // A name that is just the domain teaches us nothing `sites.name` did not
+        // already say, and writing it would look like we had learned something.
+        const useful =
+          found &&
+          found.length > 1 &&
+          found.length <= 120 &&
+          !isNamedAfterDomain(found, site.domain);
+
+        if (useful) {
+          try {
+            await createAdminClient()
+              .from('sites')
+              .update({ brand_name: found })
+              .eq('id', site.id);
+          } catch (err) {
+            console.error('Could not record business name:', err);
+          }
+        }
+
         try {
           await createAdminClient()
             .from('audit_runs')

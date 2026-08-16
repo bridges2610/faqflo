@@ -32,6 +32,34 @@ export function normalizeDomain(input: string): string {
 }
 
 /**
+ * The bare host of a source URL, for MATCHING and COUNTING — not for storage.
+ *
+ * ⚠️ THIS STRIPS `www.` AND normalizeDomain DOES NOT. That is not an
+ * inconsistency, it is the whole distinction: normalizeDomain produces the
+ * address we fetch and key a site on, where `www.` is meaningful. This answers
+ * "are these two links the same publisher", where it never is —
+ * `www.reddit.com` and `reddit.com` appearing as two rivals in a share-of-voice
+ * ranking would be wrong twice over, splitting one rival's count in half.
+ *
+ * Lives here rather than beside its callers because it has two: the classifier
+ * on the server decides whether a source is ours with it, and the dashboard
+ * store on the client ranks domains with it. Two copies of this rule would
+ * disagree about `www.` eventually, and the disagreement would be invisible —
+ * a competitor quietly counted twice.
+ *
+ * Accepts a full URL or a bare host; returns null for anything unparseable,
+ * which the callers treat as "not a source we can attribute".
+ */
+export function sourceHost(value: string): string | null {
+  try {
+    const url = value.includes('://') ? new URL(value) : new URL(`https://${value}`);
+    return url.hostname.toLowerCase().replace(/^www\./, '');
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Did the customer just name the site after its own domain?
  *
  * A site's name is free text typed into the add-site form, and most people type

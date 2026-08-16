@@ -25,7 +25,7 @@ import { isAuditReport } from '@/lib/audit/types';
 import { questionKey } from '@/lib/questions';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
 import type { AuditRunRow, CitationCheckRow, SiteRow } from '@/lib/supabase/types';
-import { normalizeDomain } from './domain';
+import { normalizeDomain, sourceHost } from './domain';
 import { contentHash, normalizePath } from './export';
 import { faqCapFor, STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
@@ -33,7 +33,9 @@ import { ENGINES } from './types';
 import type {
   CitationCheck,
   CitationDay,
+  CitedPage,
   CompetitorShare,
+  EngineBreakdown,
   ContentPlan,
   DashboardData,
   DiscoveredQuestion,
@@ -860,7 +862,11 @@ export async function trackingFromDb(
   const [checks, prompts] = await Promise.all([
     supabaseBrowser()
       .from('citation_checks')
-      .select('id, site_id, question, engine, outcome, cited_instead, checked_at')
+      // ⚠️ `sources` is the expensive column and it is here on purpose: it is
+      // the only record of WHO ELSE the engine cited, and share of voice is
+      // built from it. Without it the ranking falls back to one domain per
+      // check — 45 data points where 296 were collected.
+      .select('id, site_id, question, engine, outcome, cited_instead, sources, checked_at')
       .eq('site_id', siteId)
       .gte('checked_at', since.toISOString())
       .order('checked_at', { ascending: false }),
@@ -876,12 +882,21 @@ export async function trackingFromDb(
 
   const rows = (checks.data ?? []) as Pick<
     CitationCheckRow,
-    'id' | 'site_id' | 'question' | 'engine' | 'outcome' | 'cited_instead' | 'checked_at'
+    | 'id'
+    | 'site_id'
+    | 'question'
+    | 'engine'
+    | 'outcome'
+    | 'cited_instead'
+    | 'sources'
+    | 'checked_at'
   >[];
 
   if (rows.length === 0) return null;
 
-  const ours = siteDomain.toLowerCase().replace(/^www\./, '');
+  // sourceHost, not normalizeDomain: `www.` has to go here so one publisher is
+  // one row. See the note on each of them — they differ deliberately.
+  const ours = sourceHost(siteDomain);
 
   /*
     Every check in the window. NOT what `latest` becomes — see below.
@@ -959,33 +974,83 @@ export async function trackingFromDb(
   const daily = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 
   /*
-    Share of voice, counting each domain once per check.
+    Share of voice, from EVERY source in every answer.
 
-    From `all` rather than `latest`, matching what CompetitorShare.citations
-    says it is: "times this domain was cited across the checks we ran." A rival
-    named on every run should outrank one named once, and the deduped view
-    cannot express that difference.
+    ⚠️ THIS USED TO READ ONE DOMAIN PER CHECK — `cited_instead`, the single
+    rival that took the click — and threw the rest of each answer's source list
+    away. On a real site that was 45 data points out of 296 collected. An engine
+    citing six publishers is six facts about who is winning, and the customer
+    had already paid to learn all six.
 
-    Us on a `cited`, whoever took it otherwise. Sorted descending because the
-    meter divides by the first row — the component does not sort, and an
-    unsorted array draws bars longer than their track.
+    From `all` rather than `latest`, for the same reason the daily rollup is: a
+    rival cited on every run outranks one cited once, and the deduped view
+    cannot say that.
+
+    Sorted descending because the meter divides by the first row — the component
+    does not sort, and an unsorted array draws bars longer than their track.
   */
   const tally = new Map<string, number>();
-  for (const check of all) {
-    const domain = check.outcome === 'cited' ? ours : check.citedInstead;
-    if (!domain) continue;
-    tally.set(domain, (tally.get(domain) ?? 0) + 1);
+  const citedUrls = new Map<string, number>();
+  let sourceTotal = 0;
+  let sourceOurs = 0;
+
+  for (const row of rows) {
+    // Defensive: `sources` is jsonb, so a malformed row is a possibility the
+    // type system cannot rule out.
+    const sources = Array.isArray(row.sources) ? (row.sources as unknown[]) : [];
+
+    for (const value of sources) {
+      if (typeof value !== 'string') continue;
+      const host = sourceHost(value);
+      if (!host) continue;
+
+      sourceTotal += 1;
+      tally.set(host, (tally.get(host) ?? 0) + 1);
+
+      // Ours, and which page of ours — the actionable half of a citation.
+      // Subdomains count as ours, matching isOurs() in lib/tracking/classify.ts.
+      if (ours && (host === ours || host.endsWith(`.${ours}`))) {
+        sourceOurs += 1;
+        citedUrls.set(value, (citedUrls.get(value) ?? 0) + 1);
+      }
+    }
   }
 
   const competitors: CompetitorShare[] = [...tally.entries()]
     .map(([domain, citations]) => ({ domain, citations, isYou: domain === ours }))
-    .sort((a, b) => b.citations - a.citations);
+    .sort((a, b) => b.citations - a.citations || a.domain.localeCompare(b.domain));
+
+  const citedPages: CitedPage[] = [...citedUrls.entries()]
+    .map(([url, citations]) => ({ url, citations }))
+    .sort((a, b) => b.citations - a.citations || a.url.localeCompare(b.url));
+
+  /*
+    Per engine, over the whole window.
+
+    Built from `latest` rather than `all`: this answers "where do I stand on
+    each engine now", and the raw log would count a question asked four times
+    as four standings. ENGINES order, not discovery order, so the rows do not
+    reshuffle between loads.
+  */
+  const byEngine: EngineBreakdown[] = ENGINES.map((engine) => {
+    const mine = latest.filter((c) => c.engine === engine);
+    return {
+      engine,
+      cited: mine.filter((c) => c.outcome === 'cited').length,
+      mentioned: mine.filter((c) => c.outcome === 'mentioned').length,
+      absent: mine.filter((c) => c.outcome === 'absent').length,
+      checked: mine.length,
+    };
+  });
 
   return {
     siteId,
     daily,
     latest,
     competitors,
+    citedPages,
+    byEngine,
+    sourceAppearances: { ours: sourceOurs, total: sourceTotal },
     // What is being watched, not what has been asked — the prompt is the unit
     // the customer buys. See the note on SiteTracking.
     promptsTracked: prompts.data?.length ?? new Set(latest.map((c) => c.question)).size,
