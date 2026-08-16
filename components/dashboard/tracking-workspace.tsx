@@ -21,6 +21,7 @@ import {
   ENGINES,
   MAX_EXCERPT_CHARS,
   type CitationCheck,
+  type Engine,
   type SiteTracking,
 } from '@/lib/dashboard/types';
 import { AnswerText } from './answer-text';
@@ -29,7 +30,7 @@ import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
 import { MetricTile } from './metric-tile';
 import { Meter } from './meter';
-import { AeoIcon, ChartIcon, GlobeIcon, SearchIcon } from './nav-icons';
+import { AeoIcon, ChartIcon, ChevronIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
 import { SectionTitle } from './section-title';
@@ -221,105 +222,210 @@ function prettyUrl(url: string): string {
   }
 }
 
+
+/** Every check we hold for one question, in ENGINES order. */
+type QuestionGroup = {
+  question: string;
+  checks: CitationCheck[];
+  /** Most recent sighting across the group — what "2 days ago" should mean. */
+  checkedAt: string;
+  sources: number;
+};
+
 /**
- * One row of evidence: what was asked, what came back, and who got the link.
+ * One question, and what each engine said about it.
  *
- * ⚠️ THE ANSWER TEXT IS THE POINT. Every other surface in this product reports
- * an outcome; this is the only one that shows the thing the outcome was read
- * from. `answer_excerpt` has been stored since the first run — 0006 says why in
- * as many words — and until now nothing displayed it, so "you were not cited"
- * arrived with no way to check it. Collapsed by default because forty open
- * answers is not a report; one click away because disbelief is the normal
- * reaction to a bad number and it deserves an answer.
+ * ⚠️ GROUPED, BUT NOTHING IS MERGED. The row-per-engine layout this replaces was
+ * deliberate: each check carries its own answer, its own source list and its own
+ * `citedInstead`, and a summary row that flattened them would throw two of the
+ * three away. So the group is a container, never a summary — the badges name
+ * each engine separately, and the expansion keeps all three answers whole and
+ * apart. Flatten any of that and the original objection is right again.
+ *
+ * The comparison is the reason three engines get asked at all: being cited by
+ * Perplexity and absent from ChatGPT on the same question is one finding, and it
+ * was previously spread across three rows a customer had to hunt for.
  */
-function EvidenceRow({
-  check,
-  action,
-}: {
-  check: CitationCheck;
-  action?: React.ReactNode;
-}) {
-  const tone =
-    check.outcome === 'cited' ? 'success' : check.outcome === 'mentioned' ? 'cyan' : undefined;
-  const label =
-    check.outcome === 'cited' ? 'Cited' : check.outcome === 'mentioned' ? 'Named' : 'Absent';
+function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.ReactNode }) {
+  const byEngine = ENGINES.map((engine) => ({
+    engine,
+    check: group.checks.find((c) => c.engine === engine) ?? null,
+  }));
+
+  // Who took the click, from the first engine that named someone else. One
+  // rival stands for the group; the per-engine detail is in the expansion.
+  const instead = group.checks.find((c) => c.outcome !== 'cited' && c.citedInstead)?.citedInstead;
 
   return (
     <li className="py-4">
-      <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-navy text-[0.9375rem]">{check.question}</p>
-          <p className="text-slate mt-1 text-xs">
-            {check.engine} · {timeAgo(check.checkedAt)}
-            {check.sources.length > 0 && (
-              <> · {check.sources.length} {check.sources.length === 1 ? 'source' : 'sources'}</>
-            )}
-            {check.outcome !== 'cited' && check.citedInstead && (
-              <>
-                {' '}
-                · cited <span className="font-mono">{check.citedInstead}</span> instead
-              </>
-            )}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          {tone ? <Badge tone={tone}>{label}</Badge> : <Badge>{label}</Badge>}
-          {action}
-        </div>
-      </div>
+      <details className="group">
+        <summary className="cursor-pointer list-none">
+          {/* Read down the left column: what was asked, what each engine said,
+              then the context. The action sits right so it never interrupts
+              that order. */}
+          <div className="flex items-start gap-3">
+            <ChevronIcon
+              className="text-slate group-hover:text-navy mt-1 h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-90"
+            />
 
-      {/* <details> rather than a state hook: forty rows would be forty pieces of
-          state to no benefit, and the browser already knows how to do this. */}
-      <details className="group mt-2">
-        <summary className="text-primary hover:text-primary-hover cursor-pointer list-none text-xs font-semibold">
-          <span className="group-open:hidden">View the answer</span>
-          <span className="hidden group-open:inline">Hide the answer</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-navy text-[0.9375rem] leading-snug">{group.question}</p>
+
+              {/* The comparison, without opening anything. */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {byEngine.map(({ engine, check }) => (
+                  <EnginePill key={engine} engine={engine} check={check} />
+                ))}
+              </div>
+
+              <p className="text-slate mt-1.5 text-xs">
+                {timeAgo(group.checkedAt)}
+                {group.sources > 0 && (
+                  <>
+                    {' '}
+                    · {group.sources} {group.sources === 1 ? 'source' : 'sources'}
+                  </>
+                )}
+                {instead && (
+                  <>
+                    {' '}
+                    · cited <span className="font-mono">{instead}</span> instead
+                  </>
+                )}
+              </p>
+            </div>
+
+            {action && <div className="shrink-0">{action}</div>}
+          </div>
         </summary>
 
-        {check.excerpt ? (
-          <div className="border-line mt-2 border-l-2 pl-3">
-            <AnswerText text={check.excerpt} />
-            {looksTruncated(check.excerpt) && (
-              // Rows stored before the clean cut landed end mid-word, and the
-              // rest of the answer was never kept — so it cannot be repaired,
-              // only labelled. Without this the engine looks like it stopped
-              // talking mid-sentence.
-              <p className="text-slate/70 mt-1.5 text-xs">
-                Excerpt — we store the first {MAX_EXCERPT_CHARS} characters of each answer.
-              </p>
-            )}
-          </div>
-        ) : (
-          // Older rows predate the excerpt being stored. Say that, rather than
-          // rendering an empty quote that reads as an engine saying nothing.
-          <p className="text-slate mt-2 text-sm italic">
-            No answer text was stored for this check.
-          </p>
-        )}
+        <div className="divide-line mt-3 divide-y">
+          {byEngine.map(({ engine, check }) => (
+            <div key={engine} className="py-3 first:pt-0">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* The engine is named once here; the chip carries only the
+                    verdict. The summary pill has to say both because it stands
+                    alone. */}
+                <p className="text-navy text-xs font-semibold">{engine}</p>
+                <OutcomeChip check={check} />
+                {check && check.sources.length > 0 && (
+                  <p className="text-slate text-xs">
+                    {check.sources.length} {check.sources.length === 1 ? 'source' : 'sources'}
+                  </p>
+                )}
+                {check && check.outcome !== 'cited' && check.citedInstead && (
+                  <p className="text-slate text-xs">
+                    cited <span className="font-mono">{check.citedInstead}</span> instead
+                  </p>
+                )}
+              </div>
 
-        {check.sources.length > 0 && (
-          <ul className="mt-3 space-y-1">
-            {check.sources.map((url) => (
-              <li key={url} className="min-w-0 truncate">
-                {/* Display is cleaned; the href is the stored URL, untouched.
-                    `?utm_source=openai` is the engine tagging its own referral
-                    and makes two links to one page look like two pages — but
-                    the source list is evidence, so what we LINK to stays
-                    exactly what was recorded. */}
-                <a
-                  href={url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-slate hover:text-primary font-mono text-xs"
-                >
-                  {displayUrl(url)}
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
+              {!check ? (
+                /* ⚠️ A gap, not a zero. An engine can fail on its own — a 429
+                   during the run — and rendering "absent" here would claim a
+                   measurement we never took. */
+                <p className="text-slate mt-1.5 text-sm italic">
+                  Not checked on this engine yet.
+                </p>
+              ) : check.excerpt ? (
+                <div className="border-line mt-1.5 border-l-2 pl-3">
+                  <AnswerText text={check.excerpt} />
+                  {looksTruncated(check.excerpt) && (
+                    <p className="text-slate/70 mt-1.5 text-xs">
+                      Excerpt — we store the first {MAX_EXCERPT_CHARS} characters of each answer.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-slate mt-1.5 text-sm italic">
+                  No answer text was stored for this check.
+                </p>
+              )}
+
+              {check && check.sources.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {check.sources.map((url) => (
+                    <li key={url} className="min-w-0 truncate">
+                      {/* Display is cleaned; the href is the stored URL,
+                          untouched. `?utm_source=openai` is the engine tagging
+                          its own referral and makes two links to one page look
+                          like two — but the source list is evidence, so what we
+                          LINK to stays exactly what was recorded. */}
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-slate hover:text-primary font-mono text-xs"
+                      >
+                        {displayUrl(url)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
       </details>
     </li>
+  );
+}
+
+/**
+ * The outcome words and their tints, shared by the pill and the chip.
+ *
+ * ⚠️ THE WORD IS NOT DECORATION. Colour alone must never carry this: `cited`
+ * and `absent` are separated by a tint some readers cannot distinguish, and it
+ * is the figure the customer acts on. The tint is a second encoding of a label
+ * that is already readable — the same rule components/dashboard/meter.tsx
+ * states for its bars.
+ */
+const OUTCOME_STYLE: Record<CitationCheck['outcome'], { label: string; className: string }> = {
+  cited: { label: 'cited', className: 'bg-success/12 text-success-ink' },
+  mentioned: { label: 'named', className: 'bg-accent-soft text-navy' },
+  absent: { label: 'absent', className: 'text-slate border-line border bg-white' },
+};
+
+/** Not an outcome — the absence of one. Kept visually quieter than any verdict. */
+const NOT_CHECKED = { label: 'not checked', className: 'text-slate/80 border-line border bg-white' };
+
+/**
+ * One engine's verdict on one question, at a glance.
+ *
+ * ⚠️ ITS OWN COMPONENT RATHER THAN A SMALLER <Badge>. Badge hardcodes
+ * `px-3 py-1 text-[0.8125rem]` and emits its tone classes BEFORE `className`,
+ * so passing `px-2 text-xs` would not reliably win — conflicting Tailwind
+ * utilities resolve by their order in the generated stylesheet, not by their
+ * order in the class attribute. A pill that is smaller only sometimes is worse
+ * than one that owns its own size, and shrinking Badge would shrink it on every
+ * other screen too.
+ *
+ * Three of these sit under every question, so they are deliberately quiet: the
+ * question is what you read, these are what you scan.
+ */
+function EnginePill({ engine, check }: { engine: Engine; check: CitationCheck | null }) {
+  const { label, className } = check ? OUTCOME_STYLE[check.outcome] : NOT_CHECKED;
+
+  return (
+    <span
+      className={`rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-[0.6875rem] leading-none font-medium ${className}`}
+    >
+      <span className="font-semibold">{engine}</span>
+      {label}
+    </span>
+  );
+}
+
+/** The same verdict, inside an open row where the engine is already named. */
+function OutcomeChip({ check }: { check: CitationCheck | null }) {
+  const { label, className } = check ? OUTCOME_STYLE[check.outcome] : NOT_CHECKED;
+
+  return (
+    <span
+      className={`rounded-pill inline-flex items-center px-2 py-0.5 text-[0.6875rem] leading-none font-medium ${className}`}
+    >
+      {label}
+    </span>
   );
 }
 
@@ -690,11 +796,53 @@ export function TrackingWorkspace() {
     the things being examined. Grouping would have to throw two of the three
     away to merge them.
   */
-  const countFor = (id: OutcomeFilter) =>
-    id === 'all' ? latest.length : latest.filter((c) => c.outcome === id).length;
+  /*
+    One row per question, holding every engine's check.
 
+    ⚠️ A CONTAINER, NOT A SUMMARY. Each check keeps its own answer, sources and
+    `citedInstead` — see the note on QuestionRow. `latest` is untouched;
+    everything else on this page still reads the deduped pair rows.
+  */
+  const groups: QuestionGroup[] = [];
+  {
+    const byQuestion = new Map<string, QuestionGroup>();
+    for (const check of latest) {
+      let group = byQuestion.get(check.question);
+      if (!group) {
+        group = { question: check.question, checks: [], checkedAt: check.checkedAt, sources: 0 };
+        byQuestion.set(check.question, group);
+        groups.push(group);
+      }
+      group.checks.push(check);
+      group.sources += check.sources.length;
+      // The freshest sighting, so "2 days ago" is the most recent evidence
+      // rather than whichever engine happened to be stored first.
+      if (check.checkedAt > group.checkedAt) group.checkedAt = check.checkedAt;
+    }
+  }
+
+  /*
+    Chips carry BOTH units, because the row and the tile above count different
+    things and both are true: one engine citing you on a question the other two
+    missed is one check and one question, while two engines citing the same
+    question is two checks and one question. Printing one number and letting the
+    reader assume the other is how "these don't add up" starts.
+  */
+  const countFor = (id: OutcomeFilter) => {
+    const checks = id === 'all' ? latest : latest.filter((c) => c.outcome === id);
+    const questions = new Set(checks.map((c) => c.question)).size;
+    return { checks: checks.length, questions };
+  };
+
+  /*
+    Filtering finds the QUESTION; the expansion still shows every engine.
+
+    Narrowing the expansion to matching engines would hide the comparison this
+    grouping exists to provide — "cited by Perplexity, absent on ChatGPT" is one
+    finding, and you cannot see it if the filter removes half of it.
+  */
   const filtered =
-    filter === 'all' ? latest : latest.filter((c) => c.outcome === filter);
+    filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter));
   const visible = filtered.slice(0, shown);
   // The bar tracks prompts — the thing bought — not the checks they cost.
   const usedPct = tracking ? (tracking.promptsTracked / tracking.promptCap) * 100 : 0;
@@ -909,16 +1057,18 @@ export function TrackingWorkspace() {
           <Card className="p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SectionTitle>Every answer we checked</SectionTitle>
-              <Badge tone="cyan">{latest.length}</Badge>
+              <Badge tone="cyan">
+                {formatNumber(groups.length)} {groups.length === 1 ? 'question' : 'questions'}
+              </Badge>
             </div>
             <p className="text-slate mt-1 text-sm">
-              One row per question per engine, newest first. Open any of them to read what the
-              engine actually said and which sources it used.
+              One row per question, newest first. Open any of them to read what{' '}
+              {ENGINES.join(', ')} each said, side by side, and which sources each one used.
             </p>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {FILTERS.map((f) => {
-                const count = countFor(f.id);
+                const { checks, questions } = countFor(f.id);
                 return (
                   <button
                     key={f.id}
@@ -931,7 +1081,8 @@ export function TrackingWorkspace() {
                         : 'border-line text-slate hover:text-navy'
                     }`}
                   >
-                    {f.label} {count}
+                    {f.label} · {checks} {checks === 1 ? 'check' : 'checks'}, {questions}{' '}
+                    {questions === 1 ? 'question' : 'questions'}
                   </button>
                 );
               })}
@@ -947,20 +1098,25 @@ export function TrackingWorkspace() {
               </p>
             ) : (
               <ul className="divide-line mt-2 divide-y">
-                {visible.map((c) => (
-                  <EvidenceRow
-                    key={c.id}
-                    check={c}
+                {visible.map((group) => (
+                  <QuestionRow
+                    key={group.question}
+                    group={group}
                     action={
-                      // The loop closing, preserved from the old "Not cited for"
-                      // card: see you weren't cited, write the answer, the
-                      // question stops being open. Only offered where there is
-                      // something to fix.
-                      c.outcome !== 'cited' ? (
+                      /* The loop closing: see you weren't cited, write the
+                         answer, the question stops being open.
+
+                         ONE button per question now, not one per engine. The
+                         draft answers the question, not the engine — three
+                         identical buttons on one question was always wrong, and
+                         grouping is what made it obvious. Offered whenever any
+                         engine failed to cite you, since that is the gap the
+                         answer would close. */
+                      group.checks.some((c) => c.outcome !== 'cited') ? (
                         <DraftIntoGroup
-                          question={c.question}
+                          question={group.question}
                           onDrafted={async () => {
-                            const match = questions.find((q) => q.question === c.question);
+                            const match = questions.find((q) => q.question === group.question);
                             if (match) await coverQuestion(match.id);
                           }}
                         />
