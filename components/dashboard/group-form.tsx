@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { DuplicatePath } from '@/lib/dashboard/store';
 import { normalizePath } from '@/lib/dashboard/export';
 import type { FaqGroup } from '@/lib/dashboard/types';
 
@@ -24,8 +25,12 @@ export function GroupForm({
   domain: string;
   /** Present when editing rather than creating. */
   group?: FaqGroup;
-  /** Receives the new group's id when one was created, so the caller can open it. */
-  onDone: (createdId?: string) => void;
+  /**
+   * Receives the new page's id when one was created, and whether an existing
+   * page was MOVED — a move clears its published state, and the caller is the
+   * one with room to say so.
+   */
+  onDone: (createdId?: string, moved?: boolean) => void;
 }) {
   const { addGroup, editGroup, groups } = useDashboard();
   const [name, setName] = useState(group?.name ?? '');
@@ -39,22 +44,38 @@ export function GroupForm({
     e.preventDefault();
     setError(null);
 
-    if (!name.trim()) return setError('Give the group a name.');
+    if (!name.trim()) return setError('Give the page a name.');
 
-    // Two groups on one path would produce two blocks for the same page, each
-    // claiming the same schema @id.
+    /*
+      Checked here for a message while they type, and again in the store, which
+      is the real gate — see DuplicatePath. Two pages on one path would produce
+      two blocks for the same URL, each claiming the same schema @id.
+    */
     const clash = groups.some((g) => g.path === cleaned && g.id !== group?.id);
-    if (clash) return setError(`Another group already covers ${cleaned}.`);
+    if (clash) return setError(`Another page already covers ${cleaned}.`);
+
+    // Moving a page clears its published state, because nothing has been
+    // pasted at the new address. Said before it happens, not discovered after.
+    const moving = Boolean(group && cleaned !== group.path && group.publishedAt);
 
     setSaving(true);
     let createdId: string | undefined;
-    if (group) {
-      await editGroup(group.id, { name, path: cleaned });
-    } else {
-      createdId = await addGroup(siteId, { name, path: cleaned });
+    try {
+      if (group) {
+        await editGroup(group.id, { name, path: cleaned });
+      } else {
+        createdId = await addGroup(siteId, { name, path: cleaned });
+      }
+    } catch (err) {
+      setSaving(false);
+      return setError(
+        err instanceof DuplicatePath
+          ? `Another page already covers ${err.path}.`
+          : 'That could not be saved. Please try again.',
+      );
     }
     setSaving(false);
-    onDone(createdId);
+    onDone(createdId, moving);
   }
 
   return (
@@ -62,12 +83,12 @@ export function GroupForm({
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="block">
           <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-            Group name
+            Page name
           </span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Service page"
+            placeholder="Services"
             className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
           />
         </label>
@@ -95,7 +116,7 @@ export function GroupForm({
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Button size="sm" type="submit" disabled={saving}>
-          {saving ? 'Saving…' : group ? 'Save group' : 'Add group'}
+          {saving ? 'Saving…' : group ? 'Save page' : 'Add page'}
         </Button>
         {/* Wrapped rather than passed directly: onDone takes an optional id,
             and React would hand it a MouseEvent. */}

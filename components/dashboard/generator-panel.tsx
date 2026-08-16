@@ -47,7 +47,15 @@ export function GeneratorPanel({
   /** Where the generated set will land. */
   groups: FaqGroup[];
   targetGroupId: string | null;
-  onTargetChange: (id: string) => void;
+  /**
+   * Omitted when the destination is fixed by the route.
+   *
+   * ⚠️ The point of choosing before generating is that an answer's page decides
+   * where it may claim to live. /dashboard/faqs/[groupId] makes that choice
+   * structural, so there is nothing left to pick — a select there would be a
+   * control offering to move work somewhere the URL says it isn't.
+   */
+  onTargetChange?: (id: string) => void;
   disabled?: boolean;
 }) {
   const { site } = useDashboard();
@@ -195,7 +203,7 @@ export function GeneratorPanel({
             decides which page these answers get pasted onto. With one group
             there's nothing to choose, and a one-option select is a control that
             does nothing — so it states the destination instead. */}
-        {groups.length > 1 ? (
+        {groups.length > 1 && onTargetChange ? (
           <label className="block">
             <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
               Add to
@@ -218,7 +226,7 @@ export function GeneratorPanel({
               Add to
             </span>
             <p className="text-navy border-line mt-1.5 truncate rounded-input border border-dashed px-3 py-2 text-sm">
-              {groups[0]?.name ?? '—'}
+              {groups.find((g) => g.id === targetGroupId)?.name ?? groups[0]?.name ?? '—'}
             </p>
           </div>
         )}

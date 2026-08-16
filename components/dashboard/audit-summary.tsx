@@ -42,8 +42,8 @@ import { SectionTitle } from './section-title';
  * lists used to be open on arrival, which meant the page led with thirty items
  * and the two paragraphs explaining them scrolled away.
  *
- * ⚠️ THE CONTENT STAYS IN THE DOM WHEN CLOSED. PillarCard and GroupCard both
- * unmount their bodies; this one must not. This page is a printable deliverable
+ * ⚠️ THE CONTENT STAYS IN THE DOM WHEN CLOSED. PillarCard unmounts its body;
+ * this one must not. This page is a printable deliverable
  * and window.print() cannot reveal something React never rendered — a customer
  * printing a collapsed report would get two empty sections. `hidden print:block`
  * hides it on screen and brings it back for print, which is the masthead's trick

@@ -15,10 +15,10 @@ import { usePathname } from 'next/navigation';
 
   Real links rather than client-side panel state, deliberately. Every route kept
   its URL, so /dashboard/publish#some-group-id still works from an audit action
-  and from GroupCard's "Get the code" link. Tabs backed by state would have
+  and from the group page's "Get the code" link. Tabs backed by state would have
   broken every one of those.
 
-  The pill treatment is the one already used by GroupCard's filter and
+  The pill treatment is the one already used by the answer filters and
   GeneratorPanel's source toggle; this is that pattern lifted out rather than a
   third version of it.
 */

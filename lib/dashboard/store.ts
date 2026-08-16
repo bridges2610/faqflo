@@ -556,8 +556,32 @@ export { normalizeDomain };
 
 export type NewGroup = { name: string; path: string };
 
+/**
+ * Refused because another page on this site already publishes to that path.
+ *
+ * ⚠️ ENFORCED HERE, NOT ONLY IN THE FORM. group-form.tsx has always checked
+ * this, and its reason is right: "Two groups on one path would produce two
+ * blocks for the same page, each claiming the same schema @id." But a check
+ * that lives only in one component is a check the next caller skips — and the
+ * damage lands in the customer's published markup, where we cannot see it.
+ */
+export class DuplicatePath extends Error {
+  constructor(readonly path: string) {
+    super(`A page already publishes to ${path}`);
+    this.name = 'DuplicatePath';
+  }
+}
+
+function pathTaken(data: DashboardData, siteId: string, path: string, exceptId?: string): boolean {
+  return data.groups.some(
+    (g) => g.siteId === siteId && g.id !== exceptId && g.path === normalizePath(path),
+  );
+}
+
 export async function createGroup(siteId: string, input: NewGroup): Promise<DashboardData> {
   const data = requireData('createGroup');
+  if (pathTaken(data, siteId, input.path)) throw new DuplicatePath(normalizePath(input.path));
+
   const group: FaqGroup = {
     id: newId('grp'),
     siteId,
@@ -573,6 +597,28 @@ export async function createGroup(siteId: string, input: NewGroup): Promise<Dash
 
 export async function updateGroup(id: string, patch: Partial<NewGroup>): Promise<DashboardData> {
   const data = requireData('updateGroup');
+  const target = data.groups.find((g) => g.id === id);
+  if (!target) return data;
+
+  const nextPath = patch.path !== undefined ? normalizePath(patch.path) : target.path;
+  if (nextPath !== target.path && pathTaken(data, target.siteId, nextPath, id)) {
+    throw new DuplicatePath(nextPath);
+  }
+
+  /*
+    ⚠️ MOVING A PAGE UN-PUBLISHES IT.
+
+    `publishedHash` records what was pasted onto a specific page. Point the
+    group at a different path and nothing has ever been pasted at the new one —
+    but the hash still matched, so publishState() went on reporting `current`
+    while the schema's @id named a page the answers were never on. The customer
+    was told they were live somewhere they weren't.
+
+    ⚠️ Only on a PATH change. Renaming is cosmetic — clearing the hash for that
+    would send someone to re-paste a page that has not changed.
+  */
+  const moved = nextPath !== target.path;
+
   return write({
     ...data,
     groups: data.groups.map((g) =>
@@ -580,7 +626,8 @@ export async function updateGroup(id: string, patch: Partial<NewGroup>): Promise
         ? {
             ...g,
             ...(patch.name !== undefined ? { name: patch.name.trim() } : {}),
-            ...(patch.path !== undefined ? { path: normalizePath(patch.path) } : {}),
+            path: nextPath,
+            ...(moved ? { publishedAt: null, publishedHash: null } : {}),
           }
         : g,
     ),

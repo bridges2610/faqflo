@@ -17,6 +17,13 @@ import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './nav-icons';
   Deleting takes two clicks. The row is one of a list of near-identical rows,
   which is exactly the situation where a single-click delete hits the wrong one.
 */
+/** Where an answer came from. `discovered` means it started as a question. */
+const SOURCE_LABEL: Record<FaqEntry['source'], string> = {
+  generated: 'generated',
+  manual: 'written by you',
+  discovered: 'from a question',
+};
+
 export function FaqRow({
   faq,
   isFirst,
@@ -51,7 +58,10 @@ export function FaqRow({
   }
 
   return (
-    <li className="py-4">
+    /* The id is what makes search results and deep links land on the answer
+       itself rather than the top of its page. scroll-mt clears the sticky
+       header so the row is not hidden underneath it on arrival. */
+    <li id={faq.id} className="scroll-mt-24 py-4">
       <div className="flex items-start gap-3">
         {/* Reorder — position decides the order in the exported HTML and in the
             schema, so it's worth having where the eye already is. */}
@@ -112,6 +122,11 @@ export function FaqRow({
                 <Badge tone={published ? 'success' : 'neutral'}>
                   {published ? 'Published' : 'Draft'}
                 </Badge>
+                {/* Stored on every entry since the beginning and rendered
+                    nowhere until now. It is the closest thing to a category the
+                    data already holds, and it answers "did I write this, or did
+                    the model?" without inventing a second taxonomy. */}
+                <span className="text-slate/80 text-[0.6875rem]">{SOURCE_LABEL[faq.source]}</span>
               </div>
               {/* An entry drafted from an unanswered search arrives with no
                   answer on purpose — say so rather than rendering a blank. */}

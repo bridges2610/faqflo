@@ -341,7 +341,10 @@ export function AuditWorkspace({
       scoredCount: pillars.reduce((n, p) => n + p.scoredCount, 0),
       actions: buildActionPlan(findings, {
         domain: crawl.domain,
-        faqsHref: firstGroup ? `/dashboard/faqs#${firstGroup.id}` : '/dashboard/faqs',
+        // A real route now. This was `#${id}`, and nothing on the Answers
+        // screen ever rendered that anchor — the link landed at the top of a
+        // list and left the customer to find the page themselves.
+        faqsHref: firstGroup ? `/dashboard/faqs/${firstGroup.id}` : '/dashboard/faqs',
         publishHref: '/dashboard/publish',
         questionsHref: '/dashboard/questions',
       }),

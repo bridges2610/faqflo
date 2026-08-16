@@ -35,8 +35,11 @@ type NavItem = {
     Opportunities = /questions + /content what you haven't answered, and what
                                          you haven't written. Both are gaps.
 
-  ⚠️ NO ROUTE MOVED. Audit actions deep-link to /dashboard/faqs#<groupId>,
-  /dashboard/publish and /dashboard/questions; GroupCard links to
+  ⚠️ NO ROUTE MOVED, AND ONE GAINED A CHILD. Audit actions deep-link to
+  /dashboard/faqs/<groupId> — a real route now; it used to be an anchor
+  `#<groupId>` that nothing on the Answers screen ever rendered, so the link
+  silently landed at the top of a list. Also
+  /dashboard/publish and /dashboard/questions; the group page links to
   /dashboard/publish#<groupId>; checkout returns to /dashboard/audit and
   /dashboard/tracking with a ?purchased flag. The absorbed routes keep their
   URLs and gain a WorkspaceTabs strip, so every one of those still lands.
