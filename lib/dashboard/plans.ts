@@ -135,19 +135,21 @@ export const ENTITLEMENTS: Record<
       'The full audit, the complete answer set, and the publish-ready export for this site — plus 30 days to work with them.',
   },
   /*
-    ⚠️ The blurb leads on what this ACTUALLY does today, which is re-open
-    generation across every site once its 30-day window closes. Citation
-    tracking is the reason the subscription exists and is not built yet — there
-    is no engine-querying code anywhere in this repo — so it is named as coming
-    rather than sold as running. Anything here that promises a scheduled check
-    is a promise nothing in the codebase can keep.
+    ⚠️ THE BLURB LEADS ON TRACKING NOW, BECAUSE IT RUNS. It used to say
+    "citation tracking is coming" and lead on re-opened generation, which was
+    the honest order while no engine-querying code existed.
+
+    ⚠️ STILL DO NOT PROMISE A SCHEDULED CHECK HERE. Runs are started by hand
+    from the Results page; there is no scheduler, so "watched weekly" or
+    anything like it remains a promise nothing in this codebase can keep. The
+    pricing card carries the matching wording and the two change together.
   */
   stay_cited: {
     label: 'Stay Cited',
     price: '$29/month',
     scope: 'account',
     blurb:
-      'Keeps every site on your account generating after its 30 days — new audits and unlimited answers, for as long as you keep it. Citation tracking is coming.',
+      'Ask ChatGPT, Perplexity and Gemini your questions and see who they cite — plus every site on your account keeps generating after its 30 days.',
   },
 };
 

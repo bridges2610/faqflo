@@ -6,11 +6,18 @@ import { scoreBand } from '@/lib/audit/score';
 import { PILLARS } from '@/lib/audit/types';
 import { PLACEMENT_NOTES } from '@/lib/dashboard/export';
 import {
+  DISCOVERED_PROMPT_CAP,
   ENTITLEMENTS,
   FREE_FAQ_CAP,
   GET_CITED_WINDOW_DAYS,
+  MANUAL_QUESTION_CAP,
   PAGE_BUDGET,
+  STAY_CITED_PROMPT_CAP,
 } from '@/lib/dashboard/plans';
+// Read from the source rather than typed as prose: the engine list is a product
+// decision that has already changed once, and a hardcoded copy here would be
+// the thing that still said "Google AI Overviews" afterwards.
+import { ENGINES } from '@/lib/dashboard/types';
 import { SUPPORT_EMAIL } from '@/lib/support';
 import { ContactForm } from './contact-form';
 import { MicroLabel } from './micro-label';
@@ -53,8 +60,8 @@ const SECTIONS = [
   { id: 'answers', nav: 'Answers', title: 'Answers, and what a group is' },
   { id: 'publishing', nav: 'Publishing', title: 'Publishing: the technical bit' },
   { id: 'opportunities', nav: 'Opportunities', title: 'Opportunities: questions and pages' },
+  { id: 'results', nav: 'Results', title: 'Results: who the engines actually cite' },
   { id: 'plans', nav: 'Plans', title: 'What each plan covers' },
-  { id: 'not-yet', nav: 'Not built yet', title: 'What isn’t built yet' },
   { id: 'faq', nav: 'Common questions', title: 'Common questions' },
   { id: 'contact', nav: 'Still stuck', title: 'Still stuck?' },
 ] as const;
@@ -66,9 +73,15 @@ const meta = (id: SectionId) => SECTIONS.find((s) => s.id === id)!;
 /*
   The four setup steps, worded to match setupSteps() in lib/dashboard/worklist.ts.
 
-  ⚠️ FOUR, NOT FIVE. The worklist has the same count for the same reason: there
-  is no "watch for citations" step, because nothing in this product queries an
-  answer engine. A fifth box would be one nobody can ever tick.
+  ⚠️ FOUR, NOT FIVE, AND THE REASON CHANGED. It used to be that nothing in this
+  product queried an answer engine, so a "watch for citations" box was one nobody
+  could ever tick. Tracking runs now — but it still is not a step here, because
+  these are SETUP: done once, ticked, gone. Tracking is ongoing and has no
+  completed state, so a box for it would either never tick or tick once and
+  misrepresent a thing you are meant to keep doing.
+
+  ⚠️ setupSteps() in lib/dashboard/worklist.ts still carries the old reasoning in
+  its own comment. Same correction wanted there.
 */
 const STEPS = [
   {
@@ -128,7 +141,7 @@ const NAV_MAP = [
     nav: 'Results',
     href: '/dashboard/tracking',
     loop: 'Track',
-    body: 'Where citation tracking will live. Not running yet — see below.',
+    body: 'What the assistants say when asked your questions — who they cite, who they name, and who takes the click instead.',
   },
 ];
 
@@ -166,6 +179,30 @@ const TROUBLESHOOTING = [
           any crawler — worth fixing regardless, because the AI crawlers are hitting the same wall.
         </P>
       </>
+    ),
+  },
+  {
+    q: 'Another tool reports more citations than you do. Why?',
+    a: (
+      <P>
+        Almost always sample size rather than detection. We ask the {STAY_CITED_PROMPT_CAP}{' '}
+        questions on your watch list, and each result is one answer we saw with our own eyes on the
+        day we asked. Tools that report bigger numbers are usually watching far more prompts and
+        adding up weeks of them. Watching more questions and running more often closes the gap —
+        every figure here stays a count of checks we actually ran, so it will never be inflated to
+        match.
+      </P>
+    ),
+  },
+  {
+    q: 'Does a check keep running if I click to another page?',
+    a: (
+      <P>
+        Yes — it carries on while you use the rest of FaqFlo, and a progress bar follows you. It
+        runs from your browser though, so reloading or closing the tab does stop it. Nothing is
+        lost when that happens: the answers already collected are saved, and starting again asks
+        only for the ones still missing rather than paying twice for the same answers.
+      </P>
     ),
   },
   {
@@ -586,6 +623,111 @@ export function HelpWorkspace({ name }: { name: string | null }) {
             </P>
           </Section>
 
+          {/* -------------------------------------------------- results */}
+          <Section id="results">
+            <P>
+              Everything else in FaqFlo is preparation. This is the measurement: we put the
+              questions on your watch list to {ENGINES.join(', ')} and record what came back.
+            </P>
+            <P>
+              Each answer gets one of three verdicts. <strong>Cited</strong> means the assistant
+              used your site as a source and linked to it. <strong>Named</strong> means it said
+              your business name but sent the click somewhere else — it knows who you are, and that
+              is a different problem from being invisible. <strong>Absent</strong> means neither,
+              and we record who was cited instead.
+            </P>
+
+            {/* Moved here from "What isn't built yet", where it sat while
+                tracking was unbuilt. These are caveats about what the numbers
+                MEAN — permanent ones — so they belong beside the numbers, not
+                on a list of things that are coming. */}
+            <Callout>
+              <strong>What we ask, and what we can’t.</strong> ChatGPT here is the OpenAI API with
+              its web search, and Gemini is the Gemini API with Google Search grounding — very
+              close to what the assistants tell people, but not a recording of anyone’s real chat.{' '}
+              <strong>Google AI Overviews is absent because it has no API at all.</strong> Listing
+              it and reporting a permanent zero would read as <em>you are never cited there</em>{' '}
+              when the truth is <em>we never looked</em>.
+            </Callout>
+
+            <SectionTitle as="h3" className="mt-8">
+              The numbers along the top
+            </SectionTitle>
+            <P className="mt-2">
+              The <strong>score out of 100</strong> is not a summary sitting on top of a hidden
+              calculation — the three findings printed underneath it <em>are</em> the score. It is
+              the same AI-visibility pillar your site check uses, which is why running tracking
+              moves that score too.
+            </P>
+            <P>
+              Before your first run that pillar reads <em>Not checked</em> and doesn’t drag your
+              site score down. That’s deliberate: “0 citations” would say <em>nobody is quoting
+              you</em>, which we wouldn’t have measured. Run a check and it starts scoring off what
+              the engines actually said.
+            </P>
+            <Callout>
+              <strong>Mentions include citations.</strong> A citation is a link; a mention is being
+              named at all, linked or not. So mentions is always the larger number, and the two are
+              not rivals — if you are comparing us with another tool, check which of the two it is
+              showing you.
+            </Callout>
+            <P className="mt-4">
+              <strong>Share of voice</strong> is your slice of every source the assistants drew on,
+              not your slice of the questions. One answer citing six sites offers six slots and you
+              either hold one or you don’t, so this is the figure that compares you to a rival
+              rather than to yourself. The counts are printed beside it, always.
+            </P>
+
+            <SectionTitle as="h3" className="mt-8">
+              What to actually do with it
+            </SectionTitle>
+            <P className="mt-2">
+              <strong>Who gets cited</strong> ranks every domain the assistants used, you included.{' '}
+              <strong>Pages earning citations</strong> is the useful half of a good result — not
+              “you were cited five times” but which page did it, so you know what to write more of.{' '}
+              <strong>By engine</strong> matters because being cited on one and invisible on
+              another is a specific, fixable problem rather than a general one.
+            </P>
+            <P>
+              Below those, every question you watch, one row each. Open one and you get all three
+              assistants side by side — what each actually said, and every link it used. That is
+              the point of asking three: “Perplexity cites you, ChatGPT doesn’t” is one finding, and
+              you can only see it with both in front of you. Filter to <em>cited</em>,{' '}
+              <em>named</em> or <em>absent</em> to find the rows worth reading, and draft an answer
+              straight from any question that isn’t landing.
+            </P>
+
+            <SectionTitle as="h3" className="mt-8">
+              Your watch list
+            </SectionTitle>
+            <P className="mt-2">
+              Stay Cited watches <strong>{STAY_CITED_PROMPT_CAP} questions</strong>:{' '}
+              {DISCOVERED_PROMPT_CAP} we find for you, and {MANUAL_QUESTION_CAP} you write
+              yourself. Use <strong>Find more questions</strong> for the first and{' '}
+              <strong>Add your own question</strong> for the second — the second is for the ones you
+              already know matter, like a comparison against a rival you keep losing to. Your own
+              questions survive a re-run of the finder; the found ones are replaced by it.
+            </P>
+
+            {/* The two absences a tracking product is assumed to have, stated
+                beside the feature rather than in a section of their own. This
+                is the only place either is mentioned anywhere in the product,
+                so it is not a summary of something documented elsewhere. */}
+            <P>
+              You start each run yourself, from the button on Results — nothing runs on a schedule
+              yet, and nothing emails you when a citation appears or disappears. You find out by
+              looking. A schedule is the next thing being built.
+            </P>
+
+            <Callout>
+              <strong>Keep the tab open while a check runs.</strong> It carries on while you move
+              around FaqFlo — there’s a progress bar on every page — but it runs from your browser,
+              so reloading or closing the tab ends it. Nothing is wasted if that happens: every
+              answer already collected is saved, and running again asks only for what’s still
+              missing rather than paying for the same answers twice.
+            </Callout>
+          </Section>
+
           {/* -------------------------------------------------- plans */}
           <Section id="plans">
             <P>
@@ -640,39 +782,6 @@ export function HelpWorkspace({ name }: { name: string | null }) {
           </Section>
 
           {/* -------------------------------------------------- not built */}
-          <Section id="not-yet">
-            <Card tone="cloud" className="p-5 sm:p-7">
-              <SectionTitle>Citation tracking runs, but you have to press the button</SectionTitle>
-              <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
-                Tracking is live on <strong>Stay Cited</strong>: it puts your questions to ChatGPT,
-                Perplexity and Gemini and records, for each one, whether they cited you, named you
-                without a link, or pointed somewhere else. What doesn’t exist yet is the{' '}
-                <em>schedule</em> — nothing runs on its own, so a run happens when you start one
-                from the Results page.
-              </p>
-              <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
-                Two things we ask and one we can’t. ChatGPT here is the OpenAI API with web search,
-                and Gemini is the Gemini API with Google Search grounding — close to what the
-                assistants say, but not a recording of a real chat. <strong>Google AI Overviews is
-                absent because it has no API at all</strong>; naming it and reporting a permanent
-                zero would read as <em>you are never cited there</em> rather than{' '}
-                <em>we never looked</em>.
-              </p>
-              <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
-                Until you’ve run a check, the <strong>AI visibility</strong> pillar shows as{' '}
-                <em>Not checked</em> and doesn’t drag your score down. That’s deliberate: a “0
-                citations” figure would read as <em>nobody is quoting you</em>, which we wouldn’t
-                have measured. Run tracking and the pillar starts scoring off what the engines
-                actually said.
-              </p>
-            </Card>
-            <P className="mt-4">
-              Three smaller things that don’t exist, so you don’t go looking: a schedule that runs
-              tracking for you, alerts when a citation appears or disappears, and any figure
-              claiming how often a question is asked.
-            </P>
-          </Section>
-
           {/* -------------------------------------------------- faq */}
           <Section id="faq">
             <div className="divide-line border-line mt-2 divide-y border-t">

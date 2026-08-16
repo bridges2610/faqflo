@@ -262,12 +262,16 @@ export type SetupStep = {
 /**
  * Getting a new customer from an empty account to answers on their own site.
  *
- * ⚠️ FOUR STEPS, NOT FIVE. The loop reads add site → check it → write answers →
- * publish them → watch citations, and the fifth is deliberately absent. Nothing
- * in this product queries an answer engine, so "watch for citations" would be a
- * box nobody can ever tick — the same promise-with-nothing-behind-it the Stay
- * Cited copy had to be cleaned up for. It is named on the front page as what is
- * coming, not as a task.
+ * ⚠️ FOUR STEPS, NOT FIVE — AND THE REASON HAS CHANGED. The loop reads add site
+ * → check it → write answers → publish them → watch citations, and the fifth is
+ * still deliberately absent. It used to be absent because nothing in this
+ * product queried an answer engine, so the box could never be ticked. Tracking
+ * runs now; the box stays out because these are SETUP steps, done once and
+ * finished, and tracking has no finished state. A step that ticks the first time
+ * you press Check would tell a customer they are done with the one thing they
+ * are meant to keep doing.
+ *
+ * The help page carries the same correction beside its own copy of these steps.
  *
  * Every step is answered from data that already exists. There is no stored
  * "onboarding complete" flag, and there should not be one: a flag can disagree

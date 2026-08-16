@@ -31,8 +31,17 @@ export const metadata: Metadata = {
     default: 'FaqFlo — Get your business cited by AI',
     template: '%s — FaqFlo',
   },
+  /*
+    ⚠️ TWO DIFFERENT LISTS ON PURPOSE, AND THEY MUST NOT BE MERGED BACK.
+
+    This used to name "ChatGPT, Perplexity and Google AI Overviews" once and
+    then say "track whether THEY start citing you" — which promised tracking of
+    AI Overviews, and that has no API for anyone. Readability is about crawlers
+    generally, so it stays broad; tracking names the three engines we actually
+    ask. See the warning on ENGINES in lib/dashboard/types.ts.
+  */
   description:
-    'Check whether ChatGPT, Perplexity and Google AI Overviews can read your site, publish answers they can quote on your own domain, and track whether they start citing you. Free visibility check, no signup.',
+    'Check whether AI assistants can read your site, publish answers they can quote on your own domain, and track whether ChatGPT, Perplexity and Gemini start citing you. Free visibility check, no signup.',
   // Favicon comes from app/icon.svg (the new bubble mark) — Next picks that up
   // automatically, so there's no `icons` entry pointing at the old PNG.
   openGraph: {

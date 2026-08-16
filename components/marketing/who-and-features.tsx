@@ -56,12 +56,19 @@ const AUDIENCES: Audience[] = [
    up the page. Every line matches a bullet on a paid plan in
    pricing-teaser.tsx, so the two sections can't drift apart. */
 const FEATURES = [
-  'Full audit — including whether AI cites you today',
+  // ⚠️ "Full audit — including whether AI cites you today" was here, and the
+  // pricing card had already deleted that exact line as untrue: the visibility
+  // pillar is `locked` at weight 0 unless the account has Stay Cited. The two
+  // lists drifted anyway, under a comment promising they couldn't — so when you
+  // edit one, open the other in the next tab rather than trusting the note.
+  'Full audit of what AI can and cannot read on your site',
   'The questions people actually ask AI in your category',
   'Answer-first Q&A written to be quoted',
   'Publish-ready HTML for your own domain',
   'Entity schema and llms.txt',
-  'Citation tracking across ChatGPT, Perplexity and Google AI Overviews',
+  // ⚠️ GEMINI, NOT AI OVERVIEWS. Overviews has no API and nobody can query it.
+  // See the warning on ENGINES in lib/dashboard/types.ts.
+  'Citation tracking across ChatGPT, Perplexity and Gemini',
 ];
 
 /** Small caps kicker above each column heading, as used on the AEO panels. */
@@ -109,10 +116,11 @@ export function WhoAndFeatures() {
           </Card>
 
           <Card className="p-7 sm:p-8">
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <Kicker>Features</Kicker>
-              <Badge tone="neutral">Coming soon</Badge>
-            </div>
+            {/* The "Coming soon" badge that sat here labelled the whole card
+                while citation tracking was unbuilt — beside six green ticks,
+                which read as "none of this works yet". Everything in the list
+                below ships today, so the badge is gone rather than reworded. */}
+            <Kicker>Features</Kicker>
             <h3 className="mt-3 text-xl">What Get Cited and Stay Cited add</h3>
 
             <ul className="mt-6 space-y-3">

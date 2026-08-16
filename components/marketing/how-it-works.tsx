@@ -37,7 +37,9 @@ const STEPS = [
   {
     n: '05',
     title: 'Track',
-    body: 'Watch what ChatGPT, Perplexity and Google AI Overviews say about you over time. What you are missed on goes back to step two.',
+    // ⚠️ Gemini, not AI Overviews — Overviews has no API and cannot be asked by
+    // anyone. See the warning on ENGINES in lib/dashboard/types.ts.
+    body: 'See what ChatGPT, Perplexity and Gemini say when asked your questions — who they cite, and who takes the click instead. What you are missed on goes back to step two.',
   },
 ];
 

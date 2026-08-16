@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
+import {
+  DISCOVERED_PROMPT_CAP,
+  MANUAL_QUESTION_CAP,
+  STAY_CITED_PROMPT_CAP,
+} from '@/lib/dashboard/plans';
 
 /*
   ⚠️ THESE FIGURES ARE NOT DERIVED FROM STRIPE, AND STRIPE DOES NOT READ THEM.
@@ -17,14 +22,23 @@ import { Check } from '@/components/ui/check';
 
   The structure is the decision, not the dollars: a one-time fee for the
   discrete "get me set up" job, and a subscription for the continuous "keep me
-  cited" job. Tracking will cost us money every month it runs — repeatedly asking
-  ChatGPT, Perplexity and Google what they say about a customer — so it can only
-  be funded by recurring revenue. One-time money cannot pay a forever cost.
+  cited" job. Tracking costs us money every time it runs — asking ChatGPT,
+  Perplexity and Gemini what they say about a customer, per question, per engine
+  — so it can only be funded by recurring revenue. One-time money cannot pay a
+  forever cost.
 
-  ⚠️ Tracking is NOT LIVE. Nothing in this product queries an answer engine yet.
-  It is listed with `soon: true` rather than a tick, and lib/dashboard/plans.ts
-  says the same thing in the app. If you build it, both change together — that
-  file carries the matching warning.
+  ⚠️ TRACKING IS LIVE NOW, AND THE ENGINE LIST IS NOT WHAT IT USED TO SAY. This
+  card promised "ChatGPT, Perplexity and Google AI Overviews". AI Overviews has
+  no API and cannot be queried by anyone — see the warning on ENGINES in
+  lib/dashboard/types.ts, which corrected the same string inside the app. We ask
+  GEMINI. Never put AI Overviews back on this list: naming an engine we cannot
+  ask means reporting a permanent zero, which reads as "you are never cited
+  there" rather than "we never looked".
+
+  ⚠️ What is still NOT built is the SCHEDULE. Runs are started by hand from the
+  Results page, so "automatic checks" is listed with `soon` — ticking tracking
+  without that line would imply an automation that does not exist. Alerts are
+  the same. lib/dashboard/plans.ts carries the matching copy in the app.
 
   The three tiers are no longer the same kind of thing, so `price` is a union
   rather than a monthly figure with nulls in it. That's what stops a one-time
@@ -40,12 +54,14 @@ type Price =
 
 /*
   A feature is either shipping or it isn't, and the card has to be able to say
-  which. `soon` exists because Stay Cited's headline — citation tracking — is
-  genuinely not built: there is no engine-querying code in the product. Listing
-  it with a tick alongside things that work would be selling it as live.
+  which. `soon` carried citation tracking while it was unbuilt; tracking ships
+  now, and the flag has moved to the two things around it that genuinely don't
+  exist — a schedule, and alerts.
 
-  Ticked features must all be real today. If you find yourself wanting to tick
-  something aspirational, mark it `soon` instead.
+  ⚠️ TICKED FEATURES MUST ALL BE REAL TODAY. If you find yourself wanting to tick
+  something aspirational, mark it `soon` instead. The flag earning its keep for a
+  second time is the argument for keeping the mechanism rather than deleting it
+  the moment the first feature landed.
 */
 type Feature = { label: string; soon?: boolean };
 
@@ -94,9 +110,11 @@ const PLANS: Plan[] = [
     featured: true,
     note: 'Start here',
     features: [
-      // "including whether AI cites you today" was here and is not true — the
-      // visibility pillar is `locked` at weight 0 on every audit, because
-      // nothing asks the engines anything. See tracking, below.
+      // ⚠️ "including whether AI cites you today" was here and is still not true
+      // ON THIS TIER. Tracking exists now, but it is Stay Cited only, so the
+      // visibility pillar stays `locked` at weight 0 for a Get Cited audit. The
+      // claim moved from impossible to merely wrong-plan, which is no better on
+      // a page where someone is choosing between the two.
       { label: 'Full audit — 44 checks across your whole site' },
       { label: 'The questions people actually ask AI in your category' },
       { label: 'The pages your industry expects, and which of yours are missing' },
@@ -127,22 +145,28 @@ const PLANS: Plan[] = [
     featured: false,
     note: null,
     /*
-      Reordered so the real things come first and the unbuilt thing is marked.
+      Tracking leads now that it exists — it is the reason this subscription is
+      bought, and it spent a long time buried at the bottom under "coming soon"
+      because it was the one thing the card could not honestly claim.
 
-      What this subscription genuinely does today is re-open generation for
-      every site on the account once its 30-day window closes — permanently.
-      That is worth $29 on its own and it is what the card now leads on.
-      Tracking is the reason the product exists and it is still being built.
+      ⚠️ THE NUMBERS ARE IMPORTED, NOT TYPED. The prompt caps moved twice in one
+      week; a hardcoded "25 questions" here would have been wrong within days,
+      and a pricing page that overstates what a plan includes is a refund rather
+      than a typo.
     */
     features: [
-      { label: 'Keeps every site on your account running after its 30 days' },
-      { label: 'Re-audit any site whenever it changes — no limit' },
-      { label: 'Unlimited regeneration, and unlimited answers kept per site' },
-      { label: 'Everything Get Cited unlocks, on every site you add' },
+      { label: 'Citation tracking across ChatGPT, Perplexity and Gemini' },
       {
-        label: 'Citation tracking across ChatGPT, Perplexity and Google AI Overviews',
-        soon: true,
+        label: `${STAY_CITED_PROMPT_CAP} questions watched — ${DISCOVERED_PROMPT_CAP} we find for you, ${MANUAL_QUESTION_CAP} you write yourself`,
       },
+      { label: 'Share of voice: every domain the engines cite, ranked against yours' },
+      { label: 'Which of your pages earn citations, and what each answer actually said' },
+      { label: 'Keeps every site on your account running after its 30 days' },
+      { label: 'Unlimited re-audits, regeneration, and answers kept per site' },
+      { label: 'Everything Get Cited unlocks, on every site you add' },
+      // ⚠️ Not decoration. Tracking runs when you press the button; without this
+      // line a tick beside "citation tracking" implies it watches on its own.
+      { label: 'Automatic scheduled checks', soon: true },
       { label: 'Alerts when a citation appears or disappears', soon: true },
     ],
   },
