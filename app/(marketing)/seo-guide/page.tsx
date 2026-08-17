@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/check';
 import { Underline } from '@/components/ui/doodle';
 import { FaqItem } from '@/components/ui/faq-item';
+import { jsonLd } from '@/lib/site';
 
 /*
   The SEO guide.
@@ -37,8 +38,10 @@ import { FaqItem } from '@/components/ui/faq-item';
 
 export const metadata: Metadata = {
   title: 'SEO in the age of AI answers',
+  // 158 characters. Was 167 — outside the 70–160 window our own `meta-length`
+  // check holds customers to.
   description:
-    'A plain-English guide to the SEO fundamentals that still matter — and how each one is the groundwork for getting cited by AI. SEO is still important. AEO is the shift.',
+    'A plain-English guide to the SEO fundamentals that still matter, and how each one is the groundwork for getting cited by AI. SEO still counts; AEO is the shift.',
   alternates: { canonical: '/seo-guide' },
 };
 
@@ -682,7 +685,7 @@ export default function SeoGuide() {
               <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{
-                  __html: JSON.stringify({
+                  __html: jsonLd({
                     '@context': 'https://schema.org',
                     '@type': 'FAQPage',
                     mainEntity: FAQS.map((f) => ({

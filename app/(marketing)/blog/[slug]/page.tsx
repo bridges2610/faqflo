@@ -14,6 +14,7 @@ import {
   getPost,
   POSTS,
 } from '@/lib/blog/posts';
+import { jsonLd, SITE_NAME, SITE_URL } from '@/lib/site';
 
 /*
   The single-post template.
@@ -134,7 +135,7 @@ export default async function Post({ params }: Params) {
             dangerouslySetInnerHTML={{
               // Escaping "<" stops a stray "</script>" in the bio from closing
               // the tag early — the bio is long free text that will get edited.
-              __html: JSON.stringify({
+              __html: jsonLd({
                 '@context': 'https://schema.org',
                 '@type': 'BlogPosting',
                 headline: meta.title,
@@ -144,13 +145,13 @@ export default async function Post({ params }: Params) {
                   '@type': 'Person',
                   name: AUTHOR,
                   description: AUTHOR_BIO,
-                  image: `https://www.faqflo.com${AUTHOR_AVATAR}`,
-                  url: 'https://www.faqflo.com/about',
+                  image: `${SITE_URL}${AUTHOR_AVATAR}`,
+                  url: `${SITE_URL}/about`,
                 },
-                publisher: { '@type': 'Organization', name: 'FaqFlo' },
-                mainEntityOfPage: `https://www.faqflo.com/blog/${meta.slug}`,
-                ...(meta.image ? { image: `https://www.faqflo.com${meta.image}` } : {}),
-              }).replace(/</g, '\\u003c'),
+                publisher: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
+                mainEntityOfPage: `${SITE_URL}/blog/${meta.slug}`,
+                ...(meta.image ? { image: `${SITE_URL}${meta.image}` } : {}),
+              }),
             }}
           />
         </article>

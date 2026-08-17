@@ -5,6 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/check';
 import { FaqItem } from '@/components/ui/faq-item';
 import { Sparkle, Underline } from '@/components/ui/doodle';
+import { jsonLd } from '@/lib/site';
 
 /*
   The About page.
@@ -501,7 +502,7 @@ export default function About() {
               <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{
-                  __html: JSON.stringify({
+                  __html: jsonLd({
                     '@context': 'https://schema.org',
                     '@type': 'FAQPage',
                     mainEntity: FAQS.map((f) => ({

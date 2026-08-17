@@ -1,4 +1,5 @@
 import 'server-only';
+import { SITE_URL } from '@/lib/site';
 
 /**
  * The emails this app sends itself.
@@ -20,7 +21,15 @@ import 'server-only';
 
 /** Emails always point at production — a link in an inbox outlives a preview. */
 function origin(): string {
-  return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ?? 'https://www.faqflo.com';
+  /*
+    ⚠️ THE ENV VAR STILL WINS HERE, AND THAT IS THE OPPOSITE OF THE RULE FOR
+    CANONICALS. An email link should point at the deployment that sent it, so a
+    preview's confirmation mail returns to the preview — which is exactly why
+    .env.example says to leave NEXT_PUBLIC_SITE_URL unset outside production. A
+    canonical tag wants the reverse and must never read this variable; see the
+    note in lib/site.ts. Only the fallback is shared.
+  */
+  return process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/+$/, '') ?? SITE_URL;
 }
 
 /**

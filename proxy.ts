@@ -171,6 +171,14 @@ export const config = {
     `api` is excluded because those routes authenticate themselves through the
     DAL and a redirect is the wrong answer for a fetch: an API caller wants a
     401 it can read, not an HTML sign-in page with a 200 on it.
+
+    ⚠️ sitemap.xml, robots.txt and llms.txt are excluded for a different reason:
+    they are for crawlers, which never carry a session. Left in, every crawl of
+    those three files would open a Supabase session lookup to decide a redirect
+    that can never apply — latency and a database round trip on the three URLs
+    most likely to be hit by automated traffic.
   */
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|icon.svg|.*\\.(?:png|jpg|jpeg|gif|webp|svg)$).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|icon.svg|sitemap.xml|robots.txt|llms.txt|.*\\.(?:png|jpg|jpeg|gif|webp|svg)$).*)',
+  ],
 };

@@ -1,4 +1,5 @@
 import { FaqItem } from '@/components/ui/faq-item';
+import { jsonLd } from '@/lib/site';
 
 /*
   FaqFlo's own FAQs — real ones, not the generator's sample set.
@@ -44,7 +45,7 @@ export function SiteFaq() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
+          __html: jsonLd({
             '@context': 'https://schema.org',
             '@type': 'FAQPage',
             mainEntity: FAQS.map((f) => ({

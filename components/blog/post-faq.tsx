@@ -1,4 +1,5 @@
 import { FaqItem } from '@/components/ui/faq-item';
+import { jsonLd } from '@/lib/site';
 
 /*
   An FAQ block for the end of a post, with its schema.
@@ -27,7 +28,7 @@ export function PostFaq({ items }: { items: { q: string; a: string }[] }) {
           // a "</script>" inside any answer from closing the tag early. Every
           // answer here is a static literal today, but the array is the kind of
           // thing that eventually gets fed from elsewhere.
-          __html: JSON.stringify({
+          __html: jsonLd({
             '@context': 'https://schema.org',
             '@type': 'FAQPage',
             mainEntity: items.map((item) => ({
