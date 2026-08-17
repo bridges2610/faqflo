@@ -1,3 +1,4 @@
+import * as forBusinessOwners from '@/content/posts/faqflo-for-business-owners.mdx';
 import * as faqPlugins from '@/content/posts/why-faq-plugins-arent-a-good-idea.mdx';
 import * as whatIsAeo from '@/content/posts/what-is-aeo.mdx';
 
@@ -52,7 +53,7 @@ export const AUTHOR_BIO =
 
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
-const MODULES = [faqPlugins, whatIsAeo];
+const MODULES = [forBusinessOwners, faqPlugins, whatIsAeo];
 
 /*
   Why a runtime check when PostMeta is a type.
