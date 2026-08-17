@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { signInWithEmail } from '@/lib/auth/actions';
 import { NO_ERROR } from '@/lib/auth/form-state';
 import { AuthLink, FIELD, FieldLabel } from './auth-card';
+import { PasswordField } from './password-field';
 
 /**
  * Email and password.
@@ -35,16 +36,7 @@ export function SignInForm({ next }: { next?: string }) {
         />
       </label>
 
-      <label className="block">
-        <FieldLabel>Password</FieldLabel>
-        <input
-          className={FIELD}
-          type="password"
-          name="password"
-          autoComplete="current-password"
-          required
-        />
-      </label>
+      <PasswordField label="Password" name="password" autoComplete="current-password" />
 
       <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Signing in…' : 'Sign in'}

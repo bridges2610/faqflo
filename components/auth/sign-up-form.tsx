@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { signUpWithEmail } from '@/lib/auth/actions';
 import { NO_ERROR } from '@/lib/auth/form-state';
 import { FIELD, FieldLabel } from './auth-card';
+import { PasswordField } from './password-field';
 
 /**
  * Name, email, password.
@@ -43,19 +44,15 @@ export function SignUpForm({ next }: { next?: string }) {
         />
       </label>
 
-      <label className="block">
-        <FieldLabel>Password</FieldLabel>
-        <input
-          className={FIELD}
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-        />
-        {/* Stated up front. A rule you only meet by breaking it wastes a submit. */}
-        <span className="text-slate mt-2 block text-xs">At least 8 characters.</span>
-      </label>
+      {/* The hint is stated up front. A rule you only meet by breaking it
+          wastes a submit. */}
+      <PasswordField
+        label="Password"
+        name="password"
+        autoComplete="new-password"
+        minLength={8}
+        hint="At least 8 characters."
+      />
 
       <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Creating your account…' : 'Create account'}

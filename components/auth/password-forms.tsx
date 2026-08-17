@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { requestPasswordReset, updatePassword } from '@/lib/auth/actions';
 import { NO_ERROR } from '@/lib/auth/form-state';
 import { FIELD, FieldLabel } from './auth-card';
+import { PasswordField } from './password-field';
 
 /*
   The two halves of a password reset.
@@ -56,30 +57,23 @@ export function ResetPasswordForm() {
 
   return (
     <form action={formAction} className="space-y-4">
-      <label className="block">
-        <FieldLabel>New password</FieldLabel>
-        <input
-          className={FIELD}
-          type="password"
-          name="password"
-          autoComplete="new-password"
-          required
-          minLength={8}
-        />
-        <span className="text-slate mt-2 block text-xs">At least 8 characters.</span>
-      </label>
+      <PasswordField
+        label="New password"
+        name="password"
+        autoComplete="new-password"
+        minLength={8}
+        hint="At least 8 characters."
+      />
 
-      <label className="block">
-        <FieldLabel>Confirm it</FieldLabel>
-        <input
-          className={FIELD}
-          type="password"
-          name="confirm"
-          autoComplete="new-password"
-          required
-          minLength={8}
-        />
-      </label>
+      {/* Each field reveals on its own. Confirming a password you can see is
+          still worth doing — it catches the half-finished paste — and one
+          toggle over both would let a single click undo the check. */}
+      <PasswordField
+        label="Confirm it"
+        name="confirm"
+        autoComplete="new-password"
+        minLength={8}
+      />
 
       <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Saving…' : 'Save new password'}
