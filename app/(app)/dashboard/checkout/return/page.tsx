@@ -52,9 +52,19 @@ export default async function CheckoutReturnPage({
     unwind, so putting it earlier would skip the grant it is confirming.
   */
   if (result.status === 'granted') {
+    /*
+      ⚠️ Get Cited now lands on /dashboard/start, not on the Audit page.
+
+      It used to go to `/dashboard/audit?purchased=get_cited`, where a useEffect
+      auto-ran a full audit. That filled in one of four sections and left
+      Answers, Opportunities and Results empty until the customer went looking
+      for three more buttons — a staged signup confirmed exactly that. The audit
+      is now the first stage of a server-side scan queued during fulfilment, and
+      /dashboard/start is where they watch it.
+    */
     redirect(
       result.product === 'get_cited'
-        ? '/dashboard/audit?purchased=get_cited'
+        ? '/dashboard/start'
         : '/dashboard/tracking?purchased=stay_cited',
     );
   }

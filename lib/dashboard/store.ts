@@ -24,7 +24,14 @@
 import { isAuditReport } from '@/lib/audit/types';
 import { questionKey } from '@/lib/questions';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
-import type { AuditRunRow, CitationCheckRow, SiteRow } from '@/lib/supabase/types';
+import type {
+  AuditRunRow,
+  CitationCheckRow,
+  FaqGroupRow,
+  FaqRow,
+  QuestionRow,
+  SiteRow,
+} from '@/lib/supabase/types';
 import { normalizeDomain, sourceHost } from './domain';
 import { contentHash, normalizePath } from './export';
 import type { TrackingPeriod } from './plans';
@@ -119,14 +126,33 @@ const EMPTY_LOCAL: LocalData = {
   audits: {},
 };
 
-function readLocal(userId: string): LocalData {
+/**
+ * What Postgres held as of the last read or write.
+ *
+ * ⚠️ THIS IS A CACHE, NOT THE TRUTH, AND THE DISTINCTION IS THE WHOLE DESIGN.
+ *
+ * Every mutation below still builds the next complete snapshot in memory and
+ * hands it back in one piece — that contract is why no component knows where
+ * data lives. What changed in 0009 is the other end: write() now diffs the
+ * snapshot it is given against this cache and sends only the rows that moved.
+ *
+ * Diffing rather than rewriting is not an optimisation. localStorage could be
+ * clobbered whole on every keystroke because it was one synchronous string;
+ * doing the same to Postgres would mean deleting and re-inserting a customer's
+ * entire content on every edit, which loses ids, races other tabs, and turns a
+ * one-word fix into a hundred round trips.
+ */
+let localCache: LocalData | null = null;
+
+/** The browser copy, read only to migrate it — see importLegacyLocal(). */
+function readLegacyLocal(userId: string): LocalData | null {
   const raw = window.localStorage.getItem(storageKey(userId));
-  if (!raw) return EMPTY_LOCAL;
+  if (!raw) return null;
   try {
     return normaliseLocal(JSON.parse(raw) as LocalData);
   } catch {
     window.localStorage.removeItem(storageKey(userId));
-    return EMPTY_LOCAL;
+    return null;
   }
 }
 
@@ -210,30 +236,224 @@ function normaliseTracking(raw: SiteTracking): SiteTracking {
   };
 }
 
+/* ------------------------------------------------------- row mapping --- */
+
+/*
+  snake_case at the boundary, camelCase above it — the same explicit mapping
+  toSite() has always done for sites. Written out rather than generated so a
+  column rename breaks the build instead of becoming an undefined field.
+*/
+
+function groupToRow(g: FaqGroup, userId: string) {
+  return {
+    id: g.id,
+    site_id: g.siteId,
+    user_id: userId,
+    name: g.name,
+    path: g.path,
+    position: g.position,
+    published_at: g.publishedAt,
+    published_hash: g.publishedHash,
+    created_at: g.createdAt,
+  };
+}
+
+function rowToGroup(r: FaqGroupRow): FaqGroup {
+  return {
+    id: r.id,
+    siteId: r.site_id,
+    name: r.name,
+    path: r.path,
+    position: r.position,
+    createdAt: r.created_at,
+    publishedAt: r.published_at,
+    publishedHash: r.published_hash,
+  };
+}
+
+function faqToRow(f: FaqEntry, userId: string) {
+  return {
+    id: f.id,
+    group_id: f.groupId,
+    user_id: userId,
+    question: f.question,
+    answer: f.answer,
+    status: f.status,
+    position: f.position,
+    source: f.source,
+    tone: f.tone,
+    language: f.language,
+    created_at: f.createdAt,
+    updated_at: f.updatedAt,
+  };
+}
+
+function rowToFaq(r: FaqRow): FaqEntry {
+  return {
+    id: r.id,
+    groupId: r.group_id,
+    question: r.question,
+    answer: r.answer,
+    status: r.status,
+    position: r.position,
+    source: r.source,
+    tone: (r.tone ?? 'Professional') as FaqEntry['tone'],
+    language: (r.language ?? 'English') as FaqEntry['language'],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+function questionToRow(q: DiscoveredQuestion, userId: string) {
+  return {
+    id: q.id,
+    site_id: q.siteId,
+    user_id: userId,
+    // ⚠️ Sent exactly as held. tracked_prompts is joined to this by string
+    // equality — see 0006. Trimming here would break the coverage loop.
+    question: q.question,
+    why: q.why ?? null,
+    intent: q.intent ?? null,
+    covered: q.covered,
+    source: q.source ?? 'discovered',
+    added_at: q.addedAt,
+  };
+}
+
+function rowToQuestion(r: QuestionRow): DiscoveredQuestion {
+  return {
+    id: r.id,
+    siteId: r.site_id,
+    question: r.question,
+    why: r.why ?? undefined,
+    intent: r.intent ?? undefined,
+    covered: r.covered,
+    source: r.source,
+    addedAt: r.added_at,
+  };
+}
+
+/* ------------------------------------------------------------ the diff --- */
+
+/**
+ * Rows that were added or changed, and ids that disappeared.
+ *
+ * Compared by serialised value rather than by reference: every mutation above
+ * rebuilds its arrays with spreads, so reference equality would report the
+ * entire table as changed on every keystroke.
+ */
+function diff<T extends { id: string }>(
+  before: T[],
+  after: T[],
+): { changed: T[]; removed: string[] } {
+  const was = new Map(before.map((r) => [r.id, JSON.stringify(r)]));
+  const changed = after.filter((r) => was.get(r.id) !== JSON.stringify(r));
+  const now = new Set(after.map((r) => r.id));
+  return { changed, removed: before.filter((r) => !now.has(r.id)).map((r) => r.id) };
+}
+
 /**
  * Persist the local half and hand back the whole snapshot.
  *
- * `user` and the site rows are deliberately NOT written: they came from
- * Postgres, and a browser that can write its own copy of them is a browser
- * deciding its own entitlements again. Each site's `lastAudit` IS local, so it
- * is lifted out into the audits map on the way past.
+ * `user` and the site rows are deliberately NOT written here: they came from
+ * Postgres through their own functions, and a browser that can write its own
+ * copy of them is a browser deciding its own entitlements again.
+ *
+ * ⚠️ `audits` is no longer written by the browser at all. The report is
+ * recorded server-side in the after() block in app/api/audit/route.ts, which is
+ * what makes it survive the customer navigating away mid-crawl — the defect
+ * that outlived every other part of this file.
+ *
+ * ⚠️ THE CACHE IS UPDATED ONLY AFTER THE WRITES LAND. If a round trip fails we
+ * throw with the cache untouched, so the next attempt still knows the real
+ * delta. Updating it first would mean one failed save silently convinced this
+ * module that the row was already stored, and the change would never be
+ * retried.
  */
-function write(data: DashboardData): DashboardData {
-  const audits: Record<string, SiteAudit> = {};
-  for (const site of data.sites) {
-    if (site.lastAudit) audits[site.id] = site.lastAudit;
-  }
+async function write(data: DashboardData): Promise<DashboardData> {
+  const userId = requireUserId('write');
+  const previous = localCache ?? EMPTY_LOCAL;
+  const supabase = supabaseBrowser();
 
-  const local: LocalData = {
+  const next: LocalData = {
     groups: data.groups,
     faqs: data.faqs,
     questions: data.questions,
     tracking: data.tracking,
     contentPlans: data.contentPlans,
-    audits,
+    // Held so assemble() can keep joining reports onto sites; never persisted
+    // from here. See the note above.
+    audits: previous.audits,
   };
 
-  window.localStorage.setItem(storageKey(requireUserId('write')), JSON.stringify(local));
+  const groups = diff(previous.groups, next.groups);
+  const faqs = diff(previous.faqs, next.faqs);
+  const questions = diff(previous.questions, next.questions);
+
+  const fail = (what: string, error: { message: string } | null) => {
+    if (error) throw new Error(`Could not save your ${what}: ${error.message}`);
+  };
+
+  /*
+    ⚠️ ORDER MATTERS IN BOTH DIRECTIONS.
+
+    Groups are inserted before answers because faqs.group_id references them,
+    and answers are deleted before groups for the same reason read backwards.
+    The database would cascade the deletes for us, but doing it explicitly keeps
+    the cache and the table agreeing about what happened.
+  */
+  if (groups.changed.length) {
+    fail(
+      'pages',
+      (await supabase.from('faq_groups').upsert(groups.changed.map((g) => groupToRow(g, userId))))
+        .error,
+    );
+  }
+  if (faqs.changed.length) {
+    fail(
+      'answers',
+      (await supabase.from('faqs').upsert(faqs.changed.map((f) => faqToRow(f, userId)))).error,
+    );
+  }
+  if (questions.changed.length) {
+    fail(
+      'questions',
+      (
+        await supabase
+          .from('questions')
+          .upsert(questions.changed.map((q) => questionToRow(q, userId)))
+      ).error,
+    );
+  }
+
+  if (faqs.removed.length) {
+    fail('answers', (await supabase.from('faqs').delete().in('id', faqs.removed)).error);
+  }
+  if (groups.removed.length) {
+    fail('pages', (await supabase.from('faq_groups').delete().in('id', groups.removed)).error);
+  }
+  if (questions.removed.length) {
+    fail('questions', (await supabase.from('questions').delete().in('id', questions.removed)).error);
+  }
+
+  // One row per site, so a plan is an upsert on site_id rather than a diff.
+  for (const plan of next.contentPlans) {
+    const before = previous.contentPlans.find((p) => p.siteId === plan.siteId);
+    if (before && JSON.stringify(before) === JSON.stringify(plan)) continue;
+    fail(
+      'content plan',
+      (
+        await supabase
+          .from('content_plans')
+          .upsert(
+            { id: newId('plan'), site_id: plan.siteId, user_id: userId, plan },
+            { onConflict: 'site_id' },
+          )
+      ).error,
+    );
+  }
+
+  localCache = next;
   return data;
 }
 
@@ -258,10 +478,10 @@ function assemble(user: User, sites: Site[], local: LocalData): DashboardData {
 
 /** The snapshot as it stands right now. */
 function requireData(fn: string): DashboardData {
-  const userId = requireUserId(fn);
-  if (!serverHalf) throw new Error(`${fn} called before the dashboard was loaded.`);
+  requireUserId(fn);
+  if (!serverHalf || !localCache) throw new Error(`${fn} called before the dashboard was loaded.`);
 
-  return assemble(serverHalf.user, serverHalf.sites, readLocal(userId));
+  return assemble(serverHalf.user, serverHalf.sites, localCache);
 }
 
 /**
@@ -292,7 +512,152 @@ export async function loadDashboard(user: User, sites: Site[]): Promise<Dashboar
   activeUserId = user.id;
   serverHalf = { user, sites };
 
-  return assemble(user, sites, readLocal(user.id));
+  await importLegacyLocal(user.id, sites);
+  localCache = await readFromDb(user.id, sites);
+
+  return assemble(user, sites, localCache);
+}
+
+/**
+ * Everything this account owns, in one round of queries.
+ *
+ * ⚠️ Scoped by user_id even though RLS already is. Belt and braces: RLS is the
+ * boundary, but a filter here means a policy regression shows up as missing
+ * data in development rather than as another account's answers in production.
+ */
+async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
+  const supabase = supabaseBrowser();
+  const siteIds = sites.map((s) => s.id);
+
+  const [groupRows, faqRows, questionRows, planRows] = await Promise.all([
+    supabase.from('faq_groups').select('*').eq('user_id', userId).order('position'),
+    supabase.from('faqs').select('*').eq('user_id', userId).order('position'),
+    supabase.from('questions').select('*').eq('user_id', userId).order('added_at'),
+    supabase.from('content_plans').select('*').eq('user_id', userId),
+  ]);
+
+  const firstError =
+    groupRows.error ?? faqRows.error ?? questionRows.error ?? planRows.error ?? null;
+  if (firstError) {
+    /*
+      ⚠️ THROW RATHER THAN FALL BACK TO EMPTY. An empty dashboard is
+      indistinguishable from a new account, so a transient read failure would
+      look exactly like "your answers are gone" — and the customer's next move
+      would be to write them again on top of rows that still exist.
+    */
+    throw new Error(`Could not load your dashboard: ${firstError.message}`);
+  }
+
+  /*
+    Audit reports come back attached to their newest run, not from a table of
+    their own. Only the latest per site is read: the Audit page renders one
+    report, and the trend it plots is the score column, which auditHistory()
+    reads separately.
+  */
+  const audits: Record<string, SiteAudit> = {};
+  if (siteIds.length) {
+    const { data: runs } = await supabase
+      .from('audit_runs')
+      .select('site_id, report, checked_at')
+      .in('site_id', siteIds)
+      .not('report', 'is', null)
+      .order('checked_at', { ascending: false });
+
+    for (const run of runs ?? []) {
+      const siteId = run.site_id as string;
+      // Newest first, so the first one wins and later rows are older runs.
+      if (audits[siteId]) continue;
+      // Dropped rather than coerced when the shape no longer matches — a
+      // partial report shown as whole would put unmeasured numbers on screen.
+      if (isAuditReport(run.report)) audits[siteId] = run.report;
+    }
+  }
+
+  return {
+    groups: (groupRows.data ?? []).map(rowToGroup),
+    faqs: (faqRows.data ?? []).map(rowToFaq),
+    questions: (questionRows.data ?? []).map(rowToQuestion),
+    tracking: [],
+    contentPlans: (planRows.data ?? []).map((r) => r.plan as ContentPlan),
+    audits,
+  };
+}
+
+/**
+ * Move a browser's stored dashboard into Postgres, once.
+ *
+ * ⚠️ THIS IS NOT OPTIONAL AND IT IS NOT A CONVENIENCE. Until 0009, one
+ * localStorage key held the only copy of every answer a customer had written.
+ * Shipping the read path without this would show every existing account an
+ * empty dashboard and let them start again on top of work they could not see.
+ *
+ * ⚠️ Only when the account has no rows yet. The test is "is Postgres empty for
+ * this user", not "is there a blob" — a second browser, or the same browser
+ * after the customer has since edited things elsewhere, must not have its stale
+ * copy replayed over the real data.
+ *
+ * The key is cleared only after the writes land, so a failure part-way leaves
+ * the source intact and the next load tries again.
+ */
+async function importLegacyLocal(userId: string, sites: Site[]): Promise<void> {
+  const legacy = readLegacyLocal(userId);
+  if (!legacy) return;
+
+  const supabase = supabaseBrowser();
+  const { count, error } = await supabase
+    .from('faq_groups')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId);
+
+  // Unreadable means unknown, and importing on unknown risks duplicating a
+  // customer's content. Leave the blob where it is and try again next load.
+  if (error) return;
+  if ((count ?? 0) > 0) {
+    window.localStorage.removeItem(storageKey(userId));
+    return;
+  }
+
+  const owned = new Set(sites.map((s) => s.id));
+  // Rows for a site this account no longer has would fail the foreign key and
+  // abort the whole import, taking the rest of the customer's answers with them.
+  const groups = legacy.groups.filter((g) => owned.has(g.siteId));
+  const groupIds = new Set(groups.map((g) => g.id));
+  const faqs = legacy.faqs.filter((f) => groupIds.has(f.groupId));
+  const questions = legacy.questions.filter((q) => owned.has(q.siteId));
+  const plans = legacy.contentPlans.filter((p) => owned.has(p.siteId));
+
+  if (groups.length) {
+    const { error: e } = await supabase
+      .from('faq_groups')
+      .insert(groups.map((g) => groupToRow(g, userId)));
+    if (e) return; // Keep the blob. Nothing is lost by trying again.
+  }
+  if (faqs.length) {
+    const { error: e } = await supabase.from('faqs').insert(faqs.map((f) => faqToRow(f, userId)));
+    if (e) return;
+  }
+  if (questions.length) {
+    const { error: e } = await supabase
+      .from('questions')
+      .insert(questions.map((q) => questionToRow(q, userId)));
+    if (e) return;
+  }
+  for (const plan of plans) {
+    await supabase
+      .from('content_plans')
+      .upsert(
+        { id: newId('plan'), site_id: plan.siteId, user_id: userId, plan },
+        { onConflict: 'site_id' },
+      );
+  }
+
+  /*
+    The audit report is deliberately NOT imported. It hangs off an audit_runs
+    row, and the local blob has no run to attach it to — inventing one would
+    put a score into the customer's trend that was never measured on that date.
+    The Audit page offers to run a fresh one, which is the honest repair.
+  */
+  window.localStorage.removeItem(storageKey(userId));
 }
 
 /**
@@ -311,14 +676,20 @@ export async function seedLocalData(): Promise<DashboardData> {
 }
 
 /**
- * Forget this account's local data.
+ * Drop the pre-0009 browser copy, if one is still sitting there.
  *
- * Not called on sign-out: the data is the customer's work, and silently
- * deleting it because they signed out on a shared laptop would be worse than
- * leaving it. Exposed so a "clear my local data" control can exist.
+ * ⚠️ THIS NO LONGER DELETES ANY DATA. It used to be the "forget my local data"
+ * escape hatch, back when the browser held the only copy; now the answers are
+ * rows in Postgres and this clears nothing but the spent legacy blob.
+ *
+ * It has no callers. It is kept, narrowed, and renamed in intent rather than
+ * deleted because a customer who has not opened the app since the migration
+ * still has that key, and a support answer of "clear it" needs somewhere to
+ * point. Deleting the customer's actual content is deliberately not offered
+ * here — that belongs to deleteSite, which cascades.
  */
-export async function clearLocalData(): Promise<void> {
-  const userId = requireUserId('clearLocalData');
+export async function clearLegacyLocalData(): Promise<void> {
+  const userId = requireUserId('clearLegacyLocalData');
   window.localStorage.removeItem(storageKey(userId));
 }
 
@@ -381,7 +752,7 @@ export function toSite(row: SiteRow): Site {
 
 /** Re-read every site and rebuild the snapshot around it. */
 async function refreshSites(fn: string): Promise<DashboardData> {
-  const userId = requireUserId(fn);
+  requireUserId(fn);
   if (!serverHalf) throw new Error(`${fn} called before the dashboard was loaded.`);
 
   const supabase = supabaseBrowser();
@@ -396,9 +767,9 @@ async function refreshSites(fn: string): Promise<DashboardData> {
   const sites = ((rows as SiteRow[] | null) ?? []).map(toSite);
   serverHalf = { user: serverHalf.user, sites };
 
-  // assemble() rejoins each audit from local storage, so a rename doesn't lose
-  // the report attached to the site being renamed.
-  return assemble(serverHalf.user, sites, readLocal(userId));
+  // assemble() rejoins each site's report from the cache, so a rename doesn't
+  // lose the audit attached to the site being renamed.
+  return assemble(serverHalf.user, sites, localCache ?? EMPTY_LOCAL);
 }
 
 export async function createSite(input: NewSite): Promise<DashboardData> {
@@ -517,11 +888,17 @@ export async function deleteSite(id: string): Promise<DashboardData> {
 */
 
 /**
- * Keep the latest audit so the page shows its findings when you come back.
+ * Show the audit that just finished, without writing it.
  *
- * Still local. An audit report is a large JSON blob that only its own account
- * ever reads, and moving it to Postgres buys nothing until it is shared or
- * queried across devices — which is the next migration, not this one.
+ * ⚠️ THE SERVER ALREADY STORED THIS. app/api/audit/route.ts writes the report
+ * into audit_runs.report from an after() block, service-role, before the
+ * customer's browser has done anything with the response. This function exists
+ * only to put it on screen now rather than on the next load.
+ *
+ * That inversion is the point of 0009. The report used to be saved here, in the
+ * component's closure, after the fetch resolved — so navigating away mid-crawl
+ * threw away a crawl the customer had already paid for. Persisting it where the
+ * work happens means the tab no longer has to survive for the result to.
  */
 export async function saveAudit(siteId: string, report: SiteAudit): Promise<DashboardData> {
   const data = requireData('saveAudit');
@@ -529,8 +906,9 @@ export async function saveAudit(siteId: string, report: SiteAudit): Promise<Dash
 
   // Held on the server half too, so the next mutation's snapshot keeps it.
   if (serverHalf) serverHalf = { ...serverHalf, sites };
+  if (localCache) localCache = { ...localCache, audits: { ...localCache.audits, [siteId]: report } };
 
-  return write({ ...data, sites });
+  return assemble(data.user, sites, localCache ?? EMPTY_LOCAL);
 }
 
 /* ------------------------------------------------------------- content --- */

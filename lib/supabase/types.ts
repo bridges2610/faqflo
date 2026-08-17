@@ -78,7 +78,70 @@ export type AuditRunRow = {
   /** Quick and full runs are not comparable — never plot them on one line. */
   depth: 'quick' | 'full';
   pillar_scores: Record<string, number>;
+  /**
+   * The full report — pages, findings, pillars.
+   *
+   * Null on every row written before 0009, which is honest: those reports were
+   * only ever in the customer's browser and cannot be recovered. Typed as
+   * unknown rather than AuditReport so a stored blob from an older shape has to
+   * be parsed rather than trusted.
+   */
+  report: unknown | null;
   checked_at: string;
+};
+
+/**
+ * A page of answers — the customer's own content, not evidence.
+ *
+ * Full CRUD for `authenticated` under RLS, unlike audit_runs and
+ * citation_checks. See the reasoning at the top of 0009.
+ */
+export type FaqGroupRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  name: string;
+  /** Leading slash, no origin. The site row owns the domain. */
+  path: string;
+  position: number;
+  published_at: string | null;
+  published_hash: string | null;
+  created_at: string;
+};
+
+export type FaqRow = {
+  id: string;
+  /** The group owns the answer; the group knows its site. */
+  group_id: string;
+  user_id: string;
+  question: string;
+  answer: string;
+  /** Only 'published' reaches the export and the schema markup. */
+  status: 'published' | 'draft';
+  position: number;
+  source: 'generated' | 'manual' | 'discovered';
+  tone: string | null;
+  language: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * A question we watch — the canonical list.
+ *
+ * ⚠️ `question` must match tracked_prompts.question byte for byte; the two are
+ * joined by string equality. Same warning as on that column in 0006.
+ */
+export type QuestionRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  question: string;
+  why: string | null;
+  intent: string | null;
+  covered: boolean;
+  source: 'discovered' | 'manual';
+  added_at: string;
 };
 
 /**

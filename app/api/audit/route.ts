@@ -263,6 +263,22 @@ export async function POST(request: Request) {
                   .filter((p) => p.score !== null)
                   .map((p) => [p.id, p.score as number]),
               ),
+              /*
+                ⚠️ THE WHOLE REPORT, AND THIS IS WHAT FIXES THE OLDEST DEFECT
+                IN THE AUDIT.
+
+                Until 0009 the report was written by the browser, in the
+                component's closure, after the fetch resolved — so a customer
+                who navigated away during a crawl of up to a hundred pages lost
+                a report they had already paid for, and there was no indicator
+                anywhere that it had ever been running. Writing it here means
+                the tab no longer has to survive for the result to.
+
+                It is also what lets the server run question discovery at all:
+                lib/dashboard/discover.ts refuses without `pages`, and until now
+                `pages` existed only in a browser.
+              */
+              report,
               checked_at: report.checkedAt,
             });
         } catch (err) {

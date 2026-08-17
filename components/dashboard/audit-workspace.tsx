@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -197,8 +196,6 @@ export function AuditWorkspace({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const router = useRouter();
-
   /*
     Landing here straight from Stripe.
 
@@ -210,33 +207,24 @@ export function AuditWorkspace({
   const [showPurchased] = useState(justPurchased);
 
   /*
-    ⚠️ THIS SPENDS MONEY, SO IT IS GUARDED THREE TIMES.
+    ⚠️ THE AUTO-RUN THAT USED TO LIVE HERE IS GONE, AND MUST NOT COME BACK.
 
-    A full audit is up to a hundred requests to somebody else's server plus an
-    LLM pass. Firing it from a page load is only defensible because they just
-    bought exactly this, and only if it can happen precisely once:
+    A `useEffect` here fired a full audit whenever the URL carried
+    `?purchased=get_cited`, guarded three ways against firing twice. It was
+    defensible when it was the only automatic work in the product — somebody
+    who has just paid should not have to ask for their audit.
 
-      1. `autoRan` — a ref, not state, so React's double-invoked effects in
-         development cannot start two crawls.
-      2. the site check — the provider hydrates client-side, so `site` is null
-         on first paint and running then would audit nothing.
-      3. router.replace BEFORE run() — strips ?purchased= immediately, so a
-         refresh mid-crawl cannot start a second one. The server's
-         AUDIT_FULL_RATE_LIMIT is a backstop, not the plan.
+    It is now wrong for two reasons. The audit is the first stage of the
+    server-side scan queued during Stripe fulfilment (lib/stripe/fulfil.ts), so
+    running it here as well means two crawls of the customer's site for one
+    payment, and burns one of only four daily full audits
+    (AUDIT_FULL_RATE_LIMIT) on a duplicate. And the customer no longer arrives
+    on this page at all: /dashboard/checkout/return sends them to
+    /dashboard/start to watch all three stages.
+
+    The banner below still reads `?purchased=`, which is harmless and unused on
+    the new path — it is kept for anyone holding an old link.
   */
-  const autoRan = useRef(false);
-
-  useEffect(() => {
-    if (!justPurchased || autoRan.current) return;
-    if (!site || !data) return;
-
-    autoRan.current = true;
-    router.replace('/dashboard/audit');
-    void run();
-    // `run` is a hoisted declaration recreated each render; the ref above is
-    // the real guard, so listing it here would only re-arm what it prevents.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [justPurchased, site, data, router]);
 
   if (!site || !data) {
     return (

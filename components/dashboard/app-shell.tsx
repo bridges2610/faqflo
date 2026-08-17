@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
@@ -10,6 +11,7 @@ import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/pla
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { RunNotice } from './run-notice';
+import { ScanNotice } from './scan-notice';
 import { SiteSwitcher } from './site-switcher';
 
 type NavItem = {
@@ -210,7 +212,10 @@ function HelpLink({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { loading } = useDashboard();
+  const { loading, loadError, retryLoad } = useDashboard();
+  // Data is present and usable — the only state in which the header's
+  // data-reading children are safe to mount.
+  const ready = !loading && !loadError;
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -309,23 +314,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <MenuIcon className="h-5 w-5" />
               </button>
-              {!loading && <SiteSwitcher />}
+              {/* ⚠️ `!loading` alone is not enough here any more. A failed load
+                  stops loading without producing data, and both of these read
+                  from it — AccountMenu dereferences user.name and would throw,
+                  taking down the very panel that explains the failure. */}
+              {ready && <SiteSwitcher />}
             </div>
 
-            <div className="flex items-center gap-3">{!loading && <AccountMenu />}</div>
+            <div className="flex items-center gap-3">{ready && <AccountMenu />}</div>
           </div>
         </header>
 
         <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 sm:py-10">
           <div className="mx-auto max-w-5xl">
-            {loading ? (
+            {loadError ? (
+              <LoadFailed message={loadError} onRetry={retryLoad} />
+            ) : loading ? (
               <ShellSkeleton />
             ) : (
               <>
                 <WindowNotice />
                 {/* Same slot, same argument as the countdown above: a run that
                     only reports on the page that started it is one you assume
-                    died when you clicked away. */}
+                    died when you clicked away.
+
+                    Two notices, and their advice is deliberately contradictory:
+                    tracking runs from the browser and needs the tab, the first
+                    scan runs on the server and does not. See scan-notice.tsx. */}
+                <ScanNotice />
                 <RunNotice />
                 {children}
               </>
@@ -333,6 +349,37 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The dashboard could not be read.
+ *
+ * ⚠️ THE WORDING IS THE POINT, NOT THE PANEL. "Could not load" and "you have
+ * nothing yet" render almost identically and mean opposite things, and only one
+ * of them tempts a customer into retyping answers that are sitting safely in
+ * the database. That distinction is the whole reason the store throws on a
+ * failed read instead of returning an empty snapshot, and it would be undone
+ * here by copy that hedged.
+ *
+ * So: say plainly that the data is there and we could not reach it, show what
+ * the database actually said rather than a generic apology, and offer the
+ * retry — a reload works too, but a button that does the same thing without
+ * losing the page is kinder than making someone guess.
+ */
+function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div role="alert" className="border-line rounded-card border bg-white p-6 sm:p-8">
+      <h1 className="text-navy text-lg font-semibold">We couldn&rsquo;t load your dashboard</h1>
+      <p className="text-slate mt-2 text-sm leading-relaxed">
+        Your pages, answers and questions are saved — we just couldn&rsquo;t reach them this time.
+        Nothing has been lost, so there&rsquo;s no need to write anything again.
+      </p>
+      <p className="text-slate mt-3 font-mono text-xs">{message}</p>
+      <Button className="mt-5" size="sm" onClick={onRetry}>
+        Try again
+      </Button>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { trySendEmail } from '@/lib/email/client';
 import { setUpEmail } from '@/lib/email/templates';
+import { enqueueScan } from '@/lib/scan/enqueue';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from './client';
 
@@ -82,6 +83,29 @@ export async function fulfilCheckoutSession(sessionId: string): Promise<Fulfilme
       decide where to send them — not "did anything change just now".
     */
     if (newlyGranted) await announceSetUp(siteId, userId, session.id);
+
+    /*
+      Start the first scan.
+
+      ⚠️ NOT gated on `newlyGranted`, unlike the email above. This is
+      deliberately the other way round: the email must send exactly once, and
+      `newlyGranted` is the only thing that can promise it. The scan must EXIST
+      exactly once, which is a different guarantee and one the database already
+      makes — scan_jobs carries a partial unique index on site_id for live jobs
+      (0010), so a second call is a duplicate the insert quietly absorbs.
+
+      Gating on `newlyGranted` would have been the more obvious choice and would
+      have been wrong: whichever of the two fulfilment paths lands first wins the
+      flag, and if that one then failed to insert, the other would decline to try.
+      A paid customer with no scan is the worst outcome here.
+
+      ⚠️ Failures are logged, not thrown. app/api/stripe/webhook/route.ts:126
+      claims the Stripe event BEFORE running this, so a throw here would have its
+      retry discarded as a duplicate — the customer would have paid, been
+      granted, and silently never scanned. The scan is recoverable by other
+      means; the grant is not, so the grant is what gets to fail loudly.
+    */
+    await enqueueScan(siteId, userId);
 
     return { status: 'granted', product: 'get_cited' };
   }

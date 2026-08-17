@@ -34,8 +34,22 @@ import type { AuditReport, Finding } from '@/lib/audit/types';
 import { contentHash } from './export';
 import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
 
+/**
+ * A unique id for a row the browser is about to create.
+ *
+ * ⚠️ THIS BECAME LOAD-BEARING IN 0009. It used to be six base-36 characters
+ * from Math.random() — about 2.2 billion values, which is fine for a demo
+ * fixture and not fine for a primary key. Groups, answers and questions are
+ * database rows now, so a collision is no longer a confusing UI glitch: it is
+ * an insert that violates a primary key and a mutation that throws in the
+ * customer's face.
+ *
+ * The prefix is kept because it makes an id readable in a query result, and
+ * because the ids already in customers' browsers carry it — those import
+ * unchanged, so the two formats coexist by design.
+ */
 export function newId(prefix: string): string {
-  return `${prefix}_${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 function daysAgo(n: number): string {

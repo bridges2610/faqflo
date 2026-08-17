@@ -67,6 +67,17 @@ const IDLE_RUN: TrackingRun = {
 
 type Ctx = {
   loading: boolean;
+  /**
+   * Why the dashboard could not be read, or null.
+   *
+   * ⚠️ NOT THE SAME AS AN EMPTY DASHBOARD, and the UI must never conflate the
+   * two. "You have no answers yet" and "we could not fetch your answers" look
+   * identical on screen and mean opposite things — one of them invites the
+   * customer to retype work that is sitting safely in the database.
+   */
+  loadError: string | null;
+  /** Re-run the load after a failure. */
+  retryLoad: () => void;
   data: DashboardData | null;
   user: User | null;
   /** Currently selected site, or null while loading / if none exist. */
@@ -164,14 +175,41 @@ export function DashboardProvider({
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [siteId, setSiteId] = useState<string | null>(null);
+  /*
+    ⚠️ LOADING CAN FAIL NOW, AND IT COULD NOT BEFORE.
+
+    loadDashboard() used to read one localStorage string and, on a bad parse,
+    hand back an empty snapshot — there was nothing to catch. Since 0009 it
+    issues four queries against Postgres and throws if any of them fails, which
+    is deliberate: returning empty would render an established account as a
+    brand-new one, and the customer's next move would be to write their answers
+    again on top of rows that still exist.
+
+    Without this state that throw was an unhandled rejection: `data` stayed
+    null, `loading` stayed true, and the shell spun forever with nothing said.
+    A dropped connection became a dashboard that never loaded.
+  */
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Bumped by retryLoad() to re-run the effect below. A counter rather than a
+  // boolean so a second failure can still be retried a third time.
+  const [loadNonce, setLoadNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    store.loadDashboard(user, sites).then((loaded) => {
-      if (cancelled) return;
-      setData(loaded);
-      setSiteId(loaded.sites[0]?.id ?? null);
-    });
+    setLoadError(null);
+    store
+      .loadDashboard(user, sites)
+      .then((loaded) => {
+        if (cancelled) return;
+        setData(loaded);
+        setSiteId(loaded.sites[0]?.id ?? null);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // `data` is deliberately left null. Showing a half-populated dashboard
+        // built from a failed read is the thing the throw exists to prevent.
+        setLoadError(err instanceof Error ? err.message : 'Something went wrong.');
+      });
     return () => {
       cancelled = true;
     };
@@ -180,8 +218,11 @@ export function DashboardProvider({
       the account changes is the thing that keeps one browser signing in as two
       people honest — the store re-points at the other account's namespaced
       storage rather than serving the first one's answers to the second.
+
+      loadNonce is what "Try again" turns — the inputs are unchanged after a
+      failure, so without it there is nothing for React to key a re-run on.
     */
-  }, [user, sites]);
+  }, [user, sites, loadNonce]);
 
   /* Every mutation funnels through here so there is exactly one place that
      writes state, and the selected site can never point at a deleted row. */
@@ -458,7 +499,11 @@ export function DashboardProvider({
   );
 
   const value: Ctx = {
-    loading: data === null,
+    // Not loading if we have stopped and failed — otherwise the shell would
+    // show a spinner and an error message at the same time.
+    loading: data === null && loadError === null,
+    loadError,
+    retryLoad: () => setLoadNonce((n) => n + 1),
     data,
     user: data?.user ?? null,
     site,
