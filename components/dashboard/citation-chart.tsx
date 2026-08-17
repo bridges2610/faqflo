@@ -29,11 +29,79 @@ const SERIES: Record<Engine, string> = {
   Gemini: '#7C3AED',
 };
 
+/*
+  ⚠️ THE FIX FOR TWO ENGINES WITH THE SAME HISTORY.
+
+  Identical values put two polylines on exactly the same pixels, and the one
+  drawn second wins — the chart showed a single line and gave the reader no clue
+  an engine was missing underneath it. Dashes make the overlap legible: the gaps
+  in a dashed stroke let the line beneath show through, so two coincident series
+  read as two.
+
+  It also settles a debt this file's header comment already names. Blue↔teal
+  separate at ΔE 6.7 under tritanopia, which is "only legal alongside a second,
+  non-colour encoding" — that encoding was the end labels and the table, both of
+  which are away from the line itself. Now the stroke carries it too.
+
+  Assigned by engine, never by rank, for the same reason the colours are.
+*/
+const DASH: Record<Engine, string | undefined> = {
+  ChatGPT: undefined,
+  Perplexity: '6 3',
+  Gemini: '2 3',
+};
+
+/** Smallest gap that keeps two 11px labels from touching. */
+const LABEL_PITCH = 13;
+
+/**
+ * Below this many days, show a marker on every point.
+ *
+ * A two-day chart is a pair of measurements and should look like one — a bare
+ * segment with a dot at one end reads as unfinished. Past ten points the dots
+ * merge into the stroke and stop being information.
+ */
+const DOT_EVERY_POINT_UNTIL = 10;
+
 const W = 720;
 const H = 240;
 const PAD = { top: 14, right: 92, bottom: 24, left: 34 };
 const PLOT_W = W - PAD.left - PAD.right;
 const PLOT_H = H - PAD.top - PAD.bottom;
+
+/**
+ * Push overlapping end labels apart, without moving the data.
+ *
+ * ⚠️ THE DOTS DO NOT MOVE — only the text does. Nudging a series so it clears
+ * another one would draw a value nobody measured, which is the one thing this
+ * codebase will not do. So a label may end up off its own line, and when it
+ * does the caller draws a leader back to the real point.
+ *
+ * Greedy downward sweep: sort by true position, then any label closer than
+ * LABEL_PITCH to the one above gets pushed down. With three series the
+ * arithmetic is trivial; it is a function because the "all three equal" case
+ * has to stay legible and that is easy to break by hand.
+ */
+function dodge(entries: { engine: Engine; y: number }[]): { engine: Engine; y: number; at: number }[] {
+  const sorted = [...entries].sort((a, b) => a.y - b.y);
+  let previous = -Infinity;
+
+  const placed = sorted.map(({ engine, y }) => {
+    const at = Math.max(y, previous + LABEL_PITCH);
+    previous = at;
+    return { engine, y, at };
+  });
+
+  /*
+    Pull the stack back inside the panel if the sweep ran past the bottom.
+    Without this, three series all sitting at zero would put the last label
+    below the x-axis, on top of the date row.
+  */
+  const overflow = (placed.at(-1)?.at ?? 0) - (H - 6);
+  if (overflow > 0) for (const p of placed) p.at -= overflow;
+
+  return placed;
+}
 
 function niceMax(value: number): number {
   if (value <= 5) return 5;
@@ -54,9 +122,26 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
   );
   const stepX = daily.length > 1 ? PLOT_W / (daily.length - 1) : 0;
 
-  const x = (i: number) => PAD.left + i * stepX;
+  /*
+    ⚠️ ONE DAY IS NOT ZERO DAYS. With a single point stepX is 0, so the old
+    scale put it hard against the left axis — the first run a customer ever
+    does rendered as a chart that looked broken. Centre it instead: there is no
+    line to draw, but three dots in the middle of the panel say "we measured
+    once" rather than "something failed".
+  */
+  const lone = daily.length === 1;
+  const x = (i: number) => (lone ? PAD.left + PLOT_W / 2 : PAD.left + i * stepX);
   const y = (value: number) => PAD.top + PLOT_H - (value / max) * PLOT_H;
   const ticks = [0, max / 2, max];
+
+  const last = daily[daily.length - 1];
+  // +4 puts the text baseline level with the dot's centre; dodging works in
+  // baseline space so the result can be handed straight to <text y>.
+  const endLabels = dodge(
+    ENGINES.map((engine) => ({ engine, y: y(last?.byEngine[engine] ?? 0) + 4 })),
+  );
+  const labelAt = new Map(endLabels.map((l) => [l.engine, l.at]));
+  const showEveryDot = daily.length <= DOT_EVERY_POINT_UNTIL;
 
   return (
     <Card className="p-5 sm:p-7">
@@ -151,7 +236,9 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
 
           {ENGINES.map((engine) => {
             const points = daily.map((d, i) => `${x(i)},${y(d.byEngine[engine] ?? 0)}`);
-            const last = daily[daily.length - 1];
+            const endX = x(daily.length - 1);
+            const endY = y(last?.byEngine[engine] ?? 0);
+            const textY = labelAt.get(engine) ?? endY + 4;
             return (
               <g key={engine}>
                 <polyline
@@ -161,23 +248,55 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  strokeDasharray={DASH[engine]}
                 />
+
+                {/* ⚠️ Dots on every point only while the range is short. Two
+                    engines on the same value stack their dots exactly, so the
+                    white ring is doing real work: a stack reads as visibly
+                    heavier than a lone dot, which is the only hint the flat
+                    stretch of an overlap gives. */}
+                {showEveryDot &&
+                  daily.map((d, i) => (
+                    <circle
+                      key={d.date}
+                      cx={x(i)}
+                      cy={y(d.byEngine[engine] ?? 0)}
+                      r="3"
+                      fill={SERIES[engine]}
+                      stroke="#FFFFFF"
+                      strokeWidth="1.5"
+                    />
+                  ))}
+
                 {/* End marker plus a direct label: identity never rests on
                     colour alone, which the tritan separation makes mandatory. */}
                 <circle
-                  cx={x(daily.length - 1)}
-                  cy={y(last?.byEngine[engine] ?? 0)}
+                  cx={endX}
+                  cy={endY}
                   r="4"
                   fill={SERIES[engine]}
                   stroke="#FFFFFF"
                   strokeWidth="2"
                 />
-                <text
-                  x={x(daily.length - 1) + 10}
-                  y={y(last?.byEngine[engine] ?? 0) + 4}
-                  className="fill-slate"
-                  fontSize="11"
-                >
+
+                {/* Drawn only when the label was actually moved. A leader to a
+                    label already sitting on its own line is noise. */}
+                {Math.abs(textY - (endY + 4)) > 1 && (
+                  <line
+                    x1={endX + 5}
+                    y1={endY}
+                    x2={endX + 9}
+                    y2={textY - 4}
+                    stroke={SERIES[engine]}
+                    strokeWidth="1"
+                    opacity="0.5"
+                  />
+                )}
+
+                {/* Coloured, not grey. Once a label can sit off its own line,
+                    colour is what ties it back to the series. */}
+                <text x={endX + 10} y={textY} fontSize="11" fill={SERIES[engine]}>
                   {engine}
                 </text>
               </g>
@@ -193,21 +312,38 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
             strokeWidth="1"
           />
 
-          {daily.map((d, i) =>
-            i % 7 === 0 || (i === daily.length - 1 && i % 7 > 2) ? (
+          {/* ⚠️ THE ENDS ARE ALWAYS LABELLED. The old rule was
+              `i % 7 === 0 || (i === last && i % 7 > 2)`, which silently left
+              the final day undated at every length up to three: at two days
+              i=1 gives 1 % 7 = 1, and 1 > 2 is false. A two-day chart showed
+              one date, at the left, and nothing under the point the reader
+              actually cares about. Week markers are still every 7, but only
+              where they can't crowd an end label. */}
+          {daily.map((d, i) => {
+            const isEnd = i === 0 || i === daily.length - 1;
+            const clearOfEnds = i >= 2 && i <= daily.length - 3;
+            if (!isEnd && !(i % 7 === 0 && clearOfEnds)) return null;
+            return (
               <text
                 key={d.date}
                 x={x(i)}
                 y={H - 6}
-                textAnchor="middle"
+                // Pinned inward at the ends so a date can't overhang the panel.
+                textAnchor={
+                  daily.length > 1 && i === 0
+                    ? 'start'
+                    : daily.length > 1 && i === daily.length - 1
+                      ? 'end'
+                      : 'middle'
+                }
                 className="fill-slate"
                 fontSize="10"
                 fontFamily="var(--font-mono)"
               >
                 {shortDate(d.date)}
               </text>
-            ) : null,
-          )}
+            );
+          })}
         </svg>
       )}
     </Card>
