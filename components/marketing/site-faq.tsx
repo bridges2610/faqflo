@@ -31,7 +31,7 @@ const FAQS = [
   },
   {
     q: 'Will this work on Wix or a site builder?',
-    a: 'Check where the HTML lands first. Some builders wrap embedded code in an iframe, and content inside an iframe isn’t read as part of your page — so it won’t earn you the citation. If yours does that, put the answers in a native text or HTML section instead of an embed.',
+    a: 'Check where the HTML lands first. Some builders wrap embedded code in an iframe, and content inside an iframe isn’t read as part of your page — so it won’t earn you the citation. If yours does that, put the answers in a native text section instead of an embed.',
   },
   {
     q: 'Does the content live on your site or mine?',

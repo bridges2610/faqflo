@@ -13,10 +13,10 @@ import {
   buildPasteBlock,
   buildSchemaBlock,
   groupUrl,
-  PLACEMENT_NOTES,
   publishState,
 } from '@/lib/dashboard/export';
 import type { FaqGroup, Site } from '@/lib/dashboard/types';
+import { EmbedInstructions } from './embed-instructions';
 import { EmptyState } from './empty-state';
 import { CopyIcon, TickIcon } from './nav-icons';
 import { PageHeader } from './page-header';
@@ -289,26 +289,11 @@ export function PublishWorkspace() {
         <Card className="p-5 sm:p-7">
           <SectionTitle>Where it goes</SectionTitle>
           <p className="text-slate mt-1 text-sm leading-relaxed">
-            Every builder has somewhere to put raw HTML. Find yours below.
+            Pick your builder. Every one of them has somewhere to put raw HTML, and every one has a
+            place it trips people up — that part is under the steps.
           </p>
 
-          <ul className="divide-line mt-4 divide-y">
-            {PLACEMENT_NOTES.map((p) => (
-              <li key={p.platform} className="py-3.5">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                  <span className="text-navy text-[0.9375rem] font-semibold">{p.platform}</span>
-                  {p.warning && <Badge tone="neutral">Read this one</Badge>}
-                </div>
-                <p
-                  className={`mt-1 text-sm leading-relaxed ${
-                    p.warning ? 'text-error-ink' : 'text-slate'
-                  }`}
-                >
-                  {p.note}
-                </p>
-              </li>
-            ))}
-          </ul>
+          <EmbedInstructions />
 
           <div className="border-line mt-5 space-y-3 border-t pt-4">
             {/*

@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card';
 import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import { scoreBand } from '@/lib/audit/score';
 import { PILLARS } from '@/lib/audit/types';
-import { PLACEMENT_NOTES } from '@/lib/dashboard/export';
+import { EMBED_GUIDES } from '@/lib/dashboard/export';
 import {
   DISCOVERED_PROMPT_CAP,
   ENTITLEMENTS,
@@ -20,6 +20,7 @@ import {
 import { ENGINES } from '@/lib/dashboard/types';
 import { SUPPORT_EMAIL } from '@/lib/support';
 import { ContactForm } from './contact-form';
+import { EmbedStepList } from './embed-steps';
 import { MicroLabel } from './micro-label';
 import { PageHeader } from './page-header';
 import { SectionTitle } from './section-title';
@@ -543,23 +544,27 @@ export function HelpWorkspace({ name }: { name: string | null }) {
             <SectionTitle as="h3" className="mt-8">
               Where it goes on your platform
             </SectionTitle>
-            <ul className="divide-line mt-3 divide-y">
-              {PLACEMENT_NOTES.map((note) => (
-                <li key={note.platform} className="py-3.5">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                    <span className="text-navy text-[0.9375rem] font-semibold">{note.platform}</span>
-                    {note.warning && <Badge tone="neutral">Read this one</Badge>}
-                  </div>
-                  <p
-                    className={`mt-1 text-sm leading-relaxed ${
-                      note.warning ? 'text-error-ink' : 'text-slate'
-                    }`}
-                  >
-                    {note.note}
-                  </p>
-                </li>
+            {/*
+              All six, expanded, with no picker — and no <details> either.
+
+              ⚠️ THIS PAGE IS A SERVER COMPONENT (see the block at the top of
+              this file), so there is no selection to hold. That constraint
+              happens to agree with what the page is for: it is the long-form
+              reference somebody opens when they are already stuck, and the
+              first thing a stuck person does is Ctrl-F. Collapsed content is
+              not findable that way.
+
+              The picker lives on /dashboard/publish, where the reader has one
+              builder in front of them and wants one answer. Same EMBED_GUIDES
+              data either way.
+            */}
+            <div className="divide-line mt-3 divide-y">
+              {EMBED_GUIDES.map((guide) => (
+                <div key={guide.id} className="py-4 first:pt-0 last:pb-0">
+                  <EmbedStepList guide={guide} headingAs="h4" />
+                </div>
               ))}
-            </ul>
+            </div>
             <P className="mt-4">
               Not sure whether yours wraps embeds in an iframe? Load the published page, view
               source, and search for one of your questions. If the text isn’t there, a crawler
