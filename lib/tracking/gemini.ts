@@ -26,6 +26,30 @@ import {
   redirector rather than the publisher's own address. Recovering the real host
   from a chunk is the fiddliest part of this file — see resolveHost below, and
   read it before touching anything about sources.
+
+  ⚠️ THIS ENGINE CANNOT BE ASKED FROM A COUNTRY, AND BOTH ROUTES WERE TESTED.
+
+  ChatGPT and Perplexity both take a user location, and it visibly changes what
+  they cite. Gemini does not, so a country the customer sets applies to two of
+  the three engines and this one must never be labelled with it.
+
+    `userLocation`                        rejected outright — the API answers
+                                          400 `Unknown name "userLocation"`.
+
+    `toolConfig.retrievalConfig.latLng`   ACCEPTED, AND DOES NOT LOCALISE. This
+                                          is the trap: London and New York
+                                          coordinates return different sources,
+                                          which reads as working. It is run-to-
+                                          run variance. Asked "how much does it
+                                          cost to replace a roof?" from London
+                                          it returned thisoldhouse.com, angi.com
+                                          and gaf.com — not one .uk host, on a
+                                          question a genuinely UK search fills
+                                          with them.
+
+  So: do not add a location here on the strength of the documentation. If it
+  ever becomes supported, prove it with a country-revealing question and check
+  the SOURCES change nationality, not merely that they change.
 */
 
 /**

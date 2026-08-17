@@ -36,6 +36,16 @@ export type SiteRow = {
   location: string | null;
   profile_source: 'schema' | 'inferred' | 'manual' | null;
   /**
+   * ISO 3166-1 alpha-2 the engines are asked from, or null for no location.
+   *
+   * ⚠️ Reaches ChatGPT and Perplexity only. Gemini rejects a location
+   * parameter, so its checks are stored with a null country whatever this says
+   * — see the note at the top of lib/tracking/gemini.ts. Customer-settable,
+   * unlike brand_name below: this is a statement about their market, not
+   * evidence about their results.
+   */
+  country: string | null;
+  /**
    * The business's real name, inferred by the audit — not the display label.
    *
    * `name` is what the customer typed, and most people type their domain. This
@@ -50,7 +60,7 @@ export type SiteRow = {
 /** Columns a signed-in user is actually granted UPDATE on — see the migration. */
 export type SiteWritable = Pick<
   SiteRow,
-  'name' | 'domain' | 'industry' | 'location' | 'profile_source'
+  'name' | 'domain' | 'industry' | 'location' | 'profile_source' | 'country'
 >;
 
 /**
@@ -108,5 +118,8 @@ export type CitationCheckRow = {
   /** The answer's source URLs, as returned. Why a row says what it says. */
   sources: string[];
   answer_excerpt: string | null;
+  /** Country this check was asked from. Null when no location was sent,
+   *  and always null for Gemini, which cannot be targeted. */
+  country: string | null;
   checked_at: string;
 };

@@ -14,6 +14,7 @@ import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { PlusIcon, TrashIcon } from './nav-icons';
 import { SiteForm } from './site-form';
+import { SearchCountry, countryLabel } from './search-country';
 import { SectionTitle } from './section-title';
 
 /*
@@ -94,6 +95,9 @@ function SiteRow({ id }: { id: string }) {
             'Industry not set'
           )}
           {row.location ? <> · {row.location}</> : null}
+          {/* Where checks are asked FROM, which is not the same as the service
+              area above and is easy to mistake for it — hence the verb. */}
+          {row.country ? <> · asked from {countryLabel(row.country)}</> : null}
         </p>
       </div>
 
@@ -160,6 +164,14 @@ function SiteRow({ id }: { id: string }) {
               await renameSite(row.id, { industry, location, profileSource: 'manual' });
             }}
           />
+
+          {/* Separate from the profile above on purpose. Industry and service
+              area describe the business; this changes what the answer engines
+              are shown when we ask. Folding it into BusinessProfile would also
+              have meant changing an onSave signature two pages share. */}
+          <div className="border-line mt-5 border-t pt-5">
+            <SearchCountry siteId={row.id} country={row.country} />
+          </div>
         </div>
       )}
     </li>

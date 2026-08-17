@@ -258,6 +258,13 @@ export async function POST(request: Request) {
   const { outcomes, failures } = await checkBatch(batch, {
     domain: site.domain,
     /*
+      Null means "send no location", which is what every check before this did.
+      Not guessed from sites.location — that holds free text like
+      'Rockland County, NY', and inferring a country from it would present a
+      guess as a setting.
+    */
+    country: site.country,
+    /*
       The name the engines would actually say, falling back to the label.
 
       `brand_name` is what the audit read off the site's own schema.org markup;
@@ -294,6 +301,16 @@ export async function POST(request: Request) {
       cited_instead: o.citedInstead,
       sources: o.sources,
       answer_excerpt: o.excerpt,
+      /*
+        ⚠️ WHAT THIS CHECK WAS ACTUALLY ASKED AS — null for Gemini, always.
+
+        Gemini rejects a location parameter (see the note in gemini.ts), so its
+        answers are not asked from anywhere in particular no matter what the
+        site is set to. Stamping them with the site's country would record a
+        targeting that did not happen, and a later comparison "US vs UK" would
+        silently include rows that were neither.
+      */
+      country: o.engine === 'Gemini' ? null : site.country,
     })),
   );
 

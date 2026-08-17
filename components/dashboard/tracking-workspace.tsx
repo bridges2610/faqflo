@@ -32,6 +32,7 @@ import { EmptyState } from './empty-state';
 import { MetricTile } from './metric-tile';
 import { Meter } from './meter';
 import { RunProgress } from './run-progress';
+import { countryLabel } from './search-country';
 import { AeoIcon, ChartIcon, ChevronIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
@@ -770,7 +771,26 @@ export function TrackingWorkspace() {
       <p className="text-slate mb-5 text-sm leading-relaxed">
         We ask each engine&rsquo;s API directly, so these are the answers a machine gets rather than
         a recording of anyone&rsquo;s chat window. Close to what a customer would see, not identical
-        to it.
+        to it.{' '}
+        {/* ⚠️ The country belongs in the same breath as "how we asked", not in
+            a settings screen the customer has already left. Results asked from
+            the US and from the UK are different measurements — see the country
+            column on citation_checks and the note on audit_runs.depth. */}
+        {site.country ? (
+          <>
+            Asked as someone in{' '}
+            <span className="text-navy font-medium">{countryLabel(site.country)}</span> — except
+            Gemini, which can&rsquo;t be given a location.
+          </>
+        ) : (
+          <>
+            No country is set, so each engine answers from wherever it defaults to.{' '}
+            <Link href="/dashboard/sites" className="text-primary hover:text-primary-hover">
+              Set your market
+            </Link>{' '}
+            to see what your customers would be told.
+          </>
+        )}
       </p>
 
       {(run.error || run.notes.length > 0 || run.unreadable || runningHere) && (
@@ -911,7 +931,22 @@ export function TrackingWorkspace() {
                 {byEngine.map((e) => (
                   <li key={e.engine} className="py-3.5">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="text-navy text-sm font-semibold">{e.engine}</p>
+                      <p className="text-navy text-sm font-semibold">
+                        {e.engine}
+                        {/* ⚠️ Marked, never labelled with the country. Gemini
+                            rejects a location parameter and the coordinate
+                            route was tested and does not localise, so putting
+                            "United Kingdom" on this row would claim a
+                            targeting that did not happen. Only shown when a
+                            country is set — with none set, no engine is
+                            targeted and the note would single one out for
+                            nothing. */}
+                        {site.country && e.engine === 'Gemini' && (
+                          <span className="text-slate ml-2 text-xs font-normal">
+                            not location-targeted
+                          </span>
+                        )}
+                      </p>
                       <p className="text-slate text-xs">
                         {e.checked === 0 ? (
                           // Not a zero — a gap. Saying "0 citations" for an

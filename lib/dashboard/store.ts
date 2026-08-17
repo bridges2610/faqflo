@@ -339,6 +339,8 @@ export type SitePatch = Partial<NewSite> & {
   industry?: string | null;
   location?: string | null;
   profileSource?: Site['profileSource'];
+  /** ISO 3166-1 alpha-2, or null to send no location at all. */
+  country?: string | null;
 };
 
 /*
@@ -373,6 +375,7 @@ export function toSite(row: SiteRow): Site {
     industry: row.industry,
     location: row.location,
     profileSource: row.profile_source,
+    country: row.country,
   };
 }
 
@@ -456,6 +459,9 @@ export async function updateSite(id: string, patch: SitePatch): Promise<Dashboar
   if (patch.industry !== undefined) update.industry = trimmedOrNull(patch.industry);
   if (patch.location !== undefined) update.location = trimmedOrNull(patch.location);
   if (patch.profileSource !== undefined) update.profile_source = patch.profileSource;
+  // Empty string from a "Not set" option means null — send no location at all,
+  // which is what every run did before this column existed.
+  if (patch.country !== undefined) update.country = patch.country || null;
 
   if (Object.keys(update).length === 0) return data;
 

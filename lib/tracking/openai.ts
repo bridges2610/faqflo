@@ -36,7 +36,7 @@ type OutputBlock = {
   }[];
 };
 
-export async function askChatGpt(question: string): Promise<EngineResult> {
+export async function askChatGpt(question: string, country?: string): Promise<EngineResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey.startsWith('sk-your-')) {
     return {
@@ -62,7 +62,18 @@ export async function askChatGpt(question: string): Promise<EngineResult> {
         input: question,
         // Without this the model answers from training data and cites nobody,
         // which would record every customer as uncited on every run.
-        tools: [{ type: 'web_search' }],
+        //
+        // ⚠️ `user_location` genuinely changes the answer, so it is not
+        // decoration: asked as GB this returns .co.uk roofing directories and
+        // as US it returns US ones, with ZERO overlap between the two source
+        // lists. Omitted when the customer has not set a country, which leaves
+        // the vendor's own default — the behaviour every check before this had.
+        tools: [
+          {
+            type: 'web_search',
+            ...(country ? { user_location: { type: 'approximate', country } } : {}),
+          },
+        ],
       }),
     });
 

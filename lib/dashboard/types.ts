@@ -63,6 +63,13 @@ export type Site = {
    * corrected us, no later audit or inference may overwrite their answer.
    */
   profileSource: 'schema' | 'inferred' | 'manual' | null;
+  /**
+   * Which country the answer engines are asked from. Null = no location sent.
+   *
+   * ⚠️ Applies to ChatGPT and Perplexity only — Gemini rejects a location, so
+   * its results are never labelled with this. See lib/tracking/gemini.ts.
+   */
+  country: string | null;
 };
 
 /**

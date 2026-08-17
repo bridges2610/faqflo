@@ -129,13 +129,28 @@ export type RunResult = {
 /** One question and the engines still owed an answer for it. */
 export type QuestionSlice = { question: string; engines: Engine[] };
 
+/** What the classifier and the adapters need to know about the site. */
+export type TrackedSite = {
+  domain: string;
+  name: string;
+  /**
+   * ISO 3166-1 alpha-2 the engines are asked from, or null for no location.
+   *
+   * ⚠️ Reaches two of the three engines. Gemini rejects a location parameter,
+   * so its rows are recorded with no country rather than the site's — labelling
+   * them would claim a targeting that did not happen.
+   */
+  country: string | null;
+};
+
 /** Gate Perplexity through the shared limiter; let the others run free. */
 function ask(
   engine: Engine,
   question: string,
+  country: string | null,
   gate: <T>(task: () => Promise<T>) => Promise<T>,
 ) {
-  const call = () => ADAPTERS[engine](question);
+  const call = () => ADAPTERS[engine](question, country ?? undefined);
   return engine === 'Perplexity' ? gate(call) : call();
 }
 
@@ -154,11 +169,13 @@ function ask(
  */
 export async function checkQuestion(
   question: string,
-  site: { domain: string; name: string },
+  site: TrackedSite,
   engines: Engine[] = ALL_ENGINES,
   gate: <T>(task: () => Promise<T>) => Promise<T> = createRateGate(PERPLEXITY_MIN_INTERVAL_MS),
 ): Promise<RunResult> {
-  const results = await Promise.all(engines.map((engine) => ask(engine, question, gate)));
+  const results = await Promise.all(
+    engines.map((engine) => ask(engine, question, site.country, gate)),
+  );
 
   const outcomes: CheckOutcome[] = [];
   const failures: EngineFailure[] = [];
@@ -192,7 +209,7 @@ export async function checkQuestion(
  */
 export async function checkBatch(
   items: QuestionSlice[],
-  site: { domain: string; name: string },
+  site: TrackedSite,
 ): Promise<RunResult> {
   const gate = createRateGate(PERPLEXITY_MIN_INTERVAL_MS);
 

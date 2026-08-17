@@ -31,7 +31,7 @@ const ENDPOINT = 'https://api.perplexity.ai/chat/completions';
  */
 const MODEL = 'sonar';
 
-export async function askPerplexity(question: string): Promise<EngineResult> {
+export async function askPerplexity(question: string, country?: string): Promise<EngineResult> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey || apiKey.startsWith('pplx-your-')) {
     return {
@@ -58,6 +58,11 @@ export async function askPerplexity(question: string): Promise<EngineResult> {
         // this question would be told; steering the answer toward or away from
         // any business would make the number we report our own doing.
         messages: [{ role: 'user', content: question }],
+        // Verified against the live API: asked as GB this surfaces
+        // checkatrade.com and topratedroofers.co.uk where US does not. Omitted
+        // when no country is set, which is the vendor default and what every
+        // check before this used.
+        ...(country ? { web_search_options: { user_location: { country } } } : {}),
       }),
     });
 

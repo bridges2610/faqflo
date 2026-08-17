@@ -650,6 +650,18 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               when the truth is <em>we never looked</em>.
             </Callout>
 
+            {/* ⚠️ The exclusion is the point of this callout, not a footnote to
+                it. A customer who sets a country and sees three engines listed
+                would reasonably assume all three were asked from there. */}
+            <Callout>
+              <strong>Where we ask from.</strong> Set your market on the Sites page and ChatGPT and
+              Perplexity are asked as someone searching from there, which changes what they find —
+              asked from the UK, ChatGPT returns British directories instead of American ones.{' '}
+              <strong>Gemini can’t be given a location</strong>, so its answers are never
+              country-specific and are never labelled as though they were. Leave the country unset
+              and nothing changes: every engine answers from wherever it defaults to.
+            </Callout>
+
             <SectionTitle as="h3" className="mt-8">
               The numbers along the top
             </SectionTitle>

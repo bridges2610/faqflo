@@ -46,8 +46,15 @@ export type EngineResult =
   | { ok: true; answer: EngineAnswer }
   | { ok: false; failure: EngineFailure };
 
-/** Every adapter is this function, so the caller can hold them in a list. */
-export type EngineAdapter = (question: string) => Promise<EngineResult>;
+/**
+ * Every adapter is this function, so the caller can hold them in a list.
+ *
+ * ⚠️ `country` is honoured by ChatGPT and Perplexity and IGNORED BY GEMINI —
+ * not by choice, but because that API rejects a location outright. An adapter
+ * accepting the argument is not a promise that it uses it; see the note at the
+ * top of gemini.ts before assuming otherwise.
+ */
+export type EngineAdapter = (question: string, country?: string) => Promise<EngineResult>;
 
 /** Per-call ceiling. An engine that hasn't answered by now costs us the run. */
 export const ENGINE_TIMEOUT_MS = 25_000;
