@@ -378,7 +378,7 @@ export function HelpWorkspace({ name }: { name: string | null }) {
             </P>
 
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[34rem] text-left text-sm">
+              <table className="w-full min-w-136 text-left text-sm">
                 <thead>
                   <tr className="border-line border-b">
                     <th className="text-slate py-2 pr-4 font-mono text-[0.6875rem] tracking-wide uppercase">

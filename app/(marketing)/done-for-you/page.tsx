@@ -190,7 +190,7 @@ export default function DoneForYou() {
             alt=""
             width={80}
             height={80}
-            className="bg-cloud h-16 w-16 shrink-0 rounded-full object-cover sm:h-[4.5rem] sm:w-[4.5rem]"
+            className="bg-cloud h-16 w-16 shrink-0 rounded-full object-cover sm:h-18 sm:w-18"
           />
           <div>
             <p className="font-display text-navy text-lg font-bold">{AUTHOR}</p>
