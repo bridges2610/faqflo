@@ -24,6 +24,7 @@ import { SITE_URL } from '@/lib/site';
 const PAGES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']; priority: number }[] = [
   { path: '', changeFrequency: 'weekly', priority: 1 },
   { path: '/seo-guide', changeFrequency: 'monthly', priority: 0.8 },
+  { path: '/done-for-you', changeFrequency: 'monthly', priority: 0.8 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.7 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.3 },

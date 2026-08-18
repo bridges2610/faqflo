@@ -357,6 +357,28 @@ export function PricingTeaser() {
           Everything it makes is yours permanently, including the export. Stay Cited is what keeps
           new audits and fresh answers coming after that, across every site on your account.
         </p>
+
+        {/*
+          ⚠️ THE DONE-FOR-YOU SERVICE IS DELIBERATELY NOT PITCHED HERE.
+
+          A line used to sit under these cards reading "rather not do it
+          yourself? $497 on top of Get Cited". It was removed on purpose, and
+          re-adding it would break /done-for-you rather than this page.
+
+          That service is only offered to people who ALREADY pay for Get Cited,
+          so its landing page opens by telling the reader they have it and
+          never mentions the $129. The audience for this pricing section is the
+          opposite: somebody choosing a plan, who has bought nothing. Sending
+          them to a page written for an existing customer means a stranger
+          reading "$497 once" as all-in and meeting a second charge later —
+          which is a refund.
+
+          It is offered inside the dashboard instead (Publish, Help and Start),
+          where every reader is a customer by definition. If it ever needs to
+          be sold to a cold audience, the ordering has to go back into that
+          page's copy in the same commit — the note at the top of
+          app/(marketing)/done-for-you/page.tsx spells out why.
+        */}
       </div>
     </section>
   );

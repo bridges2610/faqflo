@@ -91,6 +91,23 @@ export const FETCH_URL_RATE_LIMIT = 60;
 export const CONTACT_RATE_LIMIT = 5;
 
 /**
+ * Ceiling for done-for-you enquiries from the public landing page.
+ *
+ * ⚠️ THIS ONE IS KEYED BY IP, AND THE COMMENT ABOVE ABOUT CONTACT_RATE_LIMIT
+ * DOES NOT TRANSFER. That route requires a session, so its bucket is
+ * `user:<id>` and the in-process Map holds up reasonably. This route is
+ * genuinely anonymous — the only public form in the app — so it is back to
+ * `ip:<addr>` on serverless instances that each carry their own copy of the
+ * Map. It is a speed bump, and the honeypot in the route is the other half of
+ * the answer.
+ *
+ * Three, not five. Nobody enquires about a $497 engagement four times in a day,
+ * and unlike the support form there is no legitimate "actually, one more
+ * thing" — the reply is a conversation by email from that point on.
+ */
+export const DONE_FOR_YOU_RATE_LIMIT = 3;
+
+/**
  * Ceiling for manual citation-tracking runs.
  *
  * ⚠️ The most expensive thing a customer can press. One call is a batch of

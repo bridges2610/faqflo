@@ -10,9 +10,10 @@ import { SITE_URL } from '@/lib/site';
  * set-up note. That is the ceiling. A fifth would be noise, and each of these
  * has to earn its place by saying something the others do not.
  *
- * The third, `contactEmail`, is the exception that proves the rule: it goes to
- * US, not to a customer, so it counts against nobody's inbox and follows none
- * of the conventions below — no `wrap()`, no sign-off, no marketing voice.
+ * The last two, `contactEmail` and `doneForYouEmail`, are the exception that
+ * proves the rule: they go to US, not to a customer, so they count against
+ * nobody's inbox and follow none of the conventions below — no `wrap()`, no
+ * sign-off, no marketing voice.
  *
  * Plain template strings rather than a rendering library: no layout to speak
  * of, and the alternative is a dependency plus a build step for markup that
@@ -172,7 +173,66 @@ export function contactEmail(opts: {
     // Prefixed so an inbox filter can find these without matching on the body,
     // and topic-first so a full folder is scannable.
     subject: `[FaqFlo help] ${topic} — ${email}`,
-    html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#0f172a">
+    html: internalHtml(facts, message),
+    text: internalText(facts, message),
+  };
+}
+
+/**
+ * An enquiry about the done-for-you service, from /done-for-you.
+ *
+ * ⚠️ EVERY FIELD HERE IS TYPED BY A STRANGER, WHICH IS THE OPPOSITE OF
+ * `contactEmail` ABOVE.
+ *
+ * That one reads its context from the session precisely so the sender cannot
+ * edit it. This form is public — there is no session to read — so the name,
+ * the address and the website are claims, not facts. They are escaped like
+ * everything else, and the practical consequence is worth stating: the reply-to
+ * on this message is an address nobody has verified. Hitting reply is fine.
+ * Believing the "From" line before they answer is not.
+ *
+ * Kept in the same internal-mail shape as `contactEmail` — facts table, quoted
+ * body, no sign-off — so both land in the same inbox looking like the same
+ * kind of thing.
+ */
+export function doneForYouEmail(opts: {
+  name: string;
+  email: string;
+  website: string;
+  platform: string;
+  getCited: string;
+  notes: string;
+}): Rendered {
+  const { name, email, website, platform, getCited, notes } = opts;
+
+  const facts: [string, string][] = [
+    ['From', `${name} <${email}>`],
+    ['Website', website],
+    ['Built on', platform],
+    ['Get Cited', getCited],
+  ];
+
+  return {
+    // Website first rather than topic: unlike support, every one of these is
+    // about the same thing, so the domain is what makes a full folder scannable.
+    subject: `[FaqFlo done-for-you] ${website} — ${email}`,
+    html: internalHtml(facts, notes || 'No notes given.'),
+    text: internalText(facts, notes || 'No notes given.'),
+  };
+}
+
+/* ------------------------------------------------- internal mail shells --- */
+
+/*
+  Shared by the two templates above, which both go to us rather than to a
+  customer: a table of facts, then the message quoted behind a rule. Extracted
+  when the second one arrived — the markup was identical, and two copies of an
+  inline-styled table is two things to fix the next time a mail client renders
+  one of them badly.
+*/
+
+function internalHtml(facts: [string, string][], body: string): string {
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#0f172a">
 <table cellpadding="0" cellspacing="0" style="font-size:13px;color:#475569;margin-bottom:20px">
 ${facts
   .map(
@@ -181,12 +241,14 @@ ${facts
   )
   .join('\n')}
 </table>
-<div style="white-space:pre-wrap;border-left:3px solid #e2e8f0;padding-left:14px">${escape(message)}</div>
-</div>`,
-    text: `${facts.map(([k, v]) => `${k}: ${v}`).join('\n')}
+<div style="white-space:pre-wrap;border-left:3px solid #e2e8f0;padding-left:14px">${escape(body)}</div>
+</div>`;
+}
+
+function internalText(facts: [string, string][], body: string): string {
+  return `${facts.map(([k, v]) => `${k}: ${v}`).join('\n')}
 
 ---
 
-${message}`,
-  };
+${body}`;
 }

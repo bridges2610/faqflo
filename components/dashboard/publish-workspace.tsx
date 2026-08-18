@@ -16,6 +16,7 @@ import {
   publishState,
 } from '@/lib/dashboard/export';
 import type { FaqGroup, Site } from '@/lib/dashboard/types';
+import { DoneForYouCard } from './done-for-you-card';
 import { EmbedInstructions } from './embed-instructions';
 import { EmptyState } from './empty-state';
 import { CopyIcon, TickIcon } from './nav-icons';
@@ -265,6 +266,14 @@ export function PublishWorkspace() {
         ) : (
           groups.map((group) => <GroupSection key={group.id} site={site} group={group} />)
         )}
+
+        {/* Placed here rather than at the top or the bottom of this page. They
+            have just scrolled a wall of <pre> HTML and have not yet reached
+            the platform instructions below — the exact moment "could someone
+            else do this?" occurs to anyone it is going to occur to. Only shown
+            once there is something to publish; offering to do a job that does
+            not exist yet is noise. */}
+        {groups.length > 0 && <DoneForYouCard />}
 
         {/* Site-wide, not per group: there is only one /llms.txt at a domain,
             so it lists every group under its own heading. */}

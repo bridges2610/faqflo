@@ -20,6 +20,7 @@ import {
 import { ENGINES } from '@/lib/dashboard/types';
 import { SUPPORT_EMAIL } from '@/lib/support';
 import { ContactForm } from './contact-form';
+import { DoneForYouCard } from './done-for-you-card';
 import { EmbedStepList } from './embed-steps';
 import { MicroLabel } from './micro-label';
 import { PageHeader } from './page-header';
@@ -818,6 +819,25 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               Send us the question and we’ll answer it. If it turns out this page should have
               covered it, we’ll add it here too.
             </P>
+
+            {/*
+              Above the form, not below it.
+
+              Somebody who has read to the bottom of this page and is reaching
+              for a support form is, more often than not, telling us the work
+              is more than they bargained for. Offering to do it after they
+              have already typed the message reads as an afterthought; offering
+              it here means they get to choose. It does not replace the form —
+              plenty of people scrolling past this genuinely just have a
+              question.
+            */}
+            <div className="mt-5">
+              <DoneForYouCard
+                title="Or don’t do any of it"
+                body="Don’t fancy working an audit and pasting HTML into your CMS? Completely fair. I’ll do the whole thing by hand instead."
+              />
+            </div>
+
             <div className="mt-5">
               <ContactForm />
             </div>

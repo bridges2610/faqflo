@@ -12,6 +12,7 @@ import { timeAgo } from '@/lib/dashboard/format';
 import { auditHistory } from '@/lib/dashboard/store';
 import type { AuditRunRow } from '@/lib/supabase/types';
 import { buildWorklist, setupSteps, standing } from '@/lib/dashboard/worklist';
+import { DoneForYouCard } from './done-for-you-card';
 import { MetricTile } from './metric-tile';
 import { AeoIcon, FaqIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
@@ -329,6 +330,27 @@ export function OverviewWorkspace() {
               we&rsquo;re building next.
             </p>
           </Card>
+
+          {/*
+            Below Learn, at the bottom of the rail.
+
+            Last on purpose: the rail is supporting context, and this is the
+            only thing in it asking for money. Above the Learn card it would be
+            the second thing on the screen after the worklist, which is a
+            harder sell than the page has earned by then.
+
+            `tone="white"` because Learn directly above is cloud — two cloud
+            cards in a row merge into one block. `compact` because the rail is
+            20rem and the card's default padding is a viewport breakpoint that
+            would resolve to p-7 in here. Copy is shorter than the default for
+            the same reason: this column is a third the width of the Publish
+            page the default wording was written for.
+          */}
+          <DoneForYouCard
+            tone="white"
+            compact
+            body="I’ll set the whole thing up by hand and get it live on your site."
+          />
         </div>
       </div>
 

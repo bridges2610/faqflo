@@ -9,6 +9,15 @@ const COLUMNS = [
       { href: '/#try', label: 'Free generator' },
       { href: '/#how', label: 'How it works' },
       { href: '/#pricing', label: 'Pricing' },
+      /*
+        ⚠️ NO "Done for you" LINK HERE, AND IT WAS REMOVED RATHER THAN NEVER
+        ADDED. That service is only offered to people who already pay for Get
+        Cited — its page opens by assuming the reader has it and never
+        mentions the $129 — so surfacing it in a footer that renders on every
+        marketing page puts it in front of exactly the audience it is not
+        written for. It lives in the dashboard instead. See the note at the
+        top of app/(marketing)/done-for-you/page.tsx.
+      */
     ],
   },
   {

@@ -48,6 +48,7 @@ export function GET(): Response {
     '',
     `- [Home](${SITE_URL}/): free visibility check, pricing, and how it works.`,
     `- [SEO in the age of AI answers](${SITE_URL}/seo-guide): what still matters from classic SEO and what AEO changes.`,
+    `- [Done for you](${SITE_URL}/done-for-you): a hands-on setup service — the audit worked, answers written and published to your site, and 30 days of tracking reported back.`,
     `- [About](${SITE_URL}/about): why FaqFlo exists and who builds it.`,
     `- [Blog](${SITE_URL}/blog): notes on getting found by AI answer engines.`,
     '',

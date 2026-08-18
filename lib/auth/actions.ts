@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { looksLikeEmail } from '@/lib/validate';
 import type { AuthState } from './form-state';
 import { safeNext, siteOrigin } from './origin';
 
@@ -44,10 +45,14 @@ import { safeNext, siteOrigin } from './origin';
  */
 const MIN_PASSWORD = 8;
 
-/** Deliberately loose. The confirmation email is the real check. */
-function looksLikeEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
+/*
+  `looksLikeEmail` used to live here as a module-private function. It moved to
+  lib/validate.ts when the public done-for-you route needed the same check:
+  nothing in a `'use server'` module can be exported unless it is an async
+  function, so a second caller had no way to reach it and would have carried a
+  second regex. Imported here rather than re-declared — an import is not an
+  export, so the contract this file is under is unaffected.
+*/
 
 function field(formData: FormData, name: string): string {
   const value = formData.get(name);
