@@ -200,6 +200,28 @@ const SEED_QUESTIONS: { q: string; why: string; intent: string; covered: boolean
    contradiction, and it silently inflates their own share of voice. */
 const COMPETITORS = ['franklinroofpros.com', 'tnroofmasters.com', 'angi.com', 'thumbtack.com'];
 
+/**
+ * Day-to-day jitter, in place of Math.random().
+ *
+ * ⚠️ IT HAS TO BE DETERMINISTIC, AND THAT IS NOT ABOUT HYDRATION. This whole
+ * file already runs client-only for that reason. It is about the marketing
+ * screenshots: app/(dev)/shots renders this fixture and scripts/shots.mjs
+ * captures it, so a random call here means every regeneration produces four
+ * subtly different PNGs and no reviewable diff — the chart would reshuffle on
+ * a run that changed nothing.
+ *
+ * A hash of the day index and the engine name, folded into 0–1. Not good
+ * randomness and does not need to be: the only job is a line that looks
+ * measured rather than drawn with a ruler, identically every time.
+ */
+function wobble(day: number, engine: string): number {
+  let h = day * 2654435761;
+  for (let i = 0; i < engine.length; i++) h = (h ^ engine.charCodeAt(i)) * 16777619;
+  // >>> 0 first: the multiplications above overflow into negatives, and a
+  // negative modulo would hand back a negative "random".
+  return ((h >>> 0) % 1000) / 1000;
+}
+
 /** Citation counts per engine per day, drifting upward as answers land. */
 function seedDaily(days: number): CitationDay[] {
   const out: CitationDay[] = [];
@@ -212,7 +234,7 @@ function seedDaily(days: number): CitationDay[] {
       // Perplexity cites sources most readily, so it moves first — that's the
       // engine a customer will see results on soonest.
       const bias = engine === 'Perplexity' ? 1.6 : engine === 'ChatGPT' ? 1.1 : 0.7;
-      byEngine[engine] = Math.max(0, Math.round(progress * 6 * bias + Math.random() * 2 - 0.5));
+      byEngine[engine] = Math.max(0, Math.round(progress * 6 * bias + wobble(i, engine) * 2 - 0.5));
     }
 
     const cited = ENGINES.reduce((n, e) => n + byEngine[e], 0);

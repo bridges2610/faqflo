@@ -3,6 +3,7 @@ import { FinalCta } from '@/components/marketing/final-cta';
 import { Hero } from '@/components/marketing/hero';
 import { HowItWorks } from '@/components/marketing/how-it-works';
 import { PricingTeaser } from '@/components/marketing/pricing-teaser';
+import { ProductShots } from '@/components/marketing/product-shots';
 import { SiteFaq } from '@/components/marketing/site-faq';
 import { Stats } from '@/components/marketing/stats';
 import { VisibilityAudit } from '@/components/marketing/visibility-audit';
@@ -111,6 +112,12 @@ export default function Home() {
       </section>
 
       <HowItWorks />
+      {/* Straight after the loop that describes the work, and showing the same
+          four screens in the same order — the visitor reads "audit, answer,
+          publish, track" and then sees each one. White between HowItWorks
+          (tint-cyan) and WhatIsAeo (cloud), which is the only seam on this page
+          where a white section touches neither of its own kind. */}
+      <ProductShots />
       <WhatIsAeo />
       {/* Answers "is this for me?" on white, between the cloud AEO section and
           the tint-blue pricing band — and immediately before the price. */}

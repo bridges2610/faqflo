@@ -168,13 +168,45 @@ export function DashboardProvider({
   user,
   sites,
   children,
+  preloaded,
 }: {
   user: User;
   sites: Site[];
   children: React.ReactNode;
+  /**
+   * State handed in ready-made, instead of read from Supabase on mount.
+   *
+   * ⚠️ DEVELOPMENT ONLY, AND IGNORED OUTRIGHT IN PRODUCTION — see `offline`
+   * below. It exists for one caller: app/(dev)/shots, the route the marketing
+   * screenshots are captured from. That route has no session, so the two load
+   * effects here would redirect or throw before anything rendered.
+   *
+   * ⚠️ IT IS NOT A LOGIN BYPASS. Nothing about this weakens the real gate:
+   * app/(app)/layout.tsx still calls requireUser() server-side before this
+   * provider is ever constructed, and proxy.ts still turns anonymous traffic
+   * away from /dashboard. All this does is let a component tree that has
+   * ALREADY been handed data skip going to fetch it again.
+   *
+   * The alternative was exporting DashboardContext and hand-building a Ctx for
+   * the screenshot route. Ctx has around forty members, most of them mutations
+   * — every one would need a stub, and the stubs would silently rot the next
+   * time a real one was added. One prop reuses the whole provider instead.
+   */
+  preloaded?: { data: DashboardData; tracking: SiteTracking | null };
 }) {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [siteId, setSiteId] = useState<string | null>(null);
+  /*
+    The guard, resolved once. `process.env.NODE_ENV` is inlined at build time,
+    so in a production bundle this is the constant `false` and every branch
+    below it folds away — the prop becomes unreachable even if something
+    passes it.
+  */
+  const offline = process.env.NODE_ENV !== 'production' && preloaded !== undefined;
+  // Seeded from `preloaded` when offline, so the very first render is already
+  // populated — no skeleton frame for a screenshot to catch.
+  const [data, setData] = useState<DashboardData | null>(offline ? preloaded!.data : null);
+  const [siteId, setSiteId] = useState<string | null>(
+    offline ? (preloaded!.data.sites[0]?.id ?? null) : null,
+  );
   /*
     ⚠️ LOADING CAN FAIL NOW, AND IT COULD NOT BEFORE.
 
@@ -195,6 +227,9 @@ export function DashboardProvider({
   const [loadNonce, setLoadNonce] = useState(0);
 
   useEffect(() => {
+    // Offline: state was seeded above and there is no session to read with.
+    if (offline) return;
+
     let cancelled = false;
     setLoadError(null);
     store
@@ -222,7 +257,7 @@ export function DashboardProvider({
       loadNonce is what "Try again" turns — the inputs are unchanged after a
       failure, so without it there is nothing for React to key a re-run on.
     */
-  }, [user, sites, loadNonce]);
+  }, [user, sites, loadNonce, offline]);
 
   /* Every mutation funnels through here so there is exactly one place that
      writes state, and the selected site can never point at a deleted row. */
@@ -270,7 +305,9 @@ export function DashboardProvider({
     store still returns for a brand-new site — zeros would read as "nobody is
     citing you", which we have not measured.
   */
-  const [dbTracking, setDbTracking] = useState<SiteTracking | null>(null);
+  const [dbTracking, setDbTracking] = useState<SiteTracking | null>(
+    offline ? preloaded!.tracking : null,
+  );
 
   const loadTracking = useCallback(async (id: string, domain: string) => {
     try {
@@ -310,6 +347,11 @@ export function DashboardProvider({
   }, [sites, user]);
 
   useEffect(() => {
+    // Offline: tracking came in with the rest of the fixture. Falling through
+    // would clear it to null and then query a database we have no session for,
+    // which is how the Results screenshot ends up empty.
+    if (offline) return;
+
     if (!site) {
       setDbTracking(null);
       return;
@@ -318,7 +360,7 @@ export function DashboardProvider({
     // citations against this one's name while the read is in flight.
     setDbTracking(null);
     void loadTracking(site.id, site.domain);
-  }, [site, loadTracking]);
+  }, [site, loadTracking, offline]);
 
   const refreshTracking = useCallback(async () => {
     if (!site) return null;
