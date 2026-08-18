@@ -86,13 +86,16 @@ export function FaqGenerator() {
         setError('Pop a URL in first.');
         return;
       }
-      try {
-        const { protocol } = new URL(target);
-        if (protocol !== 'https:' && protocol !== 'http:') throw new Error();
-      } catch {
-        setError("That doesn't look like a valid URL — it should start with https://");
-        return;
-      }
+      /*
+        ⚠️ NO `new URL()` PRE-CHECK HERE ANY MORE, DELIBERATELY.
+
+        It required an absolute address, so typing "example.com" — which is how
+        most people type an address — was rejected client-side with "it should
+        start with https://". The server is stricter AND kinder: checkPublicHttpUrl
+        adds the scheme when it is missing, and refuses private hosts, which
+        this could never have done anyway. The dashboard's copy of this form
+        already posts the raw string for the same reason.
+      */
       setStatus('Reading your page');
       try {
         content = (await postJson<{ content: string }>('/api/fetch-url', { url: target })).content;

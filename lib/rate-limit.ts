@@ -81,6 +81,31 @@ export const QUESTIONS_RATE_LIMIT = 10;
 export const FETCH_URL_RATE_LIMIT = 60;
 
 /**
+ * Ceiling for reading a page when nobody is signed in.
+ *
+ * ⚠️ THE ROUTE USED TO REFUSE ANONYMOUS CALLERS OUTRIGHT, WHICH IS WHY THERE
+ * WAS ONLY ONE NUMBER ABOVE. The FAQ generator on the home page offers a "Use
+ * a URL" mode to visitors with no account, and it failed every time with "Sign
+ * in to read a page." Opening the route is what makes a second, lower ceiling
+ * necessary: 60 was sized for a signed-in working session and is far too
+ * generous for a bucket keyed by IP.
+ *
+ * Ten, because of what it feeds. The anonymous generator is capped at
+ * RATE_LIMIT (3) sets a day, so nobody can productively read more than a
+ * handful of pages — ten leaves room for typos, a retry, and a look at two
+ * different pages, and stops well short of being a usable fetch proxy. It sits
+ * below AUDIT_RATE_LIMIT (20), the other anonymous route whose cost is
+ * outbound HTTP rather than a model call.
+ *
+ * ⚠️ IP-KEYED, SO IT IS A SPEED BUMP — the same caveat as
+ * DONE_FOR_YOU_RATE_LIMIT below. The Map is per serverless instance, and
+ * x-forwarded-for is client-supplied unless the platform overwrites it. The
+ * real protections on that route are the SSRF guard and the redirect check in
+ * lib/audit/safe-fetch.ts; this is a cost control.
+ */
+export const FETCH_URL_ANON_RATE_LIMIT = 10;
+
+/**
  * Ceiling for support messages from the Help page.
  *
  * Low, because the point is a mailbox and nobody legitimately files ten support

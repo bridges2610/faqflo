@@ -15,10 +15,22 @@
  */
 
 import { parsePage, type PageFacts } from './parse';
-import { checkPublicHttpUrl } from './url-guard';
+import { safeFetch, type FetchFailure, type FetchResult } from './safe-fetch';
 import type { CrawledPage } from './types';
 
-const TIMEOUT_MS = 10_000;
+/*
+  ⚠️ FetchFailure MOVED TO ./safe-fetch.ts AND IS RE-EXPORTED HERE.
+
+  It had to follow the function that produces it — this module now imports
+  safeFetch, so a type living here that safe-fetch.ts also needed would have
+  made the two import each other. Re-exported rather than relocated in the
+  callers' imports so app/api/audit/route.ts and everything else that already
+  says `from '@/lib/audit/fetcher'` keeps working.
+*/
+export type { FetchFailure } from './safe-fetch';
+
+// The per-request timeout moved to ./safe-fetch.ts with the fetch itself. One
+// definition, so the audit and the page reader cannot drift apart on it.
 const CONCURRENCY = 6;
 /**
  * We identify as ourselves, not as a browser.
@@ -56,18 +68,6 @@ export type FetchedPage = CrawledPage & { html: string; facts: PageFacts };
  * quietly, as it always was — one unreachable link out of a hundred is not
  * something to interrupt a report for.
  */
-export type FetchFailure =
-  | { kind: 'blocked'; status: number }
-  | { kind: 'notfound'; status: number }
-  | { kind: 'server'; status: number }
-  | { kind: 'timeout' }
-  | { kind: 'unreachable' }
-  | { kind: 'empty' };
-
-type FetchResult =
-  | { ok: true; status: number; finalUrl: string; body: string; ms: number }
-  | { ok: false; failure: FetchFailure };
-
 export type PageSetResult = { ok: true; set: PageSet } | { ok: false; failure: FetchFailure };
 
 /**
@@ -80,14 +80,6 @@ export type PageSetResult = { ok: true; set: PageSet } | { ok: false; failure: F
 function statusOf(res: FetchResult): number | null {
   if (res.ok) return res.status;
   return 'status' in res.failure ? res.failure.status : null;
-}
-
-function classify(status: number): FetchFailure {
-  if (status === 404 || status === 410) return { kind: 'notfound', status };
-  if (status >= 500) return { kind: 'server', status };
-  // 401/403/429/451 say so outright; anything else non-2xx that isn't a
-  // redirect (fetch already followed those) is a refusal in practice.
-  return { kind: 'blocked', status };
 }
 
 export type PageSet = {
@@ -163,35 +155,18 @@ function pathSegments(raw: string): number {
   }
 }
 
+/*
+  Every fetch in the crawl, through the shared guard.
+
+  ⚠️ IT USED TO CALL fetch() DIRECTLY WITH redirect: 'follow', AND THAT WAS THE
+  HOLE. The guard ran on the URL we were about to request and then the platform
+  followed the response's redirect chain wherever it led — so a page in
+  somebody else's markup could bounce us onto a private address and the audit
+  would read it back. safeFetch re-checks every hop. It also caps the body,
+  which matters more here than anywhere: this runs up to a hundred times.
+*/
 async function fetchOnce(url: string): Promise<FetchResult> {
-  const guard = checkPublicHttpUrl(url);
-  // The route already vetted the entry URL; this catches the ones we found
-  // inside somebody else's markup, which is where the risk actually lives.
-  if (!guard.ok) return { ok: false, failure: { kind: 'unreachable' } };
-
-  const started = Date.now();
-  try {
-    const res = await fetch(guard.url.toString(), {
-      headers: { 'User-Agent': UA },
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-      redirect: 'follow',
-    });
-
-    if (!res.ok) return { ok: false, failure: classify(res.status) };
-
-    return {
-      ok: true,
-      status: res.status,
-      finalUrl: res.url || guard.url.toString(),
-      body: await res.text(),
-      ms: Date.now() - started,
-    };
-  } catch (err) {
-    // A timeout and a dead host both throw here, and they mean different
-    // things to the person who typed the address.
-    const timedOut = err instanceof Error && err.name === 'TimeoutError';
-    return { ok: false, failure: { kind: timedOut ? 'timeout' : 'unreachable' } };
-  }
+  return safeFetch(url, UA);
 }
 
 async function fetchEntry(

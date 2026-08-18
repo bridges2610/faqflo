@@ -1,21 +1,43 @@
 import { NextResponse } from 'next/server';
+import { safeFetch, type FetchFailure } from '@/lib/audit/safe-fetch';
 import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import { currentUser } from '@/lib/auth/dal';
 import { MAX_CONTENT_CHARS } from '@/lib/faq';
-import { checkRateLimit, FETCH_URL_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
+import {
+  checkRateLimit,
+  FETCH_URL_ANON_RATE_LIMIT,
+  FETCH_URL_RATE_LIMIT,
+  limitKey,
+} from '@/lib/rate-limit';
 
 /*
-  Fetch a page and hand back its readable text, for the dashboard generator.
+  Fetch a page and hand back its readable text, for the FAQ generator.
 
-  ⚠️ This route previously had NO rate limit and NO authentication — it did not
-  import the limiter at all. That made it a general-purpose fetch proxy anyone
-  could point at any public address, from our servers and our IP: an
-  unmetered way to make somebody else's traffic look like ours. The SSRF guard
-  stopped it reaching private networks, which is a different problem.
+  ⚠️ THIS ROUTE IS ANONYMOUS NOW, AND IT USED TO SAY THE OPPOSITE HERE. The old
+  comment read "It is a dashboard tool, so it wants a session anyway" — which
+  stopped being true the moment the generator on the marketing home page grew a
+  "Use a URL" mode. That mode posts here, no visitor to a marketing page is
+  signed in, and so the feature answered "Sign in to read a page." every single
+  time it was used.
 
-  Both are fixed here. It is a dashboard tool, so it wants a session anyway.
+  What a session still decides is the ceiling, not the answer: signed-in
+  callers get FETCH_URL_RATE_LIMIT against their account, anonymous ones get
+  the much lower FETCH_URL_ANON_RATE_LIMIT against their IP. Same split, and
+  the same limitKey() call, as app/api/audit/route.ts — the other route that
+  serves the marketing page and the dashboard from one handler.
+
+  ⚠️ WHAT ACTUALLY PROTECTS THIS IS NOT THE LIMITER. It fetches an address a
+  stranger typed, from our server, inside our network. Two things stand in the
+  way and both live elsewhere on purpose, shared with the audit crawler:
+
+    lib/audit/url-guard.ts    refuses private ranges, loopback, cloud metadata
+                              and non-http schemes.
+    lib/audit/safe-fetch.ts   re-checks every redirect hop against that guard,
+                              and caps the response body.
+
+  The limiter is a cost control on top. Read the header of safe-fetch.ts before
+  changing anything about how the request is made.
 */
-const FETCH_TIMEOUT_MS = 10_000;
 
 function fail(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -48,11 +70,45 @@ function extractText(html: string): string {
     .slice(0, MAX_CONTENT_CHARS);
 }
 
-export async function POST(request: Request) {
-  const user = await currentUser();
-  if (!user) return fail('Sign in to read a page.', 401);
+/**
+ * A failure kind, as something worth showing a stranger.
+ *
+ * ⚠️ IT USED TO RETURN THE RAW ERROR: `Failed to fetch that URL: ${err.message}`
+ * put Node's connection text in front of an anonymous caller — "ECONNREFUSED
+ * 10.0.0.5:80", "EAI_AGAIN internal.corp". That is an SSRF oracle: the guard
+ * refuses to fetch the private network, and the error message then reports
+ * what is listening on it anyway. Fixed strings only, and never the address.
+ *
+ * Same shape and the same reasoning as describe() in app/api/audit/route.ts.
+ */
+function describe(failure: FetchFailure): { message: string; status: number } {
+  switch (failure.kind) {
+    case 'timeout':
+      return { message: 'That page took too long to respond.', status: 504 };
+    case 'notfound':
+      return { message: "There's no page at that address.", status: 400 };
+    case 'blocked':
+      return {
+        message: 'That site refused to let us read the page. Try pasting the content instead.',
+        status: 502,
+      };
+    case 'server':
+      return { message: 'That site returned an error when we asked for the page.', status: 502 };
+    case 'empty':
+      return { message: 'That page came back empty.', status: 400 };
+    case 'unreachable':
+      // Also the answer for a redirect into a private range. Deliberately says
+      // nothing about where it was pointed.
+      return { message: "We couldn't reach that page.", status: 400 };
+  }
+}
 
-  if (!checkRateLimit(`fetch-url:${limitKey(user.id, request.headers)}`, FETCH_URL_RATE_LIMIT)) {
+export async function POST(request: Request) {
+  // May be null, and that is not an error — it only chooses the ceiling.
+  const user = await currentUser();
+  const limit = user ? FETCH_URL_RATE_LIMIT : FETCH_URL_ANON_RATE_LIMIT;
+
+  if (!checkRateLimit(`fetch-url:${limitKey(user?.id ?? null, request.headers)}`, limit)) {
     return fail("That's the page reads for today. They reset at midnight UTC.", 429);
   }
 
@@ -64,44 +120,35 @@ export async function POST(request: Request) {
   }
 
   const { url } = (body ?? {}) as Record<string, unknown>;
-  if (typeof url !== 'string' || !url) return fail('URL is required.');
+  if (typeof url !== 'string' || !url.trim()) return fail('URL is required.');
 
-  // This fetch happens from our server, inside our network, to an address a
-  // stranger typed. Without this guard it will happily fetch the cloud metadata
-  // endpoint or something on the private network and hand back the body.
+  /*
+    Vetted here as well as inside safeFetch, and that repetition is on purpose:
+    this pass is what produces a useful message for the person typing. A bad
+    scheme or a private address gets url-guard's own wording ("Only http and
+    https addresses can be checked"), where safeFetch would flatten it to
+    "unreachable" — correct for a redirect target somebody else chose, useless
+    for the address a visitor just typed.
+  */
   const checked = checkPublicHttpUrl(url);
   if (!checked.ok) return fail(checked.reason);
-  const parsed = checked.url;
 
-  try {
-    const pageRes = await fetch(parsed.toString(), {
-      // Honest, for the reasons spelled out in lib/audit/fetcher.ts: the
-      // `Mozilla/5.0 (compatible; ...)` disguise this used to send is the exact
-      // shape WAFs 403 on, so it lost us pages it was meant to win.
-      headers: { 'User-Agent': 'FaqFlo/2.0 (+https://faqflo.com)' },
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      redirect: 'follow',
-    });
+  const result = await safeFetch(checked.url.toString(), 'FaqFlo/2.0 (+https://faqflo.com)');
 
-    if (!pageRes.ok) {
-      return fail(`Could not fetch that page (HTTP ${pageRes.status}).`);
-    }
-
-    const contentType = pageRes.headers.get('content-type') ?? '';
-    if (!contentType.includes('html') && !contentType.includes('text')) {
-      return fail('That URL does not look like a web page.');
-    }
-
-    const text = extractText(await pageRes.text());
-    if (text.length < 50) {
-      return fail("We couldn't pull enough text from that page. Try pasting the content instead.");
-    }
-
-    return NextResponse.json({ content: text });
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'TimeoutError') {
-      return fail('That page took too long to respond.', 504);
-    }
-    return fail(`Failed to fetch that URL: ${err instanceof Error ? err.message : 'unknown error'}`);
+  if (!result.ok) {
+    const { message, status } = describe(result.failure);
+    return fail(message, status);
   }
+
+  const contentType = result.contentType ?? '';
+  if (!contentType.includes('html') && !contentType.includes('text')) {
+    return fail('That URL does not look like a web page.');
+  }
+
+  const text = extractText(result.body);
+  if (text.length < 50) {
+    return fail("We couldn't pull enough text from that page. Try pasting the content instead.");
+  }
+
+  return NextResponse.json({ content: text });
 }

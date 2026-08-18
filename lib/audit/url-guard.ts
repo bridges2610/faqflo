@@ -23,12 +23,53 @@ const BLOCKED_HOSTNAMES = new Set([
   'instance-data',
 ]);
 
-function isPrivateIpv4(host: string): boolean {
+/**
+ * Expand the short forms of an IPv4 address into four octets.
+ *
+ * ⚠️ `http://127.1/` IS LOOPBACK, AND IT USED TO GET STRAIGHT THROUGH. The
+ * check below bailed on anything that wasn't four dot-separated parts, and the
+ * "no dot means a local name" rule further down didn't catch it either, because
+ * it does contain a dot. Every resolver and every browser reads 127.1 as
+ * 127.0.0.1.
+ *
+ * The rule is the old inet_aton one: with fewer than four parts, the LAST part
+ * is a big-endian remainder filling the rest of the address. So 127.1 is
+ * 127 + 0.0.1, and 10.1.2 is 10 + 1 + 0.2.
+ *
+ * Returns null when this isn't a numeric address at all — a normal hostname
+ * like "example.com" lands here and must fall through untouched.
+ */
+function expandIpv4(host: string): number[] | null {
   const parts = host.split('.');
-  if (parts.length !== 4) return false;
+  if (parts.length < 2 || parts.length > 4) return null;
 
-  const octets = parts.map((p) => Number(p));
-  if (octets.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return false;
+  // Number() reads "0x7f" as 127 and "" as 0, so both are rejected explicitly:
+  // a hex octet is a real obfuscation, and an empty part means a malformed
+  // address rather than a zero.
+  const values: number[] = [];
+  for (const part of parts) {
+    if (!/^[0-9]+$/.test(part)) return null;
+    values.push(Number(part));
+  }
+
+  const last = values[values.length - 1];
+  const leading = values.slice(0, -1);
+
+  // Leading parts are single octets; the remainder fills what's left.
+  if (leading.some((n) => n > 255)) return null;
+  const remainderOctets = 4 - leading.length;
+  if (last >= 2 ** (8 * remainderOctets)) return null;
+
+  const filled: number[] = [...leading];
+  for (let i = remainderOctets - 1; i >= 0; i--) {
+    filled.push((last >>> (8 * i)) & 0xff);
+  }
+  return filled;
+}
+
+function isPrivateIpv4(host: string): boolean {
+  const octets = expandIpv4(host);
+  if (!octets) return false;
 
   const [a, b] = octets;
   return (
@@ -47,6 +88,30 @@ function isPrivateIpv6(host: string): boolean {
   // URL hostnames keep IPv6 in brackets.
   const address = host.replace(/^\[|\]$/g, '').toLowerCase();
   if (address === '::1' || address === '::') return true;
+
+  /*
+    ⚠️ IPv4-MAPPED ADDRESSES USED TO WALK PAST ALL OF THIS.
+    `[::ffff:127.0.0.1]` is loopback written the v6 way: it isn't `::1`, and it
+    starts with a colon rather than fc/fd/fe8, so every test here said "public"
+    and the v4 test never saw it, because the host is not a dotted quad.
+
+    ⚠️ AND IT MUST BE MATCHED IN HEX, NOT DOTTED. This is the trap: the first
+    fix here only looked for `::ffff:127.0.0.1`, and it did nothing at all,
+    because `new URL()` has already rewritten the hostname by the time we read
+    it — `[::ffff:127.0.0.1]` normalises to `[::ffff:7f00:1]`. The dotted form
+    never reaches this function. Both spellings are handled below; a test table
+    over checkPublicHttpUrl is the only reason that was caught.
+  */
+  const mappedDotted = /^::ffff:((?:[0-9]{1,3}\.){3}[0-9]{1,3})$/.exec(address);
+  if (mappedDotted) return isPrivateIpv4(mappedDotted[1]);
+
+  const mappedHex = /^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/.exec(address);
+  if (mappedHex) {
+    const high = parseInt(mappedHex[1], 16);
+    const low = parseInt(mappedHex[2], 16);
+    return isPrivateIpv4(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
+  }
+
   // fc00::/7 unique-local, fe80::/10 link-local.
   return /^f[cd]/.test(address) || /^fe[89ab]/.test(address);
 }
