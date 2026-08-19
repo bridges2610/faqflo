@@ -1,5 +1,5 @@
 import type { MDXComponents } from 'mdx/types';
-import { A, H2, H3, Hr, Img, Li, Ol, P, Quote, Strong, Ul } from '@/components/blog/post-prose';
+import { A, Code, H2, H3, Hr, Img, Li, Ol, P, Pre, Quote, Strong, Ul } from '@/components/blog/post-prose';
 
 /*
   Maps markdown output onto the site's type scale.
@@ -28,6 +28,8 @@ const components: MDXComponents = {
   strong: Strong,
   hr: Hr,
   img: Img,
+  code: Code,
+  pre: Pre,
 };
 
 export function useMDXComponents(): MDXComponents {

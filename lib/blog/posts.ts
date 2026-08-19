@@ -1,3 +1,4 @@
+import * as blockingChatgpt from '@/content/posts/is-my-site-blocking-chatgpt.mdx';
 import * as elevatorPitch from '@/content/posts/the-60-second-faqflo-elevator-pitch.mdx';
 import * as platformRanking from '@/content/posts/ranking-the-best-ai-platforms-for-your-business.mdx';
 import * as aiReferral from '@/content/posts/why-getting-your-business-mentioned-by-ai-is-a-great-referral.mdx';
@@ -56,7 +57,15 @@ export const AUTHOR_BIO =
 
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
-const MODULES = [elevatorPitch, platformRanking, aiReferral, forBusinessOwners, faqPlugins, whatIsAeo];
+const MODULES = [
+  blockingChatgpt,
+  elevatorPitch,
+  platformRanking,
+  aiReferral,
+  forBusinessOwners,
+  faqPlugins,
+  whatIsAeo,
+];
 
 /*
   Why a runtime check when PostMeta is a type.

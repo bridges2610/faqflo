@@ -53,6 +53,44 @@ export function Quote({ children }: { children?: ReactNode }) {
   );
 }
 
+/*
+  Inline code — a bot name, a robots.txt directive, a header.
+
+  Sized in `em` rather than `rem` so a snippet inside a heading scales with the
+  heading instead of shrinking to body size.
+
+  box-decoration-clone is not cosmetic polish. A name like `OAI-SearchBot` wraps
+  on a phone, and the default `slice` draws one box across both fragments — an
+  open-ended half on each line, which reads as broken layout rather than as one
+  token. Cloning gives each fragment its own border and padding.
+*/
+export function Code({ children }: { children?: ReactNode }) {
+  return (
+    <code className="bg-cloud text-navy border-line box-decoration-clone rounded-md border px-1.5 py-0.5 font-mono text-[0.875em]">
+      {children}
+    </code>
+  );
+}
+
+/*
+  Fenced code blocks.
+
+  Markdown gives every fence a `<code>` inside the `<pre>`, and that inner
+  element also hits the Code mapping above — so the badge styling is undone
+  here rather than by teaching Code where it sits. One rule, no context, and
+  Code stays a component that only has to know about itself.
+
+  overflow-x-auto is the load-bearing part: a long curl command must scroll
+  inside its own box instead of widening the article on a phone.
+*/
+export function Pre({ children }: { children?: ReactNode }) {
+  return (
+    <pre className="bg-cloud border-line text-navy mt-6 overflow-x-auto rounded-xl border p-5 font-mono text-[0.875rem] leading-[1.75] [&_code]:border-0 [&_code]:bg-transparent [&_code]:p-0 [&_code]:text-inherit">
+      {children}
+    </pre>
+  );
+}
+
 export function Strong({ children }: { children?: ReactNode }) {
   return <strong className="text-navy font-semibold">{children}</strong>;
 }
