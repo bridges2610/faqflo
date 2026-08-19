@@ -25,7 +25,7 @@ export function FeaturedImage({
 }) {
   if (!meta.image) {
     return (
-      <div className="bg-brand-gradient-bright grain relative flex aspect-[16/9] items-end overflow-hidden rounded-xl">
+      <div className="bg-brand-gradient-bright grain relative flex aspect-video items-end overflow-hidden rounded-xl">
         {/* Navy on cyan, never white — the gradient is far too light to carry
             white type at 4.5:1. */}
         <p className="font-display text-navy relative p-6 text-lg leading-snug font-extrabold text-balance sm:p-8 sm:text-2xl">
@@ -36,7 +36,7 @@ export function FeaturedImage({
   }
 
   return (
-    <div className="bg-cloud relative aspect-[16/9] overflow-hidden rounded-xl">
+    <div className="bg-cloud relative aspect-video overflow-hidden rounded-xl">
       <Image
         src={meta.image}
         alt={meta.imageAlt}

@@ -180,11 +180,21 @@ export default function Shots() {
       {/* bg-cloud matches what AppShell paints behind a workspace, so the
           captured panel sits on the surface it really sits on. */}
       <div className="bg-cloud">
+        {/*
+          ⚠️ w-300 / h-215 BELOW ARE THE CAPTURE DIMENSIONS. On the default 16px
+          root they are exactly 1200×860 CSS pixels, which scripts/shots.mjs
+          doubles to the 2400px-wide PNGs the rest of the site's images use.
+          They were written as w-[1200px] / h-[860px] until Tailwind pointed out
+          the canonical spacing-scale equivalents; the values are identical, but
+          the basis is now rem, so anything that changed the root font-size
+          would resize every screenshot. Nothing does — the only font-size rules
+          in globals.css are print-scoped.
+        */}
         {panels.map((panel) => (
           <div
             key={panel.key}
             data-shot={panel.key}
-            className="bg-cloud h-[860px] w-[1200px] overflow-hidden"
+            className="bg-cloud h-215 w-300 overflow-hidden"
           >
             <div className="px-8 pt-8" style={{ marginTop: -panel.offset }}>
               {panel.node}
