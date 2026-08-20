@@ -1224,6 +1224,23 @@ export async function moveFaqToGroup(id: string, groupId: string): Promise<Dashb
 /* -------------------------------------------------------- audit history --- */
 
 /**
+ * Is this id one Postgres could match?
+ *
+ * `site_id` is a uuid column, so a site id that isn't a uuid doesn't return
+ * zero rows — the query fails on the cast, and the reads below log the failure
+ * and carry on. That is a real path, not a hypothetical: the dev /shots route
+ * seeds a fixture site under a readable id ('shots-site') so the screenshots
+ * have something to show, and the overview screen asks for its history like
+ * any other site's. Skipping the round trip keeps a fixture from filling the
+ * terminal with cast errors that describe nothing wrong.
+ *
+ * Both readers below use it. Neither can distinguish "no rows" from "the id
+ * could never have had rows", and neither needs to — both already treat a
+ * failed read as no data.
+ */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
  * Past runs for a site, newest first.
  *
  * Read straight from Postgres rather than from the local snapshot, because this
@@ -1240,6 +1257,8 @@ export async function moveFaqToGroup(id: string, groupId: string): Promise<Dashb
  */
 export async function auditHistory(siteId: string, limit = 12): Promise<AuditRunRow[]> {
   assertClient('auditHistory');
+
+  if (!UUID.test(siteId)) return [];
 
   const { data, error } = await supabaseBrowser()
     .from('audit_runs')
@@ -1302,6 +1321,8 @@ export async function trackingFromDb(
   days = 30,
 ): Promise<SiteTracking | null> {
   assertClient('trackingFromDb');
+
+  if (!UUID.test(siteId)) return null;
 
   const since = new Date();
   since.setUTCDate(since.getUTCDate() - (days - 1));
