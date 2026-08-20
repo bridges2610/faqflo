@@ -146,7 +146,7 @@ export async function POST(request: Request) {
 
     /*
       Two different refusals wearing one status code would be a bad experience:
-      "you never bought this" and "your 30 days are up" need different next
+      "you never bought this" and "your window is up" need different next
       steps, and only one of them is a purchase of Get Cited. See
       lib/auth/entitlements.ts for why the window exists.
     */

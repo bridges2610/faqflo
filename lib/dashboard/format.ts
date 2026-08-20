@@ -49,6 +49,29 @@ export function timeUntil(iso: string | null): string {
   return `in ${days} day${days === 1 ? '' : 's'}`;
 }
 
+/**
+ * An absolute date — "12 October 2026".
+ *
+ * ⚠️ LOCALE AND TIMEZONE ARE BOTH PINNED, for the reason lib/blog/posts.ts
+ * spells out at length: a date rendered in the browser's zone can land on the
+ * previous day, and one rendered in the browser's locale reads differently on
+ * either side of the Atlantic. Both make a scheduled date look wrong to
+ * somebody, and this one is a promise about when work happens.
+ */
+const PLAIN_DATE = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+export function formatPlainDate(iso: string | null): string {
+  if (!iso) return 'unknown';
+
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? 'unknown' : PLAIN_DATE.format(date);
+}
+
 /** Thousands separators, so 12480 doesn't read as 1248 at a glance. */
 export function formatNumber(n: number): string {
   return n.toLocaleString();

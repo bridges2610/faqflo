@@ -6,8 +6,10 @@ import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import type { AuditReport, PageContent } from '@/lib/audit/types';
 import { isAuditReport } from '@/lib/audit/types';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
-import { DISCOVERED_PROMPT_CAP, TRACKING_CHECKS_PER_PERIOD, trackingPeriod } from '@/lib/dashboard/plans';
+import { trackingPeriod } from '@/lib/dashboard/plans';
 import { PAGE_BUDGET } from '@/lib/dashboard/plans';
+import { trackingPlanFor } from '@/lib/auth/entitlements';
+import type { ProfileRow } from '@/lib/supabase/types';
 import type { Engine } from '@/lib/dashboard/types';
 import { generateQuestions } from '@/lib/questions-generate';
 import { questionKey } from '@/lib/questions';
@@ -45,6 +47,15 @@ export type ScanJob = {
   status: 'queued' | 'running' | 'done' | 'failed';
   progress: Record<string, unknown>;
   error: string | null;
+  /**
+   * The scheduled check this job is running, when it is one.
+   *
+   * Null for a purchase scan. Its presence is what switches the tracking stage
+   * from the window budget to the milestone's own allowance, and it is what lets
+   * the tick route write an outcome back without being told anything by its
+   * caller.
+   */
+  milestone_id: string | null;
 };
 
 /** What one slice did, and whether its stage is finished. */
@@ -65,8 +76,16 @@ type Db = SupabaseClient;
 
 /* ------------------------------------------------------------- the site --- */
 
+/**
+ * Only the columns this file selects — a local shape, not lib/supabase/types.
+ *
+ * ⚠️ Adding a field here means adding it to the select list in siteFor() too;
+ * the two are a pair, and a column named in one and missing from the other is
+ * `undefined` at runtime with no type error to catch it.
+ */
 type SiteRow = {
   id: string;
+  user_id: string;
   domain: string;
   name: string;
   industry: string | null;
@@ -74,12 +93,18 @@ type SiteRow = {
   country: string | null;
   brand_name: string | null;
   get_cited_at: string | null;
+  get_cited_expires_at: string | null;
 };
 
 async function siteFor(db: Db, siteId: string): Promise<SiteRow> {
   const { data, error } = await db
     .from('sites')
-    .select('id, domain, name, industry, location, country, brand_name, get_cited_at')
+    /* ⚠️ An explicit list, unlike dal.ts and store.ts which select('*') — a new
+       column has to be added here by hand or the tracking stage computes the
+       window from a fallback and silently disagrees with the rest of the app. */
+    .select(
+      'id, domain, name, industry, location, country, brand_name, get_cited_at, get_cited_expires_at, user_id',
+    )
     .eq('id', siteId)
     .single<SiteRow>();
 
@@ -193,6 +218,17 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
 
   if ((existing ?? 0) > 0) return { done: true, progress: { questions: existing } };
 
+  const { data: profile } = await db
+    .from('profiles')
+    .select('subscription')
+    .eq('id', job.user_id)
+    .maybeSingle();
+
+  /* Discovery is capped by the plan too. Without a plan the site has no live
+     window, so there is nothing to propose questions for. */
+  const discoveredCap = trackingPlanFor(site, (profile as ProfileRow | null) ?? null)?.discoveredCap;
+  if (!discoveredCap) return { done: true, progress: { questions: 0 } };
+
   const report = await latestReport(db, site.id);
   if (!report) {
     throw new ScanFailed('The site check did not produce any pages to read.');
@@ -226,7 +262,9 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
       seen.add(key);
       return true;
     })
-    .slice(0, DISCOVERED_PROMPT_CAP)
+    /* The plan's discovery ceiling. Get Cited proposes 10 and reserves 5 for
+       questions the customer writes; Stay Cited proposes 25 and reserves 10. */
+    .slice(0, discoveredCap)
     .map((q) => ({
       id: `q_${crypto.randomUUID()}`,
       site_id: site.id,
@@ -277,13 +315,43 @@ function pairKey(question: string, engine: Engine): string {
 export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResult> {
   const site = await siteFor(db, job.site_id);
 
+  /*
+    ⚠️ THE OWNER'S PLAN, READ FROM THE PROFILE — NOT ASSUMED.
+
+    This used to pass `subscription: 'none'` as a literal, which was harmless
+    only while both plans had identical caps: a subscriber got a Get Cited
+    window computed for them and nobody could tell. Now that Get Cited watches 15
+    questions and Stay Cited 35, that literal would silently hold a paying
+    subscriber to the smaller list on every scheduled run.
+  */
+  const { data: profile } = await db
+    .from('profiles')
+    .select('subscription, subscription_since')
+    .eq('id', job.user_id)
+    .maybeSingle();
+
+  const plan = trackingPlanFor(site, (profile as ProfileRow | null) ?? null);
+  if (!plan) return { done: true, progress: { checked: 0, remaining: 0 } };
+
   const { data: questionRows } = await db
     .from('questions')
     .select('question')
     .eq('site_id', site.id)
     .order('added_at');
 
-  const wanted = [...new Set((questionRows ?? []).map((r) => r.question as string))];
+  /*
+    Capped to the plan, oldest first.
+
+    ⚠️ THIS SLICE IS NEW AND IT IS NOT COSMETIC. The list used to be taken whole,
+    which was survivable when the interactive route capped it on the way in.
+    A scheduled check has no browser in front of it, so an account that
+    accumulated 40 questions would have asked all 40 — nearly triple what the
+    window is priced for, four times over.
+  */
+  const wanted = [...new Set((questionRows ?? []).map((r) => r.question as string))].slice(
+    0,
+    plan.promptCap,
+  );
   if (wanted.length === 0) return { done: true, progress: { checked: 0, remaining: 0 } };
 
   // Mirrored into tracked_prompts so the rest of the product sees this list the
@@ -328,26 +396,32 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
   }
 
   /*
-    The period budget, enforced here as it is in the interactive route. A scan
-    is the customer's first spend against it, so this will almost never bite —
-    but a job that ignored the ceiling would be a way to bypass it entirely.
+    The budget — and WHICH budget depends on who started this.
+
+    ⚠️ A SCHEDULED CHECK IS COUNTED AGAINST ITSELF, NOT AGAINST THE WINDOW.
+
+    The window ceiling is exactly what the five checks add up to, with nothing
+    spare. Counting a milestone against it means any check that half-fails and
+    retries the next day — which the per-UTC-day de-dupe makes a normal
+    occurrence, not an edge case — eats the allowance of the check after it, and
+    the customer silently loses their day-90 reading. Worse for the sites
+    grandfathered in from the 30-day era: they may already have spent 300 of the
+    old 420 by hand, so every remaining milestone would be refused on arrival.
+
+    So a milestone gets its own allowance, `promptCap × engines`, counted from
+    the moment it was claimed. One bad check cannot starve the next, and the
+    window total is still bounded because the number of milestones is.
+
+    A purchase scan has no milestone and keeps the window count: it is the
+    customer's first spend, so it will almost never bite, but a job that ignored
+    the ceiling entirely would be a way around it.
   */
-  const period = trackingPeriod({
-    getCitedAt: site.get_cited_at,
-    subscription: 'none',
-    subscriptionSince: null,
-  });
+  const budget = job.milestone_id
+    ? await milestoneBudget(db, site.id, job.milestone_id, plan.promptCap * ALL_ENGINES.length)
+    : await windowBudget(db, site, profile as ProfileRow | null, plan.checksPerPeriod);
 
-  if (period) {
-    const { count: spent } = await db
-      .from('citation_checks')
-      .select('*', { count: 'exact', head: true })
-      .eq('site_id', site.id)
-      .gte('checked_at', period.start.toISOString());
-
-    if (TRACKING_CHECKS_PER_PERIOD - (spent ?? 0) <= 0) {
-      return { done: true, progress: { checked: total - pending.length, remaining: 0, total } };
-    }
+  if (budget <= 0) {
+    return { done: true, progress: { checked: total - pending.length, remaining: 0, total } };
   }
 
   const batch = pending.slice(0, PROMPTS_PER_RUN);
@@ -385,6 +459,63 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
 }
 
 /* ------------------------------------------------------------ dispatch --- */
+
+/**
+ * What a scheduled check has left of its own allowance.
+ *
+ * Counted from when the milestone was claimed rather than from the window's
+ * start, so this is "what has this check spent", not "what has this customer
+ * ever spent". `started_at` is stamped by claim_due_milestones() in the same
+ * statement that moves the row to 'running', so it cannot be missing here.
+ */
+async function milestoneBudget(
+  db: Db,
+  siteId: string,
+  milestoneId: string,
+  allowance: number,
+): Promise<number> {
+  const { data: milestone } = await db
+    .from('tracking_milestones')
+    .select('started_at')
+    .eq('id', milestoneId)
+    .maybeSingle();
+
+  const since = (milestone as { started_at: string | null } | null)?.started_at;
+  if (!since) return allowance;
+
+  const { count } = await db
+    .from('citation_checks')
+    .select('*', { count: 'exact', head: true })
+    .eq('site_id', siteId)
+    .gte('checked_at', since);
+
+  return allowance - (count ?? 0);
+}
+
+/** What the whole window has left — the purchase scan's ceiling. */
+async function windowBudget(
+  db: Db,
+  site: SiteRow,
+  profile: ProfileRow | null,
+  ceiling: number,
+): Promise<number> {
+  const period = trackingPeriod({
+    getCitedAt: site.get_cited_at,
+    getCitedExpiresAt: site.get_cited_expires_at,
+    subscription: profile?.subscription === 'stay_cited' ? 'stay_cited' : 'none',
+    subscriptionSince: profile?.subscription_since ?? null,
+  });
+
+  if (!period) return 0;
+
+  const { count } = await db
+    .from('citation_checks')
+    .select('*', { count: 'exact', head: true })
+    .eq('site_id', site.id)
+    .gte('checked_at', period.start.toISOString());
+
+  return ceiling - (count ?? 0);
+}
 
 export const NEXT_STAGE: Record<Stage, Stage> = {
   audit: 'questions',

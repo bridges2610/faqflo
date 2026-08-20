@@ -41,6 +41,11 @@ export type Site = {
   createdAt: string;
   /** When Get Cited was bought for this site. null = free tier for this site. */
   getCitedAt: string | null;
+  /**
+   * When it stops granting new work. Null falls back to the constant — see the
+   * note on SiteRow.get_cited_expires_at.
+   */
+  getCitedExpiresAt: string | null;
   /** Latest stored audit for this site, if one has been run. */
   lastAudit: SiteAudit | null;
 
@@ -328,10 +333,42 @@ export type SiteTracking = {
    */
   promptsTracked: number;
   promptCap: number;
+  /** How much of promptCap may be hand-written. Null falls back to the wider plan. */
+  manualCap: number;
   /** How many times each prompt is asked per period. */
   runsPerPeriod: number;
+  /** The enforced ceiling, so the meter stops recomputing it from three parts. */
+  checksCap: number;
   checksUsed: number;
   periodResetsAt: string;
+
+  /** Which plan's rules these numbers came from. Null once the window closes. */
+  planId: 'get_cited' | 'stay_cited' | null;
+  /**
+   * 'milestones' — fixed days, no button. 'weekly' — scheduled and on demand.
+   *
+   * The Results page reads this to decide whether to show a Run button or a
+   * timeline. Null means the window has closed: neither, plus the history.
+   */
+  schedule: 'milestones' | 'weekly' | null;
+  /** The scheduled checks, for the timeline. Empty for a subscriber. */
+  milestones: MilestoneView[];
+};
+
+/**
+ * One scheduled check, as the Results page needs it.
+ *
+ * ⚠️ `finishedAt` is when it ran; `dueAt` is only when it was owed. Show the
+ * first. A daily sweep with an hour of slop means the two differ routinely, and
+ * a label claiming day 7 for a check that ran on day 9 is a claim the customer
+ * can disprove against their own chart.
+ */
+export type MilestoneView = {
+  day: number;
+  dueAt: string;
+  status: 'pending' | 'running' | 'done' | 'skipped' | 'failed';
+  finishedAt: string | null;
+  error: string | null;
 };
 
 /**

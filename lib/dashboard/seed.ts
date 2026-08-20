@@ -32,7 +32,7 @@ import { buildActionPlan } from '@/lib/audit/actions';
 import { buildPillars, overallScore } from '@/lib/audit/score';
 import type { AuditReport, Finding } from '@/lib/audit/types';
 import { contentHash } from './export';
-import { STAY_CITED_PROMPT_CAP, TRACKING_RUNS_PER_PERIOD } from './plans';
+import { GET_CITED_CHECK_DAYS, TRACKING_PLANS } from './plans';
 
 /**
  * A unique id for a row the browser is about to create.
@@ -223,11 +223,23 @@ function wobble(day: number, engine: string): number {
 }
 
 /** Citation counts per engine per day, drifting upward as answers land. */
-function seedDaily(days: number): CitationDay[] {
+/**
+ * The chart's points.
+ *
+ * ⚠️ TAKES DAYS-AGO PER POINT, NOT A COUNT OF CONSECUTIVE DAYS. It used to take
+ * a number and walk backwards one day at a time, which was right when a
+ * subscriber's chart was a daily line. A scheduled plan's points are weeks
+ * apart, and consecutive dates under them would show five checks in one week —
+ * the fixture claiming a cadence the product does not have, on the screenshots
+ * that sell it.
+ */
+function seedDaily(offsets: number[]): CitationDay[] {
   const out: CitationDay[] = [];
+  const days = offsets.length;
 
-  for (let i = days - 1; i >= 0; i--) {
-    const progress = (days - i) / days;
+  for (const [index, offset] of [...offsets].reverse().entries()) {
+    const i = offset;
+    const progress = (days - (days - 1 - index)) / days;
     const byEngine = {} as Record<Engine, number>;
 
     for (const engine of ENGINES) {
@@ -746,17 +758,33 @@ export function buildSeed(siteId: string): SeedLocalData {
   const tracking: SiteTracking[] = [
     {
       siteId: site.id,
-      daily: seedDaily(30),
+      /* The five real checkpoints of a site 32 days in: setup, day 7 and day 30
+         behind it, days 60 and 90 still to come. Not five consecutive days —
+         see the note on seedDaily. */
+      daily: seedDaily([32, 25, 2]),
       latest,
       competitors,
       citedPages,
       byEngine,
       sourceAppearances,
       promptsTracked: 12,
-      promptCap: STAY_CITED_PROMPT_CAP,
-      runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
-      checksUsed: 186,
-      periodResetsAt: daysAhead(11),
+      planId: 'get_cited',
+      schedule: 'milestones',
+      promptCap: TRACKING_PLANS.get_cited.promptCap,
+      manualCap: TRACKING_PLANS.get_cited.manualCap,
+      checksCap: TRACKING_PLANS.get_cited.checksPerPeriod,
+      runsPerPeriod: TRACKING_PLANS.get_cited.runsPerPeriod,
+      checksUsed: 135,
+      periodResetsAt: daysAhead(58),
+      /* Three checks behind, two ahead — the state the timeline exists to show,
+         and the one a screenshot should catch. */
+      milestones: GET_CITED_CHECK_DAYS.map((day, i) => ({
+        day,
+        dueAt: daysAhead(day - 32),
+        status: i < 2 ? ('done' as const) : ('pending' as const),
+        finishedAt: i < 2 ? daysAhead(day - 32) : null,
+        error: null,
+      })),
     },
   ];
 
@@ -782,9 +810,14 @@ export function emptyTracking(siteId: string): SiteTracking {
     byEngine: [],
     sourceAppearances: { ours: 0, total: 0 },
     promptsTracked: 0,
-    promptCap: STAY_CITED_PROMPT_CAP,
-    runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
+    planId: null,
+    schedule: null,
+    promptCap: TRACKING_PLANS.stay_cited.promptCap,
+    manualCap: TRACKING_PLANS.stay_cited.manualCap,
+    checksCap: 0,
+    runsPerPeriod: TRACKING_PLANS.stay_cited.runsPerPeriod,
     checksUsed: 0,
-    periodResetsAt: daysAhead(30),
+    periodResetsAt: daysAhead(90),
+    milestones: [],
   };
 }

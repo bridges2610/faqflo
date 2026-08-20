@@ -165,7 +165,7 @@ export function CheckoutStart({
 
       <p className="text-slate mt-5 text-xs leading-relaxed">
         Payment is handled by Stripe — we never see your card details. Get Cited is a one-time
-        charge for this site, and includes 30 days of full access.
+        charge for this site, and includes 90 days of full access.
       </p>
     </Card>
   );

@@ -6,14 +6,16 @@ import { scoreBand } from '@/lib/audit/score';
 import { PILLARS } from '@/lib/audit/types';
 import { EMBED_GUIDES } from '@/lib/dashboard/export';
 import {
-  DISCOVERED_PROMPT_CAP,
   ENTITLEMENTS,
   FREE_FAQ_CAP,
+  GET_CITED_CHECK_DAYS,
   GET_CITED_WINDOW_DAYS,
-  MANUAL_QUESTION_CAP,
   PAGE_BUDGET,
-  STAY_CITED_PROMPT_CAP,
+  TRACKING_PLANS,
 } from '@/lib/dashboard/plans';
+
+const GET_CITED = TRACKING_PLANS.get_cited;
+const STAY_CITED = TRACKING_PLANS.stay_cited;
 // Read from the source rather than typed as prose: the engine list is a product
 // decision that has already changed once, and a hardcoded copy here would be
 // the thing that still said "Google AI Overviews" afterwards.
@@ -187,7 +189,7 @@ const TROUBLESHOOTING = [
     q: 'Another tool reports more citations than you do. Why?',
     a: (
       <P>
-        Almost always sample size rather than detection. We ask the {STAY_CITED_PROMPT_CAP}{' '}
+        Almost always sample size rather than detection. We ask the {STAY_CITED.promptCap}{' '}
         questions on your watch list, and each result is one answer we saw with our own eyes on the
         day we asked. Tools that report bigger numbers are usually watching far more prompts and
         adding up weeks of them. Watching more questions and running more often closes the gap —
@@ -719,13 +721,14 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               Your watch list
             </SectionTitle>
             <P className="mt-2">
-              Tracking comes with <strong>Get Cited for 30 days</strong>, and{' '}
-              <strong>Stay Cited</strong> keeps it running after that. Either way you watch{' '}
-              <strong>{STAY_CITED_PROMPT_CAP} questions</strong>:{' '}
-              {DISCOVERED_PROMPT_CAP} we find for you, and {MANUAL_QUESTION_CAP} you write
-              yourself. Use <strong>Find more questions</strong> for the first and{' '}
-              <strong>Add your own question</strong> for the second — the second is for the ones you
-              already know matter, like a comparison against a rival you keep losing to. Your own
+              Tracking comes with <strong>Get Cited for {GET_CITED_WINDOW_DAYS} days</strong>,
+              watching <strong>{GET_CITED.promptCap} questions</strong> — {GET_CITED.discoveredCap}{' '}
+              we find for you, and {GET_CITED.manualCap} you write yourself.{' '}
+              <strong>Stay Cited</strong> keeps it running after that and widens the list to{' '}
+              <strong>{STAY_CITED.promptCap}</strong> ({STAY_CITED.discoveredCap} found,{' '}
+              {STAY_CITED.manualCap} yours). Use <strong>Find more questions</strong> for the first
+              and <strong>Add your own question</strong> for the second — the second is for the ones
+              you already know matter, like a comparison against a rival you keep losing to. Your own
               questions survive a re-run of the finder; the found ones are replaced by it.
             </P>
 
@@ -734,9 +737,17 @@ export function HelpWorkspace({ name }: { name: string | null }) {
                 is the only place either is mentioned anywhere in the product,
                 so it is not a summary of something documented elsewhere. */}
             <P>
-              You start each run yourself, from the button on Results — nothing runs on a schedule
-              yet, and nothing emails you when a citation appears or disappears. You find out by
-              looking. A schedule is the next thing being built.
+              On Get Cited the checks run themselves: one as part of your setup, then on days{' '}
+              {GET_CITED_CHECK_DAYS.join(', ')}. There is nothing to press, and nothing to
+              remember. Stay Cited checks weekly and adds a button for running one whenever you
+              want — after publishing something, usually.
+            </P>
+
+            {/* The absence that is LEFT. A schedule shipped; alerting did not,
+                and this is still the only place in the product that says so. */}
+            <P>
+              Nothing emails you when a citation appears or disappears — you find out by looking.
+              That is the next thing being built.
             </P>
 
             <Callout>

@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canTrack, hasGetCited } from '@/lib/auth/entitlements';
-import {
-  STAY_CITED_PROMPT_CAP,
-  TRACKING_CHECKS_PER_PERIOD,
-  trackingPeriod,
-} from '@/lib/dashboard/plans';
+import { canTrack, hasGetCited, trackingPlanFor } from '@/lib/auth/entitlements';
+import { trackingPeriod } from '@/lib/dashboard/plans';
 import type { Engine } from '@/lib/dashboard/types';
 import { checkRateLimit, limitKey, TRACKING_RATE_LIMIT } from '@/lib/rate-limit';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -86,8 +82,33 @@ export async function POST(request: Request) {
       // never bought. Telling the first to "get Get Cited" reads as though we
       // have forgotten they already did.
       hasGetCited(site)
-        ? 'This site’s 30 days have ended. Your results stay here — Stay Cited starts new checks again.'
-        : 'Citation tracking comes with Get Cited, for 30 days, and continues on Stay Cited.',
+        ? 'This site’s window has ended. Your results stay here — Stay Cited starts new checks again.'
+        : 'Citation tracking comes with Get Cited, and continues on Stay Cited.',
+      403,
+    );
+  }
+
+  const plan = trackingPlanFor(site, user);
+
+  /*
+    ⚠️ GET CITED HAS NO BUTTON, AND THIS IS WHERE THAT IS TRUE.
+
+    Its five checks run on fixed days — at setup, then 7, 30, 60 and 90 — and the
+    budget is sized to exactly that. A manual run would either overspend the
+    window or find nothing left and refuse, and both read as broken. The UI hides
+    the control, but hiding a control is not enforcement: this route's own header
+    says a client that tells the server which tier it is on "is not
+    authorization, it's a bypass with extra steps".
+
+    ⚠️ REFUSED BEFORE THE UPSERT BELOW, DELIBERATELY. Further down this handler
+    writes `questions` into tracked_prompts. Refusing after that point would
+    leave this route usable as a side door for growing a Get Cited watch list
+    past its cap — the milestone runner mirrors the question list itself, so
+    nothing is lost by closing it here.
+  */
+  if (plan?.schedule === 'milestones') {
+    return fail(
+      'Get Cited checks run on a schedule — at setup, then days 7, 30, 60 and 90. Stay Cited lets you run one whenever you want.',
       403,
     );
   }
@@ -100,13 +121,16 @@ export async function POST(request: Request) {
     answer. Strings are stored exactly as sent — see the byte-identical warning
     on the column in 0006; trimming here would break the loop that marks a
     question covered.
+
+    The cap comes from the plan now, not from a global: 35 on Stay Cited and 15
+    on Get Cited, which is the difference the upgrade is sold on.
   */
   const wanted = Array.isArray(questions)
     ? [
         ...new Set(
           questions.filter((q): q is string => typeof q === 'string' && q.trim().length > 0),
         ),
-      ].slice(0, STAY_CITED_PROMPT_CAP)
+      ].slice(0, plan?.promptCap ?? 0)
     : [];
 
   if (wanted.length === 0) {
@@ -213,6 +237,7 @@ export async function POST(request: Request) {
   */
   const period = trackingPeriod({
     getCitedAt: site.get_cited_at,
+    getCitedExpiresAt: site.get_cited_expires_at,
     subscription: user.subscription,
     subscriptionSince: user.subscription_since,
   });
@@ -235,12 +260,13 @@ export async function POST(request: Request) {
     return fail('Could not check your remaining allowance. Please try again.', 502);
   }
 
-  const left = TRACKING_CHECKS_PER_PERIOD - (spent ?? 0);
+  const ceiling = plan?.checksPerPeriod ?? 0;
+  const left = ceiling - (spent ?? 0);
   const resets = period.end.toISOString().slice(0, 10);
 
   if (left <= 0) {
     return fail(
-      `That's all ${TRACKING_CHECKS_PER_PERIOD} engine checks for this period. The allowance resets on ${resets}.`,
+      `That's all ${ceiling} engine checks for this period. The allowance resets on ${resets}.`,
       429,
     );
   }

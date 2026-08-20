@@ -206,7 +206,7 @@ export function VisibilityAudit() {
               >
                 Get {result.domain} set up
               </ButtonLink>
-              <span className="text-slate text-xs">$129 once · includes 30 days full access</span>
+              <span className="text-slate text-xs">$129 once · includes 90 days full access</span>
             </div>
           </Card>
         )}

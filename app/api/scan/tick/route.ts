@@ -123,6 +123,30 @@ export async function POST() {
       })
       .eq('id', job.id);
 
+    /*
+      Close the milestone when its job is done.
+
+      ⚠️ THE ID COMES OFF THE CLAIMED ROW, NOT OFF THE REQUEST. This route takes
+      no arguments and trusts no caller, and a milestone id accepted from a body
+      would be an instruction to mark somebody else's check complete.
+
+      `finished_at` is stamped here rather than derived from the due date later:
+      the sweep is daily and can be late, so this is the only record of when the
+      check actually happened, and it is what every screen shows.
+    */
+    if (finished && job.milestone_id) {
+      await db
+        .from('tracking_milestones')
+        .update({
+          status: 'done',
+          checks_written: Number((result.progress as { checked?: number })?.checked ?? 0) || null,
+          finished_at: new Date().toISOString(),
+          job_id: job.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.milestone_id);
+    }
+
     if (!finished && slices < MAX_SLICES) await chain();
 
     return NextResponse.json({ stage, done: finished, progress: result.progress });
@@ -150,6 +174,26 @@ export async function POST() {
         finished_at: new Date().toISOString(),
       })
       .eq('id', job.id);
+
+    /*
+      A failed scheduled check is recorded as failed and NOT retried, for the
+      same reason the job above is not: retrying spends money to reach the same
+      conclusion. The customer sees "the day-30 check didn't complete" with the
+      reason, which is better than a gap in the line they have to guess at — and
+      whatever the check did collect before it stopped is already stored.
+    */
+    if (job.milestone_id) {
+      await db
+        .from('tracking_milestones')
+        .update({
+          status: 'failed',
+          error: message,
+          finished_at: new Date().toISOString(),
+          job_id: job.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.milestone_id);
+    }
 
     return NextResponse.json({ error: message }, { status: 502 });
   }

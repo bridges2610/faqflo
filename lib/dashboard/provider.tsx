@@ -19,7 +19,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { trackingPeriod } from './plans';
+import { trackingPeriod, trackingPlanFor } from './plans';
 import * as store from './store';
 import type {
   ContentPlan,
@@ -328,11 +328,33 @@ export function DashboardProvider({
 
       const period = trackingPeriod({
         getCitedAt: target?.getCitedAt ?? null,
+        getCitedExpiresAt: target?.getCitedExpiresAt ?? null,
         subscription: user.subscription,
         subscriptionSince: user.subscriptionSince,
       });
 
-      const next = await store.trackingFromDb(id, domain, period);
+      const plan = trackingPlanFor(target, user);
+
+      /*
+        How far back the chart reads — and the two plans genuinely differ.
+
+        ⚠️ GET CITED READS FROM ITS PURCHASE DATE, NOT FROM A ROLLING WINDOW.
+        Its five checks are spread across 90 days and then stop forever, so a
+        window that rolls backwards from today would delete the earliest of them
+        first: the day-7 reading would vanish on day 98 and the page would be
+        empty by day 190 — a page the pricing card promises stays theirs for
+        good. A subscriber's history never stops being added to, so 30 days back
+        is the right span for them and always will be.
+      */
+      const since = new Date();
+      if (plan?.id === 'get_cited' && target?.getCitedAt) {
+        since.setTime(new Date(target.getCitedAt).getTime());
+      } else {
+        since.setUTCDate(since.getUTCDate() - 29);
+      }
+      since.setUTCHours(0, 0, 0, 0);
+
+      const next = await store.trackingFromDb(id, domain, period, plan, since);
       setDbTracking(next);
       return next;
     } catch (err) {

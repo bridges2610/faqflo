@@ -54,6 +54,17 @@ export type SiteRow = {
    */
   brand_name: string | null;
   get_cited_at: string | null;
+  /**
+   * When Get Cited stops granting NEW work for this site.
+   *
+   * ⚠️ Stored rather than computed, and null is a real state. Deadlines used to
+   * be `get_cited_at + GET_CITED_WINDOW_DAYS` everywhere, which meant changing
+   * that constant moved every existing customer's deadline retroactively. Rows
+   * written before 0011 still have null and fall back to the constant — keep
+   * that fallback, because migrations here are applied by hand and the deploy
+   * can land before the SQL does.
+   */
+  get_cited_expires_at: string | null;
   created_at: string;
 };
 
@@ -185,4 +196,34 @@ export type CitationCheckRow = {
    *  and always null for Gemini, which cannot be targeted. */
   country: string | null;
   checked_at: string;
+};
+
+/**
+ * One scheduled check on a Get Cited site — see 0011.
+ *
+ * ⚠️ `due_at` is when it was SUPPOSED to run and `finished_at` is when it did.
+ * The sweep is daily and Vercel's Hobby tier fires within an hour of its slot,
+ * so the two differ routinely. Anything shown to a customer uses `finished_at`;
+ * a row that claims a check happened on day 7 when it ran on day 9 is a small
+ * lie they can check against the dates on their own chart.
+ *
+ * SELECT-only for `authenticated`. A client that could insert here could
+ * schedule itself unlimited engine calls, which is the budget bypassed in one
+ * statement.
+ */
+export type TrackingMilestoneRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  /** Days after get_cited_at. Constrained to 7 | 30 | 60 | 90 by the migration. */
+  day: number;
+  due_at: string;
+  status: 'pending' | 'running' | 'done' | 'skipped' | 'failed';
+  job_id: string | null;
+  checks_written: number | null;
+  started_at: string | null;
+  finished_at: string | null;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
 };

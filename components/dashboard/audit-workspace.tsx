@@ -388,7 +388,7 @@ export function AuditWorkspace({
             <p className="text-slate mt-1 text-sm leading-relaxed">
               {busy
                 ? `Running your first full audit now. It reads up to ${PAGE_BUDGET.paid} pages, so give it a moment.`
-                : 'The full audit, the questions people ask AI, the content plan and the publish-ready export are all yours for the next 30 days. Everything you make stays yours for good.'}
+                : 'The full audit, the questions people ask AI, the content plan and the publish-ready export are all yours for the next 90 days. Everything you make stays yours for good.'}
             </p>
           </div>
         )}

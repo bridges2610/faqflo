@@ -325,9 +325,9 @@ export function OverviewWorkspace() {
               />
             </ul>
             <p className="text-slate border-line mt-4 border-t pt-3 text-xs leading-relaxed">
-              Citation tracking — putting your questions to the engines and recording who they name
-              — runs from the Results page on Stay Cited. Running it on a schedule is what
-              we&rsquo;re building next.
+              Citation tracking — putting your questions to the engines and recording who they
+              name — runs on a schedule: five checks across your Get Cited window, and weekly on
+              Stay Cited. You can see them on the Results page.
             </p>
           </Card>
 

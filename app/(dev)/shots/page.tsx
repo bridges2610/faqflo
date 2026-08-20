@@ -55,12 +55,26 @@ import type { DashboardData, Site, SiteTracking, User } from '@/lib/dashboard/ty
   behaviour out of shape to flatter a screenshot is the wrong way round. Just
   know that a one-line change there is expected and harmless.
 */
+/*
+  ⚠️ A GET CITED CUSTOMER, NOT A SUBSCRIBER, AND THAT IS NOW LOAD-BEARING.
+
+  This was `stay_cited`, which made every panel render the subscription's rules:
+  35 questions, a monthly allowance that "resets", and a Check now button. Those
+  are real, but they are the minority case — and they hide the thing the product
+  now leads on, which is that the checks run themselves on a schedule.
+
+  The site below still has get_cited_at set, so nothing renders as a locked
+  upsell either way. Flipping this back is a one-line change if the screenshots
+  ever need to show the subscriber's view instead; keep the seeded tracking in
+  lib/dashboard/seed.ts in step with it, or the meter will quote one plan's caps
+  while the button obeys the other's.
+*/
 const SHOT_USER: User = {
   id: 'shots-user',
   name: 'Beau',
   email: 'demo@faqflo.com',
-  subscription: 'stay_cited',
-  subscriptionSince: '2026-01-06T09:00:00.000Z',
+  subscription: 'none',
+  subscriptionSince: null,
 };
 
 const SHOT_SITE_ID = 'shots-site';
@@ -102,6 +116,9 @@ export default function Shots() {
       createdAt: '2026-01-06T09:00:00.000Z',
       // Bought, so nothing renders as a locked upsell panel.
       getCitedAt: '2026-01-06T09:00:00.000Z',
+      // Far enough ahead that the fixture is always a live window, whenever the
+      // screenshots happen to be regenerated.
+      getCitedExpiresAt: '2099-01-01T09:00:00.000Z',
       // The workspaces read the audit off the site row, not out of the seed's
       // `audits` map — that map is the shape local storage wanted.
       lastAudit: seed.audits[SHOT_SITE_ID] ?? null,

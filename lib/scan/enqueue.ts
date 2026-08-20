@@ -105,3 +105,50 @@ export async function enqueueScan(siteId: string, userId: string): Promise<Enque
 
   return { ok: true, created: true };
 }
+
+/**
+ * Queue one scheduled check, as a tracking-only job.
+ *
+ * ⚠️ STAGE 'tracking', NOT 'audit'. enqueueScan above starts at the beginning
+ * because a new purchase has nothing yet; a milestone has a crawl and a question
+ * list already and only needs the engines asked. Starting at 'audit' would
+ * re-crawl a hundred pages and re-run an Opus call on every checkpoint, which is
+ * most of the cost of the product for none of the answer.
+ *
+ * The milestone id travels ON THE JOB ROW rather than in the caller's memory, so
+ * the tick route can write the outcome back without being told anything — the
+ * property that lets it take no arguments and trust no caller.
+ */
+export async function enqueueTrackingJob(
+  siteId: string,
+  userId: string,
+  milestoneId: string,
+): Promise<EnqueueResult> {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase.from('scan_jobs').insert({
+    id: `scan_${crypto.randomUUID()}`,
+    site_id: siteId,
+    user_id: userId,
+    stage: 'tracking',
+    status: 'queued',
+    milestone_id: milestoneId,
+  });
+
+  /*
+    23505 is the one-live-job-per-site index. Another scan is already running for
+    this site — a purchase scan, or yesterday's milestone still working through
+    its slices. The caller puts the milestone back to 'pending' and the next
+    daily sweep picks it up; a day late is a day late, but marking it done here
+    would lose a check the customer was promised.
+  */
+  if (error?.code === '23505') return { ok: true, created: false };
+
+  if (error) {
+    const detail = describeDbError(error);
+    console.error(`Could not queue the scheduled check for site ${siteId}:`, detail);
+    return { ok: false, error: detail };
+  }
+
+  return { ok: true, created: true };
+}

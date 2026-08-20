@@ -42,7 +42,7 @@ export function UpgradeCard({
     ⚠️ THE ONE PLACE THE EXPIRED CASE IS HANDLED.
 
     Five call sites ask for `get_cited` when a generating feature is locked.
-    For a site whose 30-day window has CLOSED that is the wrong offer twice
+    For a site whose window has CLOSED that is the wrong offer twice
     over: they already bought Get Cited, and checkPurchasable() 409s on a
     second purchase — so the button would simply fail. What they actually need
     is Stay Cited.

@@ -62,7 +62,7 @@ import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
 export const metadata: Metadata = {
   title: 'Done for you',
   description:
-    'I set the whole thing up for you by hand — your site audited and fixed, answers written in your voice and published live, plus 30 days of tracking. $497, live in two weeks.',
+    'I set the whole thing up for you by hand — your site audited and fixed, answers written in your voice and published live, plus 90 days of tracking. $497, live in two weeks.',
   alternates: { canonical: '/done-for-you' },
 };
 
@@ -82,7 +82,7 @@ const INCLUDED = [
   'The questions people actually ask AI about businesses like yours',
   'Every answer written and edited by hand, in your voice',
   'Published live on your own site — by me, not handed to you as homework',
-  '30 days of citation tracking across ChatGPT, Perplexity and Gemini',
+  '90 days of citation tracking across ChatGPT, Perplexity and Gemini — checked five times, on a schedule',
   'One plain-English report at the end: who’s being cited, and what I’d do next',
 ];
 
@@ -104,7 +104,7 @@ const NOT_INCLUDED = [
     body: 'Nobody controls what ChatGPT quotes, and be careful with anyone who says they do. I can make you readable, quotable and worth quoting — then show you honestly whether it worked.',
   },
   {
-    label: 'Anything after the 30 days.',
+    label: 'Anything after the 90 days.',
     body: `Everything I make stays yours for good. Keeping tracking and fresh answers running is Stay Cited, at ${ENTITLEMENTS.stay_cited.price}.`,
   },
 ];
@@ -160,7 +160,7 @@ export default function DoneForYou() {
               serviceType: 'Answer engine optimisation setup',
               url: `${SITE_URL}/done-for-you`,
               description:
-                'A hands-on setup service: your site audited and fixed, the right questions chosen, answers written by hand and published to your own site, plus 30 days of citation tracking reported back to you.',
+                'A hands-on setup service: your site audited and fixed, the right questions chosen, answers written by hand and published to your own site, plus 90 days of citation tracking reported back to you.',
               provider: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
               offers: {
                 '@type': 'Offer',

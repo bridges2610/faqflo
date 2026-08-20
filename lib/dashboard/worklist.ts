@@ -212,7 +212,7 @@ function productTasks(input: WorklistInput): Task[] {
   if (hasGetCited(site) && !canTrack(site, user) && published.length > 0) {
     tasks.push({
       id: 'consider-stay-cited',
-      what: 'Keep this running after your 30 days',
+      what: 'Keep this running after your 90 days',
       why: 'Your answers are live. Stay Cited keeps new audits and fresh answers coming across every site on your account once the window closes.',
       impact: null,
       effort: '2 minutes',

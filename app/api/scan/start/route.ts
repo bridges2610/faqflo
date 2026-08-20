@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       // Two different customers. One bought and ran out of window; the other
       // never bought.
       hasGetCited(site)
-        ? 'This site’s 30 days have ended. Stay Cited starts new checks again.'
+        ? 'This site’s window has ended. Stay Cited starts new checks again.'
         : 'Setting up your site is part of Get Cited.',
       403,
     );

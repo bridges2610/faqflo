@@ -118,7 +118,7 @@ export function setUpEmail(name: string | null, siteName: string): Rendered {
       `<p>Hi ${who},</p>
 <p>Get Cited is active for <strong>${site}</strong>. That unlocks the full audit, the questions people actually put to AI about your category, the content plan, and the publish-ready export.</p>
 <p><a href="${url}" style="color:#2563eb">See your audit</a></p>
-<p>You have 30 days of full access. After that, everything you have made stays yours — the audit, the answers, the export — and running new ones is what Stay Cited covers.</p>
+<p>You have 90 days of full access, and we check whether the engines are naming you five times across it — once now, then on days 7, 30, 60 and 90. Nothing to press. After that, everything you have made stays yours — the audit, the answers, the export — and running new ones is what Stay Cited covers.</p>
 <p>Reply here if you get stuck.</p>`,
     ),
     text: `Hi ${firstName(name)},
@@ -127,7 +127,7 @@ Get Cited is active for ${siteName}. That unlocks the full audit, the questions 
 
 See your audit: ${url}
 
-You have 30 days of full access. After that, everything you have made stays yours — the audit, the answers, the export — and running new ones is what Stay Cited covers.
+You have 90 days of full access, and we check whether the engines are naming you five times across it - once now, then on days 7, 30, 60 and 90. Nothing to press. After that, everything you have made stays yours - the audit, the answers, the export - and running new ones is what Stay Cited covers.
 
 Reply here if you get stuck.
 

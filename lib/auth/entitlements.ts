@@ -1,6 +1,11 @@
 import 'server-only';
 
-import { GET_CITED_WINDOW_DAYS, PAGE_BUDGET } from '@/lib/dashboard/plans';
+import {
+  expiryFrom,
+  PAGE_BUDGET,
+  trackingPlan,
+  type TrackingPlan,
+} from '@/lib/dashboard/plans';
 import type { ProfileRow, SiteRow } from '@/lib/supabase/types';
 
 /**
@@ -34,19 +39,56 @@ export function hasStayCited(user: ProfileRow | null): boolean {
 }
 
 /**
- * Bought, and still inside the 30-day window.
+ * Bought, and still inside the window.
  *
  * ⚠️ The clock is the SERVER'S. plans.ts computes the same thing from the
  * browser's clock to decide what to render, and a browser clock can be set to
  * anything — which is exactly why this file exists and why the routes call
  * this copy rather than trusting a flag from the client.
+ *
+ * The deadline is the stored one since 0011, falling back to the constant for
+ * rows written before it. Both halves live in expiryFrom() so the two twins
+ * cannot disagree about a date that decides whether money gets spent.
  */
 export function getCitedActive(site: SiteRow | null): boolean {
   if (!site?.get_cited_at) return false;
 
-  const expiry = new Date(site.get_cited_at);
-  expiry.setDate(expiry.getDate() + GET_CITED_WINDOW_DAYS);
-  return expiry.getTime() > Date.now();
+  const expiry = expiryFrom(site.get_cited_at, site.get_cited_expires_at);
+  return Boolean(expiry && expiry.getTime() > Date.now());
+}
+
+/**
+ * Which plan's tracking rules apply — the server twin of trackingPlanFor().
+ *
+ * The caps differ per plan now (15 questions against 35), and a cap read from
+ * anywhere the customer can influence is not a cap. Every place that slices a
+ * watch list or counts a budget takes it from here.
+ */
+export function trackingPlanFor(
+  /* Pick<> rather than the whole row: lib/scan/run.ts selects a narrow shape of
+     its own, and widening this to the full row would force that file to fetch
+     columns it has no use for just to satisfy a signature. */
+  site: Pick<SiteRow, 'get_cited_at' | 'get_cited_expires_at'> | null,
+  user: Pick<ProfileRow, 'subscription'> | null,
+): TrackingPlan | null {
+  return trackingPlan({
+    subscription: user?.subscription === 'stay_cited' ? 'stay_cited' : 'none',
+    getCitedAt: site?.get_cited_at ?? null,
+    getCitedExpiresAt: site?.get_cited_expires_at ?? null,
+  });
+}
+
+/**
+ * May the CUSTOMER start a check right now?
+ *
+ * ⚠️ Distinct from canTrack, which asks whether a check may run at all — the
+ * scheduler needs that one. Get Cited runs on fixed days and has no button, so
+ * the interactive route refuses it here rather than relying on the UI to hide
+ * the control. A client that tells the server which tier it is on is not
+ * authorization, it is a bypass with extra steps.
+ */
+export function canRunCheckNow(site: SiteRow | null, user: ProfileRow | null): boolean {
+  return canTrack(site, user) && trackingPlanFor(site, user)?.schedule === 'weekly';
 }
 
 /**
@@ -85,8 +127,9 @@ export function canRegenerate(site: SiteRow | null, user: ProfileRow | null): bo
  * because asking three search-backed engines 35 questions repeatedly is a
  * recurring cost and a one-off payment cannot fund a recurring bill. That risk
  * was real and has not gone away — it is now answered by a METER rather than a
- * closed door: TRACKING_CHECKS_PER_PERIOD is enforced in the tracking route, so
- * the ceiling on a Get Cited window is a fixed, priced number of engine calls.
+ * closed door: the plan's `checksPerPeriod` is enforced in the tracking route
+ * and in the milestone runner, so the ceiling on a Get Cited window is a fixed,
+ * priced number of engine calls — 15 questions × 3 engines × 5 checks.
  *
  * ⚠️ IF THAT ENFORCEMENT IS EVER REMOVED, THIS MUST GO BACK TO hasStayCited.
  * The two changed together and only make sense together; an unmetered Get Cited

@@ -5,12 +5,17 @@ import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
 import {
-  DISCOVERED_PROMPT_CAP,
-  MANUAL_QUESTION_CAP,
-  STAY_CITED_PROMPT_CAP,
-  TRACKING_CHECKS_PER_PERIOD,
-  TRACKING_RUNS_PER_PERIOD,
+  GET_CITED_CHECK_DAYS,
+  GET_CITED_WINDOW_DAYS,
+  TRACKING_PLANS,
 } from '@/lib/dashboard/plans';
+
+const GET_CITED = TRACKING_PLANS.get_cited;
+const STAY_CITED = TRACKING_PLANS.stay_cited;
+
+/** "7, 30, 60 and 90" — the schedule, written the way a person says it. */
+const CHECK_DAYS = GET_CITED_CHECK_DAYS.slice(0, -1).join(', ') +
+  ' and ' + GET_CITED_CHECK_DAYS[GET_CITED_CHECK_DAYS.length - 1];
 
 /*
   ⚠️ THESE FIGURES ARE NOT DERIVED FROM STRIPE, AND STRIPE DOES NOT READ THEM.
@@ -37,10 +42,16 @@ import {
   ask means reporting a permanent zero, which reads as "you are never cited
   there" rather than "we never looked".
 
-  ⚠️ What is still NOT built is the SCHEDULE. Runs are started by hand from the
-  Results page, so "automatic checks" is listed with `soon` — ticking tracking
-  without that line would imply an automation that does not exist. Alerts are
-  the same. lib/dashboard/plans.ts carries the matching copy in the app.
+  ⚠️ THE SCHEDULE IS BUILT NOW, AND THIS PARAGRAPH USED TO SAY THE OPPOSITE.
+  Checks run from app/api/cron/tracking, fired daily by the crons entry in
+  vercel.json: Get Cited gets five on fixed days, Stay Cited gets one a week and
+  keeps its button. "Automatic scheduled checks" is therefore a tick rather than
+  a `soon` — the first time this card has been able to say that.
+
+  ⚠️ ALERTS ARE STILL NOT BUILT. Nothing emails a customer when a citation
+  appears or disappears; they find out by looking. That line keeps its `soon`,
+  and no other line here may imply otherwise. lib/dashboard/plans.ts carries the
+  matching copy in the app.
 
   The three tiers are no longer the same kind of thing, so `price` is a union
   rather than a monthly figure with nulls in it. That's what stops a one-time
@@ -112,24 +123,31 @@ const PLANS: Plan[] = [
     featured: true,
     note: 'Start here',
     features: [
-      // ⚠️ Tracking IS included here now, for the 30 days — which is why the
-      // line below can finally be ticked. It went from impossible, to
-      // wrong-plan, to true; check which of those three the product is in
-      // before editing this card again. The ceiling is real
-      // (TRACKING_CHECKS_PER_PERIOD, enforced in the tracking route) and is
-      // what makes a one-off payment safe to sell against a recurring cost.
+      // ⚠️ Tracking IS included here now, and it RUNS ITSELF. The line went from
+      // impossible, to wrong-plan, to true-but-manual, to this; check which of
+      // those the product is in before editing this card again. The ceiling is
+      // real — the plan's checksPerPeriod, enforced in the tracking route and in
+      // the milestone runner — and is what makes a one-off payment safe to sell
+      // against a recurring cost.
       { label: 'Full audit — 44 checks across your whole site' },
       { label: 'The questions people actually ask AI in your category' },
       { label: 'The pages your industry expects, and which of yours are missing' },
       { label: 'A complete answer-first FAQ set, written to be quoted' },
       { label: 'Publish-ready HTML for your own site' },
       { label: 'Entity schema and llms.txt' },
-      { label: 'Citation tracking across ChatGPT, Perplexity and Gemini, for the 30 days' },
+      {
+        label: `Citation tracking across ChatGPT, Perplexity and Gemini — checked at setup, then on days ${CHECK_DAYS}`,
+      },
+      {
+        label: `${GET_CITED.promptCap} of your questions watched, so you can see the trend rather than one reading`,
+      },
       // ⚠️ Both halves of the deal, stated before the card rather than
       // discovered on day 31. Everything MADE is permanent; the running of new
       // audits is what ends. Selling "yours to keep" and then stopping audits
       // without having said so is a chargeback.
-      { label: '30 days of full access — everything you make stays yours for good' },
+      {
+        label: `${GET_CITED_WINDOW_DAYS} days of full access — everything you make stays yours for good`,
+      },
     ],
   },
   {
@@ -159,23 +177,26 @@ const PLANS: Plan[] = [
       than a typo.
     */
     features: [
-      { label: 'Citation tracking that keeps running after the 30 days' },
+      { label: `Citation tracking that keeps running after the ${GET_CITED_WINDOW_DAYS} days` },
       {
-        label: `${STAY_CITED_PROMPT_CAP} questions watched — ${DISCOVERED_PROMPT_CAP} we find for you, ${MANUAL_QUESTION_CAP} you write yourself`,
+        label: `${STAY_CITED.promptCap} questions watched — ${STAY_CITED.discoveredCap} we find for you, ${STAY_CITED.manualCap} you write yourself`,
       },
       { label: 'Share of voice: every domain the engines cite, ranked against yours' },
       { label: 'Which of your pages earn citations, and what each answer actually said' },
-      { label: 'Keeps every site on your account running after its 30 days' },
+      { label: `Keeps every site on your account running after its ${GET_CITED_WINDOW_DAYS} days` },
       { label: 'Unlimited re-audits, regeneration, and answers kept per site' },
       { label: 'Everything Get Cited unlocks, on every site you add' },
       // ⚠️ The ceiling, stated where the plan is sold. "Full platform" with a
       // silent cap is something customers discover AT the cap.
       {
-        label: `${TRACKING_CHECKS_PER_PERIOD} engine checks a month — every question, every engine, ${TRACKING_RUNS_PER_PERIOD} times`,
+        label: `${STAY_CITED.checksPerPeriod} engine checks a month — every question, every engine, ${STAY_CITED.runsPerPeriod} times`,
       },
-      // ⚠️ Not decoration. Tracking runs when you press the button; without this
-      // line a tick beside "citation tracking" implies it watches on its own.
-      { label: 'Automatic scheduled checks', soon: true },
+      // ⚠️ This line spent a long time marked `soon`, with a note explaining that
+      // tracking "runs when you press the button" and that ticking it would imply
+      // an automation that did not exist. It exists now — weekly for a
+      // subscriber, and on demand as well, which is the half Get Cited does not
+      // get.
+      { label: 'Automatic weekly checks, plus a run whenever you want one' },
       { label: 'Alerts when a citation appears or disappears', soon: true },
     ],
   },
@@ -220,7 +241,7 @@ function PriceBlock({ price }: { price: Price }) {
           <span className="text-slate text-sm">once</span>
         </p>
         <p className="text-slate mt-1.5 h-4 text-xs leading-4">
-          Per site · includes 30 days of full access
+          Per site · includes {GET_CITED_WINDOW_DAYS} days of full access
         </p>
       </div>
     );
@@ -353,9 +374,10 @@ export function PricingTeaser() {
             decision is made. Everything downstream enforces this; if the copy
             and the enforcement ever disagree, the copy is the promise. */}
         <p className="text-slate mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed">
-          Get Cited comes first — it writes your answers and gives you 30 days to work with them.
-          Everything it makes is yours permanently, including the export. Stay Cited is what keeps
-          new audits and fresh answers coming after that, across every site on your account.
+          Get Cited comes first — it writes your answers, then checks {GET_CITED_WINDOW_DAYS} days
+          running to see whether the engines start naming you. Everything it makes is yours
+          permanently, including the export. Stay Cited is what keeps the checks and the fresh
+          answers coming after that, across every site on your account.
         </p>
 
         {/*

@@ -120,7 +120,7 @@ const STEPS = [
   },
   {
     title: 'We track whether it’s working',
-    body: 'We keep checking ChatGPT, Perplexity, and Google’s AI answers to see if you’re showing up — and nudge you when there’s a new question worth answering.',
+    body: 'We keep checking ChatGPT, Perplexity, and Google’s AI answers to see if you’re showing up — on a schedule, so you don’t have to remember to look.',
   },
 ];
 

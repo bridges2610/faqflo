@@ -27,21 +27,85 @@ export const FREE_FAQ_CAP = 5;
 /**
  * How long Get Cited keeps generating for.
  *
- * ⚠️ Deadlines are COMPUTED from `getCitedAt`, not stored. Changing this number
- * therefore moves the deadline for every existing customer, retroactively —
- * shortening it takes access away from people who already paid. If either that
- * or comping an individual extension is ever needed, add a stored
- * `sites.get_cited_expires_at` and read it here instead.
+ * ⚠️ THIS IS NOW A FALLBACK, NOT THE ANSWER. Deadlines used to be computed from
+ * `getCitedAt` everywhere, and the warning that used to sit here said what went
+ * wrong with that: changing the number moved the deadline for every existing
+ * customer retroactively. Raising it from 30 to 90 was exactly that change, so
+ * 0011 moved the deadline into `sites.get_cited_expires_at` and each site keeps
+ * the date its customer was actually told.
+ *
+ * This still applies to rows written before that migration landed. Migrations
+ * here are applied by hand in the Supabase editor, so a deploy can arrive first
+ * and the fallback is what makes that survivable — do not remove it.
  */
-export const GET_CITED_WINDOW_DAYS = 30;
+export const GET_CITED_WINDOW_DAYS = 90;
+
+/**
+ * Days after purchase that a scheduled check runs.
+ *
+ * Four points plus the day-0 check the purchase scan already runs, which is
+ * what makes a trend rather than a pair of readings. The gaps widen on purpose:
+ * the first week is when publishing changes something, and after that a
+ * citation moves on the scale of months.
+ */
+export const GET_CITED_CHECK_DAYS = [7, 30, 60, 90] as const;
+
+/**
+ * Slack between the last check and the door closing.
+ *
+ * ⚠️ NOT COSMETIC. Milestones are due at UTC midnight and the sweep runs once a
+ * day, within an hour of its slot. Without this, a day-90 check on a site
+ * bought at 14:00 lands after its own window has closed, `trackingPeriod()`
+ * returns null, and the run is refused — a check the customer was promised,
+ * lost to an arithmetic race. The number they are quoted stays 90.
+ */
+export const GET_CITED_GRACE_DAYS = 2;
 
 /** When the window closes for a site, or null if it was never bought. */
 export function getCitedExpiry(site: Site | null): Date | null {
   if (!site?.getCitedAt) return null;
+  return expiryFrom(site.getCitedAt, site.getCitedExpiresAt);
+}
 
-  const expiry = new Date(site.getCitedAt);
-  expiry.setDate(expiry.getDate() + GET_CITED_WINDOW_DAYS);
+/**
+ * The stored deadline, or the computed one for rows that predate 0011.
+ *
+ * Primitives in, like trackingPeriod() below and for the same reason: the
+ * server holds snake_case rows and the client holds camelCase models, and this
+ * has to be the same arithmetic on both sides.
+ */
+export function expiryFrom(getCitedAt: string, getCitedExpiresAt: string | null): Date | null {
+  if (getCitedExpiresAt) {
+    const stored = new Date(getCitedExpiresAt);
+    if (!Number.isNaN(stored.getTime())) return stored;
+  }
+
+  const start = new Date(getCitedAt);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const expiry = new Date(start);
+  expiry.setDate(expiry.getDate() + GET_CITED_WINDOW_DAYS + GET_CITED_GRACE_DAYS);
   return expiry;
+}
+
+/**
+ * When each scheduled check is due, floored to UTC midnight.
+ *
+ * ⚠️ THE FLOOR IS THE POINT. Due-ness is compared against `now()` by a sweep
+ * that runs once a day, so an anchor at 14:07 would make "day 7" mean "day 7,
+ * but only if today's sweep happens to run later than 14:07" — a different day
+ * for different customers, decided by when they happened to pay.
+ */
+export function milestoneSchedule(getCitedAt: string): { day: number; dueAt: Date }[] {
+  const start = new Date(getCitedAt);
+  if (Number.isNaN(start.getTime())) return [];
+
+  return GET_CITED_CHECK_DAYS.map((day) => {
+    const dueAt = new Date(start);
+    dueAt.setUTCDate(dueAt.getUTCDate() + day);
+    dueAt.setUTCHours(0, 0, 0, 0);
+    return { day, dueAt };
+  });
 }
 
 /**
@@ -73,7 +137,7 @@ export function pageBudgetFor(site: Site | null, user: User | null): number {
 }
 
 /**
- * How many prompts a subscription may track.
+ * How many prompts a plan may track.
  *
  * ⚠️ THIS IS NOT DERIVED FROM A PAGE COUNT, AND MUST NOT BE.
  *
@@ -86,35 +150,11 @@ export function pageBudgetFor(site: Site | null, user: User | null): number {
  * engineChecksFor() below — so the cost is visible without being the unit
  * anyone has to reason in.
  *
- * ⚠️ THIS TOTAL IS MADE OF TWO PARTS, AND THE SPLIT IS LOAD-BEARING. Questions
- * arrive two ways: a model proposes them, or the customer types them. When the
- * total was the only limit, "Find more questions" filled every slot to the cap
- * and the manual field went permanently dead — one feature made the other
- * unreachable. Discovery now stops at DISCOVERED_PROMPT_CAP, leaving the manual
- * allowance reserved whether or not it has been used.
+ * ⚠️ AND IT IS NO LONGER ONE NUMBER. These were globals shared by both plans,
+ * which was survivable only while the plans differed in nothing but duration.
+ * Get Cited now watches 15 questions on a fixed schedule and Stay Cited watches
+ * 35 on demand, so the cap arrives from the plan — see TRACKING_PLANS.
  */
-export const STAY_CITED_PROMPT_CAP = 35;
-
-/**
- * How many of those a customer may write themselves.
- *
- * Reserved out of the total, not added to it: a hand-written prompt costs the
- * same three engine calls per run as a proposed one, so it spends the same
- * allowance. Lives here beside the other caps because this is the file that
- * says what a plan buys, and because DISCOVERED_PROMPT_CAP is derived from it.
- */
-export const MANUAL_QUESTION_CAP = 10;
-
-/**
- * How many the model may propose — the total, less the reserved manual slots.
- *
- * ⚠️ Derived, never typed. Three numbers that must agree, written independently,
- * is how you end up with a discovery ceiling that quietly overruns the plan.
- */
-export const DISCOVERED_PROMPT_CAP = STAY_CITED_PROMPT_CAP - MANUAL_QUESTION_CAP;
-
-/** How often each tracked prompt is put to the engines. Weekly. */
-export const TRACKING_RUNS_PER_PERIOD = 4;
 
 /** The real cost of a prompt allowance: every prompt, every engine, every run. */
 export function engineChecksFor(promptCap: number, engines: number, runs: number): number {
@@ -122,20 +162,109 @@ export function engineChecksFor(promptCap: number, engines: number, runs: number
 }
 
 /**
- * Engine checks one account may spend on one site in a period.
+ * What one plan's tracking actually buys.
  *
- * ⚠️ THIS IS ENFORCED NOW, NOT DECORATIVE. It was displayed on the Results page
- * for a long time while nothing checked it, which was survivable only because
- * tracking was subscription-only. Get Cited buys tracking for thirty days on a
- * single payment, so the ceiling has to be real: without it, a one-off $129 can
- * fund an unbounded recurring bill on somebody else's API. The old comment on
- * canTrack was right about the risk and wrong about the remedy.
+ * ⚠️ THE OLD GLOBALS ARE GONE ON PURPOSE — STAY_CITED_PROMPT_CAP,
+ * DISCOVERED_PROMPT_CAP and TRACKING_CHECKS_PER_PERIOD. They were not renamed
+ * and not aliased, because this repo has no test suite and `npm run check`
+ * refusing to compile every stale call site is the only tool that can find them
+ * all. If you are reading this because the typechecker sent you here: the
+ * replacement is trackingPlanFor(site, user), and the server twin of the same
+ * name in lib/auth/entitlements.ts.
+ *
+ * `checksPerPeriod` is ENFORCED, not decorative. Without it a one-off $129 funds
+ * an unbounded bill on somebody else's API — the reason canTrack was allowed to
+ * stop being subscription-only at all.
  */
-export const TRACKING_CHECKS_PER_PERIOD = engineChecksFor(
-  STAY_CITED_PROMPT_CAP,
-  ENGINES.length,
-  TRACKING_RUNS_PER_PERIOD,
-);
+export type TrackingPlanId = 'get_cited' | 'stay_cited';
+
+export type TrackingPlan = {
+  id: TrackingPlanId;
+  /** Questions watched. One question costs one engine call per engine per run. */
+  promptCap: number;
+  /** Reserved out of promptCap for questions the customer types themselves. */
+  manualCap: number;
+  /** What discovery may propose — the remainder. Never typed, always derived. */
+  discoveredCap: number;
+  runsPerPeriod: number;
+  checksPerPeriod: number;
+  /**
+   * How runs happen.
+   *
+   *   'milestones' — the cron only, on GET_CITED_CHECK_DAYS. No button.
+   *   'weekly'     — the cron every week, and the button as well.
+   *
+   * The difference is what the upgrade sells: a fixed schedule versus a check
+   * whenever you want one.
+   */
+  schedule: 'milestones' | 'weekly';
+};
+
+/**
+ * ⚠️ THE MANUAL/DISCOVERED SPLIT SURVIVES ON BOTH PLANS, AND IT IS LOAD-BEARING.
+ * Questions arrive two ways: a model proposes them, or the customer types them.
+ * When the total was the only limit, "Find more questions" filled every slot and
+ * the manual field went permanently dead — one feature made the other
+ * unreachable. Discovery stops at `discoveredCap`, leaving the manual allowance
+ * reserved whether or not it has been used.
+ *
+ * ⚠️ Get Cited's `runsPerPeriod` is 5, not 4. Four are the scheduled checks; the
+ * fifth is the day-0 pass the purchase scan already runs (lib/scan/run.ts), and
+ * leaving it out of the budget means the last milestone is refused for want of
+ * an allowance somebody already spent.
+ */
+export const TRACKING_PLANS: Record<TrackingPlanId, TrackingPlan> = {
+  get_cited: build('get_cited', { promptCap: 15, manualCap: 5, runs: 5, schedule: 'milestones' }),
+  stay_cited: build('stay_cited', { promptCap: 35, manualCap: 10, runs: 4, schedule: 'weekly' }),
+};
+
+function build(
+  id: TrackingPlanId,
+  input: { promptCap: number; manualCap: number; runs: number; schedule: TrackingPlan['schedule'] },
+): TrackingPlan {
+  return {
+    id,
+    promptCap: input.promptCap,
+    manualCap: input.manualCap,
+    discoveredCap: input.promptCap - input.manualCap,
+    runsPerPeriod: input.runs,
+    checksPerPeriod: engineChecksFor(input.promptCap, ENGINES.length, input.runs),
+    schedule: input.schedule,
+  };
+}
+
+/**
+ * Which plan's tracking rules apply, from primitives.
+ *
+ * ⚠️ THE PRECEDENCE MUST MATCH trackingPeriod() BELOW — Stay Cited first. A
+ * subscriber given the Get Cited cap would be held to 15 questions while their
+ * budget was counted over a calendar month, which is wrong in both directions at
+ * once and looks like a bug in whichever half you notice second.
+ */
+export function trackingPlan(input: {
+  subscription: Subscription;
+  getCitedAt: string | null;
+  getCitedExpiresAt: string | null;
+  now?: Date;
+}): TrackingPlan | null {
+  if (input.subscription === 'stay_cited') return TRACKING_PLANS.stay_cited;
+
+  if (input.getCitedAt) {
+    const expiry = expiryFrom(input.getCitedAt, input.getCitedExpiresAt);
+    if (expiry && (input.now ?? new Date()) < expiry) return TRACKING_PLANS.get_cited;
+  }
+
+  return null;
+}
+
+/** The client twin. The server's lives in lib/auth/entitlements.ts. */
+export function trackingPlanFor(site: Site | null, user: User | null): TrackingPlan | null {
+  return trackingPlan({
+    subscription: user?.subscription ?? 'none',
+    getCitedAt: site?.getCitedAt ?? null,
+    getCitedExpiresAt: site?.getCitedExpiresAt ?? null,
+  });
+}
 
 /** The window a tracking budget is counted over. */
 export type TrackingPeriod = { start: Date; end: Date };
@@ -160,6 +289,7 @@ export type TrackingPeriod = { start: Date; end: Date };
  */
 export function trackingPeriod(input: {
   getCitedAt: string | null;
+  getCitedExpiresAt: string | null;
   subscription: Subscription;
   subscriptionSince: string | null;
   /** Injected only by tests; production always means "now". */
@@ -184,17 +314,18 @@ export function trackingPeriod(input: {
   }
 
   /*
-    Get Cited: the thirty-day window IS the period. There is no second one —
-    when it ends, access ends, so a budget that reset inside it would be giving
-    away a second allowance the customer never bought.
+    Get Cited: the whole window IS the period. There is no second one — when it
+    ends, access ends, so a budget that reset inside it would be giving away a
+    second allowance the customer never bought.
+
+    The end comes from the stored expiry, so a site grandfathered at 30 days and
+    one bought under the 90-day rule are both counted over the window they were
+    actually sold.
   */
   if (input.getCitedAt) {
     const start = new Date(input.getCitedAt);
-    if (!Number.isNaN(start.getTime())) {
-      const end = new Date(start);
-      end.setDate(end.getDate() + GET_CITED_WINDOW_DAYS);
-      if (now < end) return { start, end };
-    }
+    const end = expiryFrom(input.getCitedAt, input.getCitedExpiresAt);
+    if (!Number.isNaN(start.getTime()) && end && now < end) return { start, end };
   }
 
   return null;
@@ -239,24 +370,28 @@ export const ENTITLEMENTS: Record<
     price: '$129 once',
     scope: 'site',
     blurb:
-      'The whole platform for this site, for 30 days: the full audit, the answer set, the publish-ready export, and citation tracking across every engine.',
+      'The whole platform for this site, for 90 days: the full audit, the answer set, the publish-ready export, and citation tracking checked at setup and again on days 7, 30, 60 and 90.',
   },
   /*
     ⚠️ THE BLURB LEADS ON TRACKING NOW, BECAUSE IT RUNS. It used to say
     "citation tracking is coming" and lead on re-opened generation, which was
     the honest order while no engine-querying code existed.
 
-    ⚠️ STILL DO NOT PROMISE A SCHEDULED CHECK HERE. Runs are started by hand
-    from the Results page; there is no scheduler, so "watched weekly" or
-    anything like it remains a promise nothing in this codebase can keep. The
-    pricing card carries the matching wording and the two change together.
+    ⚠️ A SCHEDULED CHECK MAY FINALLY BE PROMISED HERE, AND THE REASON MATTERS.
+    This block carried the opposite instruction for a long time — "there is no
+    scheduler, so 'watched weekly' remains a promise nothing in this codebase can
+    keep." A scheduler exists now: app/api/cron/tracking, fired daily by the
+    crons entry in vercel.json, driving the same scan_jobs machinery the purchase
+    scan uses. What is STILL not built is alerting, so nothing here may say we
+    tell you when a citation appears or disappears. The pricing card carries the
+    matching wording and the two change together.
   */
   stay_cited: {
     label: 'Stay Cited',
     price: '$29/month',
     scope: 'account',
     blurb:
-      'Keeps citation tracking running once the 30 days end, and keeps every site on your account generating — new audits and fresh answers, for as long as you keep it.',
+      'Keeps citation tracking running once the 90 days end — 35 questions checked every week and whenever you ask — and keeps every site on your account generating.',
   },
 };
 
@@ -289,10 +424,23 @@ export function hasStayCited(user: User | null): boolean {
   return user?.subscription === 'stay_cited';
 }
 
-/** Bought, and still inside the 30-day window. */
+/** Bought, and still inside the window. */
 export function getCitedActive(site: Site | null, now: Date = new Date()): boolean {
   const left = getCitedDaysLeft(site, now);
   return left !== null && left > 0;
+}
+
+/**
+ * May this customer start a check themselves, right now?
+ *
+ * ⚠️ NOT THE SAME QUESTION AS canTrack, and keeping them apart is the point.
+ * canTrack asks whether a check may run at all — the cron needs that. This asks
+ * whether a PERSON may start one, which only Stay Cited may do. Get Cited buys
+ * five checks on fixed days; a button beside them would either overspend the
+ * window or do nothing, and both read as broken.
+ */
+export function canRunCheckNow(site: Site | null, user: User | null): boolean {
+  return canTrack(site, user) && trackingPlanFor(site, user)?.schedule === 'weekly';
 }
 
 /** Bought, but the window has closed and no subscription is covering it. */
@@ -346,13 +494,15 @@ export function canContent(site: Site | null, user: User | null): boolean {
 }
 
 /**
- * Running a check — Stay Cited, or inside a live Get Cited window.
+ * May a check run for this site at all — by anyone, including the scheduler.
  *
- * ⚠️ Was subscription-only. Get Cited now buys tracking for its 30 days, with
- * TRACKING_CHECKS_PER_PERIOD as the ceiling that keeps a one-off payment from
- * funding an unbounded engine bill. Enforced server-side in the tracking route;
- * this twin only decides what to render. See the fuller note on the server copy
- * in lib/auth/entitlements.ts.
+ * ⚠️ Was subscription-only. Get Cited now buys tracking for its window, with
+ * the plan's `checksPerPeriod` as the ceiling that keeps a one-off payment from
+ * funding an unbounded engine bill. Enforced server-side in the tracking route
+ * and in the milestone runner; this twin only decides what to render. See the
+ * fuller note on the server copy in lib/auth/entitlements.ts.
+ *
+ * For "may the customer press a button", see canRunCheckNow above.
  */
 export function canTrack(site: Site | null, user: User | null): boolean {
   return canGenerate(site, user);

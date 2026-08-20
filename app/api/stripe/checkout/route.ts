@@ -112,7 +112,7 @@ async function checkPurchasable(purchase: Purchase, userId: string) {
   /*
     ⚠️ Deliberately `get_cited_at` rather than "is the window still open".
 
-    Get Cited is bought ONCE per site. A site whose 30 days have run out must
+    Get Cited is bought ONCE per site. A site whose window has run out must
     not be sold another one — the fix for that customer is Stay Cited, and
     charging $129 for a window they have already had would be indefensible.
     lib/dashboard/plans.ts:getCitedExpired is what routes them to the right

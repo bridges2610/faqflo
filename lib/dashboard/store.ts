@@ -31,17 +31,12 @@ import type {
   FaqRow,
   QuestionRow,
   SiteRow,
+  TrackingMilestoneRow,
 } from '@/lib/supabase/types';
 import { normalizeDomain, sourceHost } from './domain';
 import { contentHash, normalizePath } from './export';
 import type { TrackingPeriod } from './plans';
-import {
-  DISCOVERED_PROMPT_CAP,
-  faqCapFor,
-  MANUAL_QUESTION_CAP,
-  STAY_CITED_PROMPT_CAP,
-  TRACKING_RUNS_PER_PERIOD,
-} from './plans';
+import { faqCapFor, TRACKING_PLANS, trackingPlanFor, type TrackingPlan } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
 import { ENGINES } from './types';
 import type {
@@ -56,6 +51,7 @@ import type {
   Engine,
   FaqEntry,
   FaqGroup,
+  MilestoneView,
   Site,
   SiteAudit,
   SiteTracking,
@@ -223,9 +219,17 @@ function normaliseTracking(raw: SiteTracking): SiteTracking {
       typeof legacy.promptsTracked === 'number'
         ? legacy.promptsTracked
         : new Set(latest.map((c) => c.question)).size,
-    promptCap: typeof legacy.promptCap === 'number' ? legacy.promptCap : STAY_CITED_PROMPT_CAP,
+    /* Hydrating a snapshot written before these fields existed. The plan is not
+       knowable from the blob, so the wider of the two is used — a stored figure
+       that is too generous shows a meter with room in it, while one that is too
+       tight would tell a subscriber they were out of allowance they had paid
+       for. Both are replaced by trackingFromDb() on the next real read. */
+    promptCap:
+      typeof legacy.promptCap === 'number' ? legacy.promptCap : TRACKING_PLANS.stay_cited.promptCap,
     runsPerPeriod:
-      typeof legacy.runsPerPeriod === 'number' ? legacy.runsPerPeriod : TRACKING_RUNS_PER_PERIOD,
+      typeof legacy.runsPerPeriod === 'number'
+        ? legacy.runsPerPeriod
+        : TRACKING_PLANS.stay_cited.runsPerPeriod,
     checksUsed:
       typeof legacy.checksUsed === 'number'
         ? legacy.checksUsed
@@ -742,6 +746,7 @@ export function toSite(row: SiteRow): Site {
     domain: row.domain,
     createdAt: row.created_at,
     getCitedAt: row.get_cited_at,
+    getCitedExpiresAt: row.get_cited_expires_at ?? null,
     lastAudit: null,
     industry: row.industry,
     location: row.location,
@@ -1318,17 +1323,25 @@ export async function trackingFromDb(
     user, so it derives the period once and hands it down.
   */
   period: TrackingPeriod | null,
-  days = 30,
+  /** Which plan's caps to report. Derived by the caller, beside the period. */
+  plan: TrackingPlan | null,
+  /**
+   * The earliest check to read, for the chart.
+   *
+   * ⚠️ A DATE, NOT A NUMBER OF DAYS, AND THE DIFFERENCE IS A BUG THAT WAS HERE.
+   * This used to be `days = 30`, i.e. a window rolling backwards from today —
+   * which quietly deletes history. A Get Cited site's day-7 check would drop out
+   * of its own chart on day 98, and by day 190 the page a customer was promised
+   * would keep "for good" is empty. Get Cited passes its purchase date;
+   * subscribers pass 30 days back, because theirs never stops being added to.
+   */
+  since: Date,
 ): Promise<SiteTracking | null> {
   assertClient('trackingFromDb');
 
   if (!UUID.test(siteId)) return null;
 
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - (days - 1));
-  since.setUTCHours(0, 0, 0, 0);
-
-  const [checks, prompts] = await Promise.all([
+  const [checks, prompts, schedule] = await Promise.all([
     supabaseBrowser()
       .from('citation_checks')
       // ⚠️ `sources` is the expensive column and it is here on purpose: it is
@@ -1342,6 +1355,13 @@ export async function trackingFromDb(
       .gte('checked_at', since.toISOString())
       .order('checked_at', { ascending: false }),
     supabaseBrowser().from('tracked_prompts').select('id').eq('site_id', siteId),
+    /* The schedule, for the timeline on Results. Read-only to the browser by
+       policy — a client that could write these could book itself engine calls. */
+    supabaseBrowser()
+      .from('tracking_milestones')
+      .select('day, due_at, status, finished_at, error')
+      .eq('site_id', siteId)
+      .order('day'),
   ]);
 
   // Swallowed, like the audit history: a missing migration should mean "no
@@ -1365,6 +1385,23 @@ export async function trackingFromDb(
   >[];
 
   if (rows.length === 0) return null;
+
+  /*
+    ⚠️ `finishedAt` IS WHAT THE UI SHOWS, `dueAt` IS ONLY WHY IT RAN.
+
+    The sweep is daily and Vercel fires it within an hour of its slot, so a
+    day-7 check routinely completes on day 7 or 8. Labelling it with the date it
+    was due would be a claim the customer can disprove against their own chart.
+  */
+  const milestones: MilestoneView[] = ((schedule.data ?? []) as TrackingMilestoneRow[]).map(
+    (row) => ({
+      day: row.day,
+      dueAt: row.due_at,
+      status: row.status,
+      finishedAt: row.finished_at,
+      error: row.error,
+    }),
+  );
 
   // sourceHost, not normalizeDomain: `www.` has to go here so one publisher is
   // one row. See the note on each of them — they differ deliberately.
@@ -1533,8 +1570,19 @@ export async function trackingFromDb(
     // What is being watched, not what has been asked — the prompt is the unit
     // the customer buys. See the note on SiteTracking.
     promptsTracked: prompts.data?.length ?? new Set(latest.map((c) => c.question)).size,
-    promptCap: STAY_CITED_PROMPT_CAP,
-    runsPerPeriod: TRACKING_RUNS_PER_PERIOD,
+    /*
+      From the plan, passed in beside the period and for the same reason its own
+      note gives: the caller is the only place holding both the site and the
+      user, and two independent derivations is how a customer gets refused at a
+      number the screen never showed them.
+    */
+    planId: plan?.id ?? null,
+    schedule: plan?.schedule ?? null,
+    promptCap: plan?.promptCap ?? TRACKING_PLANS.stay_cited.promptCap,
+    manualCap: plan?.manualCap ?? TRACKING_PLANS.stay_cited.manualCap,
+    checksCap: plan?.checksPerPeriod ?? 0,
+    runsPerPeriod: plan?.runsPerPeriod ?? TRACKING_PLANS.stay_cited.runsPerPeriod,
+    milestones,
     // The cost side, so it counts every call actually spent — the raw log, not
     // the deduped current state. Charging for one check when four ran would
     // make the quota bar a fiction.
@@ -1601,6 +1649,21 @@ export async function markQuestionCovered(id: string): Promise<DashboardData> {
  */
 export type NewQuestion = { question: string; why?: string; intent?: string };
 
+/**
+ * The caps that apply to one site's question list.
+ *
+ * ⚠️ FALLS BACK TO THE WIDER PLAN, NOT THE NARROWER ONE. A site with no live
+ * window cannot track anything, so the numbers only decide whether the customer
+ * may keep typing into a list they already own. Falling back to Get Cited's 15
+ * would tell somebody whose window closed that a question they wrote last month
+ * is now over a limit — a cap on what may be KEPT, which is the exact mistake
+ * faqCapFor() has a comment about avoiding.
+ */
+function planCapsFor(data: DashboardData, siteId: string): TrackingPlan {
+  const site = data.sites.find((s) => s.id === siteId) ?? null;
+  return trackingPlanFor(site, data.user) ?? TRACKING_PLANS.stay_cited;
+}
+
 export async function addQuestions(
   siteId: string,
   questions: NewQuestion[],
@@ -1623,7 +1686,8 @@ export async function addQuestions(
   // reserve, and letting them shrink discovery's ceiling would punish a customer
   // for having typed a question.
   const discovered = kept.filter((q) => q.source !== 'manual').length;
-  const room = mode === 'append' ? Math.max(0, DISCOVERED_PROMPT_CAP - discovered) : Infinity;
+  const room =
+    mode === 'append' ? Math.max(0, planCapsFor(data, siteId).discoveredCap - discovered) : Infinity;
 
   const created: DiscoveredQuestion[] = [];
   for (const q of questions) {
@@ -1697,11 +1761,13 @@ export async function addManualQuestion(
     return { ok: false, reason: 'duplicate' };
   }
 
-  if (mine.filter((q) => q.source === 'manual').length >= MANUAL_QUESTION_CAP) {
+  const caps = planCapsFor(data, siteId);
+
+  if (mine.filter((q) => q.source === 'manual').length >= caps.manualCap) {
     return { ok: false, reason: 'manual-cap' };
   }
 
-  if (mine.length >= STAY_CITED_PROMPT_CAP) {
+  if (mine.length >= caps.promptCap) {
     return { ok: false, reason: 'prompt-cap' };
   }
 

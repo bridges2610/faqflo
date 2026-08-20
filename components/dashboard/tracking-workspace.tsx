@@ -10,12 +10,12 @@ import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
 import {
+  canRunCheckNow,
   canTrack,
   canViewTracking,
-  DISCOVERED_PROMPT_CAP,
-  engineChecksFor,
-  MANUAL_QUESTION_CAP,
-  STAY_CITED_PROMPT_CAP,
+  GET_CITED_WINDOW_DAYS,
+  TRACKING_PLANS,
+  trackingPlanFor,
 } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import {
@@ -26,6 +26,7 @@ import {
   type SiteTracking,
 } from '@/lib/dashboard/types';
 import { AnswerText } from './answer-text';
+import { CheckSchedule } from './check-schedule';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
@@ -349,7 +350,7 @@ function useFindMore(): {
   room: number;
   hasPages: boolean;
 } {
-  const { site, questions, faqs, addQuestions, recheckCoverage } = useDashboard();
+  const { site, user, questions, faqs, addQuestions, recheckCoverage } = useDashboard();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<number | null>(null);
@@ -363,7 +364,9 @@ function useFindMore(): {
     The manual reserve is held back whether or not it has been used.
   */
   const discovered = mine.filter((q) => q.source !== 'manual').length;
-  const room = Math.max(0, DISCOVERED_PROMPT_CAP - discovered);
+  /* The plan's ceiling, not a global: Get Cited proposes 10 and Stay Cited 25. */
+  const caps = trackingPlanFor(site, user) ?? TRACKING_PLANS.stay_cited;
+  const room = Math.max(0, caps.discoveredCap - discovered);
   const hasPages = (site?.lastAudit?.pages?.length ?? 0) > 0;
 
   async function find() {
@@ -396,7 +399,7 @@ function useFindMore(): {
         Computed from the cap rather than re-reading state, which has not
         re-rendered yet.
       */
-      setAdded(Math.min(result.questions.length, room, DISCOVERED_PROMPT_CAP - before));
+      setAdded(Math.min(result.questions.length, room, caps.discoveredCap - before));
     } finally {
       setBusy(false);
     }
@@ -424,16 +427,14 @@ function useManualQuestion(): {
   room: number;
   clearError: () => void;
 } {
-  const { site, questions, addManualQuestion } = useDashboard();
+  const { site, user, questions, addManualQuestion } = useDashboard();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mine = site ? questions.filter((q) => q.siteId === site.id) : [];
   const used = mine.filter((q) => q.source === 'manual').length;
-  const room = Math.min(
-    MANUAL_QUESTION_CAP - used,
-    Math.max(0, STAY_CITED_PROMPT_CAP - mine.length),
-  );
+  const caps = trackingPlanFor(site, user) ?? TRACKING_PLANS.stay_cited;
+  const room = Math.min(caps.manualCap - used, Math.max(0, caps.promptCap - mine.length));
 
   async function add(text: string): Promise<boolean> {
     if (!site || busy) return false;
@@ -450,8 +451,8 @@ function useManualQuestion(): {
           empty: 'Type a question first.',
           'too-long': 'That is too long for a prompt — trim it to a single question.',
           duplicate: 'You are already watching that question.',
-          'manual-cap': `You can add ${MANUAL_QUESTION_CAP} of your own. Remove one on Opportunities to make room.`,
-          'prompt-cap': `Your watch list is full at ${STAY_CITED_PROMPT_CAP} prompts.`,
+          'manual-cap': `You can add ${caps.manualCap} of your own. Remove one on Opportunities to make room.`,
+          'prompt-cap': `Your watch list is full at ${caps.promptCap} prompts.`,
         }[result.reason],
       );
       return false;
@@ -502,7 +503,7 @@ export function TrackingWorkspace() {
   /*
     ⚠️ THE GATE IS canViewTracking, NOT canTrack.
 
-    Someone whose 30 days lapsed keeps the report they paid to collect — the
+    Someone whose window lapsed keeps the report they paid to collect — the
     pricing page promises "everything you make stays yours for good", and
     hiding measurements behind an upgrade card would break that promise on the
     screen that made it. What the window governs is RUNNING a new check, which
@@ -516,14 +517,27 @@ export function TrackingWorkspace() {
           entitlement="get_cited"
           siteName={site.name}
           title="See who the assistants cite"
-          body="Get Cited puts your questions to ChatGPT, Perplexity and Gemini and records, for each one, whether they cited you, named you without a link, or pointed somewhere else — for 30 days, along with the audit, the answers and the export."
+          body={`Get Cited puts your questions to ChatGPT, Perplexity and Gemini and records, for each one, whether they cited you, named you without a link, or pointed somewhere else. It checks at setup and again on days 7, 30, 60 and ${GET_CITED_WINDOW_DAYS}, so you see a trend rather than one reading — along with the audit, the answers and the export.`}
         />
       </>
     );
   }
 
-  /* May a new check be started? Separate from whether results may be READ. */
-  const canRun = canTrack(site, user);
+  /*
+    ⚠️ TWO QUESTIONS, AND THEY USED TO BE ONE VARIABLE.
+
+      canGrowList — may this site have more questions found or written?
+      canRunNow   — may this customer start a check by hand, right now?
+
+    They were both `canRun = canTrack(...)`, which was fine while every plan had
+    a button. Get Cited now runs on a schedule and has none, and collapsing these
+    again would silently switch OFF question discovery for every Get Cited
+    customer — a feature that costs an Opus call rather than engine calls, and
+    one they need working so the next scheduled check picks up what they added.
+  */
+  const canGrowList = canTrack(site, user);
+  const canRunNow = canRunCheckNow(site, user);
+  const scheduled = trackingPlanFor(site, user)?.schedule === 'milestones';
 
   const daily = tracking?.daily ?? [];
   const latest = tracking?.latest ?? [];
@@ -555,7 +569,7 @@ export function TrackingWorkspace() {
             title="You haven’t run a check yet"
             body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else. It takes a minute or two.`}
             action={
-              canRun ? (
+              canRunNow ? (
                 <Button onClick={runTracking} disabled={run.busy}>
                   {runningHere
                     ? 'Checking…'
@@ -563,6 +577,10 @@ export function TrackingWorkspace() {
                       ? 'Another check is running'
                       : 'Run the first check'}
                 </Button>
+              ) : scheduled ? (
+                // Nothing to press: the first check runs itself as part of
+                // setting the site up, and four more follow on their own days.
+                <p className="text-slate text-sm">Your first check runs as part of your setup.</p>
               ) : (
                 <ButtonLink href="/dashboard/checkout/start">Renew to run checks</ButtonLink>
               )
@@ -747,12 +765,14 @@ export function TrackingWorkspace() {
       <PageHeader
         title="Results"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
+        /* No button on a scheduled plan. The timeline below says when the next
+           check lands, which is the honest answer to what the button was for. */
         action={
-          canRun ? (
+          canRunNow ? (
             <Button variant="ghost" size="sm" onClick={runTracking} disabled={run.busy}>
               {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
             </Button>
-          ) : (
+          ) : scheduled ? null : (
             <ButtonLink href="/dashboard/checkout/start" variant="ghost" size="sm">
               Renew to run checks
             </ButtonLink>
@@ -911,7 +931,15 @@ export function TrackingWorkspace() {
           comes last. The rail holds the two things you act on. */}
       <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         <div className="space-y-5">
-          <CitationChart daily={daily} />
+          <CitationChart
+            daily={daily}
+            span={scheduled ? `across your ${GET_CITED_WINDOW_DAYS} days` : 'over the last 30 days'}
+          />
+
+          {/* The schedule, where the Run button used to be — but under the chart
+              rather than above it. The chart is what they came for; the dates
+              are the answer to the question the missing button raises. */}
+          {scheduled && <CheckSchedule milestones={tracking?.milestones ?? []} />}
 
           {/* Per engine.
 
@@ -1197,13 +1225,20 @@ export function TrackingWorkspace() {
                   {formatNumber(tracking.promptsTracked)} of {formatNumber(tracking.promptCap)}{' '}
                   prompts tracked
                 </p>
+                {/* ⚠️ The ceiling comes from the plan now, not from multiplying
+                    three fields back together here. The two plans have different
+                    caps, and an arithmetic copy in the UI is how a customer ends
+                    up refused at a number the screen never showed them.
+
+                    "Resets" is wrong for a window that ENDS rather than renewing,
+                    so a scheduled plan says so plainly. */}
                 <p className="text-slate mt-0.5 text-xs">
-                  {formatNumber(tracking.checksUsed)} of{' '}
-                  {formatNumber(
-                    engineChecksFor(tracking.promptCap, ENGINES.length, tracking.runsPerPeriod),
-                  )}{' '}
-                  engine checks this period · each prompt is asked {ENGINES.length} engines ×{' '}
-                  {tracking.runsPerPeriod} times · resets {timeUntil(tracking.periodResetsAt)}
+                  {formatNumber(tracking.checksUsed)} of {formatNumber(tracking.checksCap)} engine
+                  checks · each prompt is asked {ENGINES.length} engines × {tracking.runsPerPeriod}{' '}
+                  times ·{' '}
+                  {scheduled
+                    ? `window ends ${timeUntil(tracking.periodResetsAt)}`
+                    : `resets ${timeUntil(tracking.periodResetsAt)}`}
                 </p>
               </div>
               <Meter className="mt-3" value={usedPct} />
@@ -1213,7 +1248,7 @@ export function TrackingWorkspace() {
                   more?", and none of them is a disabled button with no reason
                   given. */}
               <div className="border-line mt-4 border-t pt-4">
-                {!canRun ? (
+                {!canGrowList ? (
                   <p className="text-slate text-xs">
                     Finding more questions needs an active window — your existing list and results
                     stay here either way.
@@ -1224,9 +1259,9 @@ export function TrackingWorkspace() {
                   // slots left, and calling that full would be untrue — and
                   // would send someone to delete a question they didn't need to.
                   <p className="text-slate text-xs">
-                    We&rsquo;ve found the {formatNumber(DISCOVERED_PROMPT_CAP)} questions this
-                    plan looks for. You can still add{' '}
-                    {formatNumber(MANUAL_QUESTION_CAP)} of your own below, or retire one on{' '}
+                    We&rsquo;ve found the {formatNumber(tracking.promptCap - tracking.manualCap)}{' '}
+                    questions this plan looks for. You can still add{' '}
+                    {formatNumber(tracking.manualCap)} of your own below, or retire one on{' '}
                     <Link
                       href="/dashboard/questions"
                       className="text-primary hover:text-primary-hover font-semibold"
@@ -1286,16 +1321,16 @@ export function TrackingWorkspace() {
               <div className="border-line mt-4 border-t pt-4">
                 <p className="text-navy text-sm font-semibold">Add your own question</p>
 
-                {!canRun ? (
+                {!canGrowList ? (
                   <p className="text-slate text-xs">
                     You can add your own questions again once the window is open — there would be
                     nothing to check them with right now.
                   </p>
                 ) : manual.room === 0 ? (
                   <p className="text-slate mt-1 text-xs">
-                    {manual.used >= MANUAL_QUESTION_CAP
-                      ? `You've added all ${MANUAL_QUESTION_CAP} of your own. Remove one on `
-                      : `Your watch list is full at ${formatNumber(STAY_CITED_PROMPT_CAP)} prompts. Make room on `}
+                    {manual.used >= tracking.manualCap
+                      ? `You've added all ${tracking.manualCap} of your own. Remove one on `
+                      : `Your watch list is full at ${formatNumber(tracking.promptCap)} prompts. Make room on `}
                     <Link
                       href="/dashboard/questions"
                       className="text-primary hover:text-primary-hover font-semibold"
@@ -1332,7 +1367,7 @@ export function TrackingWorkspace() {
                     />
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <p className="text-slate text-xs">
-                        {manual.used} of {MANUAL_QUESTION_CAP} of your own
+                        {manual.used} of {tracking.manualCap} of your own
                       </p>
                       <Button type="submit" variant="ghost" size="sm" disabled={manual.busy}>
                         {manual.busy ? 'Adding…' : 'Add'}

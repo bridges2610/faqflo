@@ -114,7 +114,22 @@ function shortDate(key: string): string {
   return `${Number(d)}/${Number(m)}`;
 }
 
-export function CitationChart({ daily }: { daily: CitationDay[] }) {
+export function CitationChart({
+  daily,
+  /**
+   * What the chart covers, in words — "the last 30 days", "your 90-day window".
+   *
+   * ⚠️ IT USED TO SAY "the last {daily.length} days" AND THAT WAS ALREADY WRONG.
+   * `daily` holds days on which a check RAN, not days elapsed, so a subscriber
+   * who ran three times in a month read "over the last 3 days". On a scheduled
+   * plan it became absurd: five checkpoints spread across three months
+   * described as "the last 5 days".
+   */
+  span = 'over the last 30 days',
+}: {
+  daily: CitationDay[];
+  span?: string;
+}) {
   const [showTable, setShowTable] = useState(false);
 
   const max = niceMax(
@@ -149,8 +164,7 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
         <div>
           <SectionTitle>Citations over time</SectionTitle>
           <p className="text-slate mt-1 text-sm">
-            Questions where your domain was named as a source, per engine, over the last{' '}
-            {daily.length} days.
+            Questions where your domain was named as a source, per engine, {span}.
           </p>
         </div>
         <button
@@ -209,7 +223,7 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
           viewBox={`0 0 ${W} ${H}`}
           className="mt-4 w-full"
           role="img"
-          aria-label={`Citations per engine over the last ${daily.length} days`}
+          aria-label={`Citations per engine ${span}`}
         >
           {ticks.map((t) => (
             <g key={t}>
@@ -319,10 +333,18 @@ export function CitationChart({ daily }: { daily: CitationDay[] }) {
               one date, at the left, and nothing under the point the reader
               actually cares about. Week markers are still every 7, but only
               where they can't crowd an end label. */}
+          {/* ⚠️ AND EVERY POINT IS LABELLED WHEN THERE ARE FEW ENOUGH OF THEM.
+              A scheduled plan produces five points that are weeks apart, drawn
+              evenly because the axis is index-based — with only the ends dated,
+              five checks spread over three months read as five consecutive
+              measurements. Reuses DOT_EVERY_POINT_UNTIL rather than inventing a
+              second threshold: the same count at which each point is worth
+              marking is the count at which each one is worth naming. */}
           {daily.map((d, i) => {
             const isEnd = i === 0 || i === daily.length - 1;
             const clearOfEnds = i >= 2 && i <= daily.length - 3;
-            if (!isEnd && !(i % 7 === 0 && clearOfEnds)) return null;
+            const sparse = daily.length <= DOT_EVERY_POINT_UNTIL;
+            if (!sparse && !isEnd && !(i % 7 === 0 && clearOfEnds)) return null;
             return (
               <text
                 key={d.date}

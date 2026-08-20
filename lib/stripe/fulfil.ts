@@ -3,8 +3,10 @@ import 'server-only';
 import type Stripe from 'stripe';
 import { trySendEmail } from '@/lib/email/client';
 import { setUpEmail } from '@/lib/email/templates';
+import { GET_CITED_GRACE_DAYS, GET_CITED_WINDOW_DAYS } from '@/lib/dashboard/plans';
 import { enqueueScan } from '@/lib/scan/enqueue';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { cancelPendingMilestones, ensureMilestones } from '@/lib/tracking/schedule';
 import { stripe } from './client';
 
 /**
@@ -148,9 +150,30 @@ export async function fulfilCheckoutSession(sessionId: string): Promise<Fulfilme
 async function grantGetCited(siteId: string, userId: string): Promise<boolean> {
   const supabase = createAdminClient();
 
+  const boughtAt = new Date();
+
+  /*
+    ⚠️ THE DEADLINE IS WRITTEN HERE, NOT COMPUTED LATER.
+
+    Every read used to derive it from `get_cited_at` plus a constant, which meant
+    changing that constant moved the deadline for every existing customer at
+    once. Storing it at the moment of sale is what lets the number change for
+    future buyers without touching anyone who has already paid.
+
+    The stored date carries GET_CITED_GRACE_DAYS on top of the 90 the customer is
+    quoted. That slack exists so the day-90 check, which is due at UTC midnight
+    and fired by a once-a-day sweep, cannot land on the wrong side of its own
+    window and be refused.
+  */
+  const expiresAt = new Date(boughtAt);
+  expiresAt.setDate(expiresAt.getDate() + GET_CITED_WINDOW_DAYS + GET_CITED_GRACE_DAYS);
+
   const { data, error } = await supabase
     .from('sites')
-    .update({ get_cited_at: new Date().toISOString() })
+    .update({
+      get_cited_at: boughtAt.toISOString(),
+      get_cited_expires_at: expiresAt.toISOString(),
+    })
     .eq('id', siteId)
     .eq('user_id', userId)
     .is('get_cited_at', null)
@@ -158,7 +181,26 @@ async function grantGetCited(siteId: string, userId: string): Promise<boolean> {
 
   if (error) throw new Error(`Failed to grant Get Cited for site ${siteId}: ${error.message}`);
 
-  return (data?.length ?? 0) > 0;
+  const granted = (data?.length ?? 0) > 0;
+
+  /*
+    Lay down the four scheduled checks the moment the sale lands, rather than
+    waiting for the nightly sweep to notice this site.
+
+    Not fatal if it fails: `ensureMilestones()` is idempotent against
+    unique (site_id, day) and the sweep runs it again over every site each night,
+    so the worst case is a schedule that appears a few hours late. Throwing here
+    would turn a successful payment into a failed webhook and a retry storm.
+  */
+  if (granted) {
+    try {
+      await ensureMilestones(siteId);
+    } catch (err) {
+      console.error(`Could not schedule checks for site ${siteId}:`, err);
+    }
+  }
+
+  return granted;
 }
 
 /**
@@ -282,12 +324,23 @@ async function revokeGetCited(siteId: string, userId: string): Promise<void> {
 
   const { error } = await supabase
     .from('sites')
-    .update({ get_cited_at: null })
+    .update({ get_cited_at: null, get_cited_expires_at: null })
     .eq('id', siteId)
     .eq('user_id', userId)
     .not('get_cited_at', 'is', null);
 
   if (error) throw new Error(`Failed to revoke Get Cited for site ${siteId}: ${error.message}`);
+
+  /*
+    ⚠️ AND CANCEL THE CHECKS THAT HAVE NOT RUN.
+
+    Without this a refunded site keeps a schedule: the entitlement is gone, but
+    four rows still say 'pending' and the nightly sweep would happily spend
+    engine calls on somebody who has their money back. Completed rows stay —
+    they record work that was really done, and deleting them would make the
+    chart disagree with the checks table it is drawn from.
+  */
+  await cancelPendingMilestones(siteId);
 }
 
 /**
