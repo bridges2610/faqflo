@@ -25,19 +25,47 @@ export function H3({ children }: { children?: ReactNode }) {
   return <h3 className="mt-9 mb-1 text-[1.1875rem]">{children}</h3>;
 }
 
+/*
+  ⚠️ THE MARKER BELONGS TO THE LIST, NOT TO THE ITEM.
+
+  Li used to draw a cyan dot itself, which meant an ORDERED list rendered as
+  bullets — the numbers silently disappeared, and with them the only reason to
+  have written an ordered list. Preflight strips real list markers, so something
+  has to draw them; the parent is the only element that knows which kind it is.
+
+  Both markers are ::before pseudo-elements on the item. Li is a flex container,
+  so a pseudo-element becomes its first flex item and sits exactly where the old
+  span did.
+*/
 export function Ul({ children }: { children?: ReactNode }) {
-  return <ul className="mt-5 space-y-3">{children}</ul>;
+  return (
+    <ul className="mt-5 space-y-3 [&>li]:before:bg-accent [&>li]:before:mt-3 [&>li]:before:h-1.5 [&>li]:before:w-1.5 [&>li]:before:shrink-0 [&>li]:before:rounded-full [&>li]:before:content-['']">
+      {children}
+    </ul>
+  );
 }
 
+/*
+  Numbers from a CSS counter rather than from the browser's own list marker.
+
+  `display: flex` on the item removes its marker box entirely, so `list-decimal`
+  renders nothing — and the flex layout is what keeps a wrapped second line
+  aligned under the first rather than under the number. A counter gives both.
+
+  tabular-nums so 9. and 10. occupy the same width and the text stays in one
+  column.
+*/
 export function Ol({ children }: { children?: ReactNode }) {
-  return <ol className="mt-5 space-y-3">{children}</ol>;
+  return (
+    <ol className="mt-5 space-y-3 [counter-reset:item] [&>li]:before:text-primary [&>li]:before:w-5 [&>li]:before:shrink-0 [&>li]:before:text-right [&>li]:before:font-semibold [&>li]:before:tabular-nums [&>li]:before:[content:counter(item)'.'] [&>li]:[counter-increment:item]">
+      {children}
+    </ol>
+  );
 }
 
-/** Preflight strips list markers, so the dot is drawn explicitly. */
 export function Li({ children }: { children?: ReactNode }) {
   return (
     <li className="text-slate flex gap-3 text-[1.0625rem] leading-[1.8]">
-      <span className="bg-accent mt-3 h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden="true" />
       <span>{children}</span>
     </li>
   );

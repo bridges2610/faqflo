@@ -1,0 +1,159 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: 'how-long-does-it-take-for-ai-search-to-pick-up-your-content',
+  title: 'How Long Does It Take for AI Search to Pick Up Your Content?',
+  date: '2026-08-21',
+  excerpt: 'Days, not months — assuming the crawler can read your page at all.',
+  image: '/blog/how-long-does-it-take-for-ai-search-to-pick-up-your-content.png',
+  // Describes the illustration rather than repeating the headline, which is
+  // already the page's h1 immediately below it.
+  imageAlt:
+    'A timeline card headed “Time to get cited”, with three stages: crawled in hours to days, indexed in days to two weeks, cited in two to eight weeks. Underneath, a red row reading “if JS-rendered or blocked” against a “Never” badge.',
+};
+
+Days, not months — assuming the crawler can read your page at all.
+
+<PostTldr>
+If AI crawlers can read your page, most will find it within hours to two weeks, and the first AI
+answers usually start quoting you somewhere between two and eight weeks after you publish. Give it
+90 days for a fair read.
+
+- If your content is rendered with JavaScript, or your `robots.txt` blocks the AI crawlers, the
+  honest answer is never — the clock never started.
+- Crawled, indexed and cited are three different clocks. Being findable and being chosen are not
+  the same thing.
+- Perplexity is fastest, ChatGPT is close behind on the prompts where it actually searches, and
+  Google AI Overviews runs on your ordinary Google indexing timeline.
+
+</PostTldr>
+
+## There are three clocks, not one
+
+“How long until AI picks up my content” is really three questions, and they run on very different
+schedules.
+
+**Crawled.** A bot fetched your page. This is the fast one — often the same day you publish.
+
+**Indexed.** Your page is now in the pool the engine can pull from when someone asks a question.
+Days to a couple of weeks.
+
+**Cited.** An AI actually names you in an answer. Weeks — and it isn’t automatic just because the
+first two happened.
+
+Most of the confusion comes from mixing up the second and third. Being findable and being chosen
+are different things.
+
+## Engine by engine
+
+**Perplexity is the fastest.** It runs a background index and a live web search on every query, so
+freshly published content can turn up in its answers almost immediately.
+
+**ChatGPT is fast — when it searches at all.** OpenAI’s `OAI-SearchBot` builds ChatGPT’s search
+index, and it visits most sites every few days or weeks rather than several times a day. There’s a
+bigger catch: a 2026 analysis found ChatGPT only runs a live web search on about a third of
+prompts — the rest are answered from what the model already knows. So a brand-new page can only win
+the searched share.
+
+**Google AI Overviews runs on Google’s clock.** If Google has indexed the page, AI Overviews can
+cite it — which means the timeline is simply your normal Google indexing timeline. For an
+established site that’s days. For a brand-new small-business site, it can be weeks, and sometimes
+it just doesn’t happen.
+
+**Copilot, Grok and Claude mostly ride the same rails.** Bing’s index feeds several of them, which
+is why getting into Bing matters more than most small businesses realise.
+
+One published test makes the speed difference concrete: a new page was crawled by ChatGPT and
+Perplexity on the day it went live, while Bing and Google didn’t come by until one to two days
+later. AI crawlers are not the slow part.
+
+## What actually decides your timeline
+
+Six dependencies, roughly in order of how much they matter.
+
+1. **Can the crawler read the page.** This is the gate everything else sits behind. OpenAI’s search
+   crawler reads raw HTML only — if your content loads through JavaScript, it frequently sees a
+   blank page. [A FAQ accordion that looks perfect to a
+   visitor](/blog/why-faq-plugins-arent-a-good-idea) can be completely absent from the version a
+   bot reads. No amount of waiting fixes this.
+2. **Your robots.txt.** [Blocking the AI crawlers](/blog/is-my-site-blocking-chatgpt) sets your
+   timeline to infinity. Worth noting that OpenAI’s systems take roughly a day to pick up changes
+   after you edit `robots.txt`, so unblocking isn’t instant either.
+3. **How often you already get crawled.** Sites that already appear in AI answers get crawled more
+   often — it compounds once you’re in. A site with existing traffic and links gets picked up in
+   days. A six-month-old site with three backlinks waits longer.
+4. **Server speed.** AI crawlers are less patient than Googlebot. A slow page that Googlebot would
+   retry may simply be skipped, or only partly fetched, by `PerplexityBot`.
+5. **How the answer is written.** This is the difference between indexed and cited. Cited pages
+   tend to lead with a direct answer in the first 50 words, and Q&A formatting is associated with
+   roughly three times the citation rate. A page that buries the answer under three paragraphs of
+   context gets passed over for one that doesn’t.
+6. **Whether anyone is asking.** You can be perfectly crawlable and still never get cited, because
+   nobody is asking a question your page answers. Citations only happen on real queries.
+
+## How to make it faster
+
+- **Publish as real HTML on your own domain.** Not a JavaScript widget. This is the single biggest
+  lever, and it’s binary.
+- **Allow the citation crawlers** — `OAI-SearchBot`, `PerplexityBot`, `Claude-SearchBot` and
+  `Google-Extended` — in your `robots.txt`.
+- **Get into Bing.** Submitting your sitemap to Bing Webmaster Tools takes about ten minutes and is
+  one of the highest-leverage things you can do, because ChatGPT Search leans on Bing’s index for
+  live retrieval. IndexNow pushes new URLs to Bing instantly instead of waiting for a crawl cycle.
+- **Put the answer in the first sentence.** Then the detail.
+- **Be specific.** Prices, hours, service areas, timeframes. Vague marketing copy is unquotable.
+- **Get mentioned elsewhere.** Being referenced on sites that are already indexed speeds up
+  discovery of yours.
+
+## What to expect at each mark
+
+**Week 1.** Check your server logs. You should see AI crawlers hitting the new page. If you see
+nothing at all, something is blocking them — that’s a technical problem, not a patience problem.
+
+**Weeks 2–4.** Start asking the engines the questions a real customer would ask. You may see
+nothing yet. That’s normal.
+
+**Weeks 4–8.** First citations usually show up here, if they’re going to. Even with everything done
+right, two to four weeks is a fair minimum before drawing conclusions — and if nothing has happened
+well past that, the issue is usually relevance or authority rather than discovery.
+
+**Day 90.** Now you have a real signal. If you’re cited for some questions and not others, you have
+a gap list, which is exactly what you want.
+
+## Where FaqFlo comes in
+
+Most of the “how long does it take” anxiety turns out to be a technical problem in disguise.
+Businesses wait three months for a page the crawlers were never able to read.
+
+[FaqFlo](/#audit) starts by checking that: whether AI can see your site at all, and whether the
+crawlers are blocked. Then it finds the questions people are actually asking AI about businesses
+like yours, writes answers built to be quoted, and gives you clean crawlable HTML to paste onto
+your own site — so the clock starts the day you publish. After that it [tracks whether you’re
+actually showing up](/#try) in ChatGPT, Perplexity and Google’s AI answers, so you’re not guessing
+about the timeline. You’re watching it.
+
+<PostFaq
+  items={[
+    {
+      q: 'How long does it take for AI to find new content on my website?',
+      a: 'Hours to two weeks for the crawl, and two to eight weeks before you’re actually quoted in an answer. AI crawlers often visit a new page the same day it’s published.',
+    },
+    {
+      q: 'Why hasn’t AI picked up my page after a month?',
+      a: 'Usually because the crawler can’t read it. If your content is rendered by JavaScript — most FAQ plugins are — AI crawlers see an empty page, and waiting won’t fix that. The other common cause is a robots.txt rule blocking the AI bots.',
+    },
+    {
+      q: 'Which AI search engine picks up new content the fastest?',
+      a: 'Perplexity, because it runs a live web search on every query. ChatGPT is close behind when it searches, and Google AI Overviews is slowest since it depends on standard Google indexing.',
+    },
+    {
+      q: 'Does getting indexed mean I’ll get cited?',
+      a: 'No. Indexing makes you eligible; citation depends on whether your answer is the clearest one available — and on whether anyone is asking the question.',
+    },
+    {
+      q: 'How do I know if AI has picked up my content?',
+      a: 'Check your server logs for AI crawler visits, then ask the engines the questions a real customer would ask and see whose names come back. FaqFlo tracks the second part for you over time.',
+    },
+  ]}
+/>

@@ -1,3 +1,4 @@
+import * as pickupTime from '@/content/posts/how-long-does-it-take-for-ai-search-to-pick-up-your-content.mdx';
 import * as blockingChatgpt from '@/content/posts/is-my-site-blocking-chatgpt.mdx';
 import * as elevatorPitch from '@/content/posts/the-60-second-faqflo-elevator-pitch.mdx';
 import * as platformRanking from '@/content/posts/ranking-the-best-ai-platforms-for-your-business.mdx';
@@ -58,6 +59,7 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  pickupTime,
   blockingChatgpt,
   elevatorPitch,
   platformRanking,

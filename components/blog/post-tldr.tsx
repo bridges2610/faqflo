@@ -25,7 +25,10 @@ export function PostTldr({ children }: { children?: ReactNode }) {
     <aside className="mt-8">
       <p className="text-primary font-mono text-[0.6875rem] tracking-wide uppercase">TL;DR</p>
 
-      <div className="mt-2.5 [&_li]:text-[0.9375rem] [&_li]:leading-[1.7] [&_li>span:first-child]:mt-2.5 [&_p]:text-[0.9375rem] [&_p]:leading-[1.7] [&>p:first-child]:text-navy [&>p:first-child]:font-semibold [&>ul]:mt-3.5">
+      {/* The bullet is an ::before on the item now rather than a span inside it
+          — see the note in post-prose.tsx — so the nudge that lines it up with
+          this box's smaller type has to target the pseudo-element. */}
+      <div className="mt-2.5 [&_li]:text-[0.9375rem] [&_li]:leading-[1.7] [&_li]:before:mt-2.5 [&_p]:text-[0.9375rem] [&_p]:leading-[1.7] [&>p:first-child]:text-navy [&>p:first-child]:font-semibold [&>ul]:mt-3.5">
         {children}
       </div>
     </aside>
