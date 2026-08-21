@@ -215,7 +215,21 @@ function money(value: number): string {
  * tier and the one-time fee, and it changes neither.
  */
 function PriceBlock({ price }: { price: Price }) {
-  const [annual, setAnnual] = useState(true); // annual is the default offer
+  /*
+    ⚠️ MONTHLY, BECAUSE MONTHLY IS WHAT THE CHECKOUT ACTUALLY SELLS.
+
+    This opened on annual, and the comment here said "annual is the default
+    offer" — so the first figure a visitor read was $24.17, from a plan nobody
+    is ever charged. Stay Cited is bought from the dashboard, and
+    components/dashboard/upgrade-card.tsx hardcodes `period: 'monthly'` on
+    purpose: annual is a one-click switch inside Stripe's portal afterwards, so
+    it is deliberately not a decision made twice. The first invoice is $29.
+
+    Quoting a number the first invoice will not match is the kind of small
+    mismatch that reads as a bait and switch even when nothing was hidden.
+    Annual stays one click away, with the saving stated, for anyone comparing.
+  */
+  const [annual, setAnnual] = useState(false);
 
   if (price.kind === 'free') {
     return (
@@ -269,19 +283,11 @@ function PriceBlock({ price }: { price: Price }) {
         role="group"
         aria-label="Billing period for Stay Cited"
       >
-        <button
-          type="button"
-          onClick={() => setAnnual(true)}
-          aria-pressed={annual}
-          className={`flex items-center gap-1.5 rounded-full py-1 pr-1.5 pl-3 text-xs transition-all duration-200 ${
-            annual ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
-          }`}
-        >
-          Annual
-          <span className="bg-accent-soft text-navy rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold">
-            2 months free
-          </span>
-        </button>
+        {/* ⚠️ MONTHLY FIRST, MATCHING THE DEFAULT ABOVE. Reading order is the
+            quieter half of "which one is the offer": a selected control sitting
+            second reads as a correction to the first rather than as the plan on
+            sale. Ordering is DOM order, so tab order follows for free — there is
+            no tabIndex to keep in step. */}
         <button
           type="button"
           onClick={() => setAnnual(false)}
@@ -291,6 +297,22 @@ function PriceBlock({ price }: { price: Price }) {
           }`}
         >
           Monthly
+        </button>
+        <button
+          type="button"
+          onClick={() => setAnnual(true)}
+          aria-pressed={annual}
+          className={`flex items-center gap-1.5 rounded-full py-1 pr-1.5 pl-3 text-xs transition-all duration-200 ${
+            annual ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
+          }`}
+        >
+          Annual
+          {/* Stays on the unselected option, which is where it does its work:
+              it is the reason to look at the other state, not a label for the
+              one you are already on. */}
+          <span className="bg-accent-soft text-navy rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold">
+            2 months free
+          </span>
         </button>
       </div>
     </div>
