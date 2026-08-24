@@ -4,24 +4,25 @@ import { siteOrigin } from '@/lib/auth/origin';
 import type { ProfileRow } from '@/lib/supabase/types';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { stripe } from './client';
-import { checkoutMode, priceFor, type Purchase } from './products';
+import { priceFor, type Purchase } from './products';
 
 /**
  * Creating a Checkout Session, in one place.
  *
- * Two routes start checkout — /api/stripe/checkout, for a signed-in customer
- * clicking a locked feature, and /api/checkout/start, for someone arriving
- * from the pricing page who may not have a site yet. They differ in how they
- * work out WHAT to buy. They must not differ in how they buy it.
+ * ⚠️ ONE CALLER NOW, AND IT STAYS A SEPARATE FUNCTION ANYWAY. There used to be
+ * two routes starting checkout — one for a signed-in customer clicking a locked
+ * feature, one for somebody arriving from the pricing page who might not have a
+ * site yet — and they differed in how they worked out WHAT to buy. There is only
+ * one thing to buy now, so /api/stripe/checkout is the only caller.
  *
  * ⚠️ What is not allowed to be reimplemented: the metadata block. It is the
  * only thing the webhook will have when it arrives, so a session created
  * without it takes the customer's money and grants nothing — and the failure
  * shows up minutes later in a log, not at the point of the mistake.
  *
- * ⚠️ AUTHORISATION IS NOT DONE HERE. This function takes ids it trusts.
- * Proving the caller owns `siteId` is the calling route's job, before it gets
- * this far — see checkPurchasable() in app/api/stripe/checkout/route.ts.
+ * ⚠️ AUTHORISATION IS NOT DONE HERE. This function bills whoever it is handed.
+ * Proving that is the signed-in user, and that they are not already paying, is
+ * the calling route's job before it gets this far.
  */
 
 /** Where Stripe sends people afterwards. Both live under the dashboard. */
@@ -42,48 +43,55 @@ export async function createCheckoutSession(
   const origin = await siteOrigin();
 
   const session = await stripe().checkout.sessions.create({
-    mode: checkoutMode(purchase.product),
+    // Always a subscription now. Get Cited was the only thing that was ever
+    // 'payment', so checkoutMode() went with it rather than becoming a function
+    // with one possible answer.
+    mode: 'subscription',
     customer: customerId,
     line_items: [{ price: priceFor(purchase), quantity: 1 }],
 
     /*
       The "Add promotion code" field on Stripe's hosted page.
 
-      Get Cited only. Stay Cited is left without it deliberately — a percentage
-      off a subscription repeats every month unless the coupon says otherwise,
-      so discounting recurring revenue is a decision to make on purpose rather
-      than inherit from a flag that happened to be on. Adding it there later is
-      this same line with the condition removed.
+      ⚠️ THE DURATION CAVEAT NOW BITES, WHICH IT COULD NOT BEFORE. This flag used
+      to be Get Cited-only precisely because "a percentage off a subscription
+      repeats every month unless the coupon says otherwise", and there was a
+      one-time price to put codes on instead. There isn't any more, so launch
+      discounts have nowhere else to live and the flag is on — which makes a
+      coupon's duration (once / repeating / forever) a real decision every time
+      one is created. A `forever` coupon on Pro is a permanent price cut for that
+      customer, granted by a dropdown.
 
       ⚠️ The codes themselves live in Stripe, not here. Create a Coupon, then a
       Promotion Code on it (the coupon is the discount; the promotion code is
       the string a customer types). They exist per MODE — codes made in test
-      mode do not work in live, exactly like prices.
+      mode do not work in live, exactly like prices. Give any public code a
+      redemption limit AND an expiry.
 
       ⚠️ Mutually exclusive with `discounts`. If a coupon ever needs applying
       automatically, that field replaces this one — passing both is an error,
       not a merge.
     */
-    ...(purchase.product === 'get_cited' ? { allow_promotion_codes: true } : {}),
+    allow_promotion_codes: true,
 
     /*
       How fulfilment finds its way home.
 
       The webhook arrives with nothing but the session, so everything needed to
       grant the right thing to the right row has to be written here — where the
-      caller has just proved it. `siteId` is an id validated against the
-      database, never one echoed back from the client at some later point.
+      caller has just proved it.
     */
     metadata: {
       userId: user.id,
       product: purchase.product,
-      ...(purchase.product === 'get_cited' ? { siteId: purchase.siteId } : {}),
+      // Not read by fulfilment — the subscription object is the source of truth
+      // for what is being paid for. Kept because a support question about a
+      // charge is answered far faster by a session that says which price it was.
+      period: purchase.period,
     },
     // Also stamped on the subscription itself, so its own events — which do
     // not carry the checkout session — can still be traced back to a person.
-    ...(purchase.product === 'stay_cited'
-      ? { subscription_data: { metadata: { userId: user.id } } }
-      : {}),
+    subscription_data: { metadata: { userId: user.id, period: purchase.period } },
 
     ...urlsFor(origin),
   });

@@ -76,9 +76,9 @@ export const currentUser = cache(async (): Promise<ProfileRow | null> => {
     The row could not be read or written — RLS, a race, a network blip.
 
     Still a signed-in user, built from the verified token. Entitlements fail
-    CLOSED: 'none' is the free tier, so the worst case is someone not seeing
-    what they paid for, which is recoverable and visible. The alternative —
-    returning null — is the loop above.
+    CLOSED: 'free' is the bottom of the ladder, so the worst case is someone not
+    seeing what they paid for, which is recoverable and visible. The alternative
+    — returning null — is the loop above.
   */
   return fromClaims(claims);
 });
@@ -100,8 +100,8 @@ function fromClaims(claims: Record<string, unknown>): ProfileRow {
     id: String(claims.sub),
     name: displayName(claims),
     email: typeof claims.email === 'string' ? claims.email : '',
-    subscription: 'none',
-    subscription_since: null,
+    plan: 'free',
+    plan_since: null,
     created_at: new Date().toISOString(),
   };
 }
@@ -114,9 +114,9 @@ function fromClaims(claims: Record<string, unknown>): ProfileRow {
  * trigger fires on insert and there is no going back — so this repairs those
  * accounts on their next request instead of leaving them permanently broken.
  *
- * The insert can only set id, email and name; `subscription` has no grant and
- * takes its column default of 'none'. So this heals an account without ever
- * being able to promote one.
+ * The insert can only set id, email and name; `plan` has no grant and takes its
+ * column default of 'free'. So this heals an account without ever being able to
+ * promote one.
  */
 async function loadOrCreateProfile(
   supabase: Awaited<ReturnType<typeof createClient>>,

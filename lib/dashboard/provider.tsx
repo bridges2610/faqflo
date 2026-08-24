@@ -30,7 +30,6 @@ import type {
   Site,
   SiteAudit,
   SiteTracking,
-  Subscription,
   User,
 } from './types';
 
@@ -327,34 +326,41 @@ export function DashboardProvider({
       const target = sites.find((s) => s.id === id) ?? null;
 
       const period = trackingPeriod({
-        getCitedAt: target?.getCitedAt ?? null,
-        getCitedExpiresAt: target?.getCitedExpiresAt ?? null,
-        subscription: user.subscription,
-        subscriptionSince: user.subscriptionSince,
+        plan: user.plan,
+        planSince: user.planSince,
+        accountCreatedAt: user.createdAt,
       });
 
-      const plan = trackingPlanFor(target, user);
+      const plan = trackingPlanFor(user);
 
       /*
         How far back the chart reads — and the two plans genuinely differ.
 
-        ⚠️ GET CITED READS FROM ITS PURCHASE DATE, NOT FROM A ROLLING WINDOW.
-        Its five checks are spread across 90 days and then stop forever, so a
-        window that rolls backwards from today would delete the earliest of them
-        first: the day-7 reading would vanish on day 98 and the page would be
-        empty by day 190 — a page the pricing card promises stays theirs for
-        good. A subscriber's history never stops being added to, so 30 days back
-        is the right span for them and always will be.
+        ⚠️ FREE READS FROM THE ACCOUNT'S CREATION DATE, NOT FROM A ROLLING
+        WINDOW. Free gets one reading, ever, taken during the onboarding scan. A
+        window rolling backwards from today would drop that reading off its own
+        chart a month later, leaving a Results page that says "we have not
+        looked" about a check we definitely ran — and the upgrade prompt beside
+        it would be arguing against evidence the page just deleted. Pro's history
+        never stops being added to, so 30 days back is the right span for them
+        and always will be.
       */
       const since = new Date();
-      if (plan?.id === 'get_cited' && target?.getCitedAt) {
-        since.setTime(new Date(target.getCitedAt).getTime());
+      if (plan.id === 'free' && user.createdAt) {
+        since.setTime(new Date(user.createdAt).getTime());
       } else {
         since.setUTCDate(since.getUTCDate() - 29);
       }
       since.setUTCHours(0, 0, 0, 0);
 
-      const next = await store.trackingFromDb(id, domain, period, plan, since);
+      const next = await store.trackingFromDb(
+        id,
+        domain,
+        period,
+        plan,
+        since,
+        target?.nextCheckAt ?? null,
+      );
       setDbTracking(next);
       return next;
     } catch (err) {

@@ -204,7 +204,7 @@ function GroupSection({ site, group }: { site: Site; group: FaqGroup }) {
 }
 
 export function PublishWorkspace() {
-  const { site, groups, faqsIn } = useDashboard();
+  const { site, user, groups, faqsIn } = useDashboard();
 
   if (!site) {
     return (
@@ -219,7 +219,7 @@ export function PublishWorkspace() {
     );
   }
 
-  if (!canPublish(site)) {
+  if (!canPublish(user)) {
     return (
       <>
         <PageHeader
@@ -228,10 +228,8 @@ export function PublishWorkspace() {
         />
         <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
         <UpgradeCard
-          entitlement="get_cited"
-          siteName={site.name}
-          title="Publish-ready export"
-          body="Clean HTML with your answers in it, the schema that identifies your business to a machine, and an llms.txt — built per page and pasted onto your own domain, so the citation goes to you."
+          title="Ready-to-paste code for your website"
+          body="Clean HTML with your answers in it, the behind-the-scenes code that tells AI who you are, and an llms.txt file — built per page and pasted onto your own site, so the mention goes to you. Your answers are always yours: copy them out as plain text from the Answers page any time."
         />
       </>
     );

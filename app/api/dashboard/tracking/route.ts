@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canTrack, hasGetCited, trackingPlanFor } from '@/lib/auth/entitlements';
+import { trackingPlanFor } from '@/lib/auth/entitlements';
 import { trackingPeriod } from '@/lib/dashboard/plans';
 import type { Engine } from '@/lib/dashboard/types';
 import { checkRateLimit, limitKey, TRACKING_RATE_LIMIT } from '@/lib/rate-limit';
@@ -16,7 +16,7 @@ import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/
 
   TWO THINGS ARE LOAD-BEARING HERE.
 
-  1. IT RUNS A SLICE, NOT A PERIOD. A full run is 35 prompts × 3 engines = 105
+  1. IT RUNS A SLICE, NOT A PERIOD. A full run is 25 prompts × 3 engines = 75
      search-backed calls and will not fit in one request; this app holds itself
      to ~60s because that is roughly the platform's ceiling. So the route checks
      whatever has not been checked today, up to PROMPTS_PER_RUN, and reports
@@ -28,8 +28,8 @@ import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/
      place they can come from — the same concession app/api/dashboard/content
      makes for `pages`. What the body may NOT decide is which site, how many
      prompts, or whether the customer is allowed: the domain is read off the
-     owned row, the list is capped at STAY_CITED_PROMPT_CAP here, and the
-     subscription is checked server-side. A domain in a body is an instruction
+     owned row, the list is capped at the PLAN's promptCap here, and the plan is
+     read from the profile row server-side. A domain in a body is an instruction
      to spend money on whatever the caller names.
 */
 
@@ -76,39 +76,27 @@ export async function POST(request: Request) {
   // tells an attacker their guess was right.
   if (!site) return fail('No such site on your account.', 404);
 
-  if (!canTrack(site, user)) {
-    return fail(
-      // Two different customers. One bought and ran out of window; the other
-      // never bought. Telling the first to "get Get Cited" reads as though we
-      // have forgotten they already did.
-      hasGetCited(site)
-        ? 'This site’s window has ended. Your results stay here — Stay Cited starts new checks again.'
-        : 'Citation tracking comes with Get Cited, and continues on Stay Cited.',
-      403,
-    );
-  }
-
-  const plan = trackingPlanFor(site, user);
+  const plan = trackingPlanFor(user);
 
   /*
-    ⚠️ GET CITED HAS NO BUTTON, AND THIS IS WHERE THAT IS TRUE.
+    ⚠️ FREE HAS NO BUTTON, AND THIS IS WHERE THAT IS TRUE.
 
-    Its five checks run on fixed days — at setup, then 7, 30, 60 and 90 — and the
-    budget is sized to exactly that. A manual run would either overspend the
-    window or find nothing left and refuse, and both read as broken. The UI hides
-    the control, but hiding a control is not enforcement: this route's own header
-    says a client that tells the server which tier it is on "is not
-    authorization, it's a bypass with extra steps".
+    Its single check runs during the onboarding scan and the budget is sized to
+    exactly that. A manual run would find nothing left and refuse, which reads
+    as broken. The UI shows an upgrade card instead of a control, but hiding a
+    control is not enforcement: this route's own header says a client that tells
+    the server which tier it is on "is not authorization, it's a bypass with
+    extra steps".
 
     ⚠️ REFUSED BEFORE THE UPSERT BELOW, DELIBERATELY. Further down this handler
     writes `questions` into tracked_prompts. Refusing after that point would
-    leave this route usable as a side door for growing a Get Cited watch list
-    past its cap — the milestone runner mirrors the question list itself, so
-    nothing is lost by closing it here.
+    leave this route usable as a side door for growing a free watch list past
+    its cap — the onboarding scan mirrors the question list itself, so nothing
+    is lost by closing it here.
   */
-  if (plan?.schedule === 'milestones') {
+  if (plan.schedule === 'once') {
     return fail(
-      'Get Cited checks run on a schedule — at setup, then days 7, 30, 60 and 90. Stay Cited lets you run one whenever you want.',
+      'Your free check has already run. Pro re-checks every week, and whenever you press the button.',
       403,
     );
   }
@@ -122,15 +110,15 @@ export async function POST(request: Request) {
     on the column in 0006; trimming here would break the loop that marks a
     question covered.
 
-    The cap comes from the plan now, not from a global: 35 on Stay Cited and 15
-    on Get Cited, which is the difference the upgrade is sold on.
+    The cap comes from the plan, not from a global: 25 on Pro and 5 on free,
+    which is a good part of what the upgrade is sold on.
   */
   const wanted = Array.isArray(questions)
     ? [
         ...new Set(
           questions.filter((q): q is string => typeof q === 'string' && q.trim().length > 0),
         ),
-      ].slice(0, plan?.promptCap ?? 0)
+      ].slice(0, plan.promptCap)
     : [];
 
   if (wanted.length === 0) {
@@ -221,30 +209,29 @@ export async function POST(request: Request) {
   }
 
   /*
-    The period budget — the thing that makes a one-off payment safe to sell.
-
-    ⚠️ THIS IS WHAT REPLACED "TRACKING IS SUBSCRIPTION-ONLY". Get Cited buys
-    thirty days of tracking on a single $129, and without a ceiling that is an
-    unbounded recurring bill on somebody else's API — the exact risk the old
-    comment on canTrack described. The allowance was displayed on the Results
-    page for months while nothing enforced it; now it is enforced here, before
-    any engine is asked, and the meter finally means something.
+    The period budget — the ceiling that keeps a $39 subscription from funding
+    an unbounded bill on somebody else's API.
 
     ⚠️ Counted from a STORED anchor, never a rolling window. trackingPeriod()
-    keys off the subscription anniversary or the Get Cited purchase date. A
-    rolling 30 days would let checks age out one at a time, so a customer at the
-    ceiling would trickle through instead of being told a date.
+    keys off the billing anniversary (profiles.plan_since). A rolling 30 days
+    would let checks age out one at a time, so a customer at the ceiling would
+    trickle through instead of being told a date.
+
+    ⚠️ SCOPED BY SITE, BUDGETED BY ACCOUNT — and with SITE_CAP at 1 those are the
+    same thing today. If multi-site Pro ever arrives, the count below has to
+    change with it: an account with three sites would otherwise get three times
+    the allowance it pays for.
   */
   const period = trackingPeriod({
-    getCitedAt: site.get_cited_at,
-    getCitedExpiresAt: site.get_cited_expires_at,
-    subscription: user.subscription,
-    subscriptionSince: user.subscription_since,
+    plan: user.plan,
+    planSince: user.plan_since,
+    accountCreatedAt: user.created_at,
   });
 
   if (!period) {
-    // canTrack passed, so access exists; a missing period means the anchor
-    // columns disagree with it. Refuse rather than spend on an unknown budget.
+    // trackingPeriod() always answers for a real plan, so this means the profile
+    // row is in a shape nothing anticipated. Refuse rather than spend against an
+    // unknown budget.
     console.error('No tracking period for site', site.id, 'user', user.id);
     return fail('We could not work out your current tracking period. Please contact support.', 409);
   }
@@ -260,13 +247,20 @@ export async function POST(request: Request) {
     return fail('Could not check your remaining allowance. Please try again.', 502);
   }
 
-  const ceiling = plan?.checksPerPeriod ?? 0;
+  const ceiling = plan.checksPerPeriod;
   const left = ceiling - (spent ?? 0);
-  const resets = period.end.toISOString().slice(0, 10);
 
   if (left <= 0) {
+    /*
+      `period.end` is null when the allowance never refills, so the sentence has
+      to branch. Only Pro reaches this line today — free is refused further up
+      for having no button at all — but printing "resets on 1970-01-01" the day
+      that stops being true is the kind of wrong that survives a review.
+    */
     return fail(
-      `That's all ${ceiling} engine checks for this period. The allowance resets on ${resets}.`,
+      period.end
+        ? `That's all ${ceiling} engine checks for this month. Your allowance resets on ${period.end.toISOString().slice(0, 10)}.`
+        : `That's all ${ceiling} engine checks included in your plan.`,
       429,
     );
   }

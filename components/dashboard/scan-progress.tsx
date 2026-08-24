@@ -216,8 +216,8 @@ export function ScanStartEmpty() {
       <p className="text-slate mt-2 text-sm leading-relaxed">
         We check what AI assistants say about one site at a time.
       </p>
-      <ButtonLink href="/dashboard/checkout/start" className="mt-5" size="sm">
-        Get started
+      <ButtonLink href="/dashboard/sites" className="mt-5" size="sm">
+        Add your site
       </ButtonLink>
     </Card>
   );

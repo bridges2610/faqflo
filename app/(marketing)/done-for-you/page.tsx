@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { DoneForYouForm } from '@/components/marketing/done-for-you-form';
 import { Check } from '@/components/ui/check';
 import { AUTHOR, AUTHOR_AVATAR } from '@/lib/blog/posts';
-import { ENTITLEMENTS } from '@/lib/dashboard/plans';
+import { PLAN_COPY } from '@/lib/dashboard/plans';
 import { DFY_PRICE, DFY_PRICE_USD, DFY_SITE_SCOPE, DFY_TURNAROUND } from '@/lib/done-for-you';
 import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
 
@@ -33,15 +33,14 @@ import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
   inconsistency to tidy up; it is the product. If this ever becomes a team of
   three, the copy changes before the delivery does.
 
-  ⚠️ THE $129 FOR GET CITED IS DELIBERATELY NOT MENTIONED, AND THAT IS A
+  ⚠️ THE PRO SUBSCRIPTION PRICE IS DELIBERATELY NOT MENTIONED, AND THAT IS A
   STATEMENT ABOUT WHO READS THIS.
 
-  The service is only offered to people who already pay for Get Cited, so by
-  the time anyone sees this page the $129 is spent, the site is set up, and
-  explaining the order is answering a question nobody has. An earlier draft
-  led the price block with "on top of Get Cited ($129 once)" and carried a
-  whole FAQ about the ordering — accurate, and pure friction for the actual
-  reader.
+  The service is only offered to people who already subscribe, so by the time
+  anyone sees this page the plan is running, the site is set up, and explaining
+  the order is answering a question nobody has. An earlier draft led the price
+  block with the subscription price and carried a whole FAQ about the ordering —
+  accurate, and pure friction for the actual reader.
 
   ⚠️ THAT ASSUMPTION IS LOAD-BEARING. It holds only while every route to this
   page runs through somebody who has already bought. If it is ever pitched to
@@ -50,8 +49,8 @@ import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
   surprise is a refund. Changing who this page is shown to means putting the
   order back into the copy in the same commit.
 
-  The form still asks whether they have Get Cited. That is the backstop for
-  the stranger who finds the page anyway, and it is why the question is worth
+  The form still asks whether they are on Pro. That is the backstop for the
+  stranger who finds the page anyway, and it is why the question is worth
   keeping even though the intended reader always answers it the same way.
 
   ⚠️ NO <FinalCta />. Every other marketing page ends with it and it pushes the
@@ -104,8 +103,8 @@ const NOT_INCLUDED = [
     body: 'Nobody controls what ChatGPT quotes, and be careful with anyone who says they do. I can make you readable, quotable and worth quoting — then show you honestly whether it worked.',
   },
   {
-    label: 'Anything after the 90 days.',
-    body: `Everything I make stays yours for good. Keeping tracking and fresh answers running is Stay Cited, at ${ENTITLEMENTS.stay_cited.price}.`,
+    label: 'A replacement for your subscription.',
+    body: `This is the setup work done by hand, once. The weekly checking, the fresh answers and the ready-to-paste code are what ${PLAN_COPY.pro.label} keeps running, at ${PLAN_COPY.pro.price}.`,
   },
 ];
 
@@ -116,10 +115,10 @@ const NOT_INCLUDED = [
   "Can you guarantee citations" is deliberately absent — it is in the list
   above, and a page that answers the same objection twice reads as nervous.
 
-  "Do I still have to buy Get Cited separately?" used to lead this list. It
-  went when the audience was pinned to existing Get Cited customers: the whole
-  answer is "you already did". See the note at the top of this file for what
-  has to change if that stops being true.
+  "Do I still need the subscription?" used to lead this list. It went when the
+  audience was pinned to existing subscribers: the whole answer is "you already
+  have it". See the note at the top of this file for what has to change if that
+  stops being true.
 */
 const FAQS = [
   {
@@ -207,9 +206,8 @@ export default function DoneForYou() {
         <div className="mt-7">
           <P>Hi.</P>
           <P>
-            You&rsquo;ve got Get Cited running. And somewhere between the audit findings and the
-            block of HTML waiting to go onto your site, this probably stopped feeling like a quick
-            job.
+            You&rsquo;ve got Pro running. And somewhere between the audit findings and the block
+            of HTML waiting to go onto your site, this probably stopped feeling like a quick job.
           </P>
           <P>
             That&rsquo;s not you being slow. It&rsquo;s an afternoon of fiddly work sitting behind
@@ -259,8 +257,8 @@ export default function DoneForYou() {
           {/* ⚠️ The second charge, stated immediately under the number rather
               than in small print. This sentence is the one thing on the page
               that cannot be cut for length. */}
-          {/* No mention of the $129 — see the note at the top of this file.
-              Everyone who reaches this page has already paid it. */}
+          {/* No mention of the subscription price — see the note at the top of
+              this file. Everyone who reaches this page is already paying it. */}
           <P>
             {DFY_SITE_SCOPE}. Live within {DFY_TURNAROUND} of me getting access, and nothing to pay
             until we&rsquo;ve agreed the scope.

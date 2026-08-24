@@ -150,6 +150,17 @@ export function AccountMenu() {
             >
               Your sites
             </Link>
+            {/* Beside Sites rather than beside billing: this is the comparison
+                and the upgrade, which is a product decision. ManageBilling below
+                is the Stripe portal, which is only useful once you are paying. */}
+            <Link
+              href="/dashboard/plan"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="text-slate hover:text-navy mt-2.5 block text-sm font-medium transition-colors duration-150"
+            >
+              Your plan
+            </Link>
           </div>
 
           <div className="border-line mt-3 border-t pt-3">

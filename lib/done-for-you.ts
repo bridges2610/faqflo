@@ -21,7 +21,7 @@
  * rejects anything not in them come from one array, so a form cannot offer a
  * value its own route refuses.
  *
- * ⚠️ THERE IS NO STRIPE PRICE BEHIND THIS. Unlike Get Cited and Stay Cited,
+ * ⚠️ THERE IS NO STRIPE PRICE BEHIND THIS. Unlike the Pro subscription,
  * nothing here is a `STRIPE_PRICE_*` id — the service is quoted, agreed by
  * email and invoiced by hand. That is deliberate, and it is what makes
  * discounting it a conversation rather than a deploy. If it ever gains a
@@ -33,7 +33,7 @@
  */
 
 /**
- * What the service costs, on top of Get Cited. Copy, not a Stripe amount.
+ * What the service costs, on top of Pro. Copy, not a Stripe amount.
  *
  * ⚠️ THE NUMBER AND THE STRING COME FROM ONE PLACE, BECAUSE THE SCHEMA READS
  * IT TOO. The landing page emits an `Offer` with a bare `price` field, and a
@@ -91,17 +91,17 @@ export const DFY_PLATFORMS = [
 export type DfyPlatform = (typeof DFY_PLATFORMS)[number];
 
 /**
- * Whether they have bought Get Cited yet.
+ * Whether they are on Pro yet.
  *
- * The service sits on top of it, so this decides what the reply says — a
- * quote, or a quote plus "buy this first and I'll take it from there". Asked
- * rather than assumed: the page is public and reachable by someone who has
- * never seen the product.
+ * The service sits on top of it, so this decides what the reply says — a quote,
+ * or a quote plus "start Pro first and I'll take it from there". Asked rather
+ * than assumed: the page is public and reachable by someone who has never seen
+ * the product.
  */
-export const DFY_GET_CITED_STATES = [
-  'Yes, already bought it',
-  'Not yet',
-  'Not sure what that is',
+export const DFY_PLAN_STATES = [
+  'Yes, I’m on Pro',
+  'Not yet — still on Free',
+  'Not sure',
 ] as const;
 
-export type DfyGetCitedState = (typeof DFY_GET_CITED_STATES)[number];
+export type DfyPlanState = (typeof DFY_PLAN_STATES)[number];

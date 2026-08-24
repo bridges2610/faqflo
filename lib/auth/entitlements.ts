@@ -1,12 +1,8 @@
 import 'server-only';
 
-import {
-  expiryFrom,
-  PAGE_BUDGET,
-  trackingPlan,
-  type TrackingPlan,
-} from '@/lib/dashboard/plans';
-import type { ProfileRow, SiteRow } from '@/lib/supabase/types';
+import { PAGE_BUDGET, TRACKING_PLANS, type TrackingPlan } from '@/lib/dashboard/plans';
+import type { PlanId } from '@/lib/dashboard/types';
+import type { ProfileRow } from '@/lib/supabase/types';
 
 /**
  * What the customer is entitled to, decided from database rows.
@@ -17,155 +13,118 @@ import type { ProfileRow, SiteRow } from '@/lib/supabase/types';
  * customer cannot write. Both must exist: a UI that can't tell what you own
  * shows the wrong screen, and a server that trusts the UI has no security.
  *
- * The rule the API routes already state, at app/api/dashboard/generate/route.ts:29 —
+ * The rule the API routes already state, at app/api/dashboard/generate/route.ts —
  * "a client that tells the server which tier it is on is not authorization,
  * it's a bypass with extra steps." This file is what makes that avoidable.
  *
  * ⚠️ Two copies of a rule drift. The numbers are imported from plans.ts rather
- * than repeated, so a tier change lands in both at once, and the predicates
+ * than repeated, so a plan change lands in both at once, and the predicates
  * below are deliberately one-liners that are obvious to diff against theirs.
  * Note this imports only pure constants and types — not the dashboard's client
- * state — which is the distinction lib/audit/limits.ts:4 draws.
+ * state — which is the distinction lib/audit/limits.ts draws.
+ *
+ * ⚠️ THESE TAKE A PROFILE, NOT A SITE, AND THAT IS THE WHOLE SHAPE CHANGE. Get
+ * Cited was per-site, so every predicate here used to take both and had to get
+ * the precedence between them right. There is one account-level plan now. A
+ * signature that still wants a site is a leftover — delete the argument rather
+ * than passing null to satisfy it.
  */
 
-/** Get Cited is one-time and belongs to a SITE. Permanent — never expires. */
-export function hasGetCited(site: SiteRow | null): boolean {
-  return Boolean(site?.get_cited_at);
-}
-
-/** Stay Cited is a subscription and belongs to the ACCOUNT. */
-export function hasStayCited(user: ProfileRow | null): boolean {
-  return user?.subscription === 'stay_cited';
-}
-
-/**
- * Bought, and still inside the window.
- *
- * ⚠️ The clock is the SERVER'S. plans.ts computes the same thing from the
- * browser's clock to decide what to render, and a browser clock can be set to
- * anything — which is exactly why this file exists and why the routes call
- * this copy rather than trusting a flag from the client.
- *
- * The deadline is the stored one since 0011, falling back to the constant for
- * rows written before it. Both halves live in expiryFrom() so the two twins
- * cannot disagree about a date that decides whether money gets spent.
- */
-export function getCitedActive(site: SiteRow | null): boolean {
-  if (!site?.get_cited_at) return false;
-
-  const expiry = expiryFrom(site.get_cited_at, site.get_cited_expires_at);
-  return Boolean(expiry && expiry.getTime() > Date.now());
+/** The account's plan. Free is the answer for a missing profile, not an error. */
+export function planOf(user: ProfileRow | null): PlanId {
+  return user?.plan === 'pro' ? 'pro' : 'free';
 }
 
 /**
- * Which plan's tracking rules apply — the server twin of trackingPlanFor().
+ * The one question. Every capability below is this under a different name.
  *
- * The caps differ per plan now (15 questions against 35), and a cap read from
- * anywhere the customer can influence is not a cap. Every place that slices a
- * watch list or counts a budget takes it from here.
+ * ⚠️ Read from the PROFILE ROW, which the browser cannot write — 0012 grants no
+ * UPDATE on `plan` to `authenticated`, exactly as 0001 withheld it for
+ * `subscription`. That is what makes this an authorization check rather than a
+ * restatement of whatever the client believes.
  */
-export function trackingPlanFor(
-  /* Pick<> rather than the whole row: lib/scan/run.ts selects a narrow shape of
-     its own, and widening this to the full row would force that file to fetch
-     columns it has no use for just to satisfy a signature. */
-  site: Pick<SiteRow, 'get_cited_at' | 'get_cited_expires_at'> | null,
-  user: Pick<ProfileRow, 'subscription'> | null,
-): TrackingPlan | null {
-  return trackingPlan({
-    subscription: user?.subscription === 'stay_cited' ? 'stay_cited' : 'none',
-    getCitedAt: site?.get_cited_at ?? null,
-    getCitedExpiresAt: site?.get_cited_expires_at ?? null,
-  });
+export function isPro(user: ProfileRow | null): boolean {
+  return user?.plan === 'pro';
+}
+
+/** Which plan's tracking rules apply. Always one of them — free is a plan. */
+export function trackingPlanFor(user: Pick<ProfileRow, 'plan'> | null): TrackingPlan {
+  return TRACKING_PLANS[user?.plan === 'pro' ? 'pro' : 'free'];
+}
+
+/* ----------------------------------------------------------- capabilities --- */
+
+export function canRunFullAudit(user: ProfileRow | null): boolean {
+  return isPro(user);
+}
+
+export function canContent(user: ProfileRow | null): boolean {
+  return isPro(user);
+}
+
+export function canDiscover(user: ProfileRow | null): boolean {
+  return isPro(user);
+}
+
+export function canRegenerate(user: ProfileRow | null): boolean {
+  return isPro(user);
+}
+
+/**
+ * The publish-ready export.
+ *
+ * ⚠️ THIS WAS PERMANENT AND IS NOT ANY MORE. Under Get Cited it was gated on
+ * "did they ever pay", because a one-time payment for a deliverable cannot be
+ * revoked without it being a chargeback. Pro is a subscription: nothing is
+ * bought outright, so nothing outlives it. What a lapsed account keeps instead
+ * is the plain-text copy every free account gets. Do not "restore" the old
+ * behaviour — the pricing page sells this one.
+ */
+export function canPublish(user: ProfileRow | null): boolean {
+  return isPro(user);
+}
+
+/**
+ * May a check run for this account at all — by anyone, including the scheduler?
+ *
+ * ⚠️ TRUE ON FREE, AND ONLY BECAUSE OF THE METER. Free buys one run: five
+ * questions across three engines, counted against the plan's checksPerPeriod
+ * over a period that never resets (see trackingPeriod in plans.ts). The ceiling
+ * is enforced in app/api/dashboard/tracking/route.ts and in lib/scan/run.ts.
+ *
+ * ⚠️ IF THAT ENFORCEMENT IS EVER REMOVED, THIS MUST GO BACK TO isPro. The two
+ * changed together and only make sense together; an unmetered free tier is an
+ * unbounded bill on somebody else's API, funded by nobody.
+ *
+ * Whether a PERSON may press a button is a different question — canRunCheckNow.
+ */
+export function canTrack(): boolean {
+  return true;
 }
 
 /**
  * May the CUSTOMER start a check right now?
  *
  * ⚠️ Distinct from canTrack, which asks whether a check may run at all — the
- * scheduler needs that one. Get Cited runs on fixed days and has no button, so
- * the interactive route refuses it here rather than relying on the UI to hide
- * the control. A client that tells the server which tier it is on is not
- * authorization, it is a bypass with extra steps.
+ * onboarding scan and the weekly cron need that one. Free's single run is
+ * automatic and has no button, so the interactive route refuses it here rather
+ * than relying on the UI to hide the control. A client that tells the server
+ * which tier it is on is not authorization, it is a bypass with extra steps.
  */
-export function canRunCheckNow(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return canTrack(site, user) && trackingPlanFor(site, user)?.schedule === 'weekly';
-}
-
-/**
- * May this site do work that costs us money right now?
- *
- * Every generating capability below is this predicate under a different name,
- * kept as separate one-liners so they stay obvious to diff against their twins
- * in plans.ts. Stay Cited is account-wide, so it re-opens a site whose own
- * window has closed — the upgrade path, and the reason these take `user` too.
- */
-export function canGenerate(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return hasStayCited(user) || getCitedActive(site);
-}
-
-export function canRunFullAudit(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return canGenerate(site, user);
-}
-
-export function canContent(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return canGenerate(site, user);
-}
-
-export function canDiscover(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return canGenerate(site, user);
-}
-
-export function canRegenerate(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return canGenerate(site, user);
-}
-
-/**
- * Running a citation check — the thing that spends money on engines.
- *
- * ⚠️ THIS USED TO BE SUBSCRIPTION-ONLY, AND THE REASON IT CHANGED MATTERS. The
- * old rule said Get Cited does not buy tracking "not even inside its 30 days",
- * because asking three search-backed engines 35 questions repeatedly is a
- * recurring cost and a one-off payment cannot fund a recurring bill. That risk
- * was real and has not gone away — it is now answered by a METER rather than a
- * closed door: the plan's `checksPerPeriod` is enforced in the tracking route
- * and in the milestone runner, so the ceiling on a Get Cited window is a fixed,
- * priced number of engine calls — 15 questions × 3 engines × 5 checks.
- *
- * ⚠️ IF THAT ENFORCEMENT IS EVER REMOVED, THIS MUST GO BACK TO hasStayCited.
- * The two changed together and only make sense together; an unmetered Get Cited
- * is exactly the unbounded spend the original comment warned about.
- *
- * Viewing past results is a different question — see canViewTracking.
- */
-export function canTrack(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return canGenerate(site, user);
+export function canRunCheckNow(user: ProfileRow | null): boolean {
+  return isPro(user);
 }
 
 /**
  * Seeing citation results that were already collected. PERMANENT.
  *
- * The twin of canPublish, and for the same reason: it hands back work already
- * paid for rather than commissioning new work. A customer whose 30 days lapsed
- * keeps the report — the pricing page promises "everything you make stays yours
- * for good", and hiding measurements they paid to collect would contradict that
- * on the screen that sold it.
- *
- * Deliberately `hasGetCited` and not `getCitedActive`: the window governs what
- * may be RUN, never what may be READ.
+ * The plan governs what may be RUN, never what may be READ. Someone who
+ * cancels keeps the readings they paid to collect; hiding them would be
+ * rewriting their history to sell a resubscribe. Kept as a function rather than
+ * inlined `true` so the reason stays attached to the decision.
  */
-export function canViewTracking(site: SiteRow | null, user: ProfileRow | null): boolean {
-  return hasGetCited(site) || hasStayCited(user);
-}
-
-/**
- * The publish-ready export. Permanent, and NOT gated on the window.
- *
- * The one capability here that deliberately outlives the subscription: it
- * hands back work already paid for rather than commissioning new work. See the
- * longer note in lib/dashboard/plans.ts.
- */
-export function canPublish(site: SiteRow | null): boolean {
-  return hasGetCited(site);
+export function canViewTracking(): boolean {
+  return true;
 }
 
 /**
@@ -175,10 +134,7 @@ export function canPublish(site: SiteRow | null): boolean {
  * clamp it to the paid ceiling, which its own comment admitted "cannot enforce
  * the customer's actual tier". A free site asking for a hundred pages got a
  * hundred pages' worth of outbound requests to somebody else's server.
- *
- * Follows the window rather than the purchase: an expired site asking for a
- * hundred pages is the same outbound cost as a free one.
  */
-export function pageBudgetFor(site: SiteRow | null, user: ProfileRow | null): number {
-  return canGenerate(site, user) ? PAGE_BUDGET.paid : PAGE_BUDGET.free;
+export function pageBudgetFor(user: ProfileRow | null): number {
+  return isPro(user) ? PAGE_BUDGET.pro : PAGE_BUDGET.free;
 }

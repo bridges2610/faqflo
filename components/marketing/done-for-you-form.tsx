@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
-  DFY_GET_CITED_STATES,
+  DFY_PLAN_STATES,
   DFY_PLATFORMS,
   DFY_PRICE,
   DFY_TURNAROUND,
@@ -22,7 +22,7 @@ import { SUPPORT_EMAIL } from '@/lib/support';
 
   Five fields, and each one earns its place by changing what the reply says:
   the website is what I would be working on, the platform decides how much of
-  the job is actually mine, and whether they have bought Get Cited decides
+  the job is actually mine, and whether they are on Pro decides
   whether the reply is a quote or a quote plus an order to sort out first. Notes
   is the only optional one. Anything else — budget, company size, "how did you
   hear about us" — is a field that makes someone work harder to give me money.
@@ -43,7 +43,7 @@ export function DoneForYouForm() {
   const [email, setEmail] = useState('');
   const [website, setWebsite] = useState('');
   const [platform, setPlatform] = useState<string>(DFY_PLATFORMS[0]);
-  const [getCited, setGetCited] = useState<string>(DFY_GET_CITED_STATES[0]);
+  const [plan, setPlan] = useState<string>(DFY_PLAN_STATES[0]);
   const [notes, setNotes] = useState('');
   /* The honeypot. Never shown, never filled by a person — see submit(). */
   const [company, setCompany] = useState('');
@@ -66,7 +66,7 @@ export function DoneForYouForm() {
       const res = await fetch('/api/done-for-you', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, website, platform, getCited, notes, company }),
+        body: JSON.stringify({ name, email, website, platform, plan, notes, company }),
       });
 
       const payload = (await res.json()) as { ok?: boolean; error?: string };
@@ -178,14 +178,14 @@ export function DoneForYouForm() {
 
           <label className="block">
             <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-              Bought Get Cited yet?
+              On Pro yet?
             </span>
             <select
-              value={getCited}
-              onChange={(e) => setGetCited(e.target.value)}
+              value={plan}
+              onChange={(e) => setPlan(e.target.value)}
               className={field}
             >
-              {DFY_GET_CITED_STATES.map((s) => (
+              {DFY_PLAN_STATES.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>

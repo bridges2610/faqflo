@@ -5,78 +5,55 @@ import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
 import {
-  GET_CITED_CHECK_DAYS,
-  GET_CITED_WINDOW_DAYS,
+  FREE_FAQ_CAP,
+  FREE_QUESTION_SAMPLE,
+  GUARANTEE_DAYS,
+  PRO_PRICE,
   TRACKING_PLANS,
 } from '@/lib/dashboard/plans';
 
-const GET_CITED = TRACKING_PLANS.get_cited;
-const STAY_CITED = TRACKING_PLANS.stay_cited;
-
-/** "7, 30, 60 and 90" — the schedule, written the way a person says it. */
-const CHECK_DAYS = GET_CITED_CHECK_DAYS.slice(0, -1).join(', ') +
-  ' and ' + GET_CITED_CHECK_DAYS[GET_CITED_CHECK_DAYS.length - 1];
+const FREE = TRACKING_PLANS.free;
+const PRO = TRACKING_PLANS.pro;
 
 /*
   ⚠️ THESE FIGURES ARE NOT DERIVED FROM STRIPE, AND STRIPE DOES NOT READ THEM.
 
-  Stripe charges whatever ITS price object says. This file is copy. If the two
-  disagree, a customer is quoted one number and billed another — so a price
-  change is always two edits: here, and the price in the Stripe dashboard
-  (whose id lives in STRIPE_PRICE_* rather than in code, so the amount can move
-  without a deploy). Test mode and live mode have SEPARATE price objects, so a
-  change made in one does not follow into the other.
+  Stripe charges whatever ITS price object says. PRO_PRICE is copy that lives in
+  lib/dashboard/plans.ts so the pricing page and the dashboard quote one number.
+  If it and Stripe disagree, a customer is quoted one figure and billed another
+  — so a price change is always two edits: PRO_PRICE, and the price in the
+  Stripe dashboard (whose id lives in STRIPE_PRICE_* rather than in code, so the
+  amount can move without a deploy). Test mode and live mode have SEPARATE price
+  objects, so a change made in one does not follow into the other.
 
-  The structure is the decision, not the dollars: a one-time fee for the
-  discrete "get me set up" job, and a subscription for the continuous "keep me
-  cited" job. Tracking costs us money every time it runs — asking ChatGPT,
-  Perplexity and Gemini what they say about a customer, per question, per engine
-  — so it can only be funded by recurring revenue. One-time money cannot pay a
-  forever cost.
+  ⚠️ THE STRUCTURE CHANGED, AND THE OLD ONE'S REASONING NO LONGER APPLIES. This
+  page used to sell three things: free, a $129 one-time setup fee, and a $29
+  subscription. The argument for that shape was that "tracking costs us money
+  every time it runs… so it can only be funded by recurring revenue. One-time
+  money cannot pay a forever cost" — which was true, and is exactly why the
+  one-time product is gone rather than repriced. Everything recurring is now
+  funded by something recurring.
 
-  ⚠️ TRACKING IS LIVE NOW, AND THE ENGINE LIST IS NOT WHAT IT USED TO SAY. This
-  card promised "ChatGPT, Perplexity and Google AI Overviews". AI Overviews has
-  no API and cannot be queried by anyone — see the warning on ENGINES in
-  lib/dashboard/types.ts, which corrected the same string inside the app. We ask
-  GEMINI. Never put AI Overviews back on this list: naming an engine we cannot
-  ask means reporting a permanent zero, which reads as "you are never cited
-  there" rather than "we never looked".
+  ⚠️ FREE COSTS US MONEY TOO, and that is a deliberate bet rather than an
+  oversight. A free signup gets a real check: five questions across three
+  search-backed engines, once. It is metered as a lifetime allowance (see
+  trackingPeriod in plans.ts) so it cannot repeat.
 
-  ⚠️ THE SCHEDULE IS BUILT NOW, AND THIS PARAGRAPH USED TO SAY THE OPPOSITE.
-  Checks run from app/api/cron/tracking, fired daily by the crons entry in
-  vercel.json: Get Cited gets five on fixed days, Stay Cited gets one a week and
-  keeps its button. "Automatic scheduled checks" is therefore a tick rather than
-  a `soon` — the first time this card has been able to say that.
+  ⚠️ WE ASK GEMINI, NOT GOOGLE AI OVERVIEWS. AI Overviews has no API and cannot
+  be queried by anyone — see the warning on ENGINES in lib/dashboard/types.ts.
+  Never put it on this list: naming an engine we cannot ask means reporting a
+  permanent zero, which reads as "you are never cited there" rather than "we
+  never looked".
 
-  ⚠️ ALERTS ARE STILL NOT BUILT. Nothing emails a customer when a citation
-  appears or disappears; they find out by looking. That line keeps its `soon`,
-  and no other line here may imply otherwise. lib/dashboard/plans.ts carries the
-  matching copy in the app.
-
-  The three tiers are no longer the same kind of thing, so `price` is a union
-  rather than a monthly figure with nulls in it. That's what stops a one-time
-  fee from being rendered as "$129 per month".
+  ⚠️ ALERTS ARE NOT BUILT AND ARE NOT LISTED. Nothing emails a customer when a
+  citation appears or disappears; they find out by looking. The `soon` flag this
+  card used to carry for that line is gone with it — every tick below is
+  something that works today, which is the only state this card is allowed to
+  be in. If something aspirational needs listing again, bring the flag back
+  rather than ticking it.
 */
 
-type Price =
-  | { kind: 'free' }
-  | { kind: 'oneTime'; amount: number }
-  // The annual figure is the total charged, not a derived per-month rate: $290
-  // a year displays as $24.17/month, and storing 24.17 would bill $290.04.
-  | { kind: 'subscription'; monthly: number; annualTotal: number };
-
-/*
-  A feature is either shipping or it isn't, and the card has to be able to say
-  which. `soon` carried citation tracking while it was unbuilt; tracking ships
-  now, and the flag has moved to the two things around it that genuinely don't
-  exist — a schedule, and alerts.
-
-  ⚠️ TICKED FEATURES MUST ALL BE REAL TODAY. If you find yourself wanting to tick
-  something aspirational, mark it `soon` instead. The flag earning its keep for a
-  second time is the argument for keeping the mechanism rather than deleting it
-  the moment the first feature landed.
-*/
-type Feature = { label: string; soon?: boolean };
+type Price = { kind: 'free' } | { kind: 'subscription'; monthly: number; annualTotal: number };
 
 type Plan = {
   name: string;
@@ -86,148 +63,87 @@ type Plan = {
   href: string;
   featured: boolean;
   note: string | null;
-  features: Feature[];
+  features: string[];
 };
 
+/*
+  Written for a plumber, a dentist or a restaurant owner — not for a marketer.
+
+  Every line answers "what do I get" in words somebody would say out loud. No
+  JSON-LD, no schema markup, no crawlers, no AEO. Where a technical term is
+  genuinely the name of the thing (llms.txt), it gets explained in the same
+  breath rather than assumed.
+*/
 const PLANS: Plan[] = [
   {
     name: 'Free',
     price: { kind: 'free' },
     blurb: 'Find out where you stand.',
-    cta: 'Check my site',
-    href: '/#audit',
+    cta: 'Check my site free',
+    href: '/sign-up',
     featured: false,
     note: null,
     features: [
-      { label: 'Quick AI-visibility score' },
-      { label: 'Is your content readable without JavaScript' },
-      { label: 'Are AI crawlers allowed in' },
-      { label: 'FAQ generator, capped' },
+      'Your AI-visibility score, out of 100',
+      'Can AI read your site, or does it just see a blank page?',
+      'Are the AI bots allowed in, or is your site accidentally shut to them?',
+      `A sample of ${FREE_QUESTION_SAMPLE} questions people ask AI about businesses like yours`,
+      `${FREE.promptCap} of those questions checked once against ChatGPT, Perplexity and Google’s Gemini`,
+      `Write up to ${FREE_FAQ_CAP} answers, and copy them out as plain text`,
     ],
   },
   {
-    name: 'Get Cited',
-    price: { kind: 'oneTime', amount: 129 },
-    blurb: 'The one-off job of getting set up properly.',
-    cta: 'Get set up',
+    name: 'Pro',
+    price: { kind: 'subscription', monthly: PRO_PRICE.monthly, annualTotal: PRO_PRICE.annualTotal },
+    blurb: 'Get quoted by AI, and stay quoted.',
+    cta: 'Start Pro',
     /*
-      Straight at checkout, not at /sign-up.
+      The in-app plan page, not straight to Stripe.
 
-      This used to land people in the dashboard, where they had to go hunting
-      for a locked feature to find a buy button — a detour through the product
-      on the way to paying for it. The page is protected, so an arrival who is
-      not signed in gets sign-in first and comes back automatically. The
-      scanned domain, if there is one, is appended by the home page audit.
+      $39 a month is a considered decision, and the comparison plus the
+      monthly/annual choice belongs on a page rather than inside a checkout
+      form. The page is protected, so somebody who is not signed in gets sign-up
+      first and arrives back here automatically.
     */
-    href: '/dashboard/checkout/start',
+    href: '/dashboard/plan',
     featured: true,
-    note: 'Start here',
+    note: 'Most popular',
     features: [
-      // ⚠️ Tracking IS included here now, and it RUNS ITSELF. The line went from
-      // impossible, to wrong-plan, to true-but-manual, to this; check which of
-      // those the product is in before editing this card again. The ceiling is
-      // real — the plan's checksPerPeriod, enforced in the tracking route and in
-      // the milestone runner — and is what makes a one-off payment safe to sell
-      // against a recurring cost.
-      { label: 'Full audit — 44 checks across your whole site' },
-      { label: 'The questions people actually ask AI in your category' },
-      { label: 'The pages your industry expects, and which of yours are missing' },
-      { label: 'A complete answer-first FAQ set, written to be quoted' },
-      { label: 'Publish-ready HTML for your own site' },
-      { label: 'Entity schema and llms.txt' },
-      {
-        label: `Citation tracking across ChatGPT, Perplexity and Gemini — checked at setup, then on days ${CHECK_DAYS}`,
-      },
-      {
-        label: `${GET_CITED.promptCap} of your questions watched, so you can see the trend rather than one reading`,
-      },
-      // ⚠️ Both halves of the deal, stated before the card rather than
-      // discovered on day 31. Everything MADE is permanent; the running of new
-      // audits is what ends. Selling "yours to keep" and then stopping audits
-      // without having said so is a chargeback.
-      {
-        label: `${GET_CITED_WINDOW_DAYS} days of full access — everything you make stays yours for good`,
-      },
-    ],
-  },
-  {
-    name: 'Stay Cited',
-    price: { kind: 'subscription', monthly: 29, annualTotal: 290 },
-    blurb: 'Because being cited once is not the same as staying cited.',
-    /*
-      Points at Get Cited, deliberately.
-
-      Stay Cited watches whether the answers Get Cited wrote are being picked
-      up, so subscribing first buys a monthly report on an empty set. The
-      checkout API refuses it with a 409 either way — this is so nobody has to
-      meet that error to find out.
-    */
-    cta: 'Start with Get Cited',
-    href: '/dashboard/checkout/start',
-    featured: false,
-    note: null,
-    /*
-      Tracking leads now that it exists — it is the reason this subscription is
-      bought, and it spent a long time buried at the bottom under "coming soon"
-      because it was the one thing the card could not honestly claim.
-
-      ⚠️ THE NUMBERS ARE IMPORTED, NOT TYPED. The prompt caps moved twice in one
-      week; a hardcoded "25 questions" here would have been wrong within days,
-      and a pricing page that overstates what a plan includes is a refund rather
-      than a typo.
-    */
-    features: [
-      { label: `Citation tracking that keeps running after the ${GET_CITED_WINDOW_DAYS} days` },
-      {
-        label: `${STAY_CITED.promptCap} questions watched — ${STAY_CITED.discoveredCap} we find for you, ${STAY_CITED.manualCap} you write yourself`,
-      },
-      { label: 'Share of voice: every domain the engines cite, ranked against yours' },
-      { label: 'Which of your pages earn citations, and what each answer actually said' },
-      { label: `Keeps every site on your account running after its ${GET_CITED_WINDOW_DAYS} days` },
-      { label: 'Unlimited re-audits, regeneration, and answers kept per site' },
-      { label: 'Everything Get Cited unlocks, on every site you add' },
-      // ⚠️ The ceiling, stated where the plan is sold. "Full platform" with a
-      // silent cap is something customers discover AT the cap.
-      {
-        label: `${STAY_CITED.checksPerPeriod} engine checks a month — every question, every engine, ${STAY_CITED.runsPerPeriod} times`,
-      },
-      // ⚠️ This line spent a long time marked `soon`, with a note explaining that
-      // tracking "runs when you press the button" and that ticking it would imply
-      // an automation that did not exist. It exists now — weekly for a
-      // subscriber, and on demand as well, which is the half Get Cited does not
-      // get.
-      { label: 'Automatic weekly checks, plus a run whenever you want one' },
-      { label: 'Alerts when a citation appears or disappears', soon: true },
+      'Everything in Free, plus:',
+      'A full check of every page on your site, not just the home page',
+      'The questions people really ask AI in your line of work',
+      'The pages your industry expects — and which of yours are missing',
+      'A complete set of answers, written to be quoted',
+      'Ready-to-paste code for your own website, whoever built it',
+      'An llms.txt file — a plain-text summary written for AI to read',
+      `${PRO.promptCap} questions watched — ${PRO.discoveredCap} we find for you, ${PRO.manualCap} you write yourself`,
+      'Checked automatically every week, and any time you press the button',
+      'Who gets quoted instead of you, ranked',
+      'Which of your pages earn a mention, and what the AI actually said',
+      'Unlimited re-checks and rewrites',
     ],
   },
 ];
 
-/** Whole dollars when exact, cents when not — $290/12 is $24.17, not $24. */
+/** Whole dollars when exact, cents when not — $390/12 is $32.50, not $32. */
 function money(value: number): string {
   return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`;
 }
 
-/**
- * Price block per kind.
- *
- * The billing switch lives inside the subscription card rather than above all
- * three. A page-level monthly/annual control would imply it changes the free
- * tier and the one-time fee, and it changes neither.
- */
 function PriceBlock({ price }: { price: Price }) {
   /*
-    ⚠️ MONTHLY, BECAUSE MONTHLY IS WHAT THE CHECKOUT ACTUALLY SELLS.
+    ⚠️ MONTHLY, BECAUSE MONTHLY IS THE FIRST INVOICE MOST PEOPLE WILL GET.
 
-    This opened on annual, and the comment here said "annual is the default
-    offer" — so the first figure a visitor read was $24.17, from a plan nobody
-    is ever charged. Stay Cited is bought from the dashboard, and
-    components/dashboard/upgrade-card.tsx hardcodes `period: 'monthly'` on
-    purpose: annual is a one-click switch inside Stripe's portal afterwards, so
-    it is deliberately not a decision made twice. The first invoice is $29.
+    Annual is genuinely purchasable now — it was display-only under the old
+    model, where the upgrade card hardcoded monthly — so showing it would not be
+    quoting a plan nobody is charged. It still opens on monthly, for two
+    reasons: $39 is the lower-friction entry for a small business owner deciding
+    in thirty seconds, and headlining "$32.50/month" when the card is charged
+    $390 today is the kind of small mismatch that reads as a bait and switch even
+    when nothing was hidden.
 
-    Quoting a number the first invoice will not match is the kind of small
-    mismatch that reads as a bait and switch even when nothing was hidden.
-    Annual stays one click away, with the saving stated, for anyone comparing.
+    Annual does its own selling from the toggle, where the saving and the
+    guarantee are both stated.
   */
   const [annual, setAnnual] = useState(false);
 
@@ -240,29 +156,14 @@ function PriceBlock({ price }: { price: Price }) {
           </span>
           <span className="text-slate text-sm">forever</span>
         </p>
-        <p className="text-slate mt-1.5 h-4 text-xs leading-4">No account, no card</p>
-      </div>
-    );
-  }
-
-  if (price.kind === 'oneTime') {
-    return (
-      <div className="mt-5">
-        <p className="flex items-baseline gap-1.5">
-          <span className="font-display text-navy text-[2.5rem] leading-none font-extrabold">
-            {money(price.amount)}
-          </span>
-          <span className="text-slate text-sm">once</span>
-        </p>
-        <p className="text-slate mt-1.5 h-4 text-xs leading-4">
-          Per site · includes {GET_CITED_WINDOW_DAYS} days of full access
-        </p>
+        <p className="text-slate mt-1.5 h-4 text-xs leading-4">No card needed</p>
       </div>
     );
   }
 
   const perMonth = annual ? price.annualTotal / 12 : price.monthly;
   const yearlySaving = price.monthly * 12 - price.annualTotal;
+  const monthsFree = Math.round(yearlySaving / price.monthly);
 
   return (
     <div className="mt-5">
@@ -281,7 +182,7 @@ function PriceBlock({ price }: { price: Price }) {
       <div
         className="bg-cloud border-line mt-3 inline-flex items-center gap-1 rounded-full border p-1"
         role="group"
-        aria-label="Billing period for Stay Cited"
+        aria-label="Billing period for Pro"
       >
         {/* ⚠️ MONTHLY FIRST, MATCHING THE DEFAULT ABOVE. Reading order is the
             quieter half of "which one is the offer": a selected control sitting
@@ -306,15 +207,30 @@ function PriceBlock({ price }: { price: Price }) {
             annual ? 'text-navy shadow-soft bg-white font-semibold' : 'text-slate hover:text-navy'
           }`}
         >
-          Annual
+          Yearly
           {/* Stays on the unselected option, which is where it does its work:
               it is the reason to look at the other state, not a label for the
               one you are already on. */}
           <span className="bg-accent-soft text-navy rounded-full px-1.5 py-0.5 text-[0.625rem] font-semibold">
-            2 months free
+            {monthsFree} months free
           </span>
         </button>
       </div>
+
+      {/*
+        ⚠️ THE GUARANTEE IS ANNUAL-ONLY AND THIS LINE MUST NOT APPEAR ON MONTHLY.
+        Monthly customers can cancel from the billing portal and lose at most one
+        month; annual is the one asking for $390 up front, which is what the
+        guarantee answers. Showing it on both would be promising a refund we do
+        not offer, on the screen where the promise is made.
+
+        The Refunds section of /terms carries the matching wording. The two
+        change together — that page currently governs, so a guarantee here that
+        the terms contradict is worse than no guarantee at all.
+      */}
+      <p className="text-slate mt-3 h-4 text-xs leading-4">
+        {annual ? `${GUARANTEE_DAYS}-day money back, no questions asked` : ''}
+      </p>
     </div>
   );
 }
@@ -326,15 +242,17 @@ export function PricingTeaser() {
         <div className="mx-auto max-w-2xl text-center">
           <Badge>Pricing</Badge>
           <h2 className="mt-5 text-[2rem] text-balance sm:text-[2.5rem]">
-            Get set up once. Stay cited monthly.
+            Start free. Upgrade when you can see it working.
           </h2>
           <p className="text-slate mt-4 text-[1.0625rem] leading-relaxed">
-            Checking where you stand is free. Getting properly set up is a one-off job with a
-            one-off price. Staying cited is the part that never finishes.
+            Find out where you stand for nothing. If you like what you see, Pro does the whole job
+            — and keeps checking whether it worked.
           </p>
         </div>
 
-        <div className="mt-12 grid items-start gap-5 md:grid-cols-3">
+        {/* Two cards, so they get a narrower grid than three did — a
+            full-width pair on a large screen reads as two billboards. */}
+        <div className="mx-auto mt-12 grid max-w-4xl items-start gap-5 md:grid-cols-2">
           {PLANS.map((plan) => (
             <div
               key={plan.name}
@@ -365,26 +283,9 @@ export function PricingTeaser() {
 
               <ul className="mt-7 space-y-3">
                 {plan.features.map((feature) => (
-                  <li key={feature.label} className="text-slate flex gap-2.5 text-sm">
-                    {/* A tick means it works. Anything still being built gets a
-                        hollow dot and says so, so the two can't be skim-read as
-                        the same promise. */}
-                    {feature.soon ? (
-                      <span
-                        className="border-line mt-[0.42rem] h-2.5 w-2.5 shrink-0 rounded-full border-2"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Check className="text-primary mt-[0.35rem] shrink-0" />
-                    )}
-                    <span className={feature.soon ? 'text-slate/70' : undefined}>
-                      {feature.label}
-                      {feature.soon && (
-                        <span className="bg-cloud text-slate border-line ml-2 rounded-full border px-2 py-0.5 text-[0.6875rem] font-medium whitespace-nowrap">
-                          Coming soon
-                        </span>
-                      )}
-                    </span>
+                  <li key={feature} className="text-slate flex gap-2.5 text-sm">
+                    <Check className="text-primary mt-[0.35rem] shrink-0" />
+                    <span>{feature}</span>
                   </li>
                 ))}
               </ul>
@@ -392,26 +293,26 @@ export function PricingTeaser() {
           ))}
         </div>
 
-        {/* The order and the cut-off, in one sentence, on the page where the
-            decision is made. Everything downstream enforces this; if the copy
-            and the enforcement ever disagree, the copy is the promise. */}
+        {/* What free actually leaves you holding, said before anyone signs up
+            rather than discovered on the day they cancel. Publishing is part of
+            Pro now — under the old one-time product it was permanent, because
+            you cannot revoke something somebody bought outright. */}
         <p className="text-slate mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed">
-          Get Cited comes first — it writes your answers, then checks {GET_CITED_WINDOW_DAYS} days
-          running to see whether the engines start naming you. Everything it makes is yours
-          permanently, including the export. Stay Cited is what keeps the checks and the fresh
-          answers coming after that, across every site on your account.
+          Free is free forever, and the answers you write stay yours — you can always copy them out
+          as plain text. Pro adds the ready-to-paste code, the full site check, and the weekly
+          watching. Cancel whenever you like.
         </p>
 
         {/*
           ⚠️ THE DONE-FOR-YOU SERVICE IS DELIBERATELY NOT PITCHED HERE.
 
-          A line used to sit under these cards reading "rather not do it
-          yourself? $497 on top of Get Cited". It was removed on purpose, and
-          re-adding it would break /done-for-you rather than this page.
+          A line used to sit under these cards offering it "on top of Get
+          Cited". It was removed on purpose, and re-adding it would break
+          /done-for-you rather than this page.
 
-          That service is only offered to people who ALREADY pay for Get Cited,
-          so its landing page opens by telling the reader they have it and
-          never mentions the $129. The audience for this pricing section is the
+          That service is only offered to people who ALREADY subscribe, so its
+          landing page opens by telling the reader they have Pro and never
+          mentions the subscription price. The audience for this section is the
           opposite: somebody choosing a plan, who has bought nothing. Sending
           them to a page written for an existing customer means a stranger
           reading "$497 once" as all-in and meeting a second charge later —

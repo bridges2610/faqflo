@@ -53,20 +53,20 @@ export default async function CheckoutReturnPage({
   */
   if (result.status === 'granted') {
     /*
-      ⚠️ Get Cited now lands on /dashboard/start, not on the Audit page.
+      ⚠️ STRAIGHT TO THE THING THEY JUST UNLOCKED, not to a receipt.
 
-      It used to go to `/dashboard/audit?purchased=get_cited`, where a useEffect
-      auto-ran a full audit. That filled in one of four sections and left
-      Answers, Opportunities and Results empty until the customer went looking
-      for three more buttons — a staged signup confirmed exactly that. The audit
-      is now the first stage of a server-side scan queued during fulfilment, and
-      /dashboard/start is where they watch it.
+      A new Pro subscriber already has a dashboard — the free onboarding scan
+      filled it in when they signed up — so there is nothing to watch and no
+      reason to stop. The audit page is where the difference is most immediately
+      visible: their score was built from one page an hour ago and Pro reads the
+      whole site.
+
+      ⚠️ The webhook, not this page, is what actually writes `plan = 'pro'`, and
+      it may not have landed yet. `?upgraded=pro` is what lets the destination
+      say "your upgrade is going through" instead of showing a lock to somebody
+      who has just paid.
     */
-    redirect(
-      result.product === 'get_cited'
-        ? '/dashboard/start'
-        : '/dashboard/tracking?purchased=stay_cited',
-    );
+    redirect('/dashboard/audit?upgraded=pro');
   }
 
   /*

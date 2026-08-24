@@ -13,7 +13,7 @@ import { DraftReview } from './draft-review';
 import { EmptyState } from './empty-state';
 import { FaqRow } from './faq-row';
 import { GeneratorPanel, type GenerationMeta } from './generator-panel';
-import { CopyHtmlButton } from './copy-html-button';
+import { CopyHtmlButton, CopyPlainButton } from './copy-html-button';
 import { GroupForm } from './group-form';
 import { ManualForm } from './manual-form';
 import { PageHeader } from './page-header';
@@ -121,7 +121,7 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
          silently do nothing. */
       setCapError(
         err instanceof FaqCapReached
-          ? `${site!.name} can hold ${err.cap} answers on the free tier, and saving these would go over. Get Cited removes the limit — everything already written stays.`
+          ? `Free accounts can hold ${err.cap} answers, and saving these would go over. Pro removes the limit — everything already written stays.`
           : 'Those answers could not be saved. Please try again.',
       );
       setSaving(false);
@@ -168,6 +168,11 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
                 Rename or change page
               </button>
               <CopyHtmlButton group={group} faqs={faqs} />
+              {/* Beside the locked one on purpose. A free account sees a padlock
+                  and, right next to it, a button that works — which is the
+                  difference between "you can't have your writing" and "you can
+                  have your writing, just not the code". */}
+              <CopyPlainButton group={group} faqs={faqs} />
               <Link
                 href={`/dashboard/publish#${group.id}`}
                 className="text-primary hover:text-primary-hover text-sm font-semibold transition-colors duration-150"

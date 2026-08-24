@@ -20,7 +20,7 @@
 
 import type { Finding, Opportunity } from '@/lib/audit/types';
 import { publishState } from './export';
-import { canTrack } from './plans';
+
 import type { DashboardData, FaqGroup, Site, SiteTracking, User } from './types';
 
 const LOCKED: Finding = {
@@ -46,11 +46,19 @@ export function visibilityFindings(
   tracking: SiteTracking | null,
 ): Finding[] {
   /*
-    ⚠️ `canTrack`, not `canViewTracking`. The pillar scores what a CURRENT
-    check found; a lapsed window keeps its stored results readable on Results,
-    but they should not go on scoring an audit run today.
+    ⚠️ EMPTY TRACKING IS LOCKED, NOT ZERO, AND THAT IS THE WHOLE RULE HERE.
+
+    This used to gate on canTrack() as well, to keep a lapsed Get Cited window
+    from scoring an audit run with stale readings. canTrack() is true for
+    everyone now — free included, since free gets one real check — so the only
+    thing left to ask is whether there are results at all.
+
+    Falling through to a score of zero would be worse than locking: it reads as
+    "no engine cites you", which is a measurement, rather than "we have not
+    looked", which is the truth for a site whose scan has not reached the
+    tracking stage yet.
   */
-  if (!canTrack(site, user) || !tracking || tracking.latest.length === 0) return [LOCKED];
+  if (!tracking || tracking.latest.length === 0) return [LOCKED];
 
   const checks = tracking.latest;
   const cited = checks.filter((c) => c.outcome === 'cited').length;

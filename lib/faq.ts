@@ -19,17 +19,25 @@ export const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Dutch', 'Ja
 export type Language = (typeof LANGUAGES)[number];
 
 export const MIN_FAQ_COUNT = 3;
-/** Free-tier ceiling: 5 question/answer pairs per generation. */
+/**
+ * The ANONYMOUS generator's ceiling: 5 pairs per generation, no account.
+ *
+ * ⚠️ NOT THE SAME NUMBER AS FREE_FAQ_CAP, and the two must not be merged. This
+ * caps one model call on a public, unauthenticated endpoint. FREE_FAQ_CAP (10)
+ * caps how many answers a signed-in free account may KEEP, across any number of
+ * generations. Signing up is meant to visibly double what you get, which is
+ * only true while these differ.
+ */
 export const MAX_FAQ_COUNT = 5;
 export const DEFAULT_FAQ_COUNT = 5;
 
 /**
- * Ceiling for the dashboard generator. Higher than the free cap because paid
- * plans advertise an unlimited generator, but still finite — one request is one
- * model call, and an unbounded count is an unbounded bill.
+ * Ceiling for the dashboard generator on Pro. Higher than the anonymous cap
+ * because Pro advertises an unlimited generator, but still finite — one request
+ * is one model call, and an unbounded count is an unbounded bill.
  */
-export const MAX_FAQ_COUNT_PAID = 12;
-export const DEFAULT_FAQ_COUNT_PAID = 6;
+export const MAX_FAQ_COUNT_PRO = 12;
+export const DEFAULT_FAQ_COUNT_PRO = 6;
 
 /** Anthropic input cap. Also applied when extracting text from a URL. */
 export const MAX_CONTENT_CHARS = 8000;
@@ -100,7 +108,7 @@ ${content.slice(0, MAX_CONTENT_CHARS)}`;
  * for anything out of range or not an integer.
  *
  * `max` defaults to the free ceiling so existing callers are unaffected; the
- * dashboard route passes MAX_FAQ_COUNT_PAID. The fallback is clamped to `max`
+ * dashboard route passes MAX_FAQ_COUNT_PRO. The fallback is clamped to `max`
  * too, so a lower ceiling can never return a default above it.
  */
 export function clampCount(value: unknown, max: number = MAX_FAQ_COUNT): number {

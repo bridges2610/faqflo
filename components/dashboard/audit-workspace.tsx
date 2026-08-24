@@ -176,10 +176,10 @@ function FindingRow({ finding }: { finding: Finding }) {
 export type AuditView = 'plain' | 'technical';
 
 export function AuditWorkspace({
-  justPurchased = false,
+  justUpgraded = false,
   view = 'plain',
 }: {
-  justPurchased?: boolean;
+  justUpgraded?: boolean;
   /**
    * Which reading of the report to show.
    *
@@ -204,7 +204,7 @@ export function AuditWorkspace({
     is cleaned a moment later and a banner that vanished on its own would look
     like a glitch.
   */
-  const [showPurchased] = useState(justPurchased);
+  const [showUpgraded] = useState(justUpgraded);
 
   /*
     ⚠️ THE AUTO-RUN THAT USED TO LIVE HERE IS GONE, AND MUST NOT COME BACK.
@@ -222,8 +222,10 @@ export function AuditWorkspace({
     on this page at all: /dashboard/checkout/return sends them to
     /dashboard/start to watch all three stages.
 
-    The banner below still reads `?purchased=`, which is harmless and unused on
-    the new path — it is kept for anyone holding an old link.
+    The banner below reads `?upgraded=pro` and does nothing but congratulate.
+    ⚠️ It must stay that way: a new subscriber DOES land here now (see the
+    redirect in /dashboard/checkout/return), so anything automatic added to this
+    effect would fire on every upgrade.
   */
 
   if (!site || !data) {
@@ -239,7 +241,7 @@ export function AuditWorkspace({
     );
   }
 
-  const full = canRunFullAudit(site, user);
+  const full = canRunFullAudit(user);
 
   async function run() {
     if (!site) return;
@@ -379,16 +381,19 @@ export function AuditWorkspace({
 
       <div className="space-y-5">
         {/* The receipt, where the thing they bought actually is. Kept after the
-            URL is cleaned so it does not blink out — see showPurchased above. */}
-        {showPurchased && (
+            URL is cleaned so it does not blink out — see showUpgraded above. */}
+        {showUpgraded && (
           <div className="border-accent bg-accent-soft rounded-xl border p-4">
-            <p className="text-navy text-sm font-semibold">
-              You&rsquo;re set up — {site.name} is unlocked
-            </p>
+            <p className="text-navy text-sm font-semibold">You&rsquo;re on Pro</p>
             <p className="text-slate mt-1 text-sm leading-relaxed">
+              {/* ⚠️ "Your upgrade is going through" rather than a flat claim.
+                  The webhook writes profiles.plan, not the return page, and it
+                  may land a second or two after this renders. Telling somebody
+                  who has just paid that a feature is locked is worse than asking
+                  them to refresh. */}
               {busy
-                ? `Running your first full audit now. It reads up to ${PAGE_BUDGET.paid} pages, so give it a moment.`
-                : 'The full audit, the questions people ask AI, the content plan and the publish-ready export are all yours for the next 90 days. Everything you make stays yours for good.'}
+                ? `Running your first full audit now. It reads up to ${PAGE_BUDGET.pro} pages, so give it a moment.`
+                : `Run the full check below and it will read every page on ${site.name}, not just the home page. If anything still looks locked, give it a moment and refresh — your payment is still going through.`}
             </p>
           </div>
         )}
@@ -422,10 +427,8 @@ export function AuditWorkspace({
 
             {!full && (
               <UpgradeCard
-                entitlement="get_cited"
-                siteName={site.name}
-                title="The full audit"
-                body="The free checks are the first three. The full audit reads your other pages too — titles, structure, identity, trust — and turns everything it finds into a ranked plan."
+                title="Check your whole site, not just the home page"
+                body="Your free check reads one page and scores three things. Pro reads every page — titles, structure, who you are, whether you look trustworthy — and turns what it finds into a list in order of what to fix first."
               />
             )}
           </>
@@ -469,10 +472,8 @@ export function AuditWorkspace({
 
             {!full && (
               <UpgradeCard
-                entitlement="get_cited"
-                siteName={site.name}
-                title="The full audit"
-                body="The free checks are the first three. The full audit reads your other pages too — titles, structure, identity, trust — and turns everything it finds into a ranked plan."
+                title="Check your whole site, not just the home page"
+                body="Your free check reads one page and scores three things. Pro reads every page — titles, structure, who you are, whether you look trustworthy — and turns what it finds into a list in order of what to fix first."
               />
             )}
 

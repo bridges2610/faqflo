@@ -155,14 +155,12 @@ export function ContentWorkspace() {
     );
   }
 
-  if (!canContent(site, user)) {
+  if (!canContent(user)) {
     return (
       <>
         <PageHeader title="Content" description={description} />
         <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
         <UpgradeCard
-          entitlement="get_cited"
-          siteName={site.name}
           title="Know what's missing before you write"
           body="The pages a business like yours is expected to have, which of yours are missing, and ten things worth writing about your area. Built from a full read of your site, so it names real pages rather than guessing."
         />

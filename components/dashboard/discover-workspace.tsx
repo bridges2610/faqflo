@@ -6,7 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { discoverQuestions } from '@/lib/dashboard/discover';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canDiscover } from '@/lib/dashboard/plans';
+import { canDiscover, FREE_QUESTION_SAMPLE, questionCapFor } from '@/lib/dashboard/plans';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
@@ -59,23 +59,33 @@ export function DiscoverWorkspace() {
     );
   }
 
-  if (!canDiscover(site, user)) {
-    return (
-      <>
-        <PageHeader title="Opportunities" description="What people ask AI about your category." />
-        <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
-        <UpgradeCard
-          entitlement="get_cited"
-          siteName={site.name}
-          title="The questions people actually ask"
-          body="Real questions put to AI assistants about your trade and your area — read off your own site, so they are ones you could genuinely answer. Each one becomes an answer you can publish."
-        />
-      </>
-    );
-  }
+  /*
+    ⚠️ THIS PAGE USED TO BE A PAYWALL FOR FREE ACCOUNTS, AND THAT CONTRADICTED
+    WHAT WE SELL. It returned an UpgradeCard instead of the list, so a free
+    account saw zero questions — while the pricing page promises "a sample of 5
+    questions people ask AI about businesses like yours". The sample existed the
+    whole time: the onboarding scan stores all 15 (see runQuestionsStage), and
+    nothing rendered them.
+
+    What is actually gated is RE-RUNNING discovery, which costs an Opus call and
+    is refused server-side at /api/dashboard/questions. Showing rows the account
+    already paid for with its one free scan costs nothing.
+  */
+  const canFindMore = canDiscover(user);
 
   const pages = site.lastAudit?.pages ?? [];
-  const uncovered = questions.filter((q) => !q.covered);
+
+  /*
+    The free sample. A display cap, not a security boundary — the rows are the
+    customer's own and readable under RLS from their browser. It exists so the
+    upgrade has something concrete to reveal, and so upgrading reveals it
+    instantly with no second model call.
+  */
+  const cap = questionCapFor(user);
+  const visible = Number.isFinite(cap) ? questions.slice(0, cap) : questions;
+  const hidden = questions.length - visible.length;
+
+  const uncovered = visible.filter((q) => !q.covered);
 
   async function discover() {
     if (!site) return;
@@ -106,7 +116,7 @@ export function DiscoverWorkspace() {
         title="Opportunities"
         description={`Questions people put to AI about a business like ${site.name}. The ones you don't answer are the ones a competitor gets quoted for.`}
         action={
-          questions.length > 0 ? (
+          canFindMore && questions.length > 0 ? (
             <Button variant="ghost" size="sm" onClick={discover} disabled={busy}>
               {busy ? 'Looking…' : 'Find more'}
             </Button>
@@ -138,9 +148,13 @@ export function DiscoverWorkspace() {
             title="Find out what people are asking"
             body="We read your site, work out your trade and your area, and come back with the questions real people put to assistants about businesses like yours — skipping anything you already answer."
             action={
-              <Button onClick={discover} disabled={busy}>
-                {busy ? 'Looking…' : 'Find questions'}
-              </Button>
+              canFindMore ? (
+                <Button onClick={discover} disabled={busy}>
+                  {busy ? 'Looking…' : 'Find questions'}
+                </Button>
+              ) : (
+                <ButtonLink href="/dashboard/plan">See Pro</ButtonLink>
+              )
             }
           />
         ) : (
@@ -149,13 +163,13 @@ export function DiscoverWorkspace() {
               <div className="flex flex-wrap items-center gap-3">
                 <SectionTitle>Questions to answer</SectionTitle>
                 <Badge tone="neutral">
-                  {questions.length - uncovered.length} of {questions.length} answered
+                  {visible.length - uncovered.length} of {visible.length} answered
                 </Badge>
               </div>
             </div>
 
             <ul className="divide-line mt-3 divide-y">
-              {questions.map((q) => (
+              {visible.map((q) => (
                 <li key={q.id} className="flex flex-wrap items-start gap-x-4 gap-y-2 py-4">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -176,7 +190,24 @@ export function DiscoverWorkspace() {
                 </li>
               ))}
             </ul>
+
+            {/* ⚠️ The held-back count is stated, not hidden. A sample the
+                customer cannot tell is a sample reads as "this is all there
+                is" — which undersells both the scan and the upgrade. */}
+            {hidden > 0 && (
+              <p className="text-slate border-line mt-4 border-t pt-4 text-sm leading-relaxed">
+                We found <strong className="text-navy">{hidden} more</strong> that your free check
+                doesn&rsquo;t show. Pro reveals them straight away — no waiting, nothing to re-run.
+              </p>
+            )}
           </Card>
+        )}
+
+        {!canFindMore && questions.length > 0 && (
+          <UpgradeCard
+            title={`See all ${questions.length} questions, not just ${FREE_QUESTION_SAMPLE}`}
+            body="Your free check already found them — Pro unlocks the rest, keeps looking for new ones as your trade changes, and turns any of them into an answer you can publish."
+          />
         )}
 
         </div>

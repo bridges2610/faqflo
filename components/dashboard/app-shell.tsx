@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { getCitedDaysLeft, hasGetCited, hasStayCited } from '@/lib/dashboard/plans';
+import { isPro, nextCheckDate, PRO_PRICE } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { RunNotice } from './run-notice';
@@ -106,43 +106,49 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 /**
- * The countdown, on every page rather than only where a lock appears.
+ * When the next automatic check lands, on every page rather than only Results.
  *
- * A deadline that is only visible on the screen it will break is a deadline
- * you meet by accident. Seven days is late enough not to nag from day one and
- * early enough to be a decision rather than an interruption.
+ * ⚠️ THIS REPLACED A COUNTDOWN, AND IT IS A DIFFERENT KIND OF MESSAGE. The old
+ * WindowNotice counted down the last seven days of a Get Cited window and then
+ * explained why things had stopped — a deadline that is only visible on the
+ * screen it will break is a deadline you meet by accident. A subscription has no
+ * such deadline. What is worth surfacing instead is the opposite fact: something
+ * is going to happen for you, without you doing anything.
  *
- * Shown once the window has ended too — at that point it is the explanation
- * for why things stopped, and without it the product just looks broken.
+ * Quiet by design — it is reassurance, not a warning, so it gets the neutral
+ * treatment the ended-window notice used rather than the accent one.
  */
-function WindowNotice() {
+function NextCheckNotice() {
   const { site, user } = useDashboard();
 
-  // A subscriber's sites do not expire, so there is nothing to count down to.
-  if (!site || hasStayCited(user) || !hasGetCited(site)) return null;
+  // Free gets one check, taken at signup. There is no next one to promise.
+  if (!site || !isPro(user)) return null;
 
-  const left = getCitedDaysLeft(site);
-  if (left === null || left > 7) return null;
+  const due = nextCheckDate(site);
+  if (!due) return null;
 
-  const ended = left <= 0;
+  /*
+    Due already, or overdue: the sweep runs nightly, so "today" is honest and a
+    date in the past is not. Saying a check was due yesterday invites the
+    question of where it is, and the answer — "tonight" — is the useful half.
+  */
+  const today = due.getTime() <= Date.now();
 
   return (
-    <div
-      className={`mb-6 rounded-xl border p-4 ${
-        ended ? 'border-line bg-cloud' : 'border-accent bg-accent-soft'
-      }`}
-    >
+    <div className="border-line bg-cloud mb-6 rounded-xl border p-4">
       <p className="text-navy text-sm font-semibold">
-        {ended
-          ? `Your Get Cited window for ${site.name} has ended`
-          : `${left} ${left === 1 ? 'day' : 'days'} left on Get Cited for ${site.name}`}
+        {today
+          ? `Next check for ${site.name} runs tonight`
+          : `Next check for ${site.name}: ${due.toLocaleDateString(undefined, {
+              weekday: 'long',
+              day: 'numeric',
+              month: 'short',
+            })}`}
       </p>
       <p className="text-slate mt-1 text-sm leading-relaxed">
-        {ended
-          ? 'Everything already made is still yours — the audit, the answers and the export. Stay Cited starts them running again.'
-          : 'After that you keep everything made so far, and new audits pause. Stay Cited keeps them running across every site.'}{' '}
+        We ask the AI engines about you every week and record what they say.{' '}
         <Link href="/dashboard/tracking" className="text-primary hover:text-primary-hover font-semibold">
-          See Stay Cited →
+          See your results →
         </Link>
       </p>
     </div>
@@ -150,37 +156,50 @@ function WindowNotice() {
 }
 
 /**
- * What this account owns, pinned to the bottom of the sidebar.
+ * What plan this account is on, pinned to the bottom of the sidebar.
  *
- * Says both scopes explicitly, because they're different: Get Cited is counted
- * per site, Stay Cited is on or off for the whole account.
+ * ⚠️ NO MORE "N of M sites set up". That line counted per-site purchases, which
+ * was the only honest summary when the money was per site and an account could
+ * hold a mix of paid and unpaid ones. One account is on one plan now, so the
+ * count would always read "1 of 1" or "0 of 1" and teach nothing.
  */
 function PlanFooter() {
-  const { sites, user } = useDashboard();
+  const { user, tracking } = useDashboard();
+  const pro = isPro(user);
 
-  const setUp = sites.filter((s) => s.getCitedAt).length;
-  const tracking = hasStayCited(user);
+  /*
+    ⚠️ "ALREADY TAKEN" IS A CLAIM ABOUT THE PAST AND HAS TO BE CHECKED.
+
+    This line read "One check, already taken" for every free account, which is
+    false for the majority of the time somebody spends on this screen: a brand
+    new signup has not had their check yet, and the first thing the sidebar told
+    them was that they had used up the thing they came for.
+
+    `checksUsed` is the count the meter on Results is drawn from, so the sidebar
+    and that page cannot disagree about whether a check has happened.
+  */
+  const spent = (tracking?.checksUsed ?? 0) > 0;
 
   return (
     <div className="border-line bg-cloud rounded-xl border p-4">
-      <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Your account</p>
-      <p className="text-navy mt-1 text-sm font-semibold">
-        {setUp} of {sites.length} {sites.length === 1 ? 'site' : 'sites'} set up
-      </p>
+      <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Your plan</p>
+      <p className="text-navy mt-1 text-sm font-semibold">{pro ? 'Pro' : 'Free'}</p>
       <p className="text-slate mt-1 text-xs leading-relaxed">
-        {tracking ? 'Stay Cited is active' : 'No subscription'}
+        {pro
+          ? 'Checked automatically every week'
+          : spent
+            ? 'Your one check has run'
+            : 'Includes one free check'}
       </p>
-      {!tracking && (
-        /* Straight to checkout, not out to /#pricing. Sending a signed-in
-           customer back to the marketing site to buy means they land on a page
-           written for strangers and have to find their way back in. */
-        <Link
-          href="/dashboard/checkout/start"
-          className="text-primary hover:text-primary-hover mt-3 inline-block text-xs font-semibold"
-        >
-          Add Stay Cited →
-        </Link>
-      )}
+      {/* Straight to the in-app plan page, not out to /#pricing. Sending a
+          signed-in customer back to the marketing site to buy means they land on
+          a page written for strangers and have to find their way back in. */}
+      <Link
+        href="/dashboard/plan"
+        className="text-primary hover:text-primary-hover mt-3 inline-block text-xs font-semibold"
+      >
+        {pro ? 'Manage your plan →' : `Upgrade to Pro — $${PRO_PRICE.monthly}/mo →`}
+      </Link>
     </div>
   );
 }
@@ -333,7 +352,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ShellSkeleton />
             ) : (
               <>
-                <WindowNotice />
+                <NextCheckNotice />
                 {/* Same slot, same argument as the countdown above: a run that
                     only reports on the page that started it is one you assume
                     died when you clicked away.

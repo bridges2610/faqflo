@@ -6,9 +6,10 @@
  * on the server than on the client and hydration would tear. lib/dashboard/
  * store.ts is what enforces that; this file just builds the objects.
  *
- * The demo account has Get Cited on its one site and an active Stay Cited
- * subscription, so every surface has something in it. The entitlement switcher
- * in the header is how you see the locked states.
+ * The demo account is on Pro, so every surface has something in it rather than
+ * an upgrade card. To see the locked states, flip SHOT_USER.plan to 'free' in
+ * app/(dev)/shots/page.tsx — the switcher that used to do it from the header is
+ * gone, because the plan is a column the browser cannot write.
  */
 
 import {
@@ -32,7 +33,7 @@ import { buildActionPlan } from '@/lib/audit/actions';
 import { buildPillars, overallScore } from '@/lib/audit/score';
 import type { AuditReport, Finding } from '@/lib/audit/types';
 import { contentHash } from './export';
-import { GET_CITED_CHECK_DAYS, TRACKING_PLANS } from './plans';
+import { TRACKING_PLANS } from './plans';
 
 /**
  * A unique id for a row the browser is about to create.
@@ -758,9 +759,8 @@ export function buildSeed(siteId: string): SeedLocalData {
   const tracking: SiteTracking[] = [
     {
       siteId: site.id,
-      /* The five real checkpoints of a site 32 days in: setup, day 7 and day 30
-         behind it, days 60 and 90 still to come. Not five consecutive days —
-         see the note on seedDaily. */
+      /* Three weeks of a Pro account's checks: a month in, then three weeks ago
+         and two days ago. Not three consecutive days — see the note on seedDaily. */
       daily: seedDaily([32, 25, 2]),
       latest,
       competitors,
@@ -768,23 +768,17 @@ export function buildSeed(siteId: string): SeedLocalData {
       byEngine,
       sourceAppearances,
       promptsTracked: 12,
-      planId: 'get_cited',
-      schedule: 'milestones',
-      promptCap: TRACKING_PLANS.get_cited.promptCap,
-      manualCap: TRACKING_PLANS.get_cited.manualCap,
-      checksCap: TRACKING_PLANS.get_cited.checksPerPeriod,
-      runsPerPeriod: TRACKING_PLANS.get_cited.runsPerPeriod,
+      planId: 'pro',
+      schedule: 'weekly',
+      promptCap: TRACKING_PLANS.pro.promptCap,
+      manualCap: TRACKING_PLANS.pro.manualCap,
+      checksCap: TRACKING_PLANS.pro.checksPerPeriod,
+      runsPerPeriod: TRACKING_PLANS.pro.runsPerPeriod,
       checksUsed: 135,
-      periodResetsAt: daysAhead(58),
-      /* Three checks behind, two ahead — the state the timeline exists to show,
-         and the one a screenshot should catch. */
-      milestones: GET_CITED_CHECK_DAYS.map((day, i) => ({
-        day,
-        dueAt: daysAhead(day - 32),
-        status: i < 2 ? ('done' as const) : ('pending' as const),
-        finishedAt: i < 2 ? daysAhead(day - 32) : null,
-        error: null,
-      })),
+      periodResetsAt: daysAhead(12),
+      /* Partway through the week, so a screenshot catches the "next check" line
+         rather than the edge case where one is due today. */
+      nextCheckAt: daysAhead(5),
     },
   ];
 
@@ -810,14 +804,22 @@ export function emptyTracking(siteId: string): SiteTracking {
     byEngine: [],
     sourceAppearances: { ours: 0, total: 0 },
     promptsTracked: 0,
-    planId: null,
-    schedule: null,
-    promptCap: TRACKING_PLANS.stay_cited.promptCap,
-    manualCap: TRACKING_PLANS.stay_cited.manualCap,
-    checksCap: 0,
-    runsPerPeriod: TRACKING_PLANS.stay_cited.runsPerPeriod,
+    /*
+      ⚠️ FREE, NOT NULL. planId and schedule used to be nullable, meaning "no
+      tracking access at all" — a state that existed because Get Cited's window
+      could close. Free is a plan with real numbers now, so the blank state is a
+      free account that has not been checked yet rather than an account with no
+      answer.
+    */
+    planId: 'free',
+    schedule: 'once',
+    promptCap: TRACKING_PLANS.free.promptCap,
+    manualCap: TRACKING_PLANS.free.manualCap,
+    checksCap: TRACKING_PLANS.free.checksPerPeriod,
+    runsPerPeriod: TRACKING_PLANS.free.runsPerPeriod,
     checksUsed: 0,
-    periodResetsAt: daysAhead(90),
-    milestones: [],
+    // Free's allowance never refills, so there is no date to print.
+    periodResetsAt: null,
+    nextCheckAt: null,
   };
 }

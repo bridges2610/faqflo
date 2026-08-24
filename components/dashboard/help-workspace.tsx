@@ -6,16 +6,18 @@ import { scoreBand } from '@/lib/audit/score';
 import { PILLARS } from '@/lib/audit/types';
 import { EMBED_GUIDES } from '@/lib/dashboard/export';
 import {
-  ENTITLEMENTS,
   FREE_FAQ_CAP,
-  GET_CITED_CHECK_DAYS,
-  GET_CITED_WINDOW_DAYS,
+  FREE_QUESTION_SAMPLE,
+  GUARANTEE_DAYS,
   PAGE_BUDGET,
+  PLAN_COPY,
+  PRO_PRICE,
+  SITE_CAP,
   TRACKING_PLANS,
 } from '@/lib/dashboard/plans';
 
-const GET_CITED = TRACKING_PLANS.get_cited;
-const STAY_CITED = TRACKING_PLANS.stay_cited;
+const FREE = TRACKING_PLANS.free;
+const PRO = TRACKING_PLANS.pro;
 // Read from the source rather than typed as prose: the engine list is a product
 // decision that has already changed once, and a hardcoded copy here would be
 // the thing that still said "Google AI Overviews" afterwards.
@@ -189,7 +191,7 @@ const TROUBLESHOOTING = [
     q: 'Another tool reports more citations than you do. Why?',
     a: (
       <P>
-        Almost always sample size rather than detection. We ask the {STAY_CITED.promptCap}{' '}
+        Almost always sample size rather than detection. We ask the {PRO.promptCap}{' '}
         questions on your watch list, and each result is one answer we saw with our own eyes on the
         day we asked. Tools that report bigger numbers are usually watching far more prompts and
         adding up weeks of them. Watching more questions and running more often closes the gap —
@@ -250,11 +252,12 @@ const TROUBLESHOOTING = [
     ),
   },
   {
-    q: 'I added a second site — do I pay again?',
+    q: 'Can I check more than one website?',
     a: (
       <P>
-        Get Cited is per site, so yes for a one-off setup. Stay Cited is per account, so one
-        subscription covers every site you own. Adding sites is always free.
+        {SITE_CAP === 1
+          ? 'One website per account, on both plans. If you need to check a different one, remove the current site on the Sites page and add the new one — though anything written for the old site goes with it.'
+          : `Up to ${SITE_CAP} websites per account, on both plans.`}
       </P>
     ),
   },
@@ -424,7 +427,7 @@ export function HelpWorkspace({ name }: { name: string | null }) {
             <P>
               We fetch your pages the way a crawler does — no JavaScript, no logging in — and run a
               list of checks against what comes back. A paid check reads up to{' '}
-              <strong>{PAGE_BUDGET.paid} pages</strong>, chosen by how likely each is to matter
+              <strong>{PAGE_BUDGET.pro} pages</strong>, chosen by how likely each is to matter
               rather than the order we trip over them, and stops after{' '}
               {Math.round(AUDIT_TIME_BUDGET_MS / 1000)} seconds if your host is slow. The free check
               reads {PAGE_BUDGET.free === 1 ? 'one page' : `${PAGE_BUDGET.free} pages`}. When it
@@ -506,9 +509,9 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               be pasted”.
             </P>
             <Callout>
-              Without Get Cited a site keeps up to <strong>{FREE_FAQ_CAP} answers</strong>. Once
-              it’s bought, that cap is gone for good — including after the {GET_CITED_WINDOW_DAYS}
-              -day window closes. We don’t delete work you paid to have written.
+              On Free you can keep up to <strong>{FREE_FAQ_CAP} answers</strong>. Pro removes the
+              limit. Either way the words are yours — the Answers page has a plain-text copy button
+              that never locks, so you can take them with you whatever happens to your plan.
             </Callout>
           </Section>
 
@@ -721,14 +724,12 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               Your watch list
             </SectionTitle>
             <P className="mt-2">
-              Tracking comes with <strong>Get Cited for {GET_CITED_WINDOW_DAYS} days</strong>,
-              watching <strong>{GET_CITED.promptCap} questions</strong> — {GET_CITED.discoveredCap}{' '}
-              we find for you, and {GET_CITED.manualCap} you write yourself.{' '}
-              <strong>Stay Cited</strong> keeps it running after that and widens the list to{' '}
-              <strong>{STAY_CITED.promptCap}</strong> ({STAY_CITED.discoveredCap} found,{' '}
-              {STAY_CITED.manualCap} yours). Use <strong>Find more questions</strong> for the first
-              and <strong>Add your own question</strong> for the second — the second is for the ones
-              you already know matter, like a comparison against a rival you keep losing to. Your own
+              Free watches <strong>{FREE.promptCap} questions</strong>, checked once when you sign
+              up. <strong>Pro</strong> widens that to <strong>{PRO.promptCap}</strong> —{' '}
+              {PRO.discoveredCap} we find for you and {PRO.manualCap} you write yourself — and
+              checks them every week. Use <strong>Find more questions</strong> for the first and{' '}
+              <strong>Add your own question</strong> for the second; the second is for the ones you
+              already know matter, like a comparison against a rival you keep losing to. Your own
               questions survive a re-run of the finder; the found ones are replaced by it.
             </P>
 
@@ -737,10 +738,10 @@ export function HelpWorkspace({ name }: { name: string | null }) {
                 is the only place either is mentioned anywhere in the product,
                 so it is not a summary of something documented elsewhere. */}
             <P>
-              On Get Cited the checks run themselves: one as part of your setup, then on days{' '}
-              {GET_CITED_CHECK_DAYS.join(', ')}. There is nothing to press, and nothing to
-              remember. Stay Cited checks weekly and adds a button for running one whenever you
-              want — after publishing something, usually.
+              On Free the check runs itself, once, as part of setting your site up — there is
+              nothing to press because there is nothing left to spend. Pro checks every week on its
+              own, and adds a button for running one whenever you want, which is usually right
+              after you have published something.
             </P>
 
             {/* The absence that is LEFT. A schedule shipped; alerting did not,
@@ -762,53 +763,55 @@ export function HelpWorkspace({ name }: { name: string | null }) {
           {/* -------------------------------------------------- plans */}
           <Section id="plans">
             <P>
-              Two things, bought at different levels, and the difference matters more than the
-              price does.
+              Two plans, and the difference is how much of your site we look at and how often we
+              keep looking.
             </P>
 
             <div className="mt-5 grid gap-4 sm:grid-cols-2">
               <Card className="p-5">
-                <MicroLabel tone="primary">Per site · one-off</MicroLabel>
+                <MicroLabel>Free forever</MicroLabel>
                 <SectionTitle as="h3" className="mt-3">
-                  {ENTITLEMENTS.get_cited.label} — {ENTITLEMENTS.get_cited.price}
+                  {PLAN_COPY.free.label} — {PLAN_COPY.free.price}
                 </SectionTitle>
                 <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
-                  {ENTITLEMENTS.get_cited.blurb}
+                  {PLAN_COPY.free.blurb}
                 </p>
               </Card>
               <Card className="p-5">
-                <MicroLabel>Per account · subscription</MicroLabel>
+                <MicroLabel tone="primary">Subscription</MicroLabel>
                 <SectionTitle as="h3" className="mt-3">
-                  {ENTITLEMENTS.stay_cited.label} — {ENTITLEMENTS.stay_cited.price}
+                  {PLAN_COPY.pro.label} — {PLAN_COPY.pro.price}
                 </SectionTitle>
                 <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
-                  {ENTITLEMENTS.stay_cited.blurb}
+                  {PLAN_COPY.pro.blurb}
                 </p>
               </Card>
             </div>
 
             <SectionTitle as="h3" className="mt-8">
-              What the {GET_CITED_WINDOW_DAYS} days actually cover
+              What happens if you cancel
             </SectionTitle>
             <P className="mt-2">
               This is the part worth being precise about, because it’s the one most people skim.
-              Get Cited buys two different things: a deliverable, and a period of work.
             </P>
             <ul className="divide-line mt-3 divide-y text-sm">
-              <State term="Yours permanently">
-                The audit you ran, every answer written, the copy-paste export, the structured data
-                and the llms.txt. Publishing never stops working — you can come back in a year and
-                copy your block again.
+              <State term="Yours whatever happens">
+                Every answer you wrote, and every result we collected. The Answers page has a
+                plain-text copy button that never locks, and the Results page keeps showing the
+                readings your account paid for. We do not hide measurements to sell them back.
               </State>
-              <State term={`Runs for ${GET_CITED_WINDOW_DAYS} days`}>
-                Making <em>new</em> work: running fresh checks, discovering new questions, building
-                a content plan, generating more answers. That’s what Stay Cited keeps open.
+              <State term="Stops when the subscription does">
+                The ready-to-paste HTML and schema code, new site checks, finding new questions,
+                writing new answers, and the weekly watching. That is what the subscription buys, so
+                that is what it stops buying.
               </State>
             </ul>
             <P className="mt-4">
-              Stay Cited is per account, so one subscription re-opens every site you own — including
-              ones whose {GET_CITED_WINDOW_DAYS} days already ran out. Adding sites is always free;
-              the money is per site set up, so we’ve no reason to cap them.
+              Yearly costs ${PRO_PRICE.annualTotal} instead of ${PRO_PRICE.monthly * 12} — about{' '}
+              {Math.round((PRO_PRICE.monthly * 12 - PRO_PRICE.annualTotal) / PRO_PRICE.monthly)}{' '}
+              months free — and if it isn’t for you, tell us within {GUARANTEE_DAYS} days and we
+              refund the lot. Monthly you can cancel whenever you like from Manage billing; there is
+              no refund on a month already started, because you can stop before the next one.
             </P>
           </Section>
 

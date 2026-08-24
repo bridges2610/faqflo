@@ -82,7 +82,7 @@ export async function POST(request: Request) {
     name: user.name,
     email: user.email,
     userId: user.id,
-    subscription: user.subscription,
+    plan: user.plan,
     domains,
   });
 

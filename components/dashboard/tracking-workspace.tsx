@@ -9,14 +9,7 @@ import { pillarBand, scoreOf } from '@/lib/audit/score';
 import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
-import {
-  canRunCheckNow,
-  canTrack,
-  canViewTracking,
-  GET_CITED_WINDOW_DAYS,
-  TRACKING_PLANS,
-  trackingPlanFor,
-} from '@/lib/dashboard/plans';
+import { canRunCheckNow, isPro, trackingPlanFor } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import {
   ENGINES,
@@ -26,7 +19,6 @@ import {
   type SiteTracking,
 } from '@/lib/dashboard/types';
 import { AnswerText } from './answer-text';
-import { CheckSchedule } from './check-schedule';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
 import { EmptyState } from './empty-state';
@@ -364,8 +356,8 @@ function useFindMore(): {
     The manual reserve is held back whether or not it has been used.
   */
   const discovered = mine.filter((q) => q.source !== 'manual').length;
-  /* The plan's ceiling, not a global: Get Cited proposes 10 and Stay Cited 25. */
-  const caps = trackingPlanFor(site, user) ?? TRACKING_PLANS.stay_cited;
+  /* The plan's ceiling, not a global: free proposes 5 and Pro 15. */
+  const caps = trackingPlanFor(user);
   const room = Math.max(0, caps.discoveredCap - discovered);
   const hasPages = (site?.lastAudit?.pages?.length ?? 0) > 0;
 
@@ -433,7 +425,7 @@ function useManualQuestion(): {
 
   const mine = site ? questions.filter((q) => q.siteId === site.id) : [];
   const used = mine.filter((q) => q.source === 'manual').length;
-  const caps = trackingPlanFor(site, user) ?? TRACKING_PLANS.stay_cited;
+  const caps = trackingPlanFor(user);
   const room = Math.min(caps.manualCap - used, Math.max(0, caps.promptCap - mine.length));
 
   async function add(text: string): Promise<boolean> {
@@ -509,35 +501,31 @@ export function TrackingWorkspace() {
     screen that made it. What the window governs is RUNNING a new check, which
     spends money; every one of those controls is gated on `canRun` below.
   */
-  if (!canViewTracking(site, user)) {
-    return (
-      <>
-        <PageHeader title="Results" description="Whether AI is actually citing you." />
-        <UpgradeCard
-          entitlement="get_cited"
-          siteName={site.name}
-          title="See who the assistants cite"
-          body={`Get Cited puts your questions to ChatGPT, Perplexity and Gemini and records, for each one, whether they cited you, named you without a link, or pointed somewhere else. It checks at setup and again on days 7, 30, 60 and ${GET_CITED_WINDOW_DAYS}, so you see a trend rather than one reading — along with the audit, the answers and the export.`}
-        />
-      </>
-    );
-  }
+  /*
+    ⚠️ NO canViewTracking GATE HERE ANY MORE, AND ITS ABSENCE IS THE POINT.
+
+    Results is readable by everyone. Free accounts have one real reading to look
+    at, taken during their onboarding scan, and a lapsed Pro account keeps every
+    reading it paid to collect — the plan governs what may be RUN, never what may
+    be READ. Hiding measurements somebody's own account produced, to sell them
+    back, is the one thing this page must not do.
+  */
 
   /*
     ⚠️ TWO QUESTIONS, AND THEY USED TO BE ONE VARIABLE.
 
-      canGrowList — may this site have more questions found or written?
+      canGrowList — may this account have more questions found or written?
       canRunNow   — may this customer start a check by hand, right now?
 
-    They were both `canRun = canTrack(...)`, which was fine while every plan had
-    a button. Get Cited now runs on a schedule and has none, and collapsing these
-    again would silently switch OFF question discovery for every Get Cited
-    customer — a feature that costs an Opus call rather than engine calls, and
-    one they need working so the next scheduled check picks up what they added.
+    They were both the same predicate, which was fine while every plan had a
+    button. Free's single check runs itself and has none, and collapsing these
+    again would silently switch question discovery off for free accounts — a
+    feature that costs an Opus call rather than engine calls.
   */
-  const canGrowList = canTrack(site, user);
-  const canRunNow = canRunCheckNow(site, user);
-  const scheduled = trackingPlanFor(site, user)?.schedule === 'milestones';
+  const pro = isPro(user);
+  const canGrowList = pro;
+  const canRunNow = canRunCheckNow(user);
+  const oneShot = trackingPlanFor(user).schedule === 'once';
 
   const daily = tracking?.daily ?? [];
   const latest = tracking?.latest ?? [];
@@ -550,9 +538,8 @@ export function TrackingWorkspace() {
     this state can say the first thing rather than showing zeros that read as
     the second. Zeros here would be a measurement we never took.
 
-    There is no scheduler yet, so the run is a button. When one lands this
-    becomes the state a brand-new site sees for a day rather than the normal
-    way to get data.
+    For a free account this is the state between signing up and the onboarding
+    scan reaching its tracking stage — a few minutes, not a dead end.
   */
   if (daily.length === 0) {
     return (
@@ -577,12 +564,12 @@ export function TrackingWorkspace() {
                       ? 'Another check is running'
                       : 'Run the first check'}
                 </Button>
-              ) : scheduled ? (
-                // Nothing to press: the first check runs itself as part of
-                // setting the site up, and four more follow on their own days.
-                <p className="text-slate text-sm">Your first check runs as part of your setup.</p>
+              ) : oneShot ? (
+                // Nothing to press: the check runs itself as part of setting the
+                // site up, and free gets exactly the one.
+                <p className="text-slate text-sm">Your check runs as part of setting up.</p>
               ) : (
-                <ButtonLink href="/dashboard/checkout/start">Renew to run checks</ButtonLink>
+                <ButtonLink href="/dashboard/plan">See Pro</ButtonLink>
               )
             }
           />
@@ -765,16 +752,16 @@ export function TrackingWorkspace() {
       <PageHeader
         title="Results"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
-        /* No button on a scheduled plan. The timeline below says when the next
-           check lands, which is the honest answer to what the button was for. */
+        /* Free has no button — its one check has already run. The upgrade is the
+           honest answer to what the button was for. */
         action={
           canRunNow ? (
             <Button variant="ghost" size="sm" onClick={runTracking} disabled={run.busy}>
               {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
             </Button>
-          ) : scheduled ? null : (
-            <ButtonLink href="/dashboard/checkout/start" variant="ghost" size="sm">
-              Renew to run checks
+          ) : (
+            <ButtonLink href="/dashboard/plan" variant="ghost" size="sm">
+              Check weekly with Pro
             </ButtonLink>
           )
         }
@@ -933,13 +920,24 @@ export function TrackingWorkspace() {
         <div className="space-y-5">
           <CitationChart
             daily={daily}
-            span={scheduled ? `across your ${GET_CITED_WINDOW_DAYS} days` : 'over the last 30 days'}
+            span={oneShot ? 'from your one check' : 'over the last 30 days'}
           />
 
-          {/* The schedule, where the Run button used to be — but under the chart
-              rather than above it. The chart is what they came for; the dates
-              are the answer to the question the missing button raises. */}
-          {scheduled && <CheckSchedule milestones={tracking?.milestones ?? []} />}
+          {/*
+            What used to be a four-point timeline is one line of text.
+
+            CheckSchedule rendered tracking_milestones — days 7, 30, 60 and 90
+            with a status each — because Get Cited promised four specific checks
+            and a customer could reasonably ask which of them had happened. A
+            weekly cadence has no such list to keep score against: what ran is
+            the chart above, and what is coming is one date.
+          */}
+          {!oneShot && tracking?.nextCheckAt && (
+            <p className="text-slate text-sm">
+              Next automatic check {timeUntil(tracking.nextCheckAt)}. We ask every week without you
+              having to do anything.
+            </p>
+          )}
 
           {/* Per engine.
 
@@ -1230,15 +1228,15 @@ export function TrackingWorkspace() {
                     caps, and an arithmetic copy in the UI is how a customer ends
                     up refused at a number the screen never showed them.
 
-                    "Resets" is wrong for a window that ENDS rather than renewing,
-                    so a scheduled plan says so plainly. */}
+                    ⚠️ `periodResetsAt` is NULL on free, meaning the allowance
+                    never refills. Printing "resets" against a missing date would
+                    promise a top-up that never comes, so the sentence branches on
+                    the value rather than on the plan. */}
                 <p className="text-slate mt-0.5 text-xs">
                   {formatNumber(tracking.checksUsed)} of {formatNumber(tracking.checksCap)} engine
                   checks · each prompt is asked {ENGINES.length} engines × {tracking.runsPerPeriod}{' '}
-                  times ·{' '}
-                  {scheduled
-                    ? `window ends ${timeUntil(tracking.periodResetsAt)}`
-                    : `resets ${timeUntil(tracking.periodResetsAt)}`}
+                  {tracking.runsPerPeriod === 1 ? 'time' : 'times'}
+                  {tracking.periodResetsAt ? ` · resets ${timeUntil(tracking.periodResetsAt)}` : ''}
                 </p>
               </div>
               <Meter className="mt-3" value={usedPct} />
@@ -1250,7 +1248,7 @@ export function TrackingWorkspace() {
               <div className="border-line mt-4 border-t pt-4">
                 {!canGrowList ? (
                   <p className="text-slate text-xs">
-                    Finding more questions needs an active window — your existing list and results
+                    Finding more questions is part of Pro — your existing list and results
                     stay here either way.
                   </p>
                 ) : more.room === 0 ? (

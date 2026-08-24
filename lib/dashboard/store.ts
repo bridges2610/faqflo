@@ -31,12 +31,18 @@ import type {
   FaqRow,
   QuestionRow,
   SiteRow,
-  TrackingMilestoneRow,
 } from '@/lib/supabase/types';
 import { normalizeDomain, sourceHost } from './domain';
 import { contentHash, normalizePath } from './export';
 import type { TrackingPeriod } from './plans';
-import { faqCapFor, TRACKING_PLANS, trackingPlanFor, type TrackingPlan } from './plans';
+import {
+  canAddSite,
+  faqCapFor,
+  SITE_CAP,
+  TRACKING_PLANS,
+  trackingPlanFor,
+  type TrackingPlan,
+} from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
 import { ENGINES } from './types';
 import type {
@@ -51,7 +57,6 @@ import type {
   Engine,
   FaqEntry,
   FaqGroup,
-  MilestoneView,
   Site,
   SiteAudit,
   SiteTracking,
@@ -225,18 +230,23 @@ function normaliseTracking(raw: SiteTracking): SiteTracking {
        tight would tell a subscriber they were out of allowance they had paid
        for. Both are replaced by trackingFromDb() on the next real read. */
     promptCap:
-      typeof legacy.promptCap === 'number' ? legacy.promptCap : TRACKING_PLANS.stay_cited.promptCap,
+      typeof legacy.promptCap === 'number' ? legacy.promptCap : TRACKING_PLANS.pro.promptCap,
     runsPerPeriod:
       typeof legacy.runsPerPeriod === 'number'
         ? legacy.runsPerPeriod
-        : TRACKING_PLANS.stay_cited.runsPerPeriod,
+        : TRACKING_PLANS.pro.runsPerPeriod,
     checksUsed:
       typeof legacy.checksUsed === 'number'
         ? legacy.checksUsed
         : typeof legacy.queriesUsed === 'number'
           ? legacy.queriesUsed
           : latest.length,
-    periodResetsAt: raw.periodResetsAt ?? new Date(Date.now() + 30 * 86_400_000).toISOString(),
+    /* ⚠️ Null is a real value here now — free's allowance never resets — so this
+       cannot use `??` to substitute a date. An absent field on an old blob and a
+       deliberate "never" are indistinguishable in the stored shape, and inventing
+       a reset date is the worse of the two errors: it promises a refill that will
+       not come. trackingFromDb() replaces it on the next real read either way. */
+    periodResetsAt: raw.periodResetsAt ?? null,
   };
 }
 
@@ -745,8 +755,7 @@ export function toSite(row: SiteRow): Site {
     name: row.name,
     domain: row.domain,
     createdAt: row.created_at,
-    getCitedAt: row.get_cited_at,
-    getCitedExpiresAt: row.get_cited_expires_at ?? null,
+    nextCheckAt: row.next_check_at ?? null,
     lastAudit: null,
     industry: row.industry,
     location: row.location,
@@ -777,9 +786,39 @@ async function refreshSites(fn: string): Promise<DashboardData> {
   return assemble(serverHalf.user, sites, localCache ?? EMPTY_LOCAL);
 }
 
+/** Thrown when the account is already at SITE_CAP. Named so the UI can offer help. */
+export class SiteCapReached extends Error {
+  constructor(readonly cap: number) {
+    super(
+      cap === 1
+        ? 'You can track one website per account.'
+        : `You can track up to ${cap} websites per account.`,
+    );
+    this.name = 'SiteCapReached';
+  }
+}
+
 export async function createSite(input: NewSite): Promise<DashboardData> {
   const data = requireData('createSite');
   const supabase = supabaseBrowser();
+
+  /*
+    ⚠️ THE ONLY PLACE THE SITE CAP IS ACTUALLY APPLIED.
+
+    canAddSite() spent its whole life returning a bare `true` with no call sites
+    — a cap that existed as a name and nothing else — because Get Cited was
+    priced per site and an extra site was extra revenue. Pro is priced per
+    account, so every extra site is a full crawl and 75 more engine calls a week
+    against one subscription.
+
+    This is a client-side check and therefore a product gate, not a security
+    boundary: `sites` grants INSERT to `authenticated` because a site row is the
+    customer's own data. What bounds the actual SPEND is the per-account check
+    meter in app/api/dashboard/tracking/route.ts, which does not care how many
+    sites the checks were spread across. If sites ever start costing money on
+    creation alone, this needs a server route rather than a stronger comment.
+  */
+  if (!canAddSite(data.sites.length)) throw new SiteCapReached(SITE_CAP);
 
   const { data: row, error } = await supabase
     .from('sites')
@@ -1112,20 +1151,21 @@ export class FaqCapReached extends Error {
   site could accumulate unlimited answers — the cap was documented, priced, and
   not actually applied anywhere.
 
-  It is keyed to hasGetCited rather than the 30-day window on purpose: this
-  limits what may be KEPT, and shrinking it on day 31 would mean refusing to
-  store answers somebody already paid to have written. What stops at day 31 is
-  writing new ones, which is canRegenerate's job, on the server.
+  A cap on what may be STORED, not on what may be written in one go — that is
+  MAX_FAQ_COUNT_PRO in lib/faq.ts. Someone who generates six, deletes four and
+  generates six more is at eight, not twelve.
 
-  Counted per SITE, not per group, because that is the unit Get Cited is sold in.
+  ⚠️ COUNTED PER SITE, and since SITE_CAP is 1 that is currently the same as per
+  account. It stays per site because that is the unit a customer thinks in, and
+  because multi-site Pro would otherwise silently turn a per-account cap into a
+  shared one.
 */
 export async function createFaqs(groupId: string, entries: NewFaq[]): Promise<DashboardData> {
   const data = requireData('createFaqs');
 
   const group = data.groups.find((g) => g.id === groupId);
   if (group) {
-    const site = data.sites.find((s) => s.id === group.siteId) ?? null;
-    const cap = faqCapFor(site);
+    const cap = faqCapFor(data.user);
     if (Number.isFinite(cap)) {
       const held = faqsForSite(data, group.siteId).length;
       if (held + entries.length > cap) throw new FaqCapReached(cap);
@@ -1324,24 +1364,26 @@ export async function trackingFromDb(
   */
   period: TrackingPeriod | null,
   /** Which plan's caps to report. Derived by the caller, beside the period. */
-  plan: TrackingPlan | null,
+  plan: TrackingPlan,
   /**
    * The earliest check to read, for the chart.
    *
    * ⚠️ A DATE, NOT A NUMBER OF DAYS, AND THE DIFFERENCE IS A BUG THAT WAS HERE.
    * This used to be `days = 30`, i.e. a window rolling backwards from today —
-   * which quietly deletes history. A Get Cited site's day-7 check would drop out
-   * of its own chart on day 98, and by day 190 the page a customer was promised
-   * would keep "for good" is empty. Get Cited passes its purchase date;
-   * subscribers pass 30 days back, because theirs never stops being added to.
+   * which quietly deletes history. A free account's one reading would drop off
+   * its own chart a month later, leaving a page that says "we have not looked"
+   * about a check we definitely ran. Free passes the account's creation date;
+   * Pro passes 30 days back, because theirs never stops being added to.
    */
   since: Date,
+  /** When the next automatic check is due, straight off the site row. */
+  nextCheckAt: string | null,
 ): Promise<SiteTracking | null> {
   assertClient('trackingFromDb');
 
   if (!UUID.test(siteId)) return null;
 
-  const [checks, prompts, schedule] = await Promise.all([
+  const [checks, prompts] = await Promise.all([
     supabaseBrowser()
       .from('citation_checks')
       // ⚠️ `sources` is the expensive column and it is here on purpose: it is
@@ -1355,13 +1397,15 @@ export async function trackingFromDb(
       .gte('checked_at', since.toISOString())
       .order('checked_at', { ascending: false }),
     supabaseBrowser().from('tracked_prompts').select('id').eq('site_id', siteId),
-    /* The schedule, for the timeline on Results. Read-only to the browser by
-       policy — a client that could write these could book itself engine calls. */
-    supabaseBrowser()
-      .from('tracking_milestones')
-      .select('day, due_at, status, finished_at, error')
-      .eq('site_id', siteId)
-      .order('day'),
+    /*
+      No third query for a schedule any more.
+
+      Get Cited promised four checks on four named days, so the Results page had
+      a timeline to draw and tracking_milestones existed to hold it — including
+      the statuses ('skipped', 'failed') that only make sense for a check that was
+      owed on a specific date. Pro promises a cadence instead: what ran is
+      citation_checks.checked_at, and what is coming is one date on the site row.
+    */
   ]);
 
   // Swallowed, like the audit history: a missing migration should mean "no
@@ -1385,23 +1429,6 @@ export async function trackingFromDb(
   >[];
 
   if (rows.length === 0) return null;
-
-  /*
-    ⚠️ `finishedAt` IS WHAT THE UI SHOWS, `dueAt` IS ONLY WHY IT RAN.
-
-    The sweep is daily and Vercel fires it within an hour of its slot, so a
-    day-7 check routinely completes on day 7 or 8. Labelling it with the date it
-    was due would be a claim the customer can disprove against their own chart.
-  */
-  const milestones: MilestoneView[] = ((schedule.data ?? []) as TrackingMilestoneRow[]).map(
-    (row) => ({
-      day: row.day,
-      dueAt: row.due_at,
-      status: row.status,
-      finishedAt: row.finished_at,
-      error: row.error,
-    }),
-  );
 
   // sourceHost, not normalizeDomain: `www.` has to go here so one publisher is
   // one row. See the note on each of them — they differ deliberately.
@@ -1576,13 +1603,13 @@ export async function trackingFromDb(
       user, and two independent derivations is how a customer gets refused at a
       number the screen never showed them.
     */
-    planId: plan?.id ?? null,
-    schedule: plan?.schedule ?? null,
-    promptCap: plan?.promptCap ?? TRACKING_PLANS.stay_cited.promptCap,
-    manualCap: plan?.manualCap ?? TRACKING_PLANS.stay_cited.manualCap,
-    checksCap: plan?.checksPerPeriod ?? 0,
-    runsPerPeriod: plan?.runsPerPeriod ?? TRACKING_PLANS.stay_cited.runsPerPeriod,
-    milestones,
+    planId: plan.id,
+    schedule: plan.schedule,
+    promptCap: plan.promptCap,
+    manualCap: plan.manualCap,
+    checksCap: plan.checksPerPeriod,
+    runsPerPeriod: plan.runsPerPeriod,
+    nextCheckAt,
     // The cost side, so it counts every call actually spent — the raw log, not
     // the deduped current state. Charging for one check when four ran would
     // make the quota bar a fiction.
@@ -1594,7 +1621,16 @@ export async function trackingFromDb(
       does not enforce.
     */
     checksUsed: period ? all.filter((c) => c.checkedAt >= period.start.toISOString()).length : 0,
-    periodResetsAt: (period?.end ?? new Date()).toISOString(),
+    /*
+      ⚠️ NULL WHEN THE ALLOWANCE NEVER REFILLS, which is the free tier.
+
+      This used to fall back to `new Date()` — "resets now" — for a plan that had
+      no period at all. That was survivable while every plan reset eventually.
+      Free's window has no end by design, so a date here would promise a refill
+      that never arrives, and the customer would keep coming back to a meter
+      that never moved. The UI says "one check" instead.
+    */
+    periodResetsAt: period?.end ? period.end.toISOString() : null,
   };
 }
 
@@ -1652,16 +1688,13 @@ export type NewQuestion = { question: string; why?: string; intent?: string };
 /**
  * The caps that apply to one site's question list.
  *
- * ⚠️ FALLS BACK TO THE WIDER PLAN, NOT THE NARROWER ONE. A site with no live
- * window cannot track anything, so the numbers only decide whether the customer
- * may keep typing into a list they already own. Falling back to Get Cited's 15
- * would tell somebody whose window closed that a question they wrote last month
- * is now over a limit — a cap on what may be KEPT, which is the exact mistake
- * faqCapFor() has a comment about avoiding.
+ * No fallback any more, and no `siteId` either: free is a plan rather than the
+ * absence of one, so trackingPlanFor() always has an answer. The parameter is
+ * kept off the signature rather than ignored, so nothing reads as if the site
+ * still influences a cap that is now purely account-level.
  */
-function planCapsFor(data: DashboardData, siteId: string): TrackingPlan {
-  const site = data.sites.find((s) => s.id === siteId) ?? null;
-  return trackingPlanFor(site, data.user) ?? TRACKING_PLANS.stay_cited;
+function planCapsFor(data: DashboardData): TrackingPlan {
+  return trackingPlanFor(data.user);
 }
 
 export async function addQuestions(
@@ -1687,7 +1720,7 @@ export async function addQuestions(
   // for having typed a question.
   const discovered = kept.filter((q) => q.source !== 'manual').length;
   const room =
-    mode === 'append' ? Math.max(0, planCapsFor(data, siteId).discoveredCap - discovered) : Infinity;
+    mode === 'append' ? Math.max(0, planCapsFor(data).discoveredCap - discovered) : Infinity;
 
   const created: DiscoveredQuestion[] = [];
   for (const q of questions) {
@@ -1761,7 +1794,7 @@ export async function addManualQuestion(
     return { ok: false, reason: 'duplicate' };
   }
 
-  const caps = planCapsFor(data, siteId);
+  const caps = planCapsFor(data);
 
   if (mine.filter((q) => q.source === 'manual').length >= caps.manualCap) {
     return { ok: false, reason: 'manual-cap' };

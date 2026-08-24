@@ -142,18 +142,19 @@ export const DONE_FOR_YOU_RATE_LIMIT = 3;
  *
  * ⚠️ THE UNIT IS REQUESTS, BUT THE BUDGET IS RUNS, AND THEY ARE NOT 1:1. One
  * honest run is several requests — the route asks a bounded slice per call and
- * the client loops until nothing is left, so a full set at STAY_CITED_PROMPT_CAP
- * (35) with PROMPTS_PER_RUN (5) is ceil(35 / 5) = 7 requests. This number is
- * therefore sized as 12 runs × 7 requests:
+ * the client loops until nothing is left, so a full set at Pro's promptCap (25)
+ * with PROMPTS_PER_RUN (5) is ceil(25 / 5) = 5 requests. This number is
+ * therefore sized as 12 runs × 5 requests:
  *
- *     12 runs/day × ceil(35 prompts / 5 per request) = 84
+ *     12 runs/day × ceil(25 prompts / 5 per request) = 60
  *
- * ⚠️ IT IS DERIVED FROM THE PROMPT CAP AND MUST BE REDONE WHEN THAT MOVES. At 25
- * prompts this was 60; leaving it there after the cap rose to 35 would have cut
- * a subscriber to eight full runs a day while the constant still claimed twelve.
- * It was 12 once, which read as "12 runs" and behaved as barely two — one click
- * could exhaust the day, because the client's own retry loop is bounded at 12
- * passes and a single press could spend the whole allowance by design.
+ * ⚠️ IT IS DERIVED FROM THE PROMPT CAP AND MUST BE REDONE WHEN THAT MOVES. It
+ * was 84 while the cap was 35, and 60 before that when the cap was 25 — leaving
+ * a stale value cuts a subscriber to fewer full runs a day than the comment
+ * claims, silently. It was 12 once, which read as "12 runs" and behaved as
+ * barely two: one click could exhaust the day, because the client's own retry
+ * loop is bounded at 12 passes and a single press could spend the whole
+ * allowance by design.
  *
  * ⚠️ Not derived by importing PROMPTS_PER_RUN: that lives in lib/tracking/run.ts,
  * which is `server-only`, and this module must stay importable from anywhere.
@@ -162,11 +163,11 @@ export const DONE_FOR_YOU_RATE_LIMIT = 3;
  * Spend itself is bounded elsewhere and does not depend on this: the route
  * skips questions already checked today, so repeat presses ask nobody anything.
  * This limit exists to stop request floods, not to cap the bill. Low enough
- * that holding the button down is not a business model. When the scheduler
- * lands, most runs stop coming through here at all and this becomes the
- * manual-override allowance it reads like.
+ * that holding the button down is not a business model. The weekly scheduler
+ * runs its checks through lib/scan/run.ts rather than through this route, so
+ * this is now the manual-override allowance it always read like.
  */
-export const TRACKING_RATE_LIMIT = 84;
+export const TRACKING_RATE_LIMIT = 60;
 
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();

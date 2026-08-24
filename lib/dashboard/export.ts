@@ -203,6 +203,48 @@ export function buildLlmsTxt(
 }
 
 /**
+ * The answers as plain text. THE ONE EXPORT THAT IS NEVER GATED.
+ *
+ * ⚠️ THIS EXISTS TO KEEP A PROMISE THE PRICING PAGE MAKES, and deleting it would
+ * break that promise rather than merely remove a feature.
+ *
+ * Under the old one-time product, everything a customer made was theirs
+ * permanently — canPublish() was gated on "did they ever pay", never on "are
+ * they still paying", because you cannot revoke something somebody bought
+ * outright. Pro is a subscription, so the HTML and the schema now stop with it.
+ * That is defensible only because the WORDS do not: this is how a free account,
+ * or a lapsed one, takes its own writing away.
+ *
+ * ⚠️ DELIBERATELY NOT USEFUL FOR PUBLISHING. No markup, no schema, no heading
+ * structure a crawler reads as a Q&A block — because that is exactly what the
+ * subscription sells. Anyone can retype this into their own site; nobody can
+ * paste it and get the structured-data benefit. If this ever grows a tag, it has
+ * become buildFaqHtml() with extra steps and the gate is gone.
+ *
+ * Includes DRAFTS as well as published answers, unlike every other export here.
+ * The others feed a live website, where a half-written draft leaking out is the
+ * failure they guard against. This one feeds a text file the customer is taking
+ * with them, and silently dropping their unfinished work would be the failure.
+ */
+export function buildPlainText(group: FaqGroup, faqs: FaqEntry[]): string {
+  const ordered = [...faqs].sort((a, b) => a.position - b.position);
+
+  const lines: string[] = [group.name, ''];
+
+  for (const faq of ordered) {
+    const question = faq.question.trim();
+    const answer = faq.answer.trim();
+    if (!question || !answer) continue;
+
+    // Marked rather than silently mixed in: a customer pasting this somewhere
+    // should be able to see which ones they had not finished.
+    lines.push(`Q: ${question}${faq.status === 'draft' ? '  [draft]' : ''}`, `A: ${answer}`, '');
+  }
+
+  return lines.join('\n').trimEnd() + '\n';
+}
+
+/**
  * Fingerprint of what's currently publishable in a group.
  *
  * Compared against the hash stored when the customer last pasted, to tell them

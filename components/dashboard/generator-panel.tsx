@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   LANGUAGES,
-  MAX_FAQ_COUNT_PAID,
-  DEFAULT_FAQ_COUNT_PAID,
+  MAX_FAQ_COUNT_PRO,
+  DEFAULT_FAQ_COUNT_PRO,
   MIN_FAQ_COUNT,
   TONES,
   type Faq,
@@ -30,7 +30,7 @@ import { SectionTitle } from './section-title';
 type Mode = 'text' | 'url';
 
 const COUNTS = Array.from(
-  { length: MAX_FAQ_COUNT_PAID - MIN_FAQ_COUNT + 1 },
+  { length: MAX_FAQ_COUNT_PRO - MIN_FAQ_COUNT + 1 },
   (_, i) => MIN_FAQ_COUNT + i,
 );
 
@@ -62,7 +62,7 @@ export function GeneratorPanel({
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
-  const [count, setCount] = useState<number>(DEFAULT_FAQ_COUNT_PAID);
+  const [count, setCount] = useState<number>(DEFAULT_FAQ_COUNT_PRO);
   const [tone, setTone] = useState<Tone>('Professional');
   const [language, setLanguage] = useState<Language>('English');
   const [busy, setBusy] = useState(false);

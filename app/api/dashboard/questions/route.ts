@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateQuestions, isPageContent, MAX_ANSWERED } from '@/lib/questions-generate';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canDiscover, hasGetCited } from '@/lib/auth/entitlements';
+import { canDiscover } from '@/lib/auth/entitlements';
 import { checkRateLimit, limitKey, QUESTIONS_RATE_LIMIT } from '@/lib/rate-limit';
 
 /*
@@ -59,13 +59,15 @@ export async function POST(request: Request) {
   const site = await siteForUser(siteId, user.id);
   if (!site) return fail('No such site on your account.', 404);
 
-  if (!canDiscover(site, user)) {
-    return fail(
-      hasGetCited(site)
-        ? 'Your Get Cited window has ended for this site. Stay Cited keeps question discovery running.'
-        : 'Finding the questions people ask is part of Get Cited for this site.',
-      403,
-    );
+  /*
+    ⚠️ RE-RUNNING discovery is what is gated, not seeing it. Every free signup
+    gets one discovery pass during the onboarding scan and keeps the sample it
+    produced; this refuses the SECOND model call, which is the part that costs
+    money. See FREE_QUESTION_SAMPLE in lib/dashboard/plans.ts for the display
+    side, which is a product gate rather than this one.
+  */
+  if (!canDiscover(user)) {
+    return fail('Finding more questions is part of Pro.', 403);
   }
 
   /*

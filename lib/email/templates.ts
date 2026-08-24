@@ -153,10 +153,10 @@ export function contactEmail(opts: {
   name: string | null;
   email: string;
   userId: string;
-  subscription: string;
+  plan: string;
   domains: string[];
 }): Rendered {
-  const { topic, message, name, email, userId, subscription, domains } = opts;
+  const { topic, message, name, email, userId, plan, domains } = opts;
 
   const sites = domains.length ? domains.join(', ') : 'none yet';
   const who = name?.trim() || 'No name';
@@ -164,7 +164,7 @@ export function contactEmail(opts: {
   const facts: [string, string][] = [
     ['From', `${who} <${email}>`],
     ['Topic', topic],
-    ['Plan', subscription],
+    ['Plan', plan],
     ['Sites', sites],
     ['User id', userId],
   ];
@@ -200,16 +200,16 @@ export function doneForYouEmail(opts: {
   email: string;
   website: string;
   platform: string;
-  getCited: string;
+  plan: string;
   notes: string;
 }): Rendered {
-  const { name, email, website, platform, getCited, notes } = opts;
+  const { name, email, website, platform, plan, notes } = opts;
 
   const facts: [string, string][] = [
     ['From', `${name} <${email}>`],
     ['Website', website],
     ['Built on', platform],
-    ['Get Cited', getCited],
+    ['Plan', plan],
   ];
 
   return {

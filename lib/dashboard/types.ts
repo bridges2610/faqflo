@@ -15,22 +15,32 @@ import type { AuditReport } from '@/lib/audit/types';
 import type { Language, Tone } from '@/lib/faq';
 
 /**
- * What the account is subscribed to.
+ * Which plan the account is on.
  *
- * Note this is NOT a tier ladder. Get Cited is a one-time purchase that belongs
- * to a SITE, so it lives on Site; Stay Cited is a subscription that belongs to
- * the ACCOUNT. Flattening them into one enum would make a Get Cited purchase
- * for one site silently unlock every other site the customer owns.
+ * ⚠️ A LADDER NOW, WHICH IT DELIBERATELY WAS NOT BEFORE. This type used to be
+ * `'none' | 'stay_cited'` with a warning that flattening the two products into
+ * one enum "would make a Get Cited purchase for one site silently unlock every
+ * other site the customer owns" — true, because Get Cited belonged to a SITE
+ * and Stay Cited to the ACCOUNT. Both are retired. There is one product, it
+ * belongs to the account, and a ladder is now the honest shape.
  */
-export type Subscription = 'none' | 'stay_cited';
+export type PlanId = 'free' | 'pro';
 
 export type User = {
   id: string;
   name: string;
   email: string;
-  subscription: Subscription;
-  /** When the subscription started; null when there isn't one. */
-  subscriptionSince: string | null;
+  plan: PlanId;
+  /** When the current Pro subscription started; null on free. */
+  planSince: string | null;
+  /**
+   * When the account was made.
+   *
+   * Not cosmetic: it anchors the free tier's lifetime check allowance, because
+   * a period that never resets still needs somewhere to start counting from.
+   * See trackingPeriod() in lib/dashboard/plans.ts.
+   */
+  createdAt: string | null;
 };
 
 export type Site = {
@@ -39,13 +49,15 @@ export type Site = {
   /** Bare host, no scheme and no trailing slash. */
   domain: string;
   createdAt: string;
-  /** When Get Cited was bought for this site. null = free tier for this site. */
-  getCitedAt: string | null;
   /**
-   * When it stops granting new work. Null falls back to the constant — see the
-   * note on SiteRow.get_cited_expires_at.
+   * When the next automatic weekly check is due. Null when nothing is scheduled.
+   *
+   * ⚠️ A CURSOR, NOT A SETTING. The cron moves it forward a week each time it
+   * fires; upgrading sets it and downgrading clears it. It is service-role only
+   * for the obvious reason — a browser that could write it could set it to now()
+   * in a loop and bill us for three engines every sweep.
    */
-  getCitedExpiresAt: string | null;
+  nextCheckAt: string | null;
   /** Latest stored audit for this site, if one has been run. */
   lastAudit: SiteAudit | null;
 
@@ -340,35 +352,27 @@ export type SiteTracking = {
   /** The enforced ceiling, so the meter stops recomputing it from three parts. */
   checksCap: number;
   checksUsed: number;
-  periodResetsAt: string;
-
-  /** Which plan's rules these numbers came from. Null once the window closes. */
-  planId: 'get_cited' | 'stay_cited' | null;
   /**
-   * 'milestones' — fixed days, no button. 'weekly' — scheduled and on demand.
+   * When the allowance refills. NULL MEANS NEVER, which is the free tier.
    *
-   * The Results page reads this to decide whether to show a Run button or a
-   * timeline. Null means the window has closed: neither, plus the history.
+   * ⚠️ Null is a real state, not a missing value. Free buys one run metered over
+   * a period with no end, so "resets on the 3rd" would be a date that never
+   * arrives. Anything rendering this must say "one check" rather than print a
+   * fallback date.
    */
-  schedule: 'milestones' | 'weekly' | null;
-  /** The scheduled checks, for the timeline. Empty for a subscriber. */
-  milestones: MilestoneView[];
-};
+  periodResetsAt: string | null;
 
-/**
- * One scheduled check, as the Results page needs it.
- *
- * ⚠️ `finishedAt` is when it ran; `dueAt` is only when it was owed. Show the
- * first. A daily sweep with an hour of slop means the two differ routinely, and
- * a label claiming day 7 for a check that ran on day 9 is a claim the customer
- * can disprove against their own chart.
- */
-export type MilestoneView = {
-  day: number;
-  dueAt: string;
-  status: 'pending' | 'running' | 'done' | 'skipped' | 'failed';
-  finishedAt: string | null;
-  error: string | null;
+  /** Which plan's rules these numbers came from. */
+  planId: PlanId;
+  /**
+   * 'once' — the onboarding run, no button. 'weekly' — scheduled and on demand.
+   *
+   * The Results page reads this to decide whether to show a Run button or an
+   * explanation of why there isn't one.
+   */
+  schedule: 'once' | 'weekly';
+  /** When the next automatic check is due. Null on free — there isn't one. */
+  nextCheckAt: string | null;
 };
 
 /**

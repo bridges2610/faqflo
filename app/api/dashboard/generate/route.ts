@@ -6,16 +6,16 @@ import {
   coerceLanguage,
   coerceTone,
   FAQ_SCHEMA,
-  MAX_FAQ_COUNT_PAID,
+  MAX_FAQ_COUNT_PRO,
   type Faq,
 } from '@/lib/faq';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canRegenerate, hasGetCited } from '@/lib/auth/entitlements';
+import { canRegenerate } from '@/lib/auth/entitlements';
 import { checkRateLimit, DASHBOARD_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
 
 /*
   Generation for the dashboard: same model and same schema as the free route,
-  at the paid ceiling (MAX_FAQ_COUNT_PAID) and a much higher daily limit.
+  at the paid ceiling (MAX_FAQ_COUNT_PRO) and a much higher daily limit.
 
   There is no `plan` field read from the request body, because "a client that
   tells the server which tier it is on is not authorization — it's a bypass with
@@ -71,13 +71,8 @@ export async function POST(request: Request) {
   const site = await siteForUser(siteId, user.id);
   if (!site) return fail('No such site on your account.', 404);
 
-  if (!canRegenerate(site, user)) {
-    return fail(
-      hasGetCited(site)
-        ? 'Your Get Cited window has ended for this site. Stay Cited keeps answers coming.'
-        : 'Writing answers is part of Get Cited for this site.',
-      403,
-    );
+  if (!canRegenerate(user)) {
+    return fail('Writing new answers is part of Pro.', 403);
   }
 
   const client = new Anthropic({ apiKey });
@@ -92,7 +87,7 @@ export async function POST(request: Request) {
           role: 'user',
           content: buildPrompt({
             content,
-            count: clampCount(count, MAX_FAQ_COUNT_PAID),
+            count: clampCount(count, MAX_FAQ_COUNT_PRO),
             tone: coerceTone(tone),
             language: coerceLanguage(language),
           }),

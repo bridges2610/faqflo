@@ -1,12 +1,7 @@
 import type Stripe from 'stripe';
 import { NextResponse } from 'next/server';
 import { stripe, webhookSecret } from '@/lib/stripe/client';
-import {
-  applySubscription,
-  claimEvent,
-  fulfilCheckoutSession,
-  revokeForPaymentIntent,
-} from '@/lib/stripe/fulfil';
+import { applySubscription, claimEvent, fulfilCheckoutSession } from '@/lib/stripe/fulfil';
 
 /*
   Stripe's webhook. THE ONLY UNAUTHENTICATED WRITE PATH IN THE APP.
@@ -163,73 +158,30 @@ async function handle(event: Stripe.Event): Promise<void> {
     }
 
     /*
-      Money going back out. The only events that TAKE something away.
+      ⚠️ NO charge.refunded AND NO charge.dispute.created, AND THAT IS A CHANGE.
 
-      FULL refunds only. A partial refund is nearly always goodwill on a sale
-      that still stands — a $20 credit on a $129 purchase — and revoking there
-      would delete a product from someone who is still, on balance, a paying
-      customer. `amount_refunded >= amount` is the test; note that it is `>=`
-      rather than `===` because a refunded charge can carry adjustments, and
-      erring toward "fully refunded" is the safer direction for a comparison
-      that decides whether someone keeps something they no longer paid for.
+      Both used to be handled here, because Get Cited was a one-time payment:
+      the only record that it had been bought was a column we wrote ourselves,
+      so the only way to un-buy it was to watch the money and write the column
+      back. A subscription has no such column to guard — Stripe holds the
+      answer to "is this person currently paying", and every way that answer can
+      change emits a customer.subscription.* event, which the case above already
+      handles.
+
+      Concretely: refunding an invoice without cancelling does not end the
+      subscription, and it should not — the customer is still subscribed and
+      still being served. Cancelling fires `deleted`. A dispute that goes
+      unanswered ends in Stripe cancelling the subscription, which also fires
+      `deleted`. Adding a charge-level handler back would be a second writer for
+      profiles.plan, racing the first, for no case the first does not already
+      cover.
+
+      ⚠️ IF THESE ARE RE-ADDED, UNSUBSCRIBE THEM IN THE STRIPE DASHBOARD TOO —
+      and the reverse: they are still listed on the webhook endpoint from the
+      old model, where they are now delivered, claimed, and ignored. Harmless,
+      but see step 7 of .env.example for the list that should be there.
     */
-    case 'charge.refunded': {
-      const charge = event.data.object;
-      if (charge.amount_refunded < charge.amount) {
-        console.info(
-          `Partial refund on ${charge.id} (${charge.amount_refunded}/${charge.amount}) — access kept.`,
-        );
-        return;
-      }
-      await revokeFor(charge.payment_intent, `refund of ${charge.id}`);
-      return;
-    }
-
-    /*
-      A chargeback, and strictly worse than a refund: the money is clawed back
-      AND a dispute fee is charged. No amount test — a dispute is never a
-      goodwill gesture. Revoking now rather than at dispute.closed is
-      deliberate; the alternative leaves full access running for the weeks a
-      dispute takes to resolve, which is exactly the window a fraudulent
-      purchase wants.
-
-      Winning the dispute does NOT auto-restore. See the note in the plan: it
-      is rare, and a status misread would re-grant to someone who charged back.
-    */
-    case 'charge.dispute.created': {
-      const dispute = event.data.object;
-      await revokeFor(dispute.payment_intent, `dispute ${dispute.id}`);
-      return;
-    }
-
     default:
       return;
   }
-}
-
-/**
- * Resolve the payment intent — which may arrive expanded — and revoke.
- *
- * Stripe types these as `string | Object | null` because a caller can ask for
- * them expanded. We never do, so in practice it is the id, but narrowing
- * rather than casting means an expanded payload would still work instead of
- * silently stringifying to "[object Object]" and matching no session.
- */
-async function revokeFor(
-  paymentIntent: string | { id: string } | null,
-  because: string,
-): Promise<void> {
-  const id = typeof paymentIntent === 'string' ? paymentIntent : paymentIntent?.id;
-
-  if (!id) {
-    console.warn(`Cannot revoke for ${because}: no payment intent on the object.`);
-    return;
-  }
-
-  const result = await revokeForPaymentIntent(id);
-  console.info(
-    result.status === 'revoked'
-      ? `Revoked Get Cited for site ${result.siteId} (${because}).`
-      : `No revocation for ${because}: ${result.reason}`,
-  );
 }

@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
+// Imported rather than typed, so the guarantee this page GOVERNS cannot say a
+// different number from the one the pricing page and the checkout promise.
+import { GUARANTEE_DAYS } from '@/lib/dashboard/plans';
 
 /*
   Terms and Conditions.
@@ -40,7 +43,7 @@ const CONTACT_EMAIL = 'hello@faqflo.com';
 const FEE_TERMS = [
   {
     term: 'Pricing',
-    body: 'is shown at purchase, in U.S. dollars. One-time plans cover a defined deliverable.',
+    body: 'is shown at purchase, in U.S. dollars.',
   },
   {
     term: 'Subscriptions',
@@ -129,10 +132,31 @@ export default function Terms() {
         </Section>
 
         <Section id="refunds" n={5} title="Refunds">
+          {/*
+            ⚠️ THIS SECTION USED TO SAY THE OPPOSITE, AND IT GOVERNS. It read
+            "fees are non-refundable… any refund we choose to give is
+            discretionary", which directly contradicted the money-back guarantee
+            now offered on the annual plan. A guarantee on the pricing page that
+            the terms deny is worse than no guarantee at all, so the two change
+            together — see GUARANTEE_DAYS in lib/dashboard/plans.ts, which is
+            where the number the app quotes comes from.
+          */}
           <P>
-            Except where required by law, fees are non-refundable, and unused time or allowances are
-            not refunded on cancellation. Any refund we choose to give is discretionary. A specific
-            refund policy shown at purchase governs that transaction.
+            <strong>Annual plans come with a {GUARANTEE_DAYS}-day money-back guarantee.</strong>{' '}
+            Ask us within {GUARANTEE_DAYS} days of your first annual payment and we will refund it
+            in full and cancel the subscription. The guarantee applies to a first annual term, once
+            per customer.
+          </P>
+          <P>
+            Monthly plans are not covered by that guarantee, because you can cancel at any time and
+            the most you can be charged for is the month already running. Cancellation takes effect
+            at the end of the current billing period and we do not refund part-months or unused
+            allowances.
+          </P>
+          <P>
+            Except as set out above, and except where required by law, fees are non-refundable. Any
+            other refund we choose to give is discretionary. A specific refund policy shown at
+            purchase governs that transaction.
           </P>
         </Section>
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { hasGetCited } from '@/lib/dashboard/plans';
+import { canAddSite, SITE_CAP } from '@/lib/dashboard/plans';
 import { publishState } from '@/lib/dashboard/export';
 import { timeAgo } from '@/lib/dashboard/format';
 import { BusinessProfile } from './business-profile';
@@ -20,9 +20,12 @@ import { SectionTitle } from './section-title';
 /*
   Sites.
 
-  Get Cited is bought per site, so this is where that fact is visible: each row
-  says whether this particular site is set up, and adding a site is never
-  blocked — the money is per site, so a cap would only cost us customers.
+  ⚠️ THE PLAN IS NO LONGER PER SITE, WHICH INVERTS WHAT THIS PAGE IS FOR. It
+  used to show which of an account's sites had been paid for, and adding one was
+  never blocked because the money was per site and a cap would only cost us
+  customers. Pro covers the account, so every extra site is a full crawl and 75
+  more engine calls a week against one subscription — the cap is now the thing
+  this page has to enforce. See SITE_CAP.
 
   This is also where a site's industry and service area are edited. They belong
   here rather than on Content, which is where the only editor used to live: they
@@ -57,7 +60,6 @@ function SiteRow({ id }: { id: string }) {
   );
   const staleCount = groupStates.filter((s) => s === 'stale').length;
   const liveCount = groupStates.filter((s) => s === 'current').length;
-  const setUp = hasGetCited(row);
 
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-2 py-4">
@@ -65,7 +67,10 @@ function SiteRow({ id }: { id: string }) {
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
           <span className="text-navy font-semibold">{row.name}</span>
           {isCurrent && <Badge tone="blue">Selected</Badge>}
-          {setUp ? <Badge tone="cyan">Get Cited</Badge> : <Badge tone="neutral">Free</Badge>}
+          {/* ⚠️ NO PLAN BADGE PER SITE. Get Cited was bought per site, so a row
+              genuinely needed to say which of them was paid for. The plan is on
+              the account now — PlanBadge in the sidebar says it once. Repeating
+              it on every row would imply sites can differ, which they cannot. */}
           {staleCount > 0 && (
             <Badge tone="neutral">
               {staleCount} {staleCount === 1 ? 'page' : 'pages'} out of date
@@ -102,10 +107,10 @@ function SiteRow({ id }: { id: string }) {
       </div>
 
       <div className="flex items-center gap-3">
-        {/* The grant/revoke buttons that used to sit here are gone. Get Cited
-            is a column the browser has no UPDATE grant on, so the control
-            could only ever have failed silently. Buying it is the Stripe
-            stage; until then, set get_cited_at in the SQL editor. */}
+        {/* The grant/revoke buttons that used to sit here are gone. The plan is
+            a column the browser has no UPDATE grant on, so the control could
+            only ever have failed silently. Buying it is the Stripe stage; to
+            exercise Pro in development, set profiles.plan in the SQL editor. */}
         {!isCurrent && (
           <button
             onClick={() => selectSite(row.id)}
@@ -186,7 +191,11 @@ export function SitesWorkspace() {
     <>
       <PageHeader
         title="Sites"
-        description="Each site is set up on its own — Get Cited is bought per site, and answers never cross between them."
+        description={
+          SITE_CAP === 1
+            ? 'The website we check for you. Change it here if you need to.'
+            : `Up to ${SITE_CAP} websites on your account — each is checked on its own.`
+        }
       />
 
       <Card className="p-5 sm:p-7">
@@ -195,16 +204,31 @@ export function SitesWorkspace() {
             <SectionTitle>Your sites</SectionTitle>
             <Badge tone="neutral">{sites.length}</Badge>
           </div>
-          <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)}>
-            <PlusIcon className="h-4 w-4" />
-            Add site
-          </Button>
+          {/* ⚠️ HIDDEN AT THE CAP RATHER THAN DISABLED. A disabled button with
+              no reason beside it reads as a bug; the sentence below says what
+              the limit is. store.createSite() refuses past it as well, and
+              /api/onboarding/start refuses server-side — this is only the part
+              that stops somebody trying. */}
+          {canAddSite(sites.length) && (
+            <Button size="sm" variant="ghost" onClick={() => setAdding((v) => !v)}>
+              <PlusIcon className="h-4 w-4" />
+              Add site
+            </Button>
+          )}
         </div>
 
         {adding && (
           <div className="mt-4">
             <SiteForm onDone={() => setAdding(false)} />
           </div>
+        )}
+
+        {!canAddSite(sites.length) && (
+          <p className="text-slate mt-3 text-xs leading-relaxed">
+            {SITE_CAP === 1
+              ? 'One website per account. To check a different one, remove this and add it.'
+              : `That's all ${SITE_CAP} websites on your account.`}
+          </p>
         )}
 
         {sites.length === 0 ? (

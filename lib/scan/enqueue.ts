@@ -5,11 +5,20 @@ import { createAdminClient } from '@/lib/supabase/admin';
 /*
   Put a site's first scan on the queue.
 
-  ⚠️ ONE COPY, TWO CALLERS. Stripe fulfilment queues a scan the moment somebody
-  pays; /api/scan/start queues one when the customer asks, because the first
-  attempt did not survive. Written twice, the copy nobody exercises is the one
-  that runs when something has already gone wrong — which is precisely when it
-  needs to work.
+  ⚠️ ONE COPY, TWO CALLERS. /api/onboarding/start queues a scan the moment a
+  site is created; /api/scan/start queues one when the customer asks, because
+  the first attempt did not survive. Written twice, the copy nobody exercises is
+  the one that runs when something has already gone wrong — which is precisely
+  when it needs to work.
+
+  ⚠️ THE TRIGGER MOVED FROM PAYMENT TO SIGNUP, AND THAT IS THE COST DECISION
+  BEHIND THE FREE TIER. Stripe fulfilment used to queue this the moment somebody
+  paid $129, so every scan was funded before it ran. Now every free signup gets
+  one: a one-page crawl, an Opus discovery call, and five questions across three
+  engines — roughly $0.50–$1.00 of somebody else's API per account, spent whether
+  or not they ever come back. What bounds it is hasScanned() below, the
+  per-account check meter, and SITE_CAP. Removing any of those three makes free
+  signup an unbounded bill.
 */
 
 /**
@@ -34,15 +43,55 @@ export type EnqueueResult =
   | { ok: false; error: string };
 
 /**
+ * Has this site ever had a scan queued for it?
+ *
+ * ⚠️ THE FREE TIER'S "ONCE" IS ENFORCED WITH THIS, and it deliberately asks
+ * about jobs rather than about results. Asking "has an audit ever completed"
+ * would let a free account re-queue after any failure — including one it caused
+ * by closing the tab — and a crawl plus an Opus call is spent whether or not the
+ * run finished. A job that exists at all is a budget that was already committed.
+ *
+ * The cost of erring this way is a free account whose one scan genuinely broke
+ * and cannot retry. That is a support email, and support can delete the row.
+ * The other direction is a loop.
+ *
+ * Counts rows rather than reading them: the caller only needs the boolean, and
+ * scan_jobs carries a progress blob per row.
+ */
+export async function hasScanned(siteId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+
+  const { count, error } = await supabase
+    .from('scan_jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('site_id', siteId);
+
+  if (error) {
+    /*
+      Fail CLOSED — treat an unreadable table as "already scanned".
+
+      The failure this protects against is the expensive one: if the count
+      cannot be read, letting the scan through means an unbounded number of
+      free runs for as long as the error persists. Refusing means a customer
+      sees "we could not start your check", which is visible and recoverable.
+    */
+    console.error(`Could not count scans for site ${siteId}:`, describeDbError(error));
+    return true;
+  }
+
+  return (count ?? 0) > 0;
+}
+
+/**
  * Queue a scan, and give the site somewhere to put answers.
  *
  * ⚠️ THE "HOME PAGE" GROUP IS A BUG FIX RIDING ALONG, AND IT MATTERS MORE THAN
  * IT LOOKS. store.createSite() has always created one, but that runs only when
- * somebody adds a site by hand on the Sites page. The checkout funnel — the
- * path essentially every paying customer takes — creates the row server-side in
- * app/api/checkout/start/route.ts and never calls it. A staged signup confirmed
+ * somebody adds a site by hand on the Sites page. The signup funnel — the
+ * path essentially every customer takes — creates the row server-side in
+ * app/api/onboarding/start/route.ts and never calls it. A staged signup confirmed
  * the result: an audit, and an Answers page with no group at all, so the first
- * thing a customer saw after paying was a section with nothing in it.
+ * thing a customer saw was a section with nothing in it.
  *
  * ⚠️ The scan does NOT generate answers into this group. Every other stage is a
  * measurement, true whether or not the customer agrees; answers are content in
@@ -50,11 +99,11 @@ export type EnqueueResult =
  * a person accepting it first. The group is an empty page waiting for them.
  *
  * ⚠️ CALLERS ARE RESPONSIBLE FOR ENTITLEMENT. This spends money — a crawl, an
- * Opus call and dozens of search-backed engine calls — and deliberately does not
- * check whether the customer has paid, because its two callers know different
- * things: fulfilment has just watched the payment succeed, and the route has a
- * session to check `canTrack` against. A permission check here would be a third
- * opinion, and the weakest of the three.
+ * Opus call and fifteen search-backed engine calls — and deliberately does not
+ * check the plan itself, because its callers ask different questions: onboarding
+ * asks "is this account allowed a first scan", /api/scan/start asks "is this
+ * account allowed ANOTHER one". Both go through hasScanned() and isPro(). A
+ * permission check here would be a third opinion, and the weakest of the three.
  *
  * `created` distinguishes "queued one" from "one was already live". Both are
  * success; only the first is news.
@@ -107,23 +156,21 @@ export async function enqueueScan(siteId: string, userId: string): Promise<Enque
 }
 
 /**
- * Queue one scheduled check, as a tracking-only job.
+ * Queue one weekly check, as a tracking-only job.
  *
  * ⚠️ STAGE 'tracking', NOT 'audit'. enqueueScan above starts at the beginning
- * because a new purchase has nothing yet; a milestone has a crawl and a question
- * list already and only needs the engines asked. Starting at 'audit' would
- * re-crawl a hundred pages and re-run an Opus call on every checkpoint, which is
- * most of the cost of the product for none of the answer.
+ * because a new account has nothing yet; a weekly check has a crawl and a
+ * question list already and only needs the engines asked. Starting at 'audit'
+ * would re-crawl a hundred pages and re-run an Opus call every single week,
+ * which is most of the cost of the product for none of the answer.
  *
- * The milestone id travels ON THE JOB ROW rather than in the caller's memory, so
- * the tick route can write the outcome back without being told anything — the
- * property that lets it take no arguments and trust no caller.
+ * ⚠️ NO MILESTONE ID ANY MORE. It used to travel on the job row so the tick
+ * route could write an outcome back to tracking_milestones without being told
+ * anything. There is no milestone to write back to: the cursor on the site row
+ * has already moved forward, and what actually happened is the citation_checks
+ * rows the job writes.
  */
-export async function enqueueTrackingJob(
-  siteId: string,
-  userId: string,
-  milestoneId: string,
-): Promise<EnqueueResult> {
+export async function enqueueTrackingJob(siteId: string, userId: string): Promise<EnqueueResult> {
   const supabase = createAdminClient();
 
   const { error } = await supabase.from('scan_jobs').insert({
@@ -132,15 +179,13 @@ export async function enqueueTrackingJob(
     user_id: userId,
     stage: 'tracking',
     status: 'queued',
-    milestone_id: milestoneId,
   });
 
   /*
     23505 is the one-live-job-per-site index. Another scan is already running for
-    this site — a purchase scan, or yesterday's milestone still working through
-    its slices. The caller puts the milestone back to 'pending' and the next
-    daily sweep picks it up; a day late is a day late, but marking it done here
-    would lose a check the customer was promised.
+    this site — an onboarding scan, or last week's check still working through
+    its slices. The caller re-arms the cursor for tomorrow rather than losing the
+    week; see rearmCheck() in lib/tracking/schedule.ts.
   */
   if (error?.code === '23505') return { ok: true, created: false };
 

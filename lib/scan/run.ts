@@ -6,7 +6,7 @@ import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import type { AuditReport, PageContent } from '@/lib/audit/types';
 import { isAuditReport } from '@/lib/audit/types';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
-import { trackingPeriod } from '@/lib/dashboard/plans';
+import { TRACKING_PLANS, trackingPeriod } from '@/lib/dashboard/plans';
 import { PAGE_BUDGET } from '@/lib/dashboard/plans';
 import { trackingPlanFor } from '@/lib/auth/entitlements';
 import type { ProfileRow } from '@/lib/supabase/types';
@@ -47,15 +47,6 @@ export type ScanJob = {
   status: 'queued' | 'running' | 'done' | 'failed';
   progress: Record<string, unknown>;
   error: string | null;
-  /**
-   * The scheduled check this job is running, when it is one.
-   *
-   * Null for a purchase scan. Its presence is what switches the tracking stage
-   * from the window budget to the milestone's own allowance, and it is what lets
-   * the tick route write an outcome back without being told anything by its
-   * caller.
-   */
-  milestone_id: string | null;
 };
 
 /** What one slice did, and whether its stage is finished. */
@@ -92,8 +83,6 @@ type SiteRow = {
   location: string | null;
   country: string | null;
   brand_name: string | null;
-  get_cited_at: string | null;
-  get_cited_expires_at: string | null;
 };
 
 async function siteFor(db: Db, siteId: string): Promise<SiteRow> {
@@ -103,7 +92,7 @@ async function siteFor(db: Db, siteId: string): Promise<SiteRow> {
        column has to be added here by hand or the tracking stage computes the
        window from a fallback and silently disagrees with the rest of the app. */
     .select(
-      'id, domain, name, industry, location, country, brand_name, get_cited_at, get_cited_expires_at, user_id',
+      'id, domain, name, industry, location, country, brand_name, user_id',
     )
     .eq('id', siteId)
     .single<SiteRow>();
@@ -129,9 +118,38 @@ async function siteFor(db: Db, siteId: string): Promise<SiteRow> {
 export async function runAuditStage(db: Db, job: ScanJob): Promise<SliceResult> {
   const site = await siteFor(db, job.site_id);
 
+  /*
+    ⚠️ THE BUDGET FOLLOWS THE PLAN, AND HARDCODING IT WAS A REAL BUG.
+
+    This read `depth: 'full'` with `maxPages: PAGE_BUDGET.pro`, which was correct
+    for as long as this scan only ever ran after somebody had paid $129 — there
+    was no such thing as a free scan. The free tier moved the trigger to signup
+    and left this behind, so every free account was getting a hundred-page Pro
+    audit: about 100× the intended crawl of somebody else's server per signup,
+    and a free tier that already did the thing the pricing page sells as Pro's.
+
+    ⚠️ `depth` IS NOT COSMETIC EITHER. audit_runs.depth is stored, and its column
+    comment is blunt: "Quick and full runs are not comparable — never plot them
+    on one line." A one-page free audit written as 'full' puts a 3-check score
+    and a 44-check score on the same trend line, so the day somebody upgrades
+    their score appears to collapse.
+  */
+  /* `owner`, not `profile` — this function already has a local `profile` further
+     down, holding the industry/location patch read off the site's own markup. */
+  const { data: owner } = await db
+    .from('profiles')
+    .select('plan')
+    .eq('id', job.user_id)
+    .maybeSingle();
+
+  const pro = (owner as { plan?: string } | null)?.plan === 'pro';
+
   const result = await runAudit(`https://${site.domain}`, {
-    depth: 'full',
-    budget: { maxPages: PAGE_BUDGET.paid, maxMs: AUDIT_TIME_BUDGET_MS },
+    depth: pro ? 'full' : 'quick',
+    budget: {
+      maxPages: pro ? PAGE_BUDGET.pro : PAGE_BUDGET.free,
+      maxMs: AUDIT_TIME_BUDGET_MS,
+    },
   });
 
   if (!result.ok) {
@@ -218,17 +236,6 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
 
   if ((existing ?? 0) > 0) return { done: true, progress: { questions: existing } };
 
-  const { data: profile } = await db
-    .from('profiles')
-    .select('subscription')
-    .eq('id', job.user_id)
-    .maybeSingle();
-
-  /* Discovery is capped by the plan too. Without a plan the site has no live
-     window, so there is nothing to propose questions for. */
-  const discoveredCap = trackingPlanFor(site, (profile as ProfileRow | null) ?? null)?.discoveredCap;
-  if (!discoveredCap) return { done: true, progress: { questions: 0 } };
-
   const report = await latestReport(db, site.id);
   if (!report) {
     throw new ScanFailed('The site check did not produce any pages to read.');
@@ -262,9 +269,26 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
       seen.add(key);
       return true;
     })
-    /* The plan's discovery ceiling. Get Cited proposes 10 and reserves 5 for
-       questions the customer writes; Stay Cited proposes 25 and reserves 10. */
-    .slice(0, discoveredCap)
+    /*
+      ⚠️ STORED AT THE PRO CEILING, NOT AT THE ACCOUNT'S OWN CAP, AND ON PURPOSE.
+
+      This used to slice to the caller's discoveredCap, which was right when
+      discovery only ran for a plan that had paid for it. It runs for free
+      signups now, and a free account's cap is 5 — so slicing here would throw
+      away ten questions this one model call already produced and already paid
+      for, then charge a second call to get them back the moment somebody
+      upgrades.
+
+      What free actually gets is a SAMPLE: the rows are all stored, and
+      questionCapFor() in lib/dashboard/plans.ts shows five of them. Upgrading
+      reveals the rest instantly with no waiting and no second call.
+
+      That display cap is a product gate, not a security boundary — the rows are
+      the customer's own and readable under RLS. The thing that is genuinely
+      gated is running discovery AGAIN, which costs money and is refused
+      server-side in app/api/dashboard/questions.
+    */
+    .slice(0, TRACKING_PLANS.pro.discoveredCap)
     .map((q) => ({
       id: `q_${crypto.randomUUID()}`,
       site_id: site.id,
@@ -318,20 +342,18 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
   /*
     ⚠️ THE OWNER'S PLAN, READ FROM THE PROFILE — NOT ASSUMED.
 
-    This used to pass `subscription: 'none'` as a literal, which was harmless
-    only while both plans had identical caps: a subscriber got a Get Cited
-    window computed for them and nobody could tell. Now that Get Cited watches 15
-    questions and Stay Cited 35, that literal would silently hold a paying
-    subscriber to the smaller list on every scheduled run.
+    This used to pass a literal, which was harmless only while both plans had
+    identical caps. Free watches 5 questions and Pro 25, so a literal here would
+    either hold a paying subscriber to the smaller list on every weekly run, or
+    hand a free signup five times the checks their tier is priced for.
   */
   const { data: profile } = await db
     .from('profiles')
-    .select('subscription, subscription_since')
+    .select('plan, plan_since, created_at')
     .eq('id', job.user_id)
     .maybeSingle();
 
-  const plan = trackingPlanFor(site, (profile as ProfileRow | null) ?? null);
-  if (!plan) return { done: true, progress: { checked: 0, remaining: 0 } };
+  const plan = trackingPlanFor((profile as ProfileRow | null) ?? null);
 
   const { data: questionRows } = await db
     .from('questions')
@@ -396,29 +418,30 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
   }
 
   /*
-    The budget — and WHICH budget depends on who started this.
+    The budget — TWO ceilings, and a job has to clear both.
 
-    ⚠️ A SCHEDULED CHECK IS COUNTED AGAINST ITSELF, NOT AGAINST THE WINDOW.
+    ⚠️ A RUN IS ALSO COUNTED AGAINST ITSELF, NOT ONLY AGAINST THE PERIOD.
 
-    The window ceiling is exactly what the five checks add up to, with nothing
-    spare. Counting a milestone against it means any check that half-fails and
-    retries the next day — which the per-UTC-day de-dupe makes a normal
-    occurrence, not an edge case — eats the allowance of the check after it, and
-    the customer silently loses their day-90 reading. Worse for the sites
-    grandfathered in from the 30-day era: they may already have spent 300 of the
-    old 420 by hand, so every remaining milestone would be refused on arrival.
+    This used to key off `job.milestone_id`, because Get Cited's period ceiling
+    was exactly what its five scheduled checks added up to with nothing spare, so
+    a check that half-failed and retried the next day would eat the allowance of
+    the check after it. The same hazard survives the move to weekly: a run that
+    dies mid-slice and resumes tomorrow would otherwise spend twice out of one
+    month's 375, and by the fifth week of a bad month the customer silently
+    stops getting checked.
 
-    So a milestone gets its own allowance, `promptCap × engines`, counted from
-    the moment it was claimed. One bad check cannot starve the next, and the
-    window total is still bounded because the number of milestones is.
-
-    A purchase scan has no milestone and keeps the window count: it is the
-    customer's first spend, so it will almost never bite, but a job that ignored
-    the ceiling entirely would be a way around it.
+    So a job gets its own allowance — `promptCap × engines`, counted from the
+    moment the job row was created — AND the period ceiling still applies. The
+    first stops one run from eating the month; the second stops the month from
+    being exceeded however many runs there are. Taking the lower of the two is
+    the only version that holds both.
   */
-  const budget = job.milestone_id
-    ? await milestoneBudget(db, site.id, job.milestone_id, plan.promptCap * ALL_ENGINES.length)
-    : await windowBudget(db, site, profile as ProfileRow | null, plan.checksPerPeriod);
+  const [jobLeft, periodLeft] = await Promise.all([
+    jobBudget(db, site.id, job.id, plan.promptCap * ALL_ENGINES.length),
+    periodBudget(db, site.id, profile as ProfileRow | null, plan.checksPerPeriod),
+  ]);
+
+  const budget = Math.min(jobLeft, periodLeft);
 
   if (budget <= 0) {
     return { done: true, progress: { checked: total - pending.length, remaining: 0, total } };
@@ -461,26 +484,26 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
 /* ------------------------------------------------------------ dispatch --- */
 
 /**
- * What a scheduled check has left of its own allowance.
+ * What THIS job has left of its own allowance.
  *
- * Counted from when the milestone was claimed rather than from the window's
- * start, so this is "what has this check spent", not "what has this customer
- * ever spent". `started_at` is stamped by claim_due_milestones() in the same
- * statement that moves the row to 'running', so it cannot be missing here.
+ * Counted from when the job row was created rather than from the period's
+ * start, so this answers "what has this run spent", not "what has this customer
+ * ever spent". A job that resumes after a dead lease keeps the same created_at
+ * and therefore the same allowance, which is the point: resuming a run is not a
+ * second run.
+ *
+ * ⚠️ scan_jobs.created_at, NOT the lease. The lease moves every time a slice is
+ * claimed, so counting from it would hand each slice a fresh full allowance and
+ * make this ceiling meaningless.
  */
-async function milestoneBudget(
-  db: Db,
-  siteId: string,
-  milestoneId: string,
-  allowance: number,
-): Promise<number> {
-  const { data: milestone } = await db
-    .from('tracking_milestones')
-    .select('started_at')
-    .eq('id', milestoneId)
+async function jobBudget(db: Db, siteId: string, jobId: string, allowance: number): Promise<number> {
+  const { data: row } = await db
+    .from('scan_jobs')
+    .select('created_at')
+    .eq('id', jobId)
     .maybeSingle();
 
-  const since = (milestone as { started_at: string | null } | null)?.started_at;
+  const since = (row as { created_at: string | null } | null)?.created_at;
   if (!since) return allowance;
 
   const { count } = await db
@@ -492,18 +515,23 @@ async function milestoneBudget(
   return allowance - (count ?? 0);
 }
 
-/** What the whole window has left — the purchase scan's ceiling. */
-async function windowBudget(
+/**
+ * What the current period has left — the plan's real ceiling.
+ *
+ * On free that period never ends, so this is a LIFETIME count and it is the only
+ * thing standing between one free signup and unlimited engine calls. On Pro it
+ * resets on the billing anniversary.
+ */
+async function periodBudget(
   db: Db,
-  site: SiteRow,
+  siteId: string,
   profile: ProfileRow | null,
   ceiling: number,
 ): Promise<number> {
   const period = trackingPeriod({
-    getCitedAt: site.get_cited_at,
-    getCitedExpiresAt: site.get_cited_expires_at,
-    subscription: profile?.subscription === 'stay_cited' ? 'stay_cited' : 'none',
-    subscriptionSince: profile?.subscription_since ?? null,
+    plan: profile?.plan === 'pro' ? 'pro' : 'free',
+    planSince: profile?.plan_since ?? null,
+    accountCreatedAt: profile?.created_at ?? null,
   });
 
   if (!period) return 0;
@@ -511,7 +539,7 @@ async function windowBudget(
   const { count } = await db
     .from('citation_checks')
     .select('*', { count: 'exact', head: true })
-    .eq('site_id', site.id)
+    .eq('site_id', siteId)
     .gte('checked_at', period.start.toISOString());
 
   return ceiling - (count ?? 0);

@@ -123,10 +123,10 @@ export async function proxy(request: NextRequest) {
 
       This used to send only `path`. Two things went wrong with that, and the
       second is why it was invisible: clone() carries the original params over
-      to the sign-in URL, so `/dashboard/checkout/start?domain=acme.com` became
-      `/sign-in?domain=acme.com&next=/dashboard/checkout/start` — the domain was
-      still on screen, and still lost the moment sign-in redirected. The buyer
-      was then asked for a web address they had already typed on the home page.
+      to the sign-in URL, so `/dashboard/start?domain=acme.com` became
+      `/sign-in?domain=acme.com&next=/dashboard/start` — the domain was still on
+      screen, and still lost the moment sign-in redirected. The visitor was then
+      asked for a web address they had already typed on the home page.
 
       So: capture the search before clearing it, clear it so the sign-in URL
       carries nothing it doesn't need, and put the whole destination in `next`.
@@ -139,15 +139,24 @@ export async function proxy(request: NextRequest) {
     /*
       Which form they meet depends on why they are here.
 
-      Buying is overwhelmingly a new-customer action, so someone arriving at
-      checkout without an account is shown the one that creates one. Everything
-      else — a bookmarked /dashboard/audit, a link from an email — is a person
-      who already has an account and wants back in.
+      ⚠️ THE LIST CHANGED WITH THE PLANS, AND IT IS THE MARKETING CTAs THAT
+      DECIDE IT. It used to be `/dashboard/checkout/*` alone, because buying was
+      the only new-customer action and everything else was a returning customer
+      with a bookmark. The two destinations the home page now sends strangers to
+      are `/dashboard/start` (the free check, carrying ?domain= from the home
+      page audit) and `/dashboard/plan` (the Pro card's CTA) — so both show the
+      form that creates an account. Everything else — a bookmarked
+      /dashboard/audit, a link from an email — is somebody who wants back in.
+
+      ⚠️ Keep this in step with the hrefs in components/marketing/*. A CTA
+      pointing at a path missing from this list shows a stranger a sign-in form,
+      which is the highest-friction possible answer to "I'd like to try this".
 
       Both pages link to each other carrying `next`, so guessing wrong costs a
-      click rather than the purchase.
+      click rather than the signup.
     */
-    target.pathname = path.startsWith('/dashboard/checkout/') ? '/sign-up' : '/sign-in';
+    const SIGNUP_FIRST = ['/dashboard/start', '/dashboard/plan', '/dashboard/checkout/'];
+    target.pathname = SIGNUP_FIRST.some((p) => path.startsWith(p)) ? '/sign-up' : '/sign-in';
     target.search = '';
     target.searchParams.set('next', destination);
     return NextResponse.redirect(target);

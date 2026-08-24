@@ -55,8 +55,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         id: user.id,
         name: user.name ?? user.email,
         email: user.email,
-        subscription: user.subscription,
-        subscriptionSince: user.subscription_since,
+        plan: user.plan,
+        planSince: user.plan_since,
+        // Anchors the free tier's lifetime check allowance — see
+        // trackingPeriod() in lib/dashboard/plans.ts.
+        createdAt: user.created_at,
       }}
       sites={sites.map(toSite)}
     >

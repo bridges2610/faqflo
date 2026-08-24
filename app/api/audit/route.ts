@@ -5,7 +5,7 @@ import { checkPublicHttpUrl } from '@/lib/audit/url-guard';
 import type { AuditDepth } from '@/lib/audit/types';
 import { AUDIT_TIME_BUDGET_MS } from '@/lib/audit/limits';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canRunFullAudit, hasGetCited, pageBudgetFor } from '@/lib/auth/entitlements';
+import { canRunFullAudit, pageBudgetFor } from '@/lib/auth/entitlements';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { createAdminClient } from '@/lib/supabase/admin';
 import {
@@ -31,11 +31,11 @@ import {
   callers on purpose: the site promises "Free · No signup" in five places, and
   it reads one page, which is a cheap thing to give away. IP-limited, as before.
 
-  `full` is the paid crawl. It now requires a session, a `siteId` the caller
-  actually owns, and Get Cited on that site — and the page budget is computed
-  HERE from the site row rather than read from the request. That last part is
+  `full` is the Pro crawl. It requires a session, a `siteId` the caller actually
+  owns, and a Pro plan on that account — and the page budget is computed HERE
+  from the profile row rather than read from the request. That last part is
   the fix for what this file used to admit: "the dashboard sends
-  pageBudgetFor(site) and an arbitrary caller can send whatever it likes."
+  pageBudgetFor(user) and an arbitrary caller can send whatever it likes."
   A hundred pages is a hundred outbound requests to somebody else's server, so
   who may ask for that is not a client-side decision.
 */
@@ -150,16 +150,14 @@ export async function POST(request: Request) {
       steps, and only one of them is a purchase of Get Cited. See
       lib/auth/entitlements.ts for why the window exists.
     */
-    if (!canRunFullAudit(site, user)) {
+    if (!canRunFullAudit(user)) {
       return fail(
-        hasGetCited(site)
-          ? 'Your Get Cited window has ended for this site. Stay Cited keeps audits running.'
-          : 'A full audit is part of Get Cited for this site.',
+        'Your free check reads your home page. Pro checks every page on your site.',
         403,
       );
     }
 
-    pageBudget = pageBudgetFor(site, user);
+    pageBudget = pageBudgetFor(user);
   }
 
   const key = limitKey(user?.id ?? null, request.headers);

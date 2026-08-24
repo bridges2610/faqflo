@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { siteOrigin } from '@/lib/auth/origin';
+import { trySendEmail } from '@/lib/email/client';
+import { setUpEmail } from '@/lib/email/templates';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NEXT_STAGE, runStage, ScanFailed, type ScanJob } from '@/lib/scan/run';
 
@@ -124,28 +126,20 @@ export async function POST() {
       .eq('id', job.id);
 
     /*
-      Close the milestone when its job is done.
+      Tell them it's ready — once, on the first scan a site ever completes.
+
+      ⚠️ THIS MOVED HERE FROM STRIPE FULFILMENT, AND THE TRIGGER CHANGED WITH IT.
+      The "your site is set up" email used to send the moment a $129 payment
+      landed, gated on whether that call was the one that granted it. There is no
+      payment at this point any more — every free signup gets a scan — so the
+      thing worth announcing is not that money moved, it is that the results
+      exist. Sending it at signup instead would promise a dashboard that is still
+      three stages from having anything in it.
 
       ⚠️ THE ID COMES OFF THE CLAIMED ROW, NOT OFF THE REQUEST. This route takes
-      no arguments and trusts no caller, and a milestone id accepted from a body
-      would be an instruction to mark somebody else's check complete.
-
-      `finished_at` is stamped here rather than derived from the due date later:
-      the sweep is daily and can be late, so this is the only record of when the
-      check actually happened, and it is what every screen shows.
+      no arguments and trusts no caller.
     */
-    if (finished && job.milestone_id) {
-      await db
-        .from('tracking_milestones')
-        .update({
-          status: 'done',
-          checks_written: Number((result.progress as { checked?: number })?.checked ?? 0) || null,
-          finished_at: new Date().toISOString(),
-          job_id: job.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', job.milestone_id);
-    }
+    if (finished) await announceIfFirst(db, job);
 
     if (!finished && slices < MAX_SLICES) await chain();
 
@@ -176,26 +170,69 @@ export async function POST() {
       .eq('id', job.id);
 
     /*
-      A failed scheduled check is recorded as failed and NOT retried, for the
-      same reason the job above is not: retrying spends money to reach the same
-      conclusion. The customer sees "the day-30 check didn't complete" with the
-      reason, which is better than a gap in the line they have to guess at — and
-      whatever the check did collect before it stopped is already stored.
+      ⚠️ NO SEPARATE MILESTONE ROW TO MARK FAILED ANY MORE, and nothing is lost.
+
+      A scheduled check used to own a row that could say 'failed' with a reason,
+      because Get Cited promised four checks on four named days and a customer
+      staring at a gap in a four-point timeline deserved to know which one broke.
+      A weekly cadence has no such list: scan_jobs.error above already carries
+      the reason, the Results page shows it, and next week's sweep tries again on
+      its own because the cursor moved forward regardless.
     */
-    if (job.milestone_id) {
-      await db
-        .from('tracking_milestones')
-        .update({
-          status: 'failed',
-          error: message,
-          finished_at: new Date().toISOString(),
-          job_id: job.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', job.milestone_id);
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
+}
+
+/**
+ * Send the "your site is ready" email, but only after a site's FIRST scan.
+ *
+ * ⚠️ CANNOT THROW, AND THAT IS LOAD-BEARING. This runs after the slice's work is
+ * already written. An exception here would turn a completed scan into a 502 and
+ * a `failed` job row the customer would see, for the sake of an email. Mail is a
+ * courtesy; it does not get a vote on whether the scan succeeded.
+ *
+ * ⚠️ "FIRST" IS COUNTED FROM scan_jobs, NOT FROM A FLAG. Pro re-runs weekly, so
+ * a per-completion send would mail somebody every Tuesday forever. Counting the
+ * site's jobs is exact and needs no new column: this job is already inserted, so
+ * a count of 1 means it is the only one there has ever been.
+ *
+ * The Resend idempotency key is a second belt on top of that — two slices
+ * racing to finish the same job would both count 1.
+ */
+async function announceIfFirst(db: ReturnType<typeof createAdminClient>, job: ScanJob): Promise<void> {
+  try {
+    const { count, error } = await db
+      .from('scan_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('site_id', job.site_id);
+
+    if (error || (count ?? 0) !== 1) return;
+
+    const [{ data: profile }, { data: site }] = await Promise.all([
+      db.from('profiles').select('email, name').eq('id', job.user_id).maybeSingle<{
+        email: string;
+        name: string | null;
+      }>(),
+      db.from('sites').select('name').eq('id', job.site_id).maybeSingle<{ name: string }>(),
+    ]);
+
+    if (!profile?.email || !site?.name) {
+      console.error(`No profile or site for the set-up email (job ${job.id}).`);
+      return;
     }
 
-    return NextResponse.json({ error: message }, { status: 502 });
+    await trySendEmail(
+      {
+        to: profile.email,
+        ...setUpEmail(profile.name, site.name),
+        // Keyed on the job, so the same scan can never mail twice even if the
+        // count above is somehow raced.
+        idempotencyKey: `setup-${job.id}`,
+      },
+      'set-up email',
+    );
+  } catch (err) {
+    console.error('Set-up email failed (the scan itself is unaffected):', err);
   }
 }
 

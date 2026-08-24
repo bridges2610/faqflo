@@ -24,7 +24,7 @@ export function ManualForm({ groupId, onDone }: { groupId: string; onDone: () =>
       // clearing the form on a cap error would throw away their work.
       setError(
         err instanceof FaqCapReached
-          ? `This site can hold ${err.cap} answers on the free tier. Get Cited removes the limit.`
+          ? `Free accounts can hold ${err.cap} answers. Pro removes the limit.`
           : 'That answer could not be saved. Please try again.',
       );
       setSaving(false);

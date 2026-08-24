@@ -3,30 +3,31 @@ import { timingSafeEqual } from 'node:crypto';
 import { siteOrigin } from '@/lib/auth/origin';
 import { enqueueTrackingJob } from '@/lib/scan/enqueue';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ensureMilestones } from '@/lib/tracking/schedule';
-import type { TrackingMilestoneRow } from '@/lib/supabase/types';
+import { rearmCheck, type ClaimedSite } from '@/lib/tracking/schedule';
 
 /*
-  The scheduler. Once a day, fire the checks that have come due.
+  The scheduler. Once a day, fire the weekly checks that have come due.
 
   ⚠️ THIS ROUTE MAKES NO ENGINE CALLS. It finds work and hands it to the machinery
   that already exists — scan_jobs, its lease, and /api/scan/tick, which slices
-  five questions at a time and chains itself. app/api/scan/tick:16-28 has said so
+  five questions at a time and chains itself. app/api/scan/tick has said so
   since it was written: "a cron sweep if the project ever moves to a Vercel plan
   that has one — at which point this route is the thing the cron calls,
-  unchanged." This is that cron, and the tick route is unchanged apart from
-  writing the outcome back to the milestone.
+  unchanged." This is that cron.
 
-  Doing the work inline instead would mean up to 25 sites × 15 questions × 3
+  Doing the work inline instead would mean up to 25 sites × 25 questions × 3
   engines in one invocation, against a 60-second ceiling. It would time out on
-  the third customer.
+  the first customer.
 
-  ⚠️ DAILY IS ENOUGH, AND LATE IS NOT LOST. Due-ness is `due_at <= now()`, so
-  this is a sweep rather than an alarm clock: a missed day, or Vercel's
-  ±59-minute scheduling slop on the Hobby tier, delays a check rather than
-  dropping it. Everything downstream therefore shows a milestone's real
-  `finished_at`, never the date it was due — a check that says "day 7" but ran on
-  day 9 is a small lie the customer can catch.
+  ⚠️ DAILY FOR A WEEKLY CADENCE, AND THAT IS NOT A MISMATCH. Due-ness is
+  `next_check_at <= now()`, so this is a sweep rather than an alarm clock: it
+  runs every night, finds the roughly one-seventh of sites whose week is up, and
+  ignores the rest. A missed night, or Vercel's ±59-minute scheduling slop on the
+  Hobby tier, delays a check rather than dropping it.
+
+  ⚠️ AND A MISSED MONTH DOES NOT FIRE A MONTH OF CHECKS. claim_due_checks()
+  clamps the next date forward to at least now(), so an outage means skipped
+  weeks rather than a backlog spent in one afternoon. See 0012.
 */
 
 export const dynamic = 'force-dynamic';
@@ -35,12 +36,11 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
- * How many milestones one sweep may claim.
+ * How many sites one sweep may claim.
  *
- * Each claimed milestone becomes a queued job, not work done here, so this
- * bounds the burst rather than the runtime — 25 sites coming due on one day is
- * already an unusual day, and the rest keep until tomorrow because their rows
- * stay 'pending'.
+ * Each claimed site becomes a queued job, not work done here, so this bounds the
+ * burst rather than the runtime. The rest keep until tomorrow: their cursors are
+ * untouched by a sweep that never reached them, so they stay due.
  */
 const CLAIM_LIMIT = 25;
 
@@ -94,50 +94,53 @@ export async function GET(request: Request): Promise<NextResponse> {
   */
   void fetch(`${base}/api/scan/tick`, { method: 'POST' }).catch(() => {});
 
-  // 2. Materialise any schedule that does not exist yet. Free when it does:
-  //    four no-ops against unique (site_id, day).
-  const ensured = await ensureMilestones();
+  /*
+    2. Claim what is due, and move each cursor on a week in the same statement.
 
-  // 3. Claim what is due. SKIP LOCKED, so two sweeps overlapping take different
-  //    rows rather than one blocking on the other.
-  const { data, error } = await db.rpc('claim_due_milestones', { limit_count: CLAIM_LIMIT });
+    SKIP LOCKED, so two sweeps overlapping take different rows rather than one
+    blocking on the other. The RPC also re-checks profiles.plan = 'pro', so a
+    cursor left behind on a lapsed account claims nothing — the entitlement is
+    the guard, not the cursor. See 0012.
+
+    There is no "materialise the schedule" step any more. Milestones had to be
+    written into rows before they could be claimed; a cursor is set once, by the
+    subscription event that starts the plan.
+  */
+  const { data, error } = await db.rpc('claim_due_checks', { limit_count: CLAIM_LIMIT });
 
   if (error) {
-    console.error('Could not claim due milestones:', error.message);
-    return NextResponse.json({ error: 'Could not claim milestones' }, { status: 502 });
+    console.error('Could not claim due checks:', error.message);
+    return NextResponse.json({ error: 'Could not claim checks' }, { status: 502 });
   }
 
-  const claimed = (data ?? []) as TrackingMilestoneRow[];
+  const claimed = (data ?? []) as ClaimedSite[];
   let queued = 0;
   let deferred = 0;
 
-  // 4. One tracking job each.
-  for (const milestone of claimed) {
-    const result = await enqueueTrackingJob(milestone.site_id, milestone.user_id, milestone.id);
+  // 3. One tracking job each.
+  for (const site of claimed) {
+    const result = await enqueueTrackingJob(site.id, site.user_id);
 
     if (result.ok && result.created) {
-      await db
-        .from('tracking_milestones')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', milestone.id);
       queued += 1;
       continue;
     }
 
     /*
-      ⚠️ BACK TO 'pending', NOT 'failed' AND NOT 'done'.
+      ⚠️ RE-ARMED FOR TOMORROW, NOT LOST.
 
-      A refused insert means another scan is already live for that site — the
-      purchase scan, or yesterday's milestone still working through its slices.
-      Nothing has gone wrong and nothing has been checked; tomorrow's sweep finds
-      the same row due and tries again. Marking it done here would silently drop
-      a check the customer was promised, and marking it failed would show them an
-      error for a queue that was merely busy.
+      A refused insert means another scan is already live for that site — an
+      onboarding scan, or last week's check still working through its slices.
+      Nothing has gone wrong and nothing has been checked, but the claim has
+      already pushed this site's cursor a week into the future, so doing nothing
+      here would silently cost the customer a check they are paying for.
+
+      rearmCheck() sets it back to now(), which tomorrow's sweep picks up. Not to
+      the original due date: the live job that refused us may still be running
+      then, and a cursor in the past would be re-claimed on every sweep until it
+      finishes.
     */
-    await db
-      .from('tracking_milestones')
-      .update({ status: 'pending', started_at: null, updated_at: new Date().toISOString() })
-      .eq('id', milestone.id);
+    await rearmCheck(site.id);
     deferred += 1;
   }
 
@@ -146,11 +149,5 @@ export async function GET(request: Request): Promise<NextResponse> {
   // check it just scheduled.
   if (queued > 0) void fetch(`${base}/api/scan/tick`, { method: 'POST' }).catch(() => {});
 
-  return NextResponse.json({
-    scheduled: ensured.inserted,
-    sites: ensured.sites,
-    claimed: claimed.length,
-    queued,
-    deferred,
-  });
+  return NextResponse.json({ claimed: claimed.length, queued, deferred });
 }

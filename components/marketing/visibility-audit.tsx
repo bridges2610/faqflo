@@ -192,21 +192,27 @@ export function VisibilityAudit() {
             {/*
               The domain they just scanned, carried into checkout.
 
-              This is the step that makes buying one click instead of three:
+              This is the step that makes signing up one click instead of three:
               they have already typed their address, so asking again on the
               other side of sign-up is asking them to repeat themselves at the
-              exact moment they are deciding whether to pay. encodeURIComponent
-              because the value came from a text field, not from us.
+              exact moment they are deciding whether to bother.
+              encodeURIComponent because the value came from a text field, not
+              from us.
+
+              ⚠️ /dashboard/start, not a checkout. Nothing is being sold here any
+              more — the domain is carried into a FREE account's first scan, and
+              the page is protected so a signed-out arrival gets sign-up first
+              and lands back here automatically.
             */}
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <ButtonLink
-                href={`/dashboard/checkout/start?domain=${encodeURIComponent(result.domain)}`}
+                href={`/dashboard/start?domain=${encodeURIComponent(result.domain)}`}
                 size="md"
                 arrow
               >
-                Get {result.domain} set up
+                Check {result.domain} properly
               </ButtonLink>
-              <span className="text-slate text-xs">$129 once · includes 90 days full access</span>
+              <span className="text-slate text-xs">Free · no card needed</span>
             </div>
           </Card>
         )}

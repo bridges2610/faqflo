@@ -270,9 +270,7 @@ export function OverviewWorkspace() {
                      would read as "nobody is citing you", which we would not have
                      measured. `checks > 0` is what makes this a count rather than
                      an assumption. */
-                  value={
-                    canTrack(site, user) && checks > 0 ? `${cited} of ${checks}` : 'not measured'
-                  }
+                  value={checks > 0 ? `${cited} of ${checks}` : 'not measured'}
                 />
               </dl>
 
@@ -326,8 +324,8 @@ export function OverviewWorkspace() {
             </ul>
             <p className="text-slate border-line mt-4 border-t pt-3 text-xs leading-relaxed">
               Citation tracking — putting your questions to the engines and recording who they
-              name — runs on a schedule: five checks across your Get Cited window, and weekly on
-              Stay Cited. You can see them on the Results page.
+              name — runs once on Free, and every week on Pro without you having to do anything.
+              You can see the results on the Results page.
             </p>
           </Card>
 

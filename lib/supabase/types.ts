@@ -16,14 +16,24 @@
  * explicit so a column rename can't silently become an undefined field.
  */
 
-import type { Subscription } from '@/lib/dashboard/types';
+import type { PlanId } from '@/lib/dashboard/types';
 
 export type ProfileRow = {
   id: string;
   name: string | null;
   email: string;
-  subscription: Subscription;
-  subscription_since: string | null;
+  /**
+   * The account's plan — the only entitlement axis there is.
+   *
+   * ⚠️ NO UPDATE GRANT FOR `authenticated`, and that is the security property
+   * rather than a policy detail. 0001 revoked everything on profiles and
+   * granted back `update (name)`; 0002 added `insert (id, email, name)`. This
+   * column is outside both lists, so the only writer is the service role — see
+   * lib/supabase/admin.ts, which exists for exactly this.
+   */
+  plan: PlanId;
+  /** Anchors the monthly check budget. Null on free. See 0012. */
+  plan_since: string | null;
   created_at: string;
 };
 
@@ -53,18 +63,16 @@ export type SiteRow = {
    * counts as a mention. Service-role writes only; see 0007.
    */
   brand_name: string | null;
-  get_cited_at: string | null;
   /**
-   * When Get Cited stops granting NEW work for this site.
+   * When the weekly automatic check is next due. Null = nothing scheduled.
    *
-   * ⚠️ Stored rather than computed, and null is a real state. Deadlines used to
-   * be `get_cited_at + GET_CITED_WINDOW_DAYS` everywhere, which meant changing
-   * that constant moved every existing customer's deadline retroactively. Rows
-   * written before 0011 still have null and fall back to the constant — keep
-   * that fallback, because migrations here are applied by hand and the deploy
-   * can land before the SQL does.
+   * ⚠️ A SPENDING CURSOR, AND SERVICE-ROLE ONLY. 0012 adds no grant for it for
+   * the same reason `plan` has none: a browser that could write this could set
+   * it to now() on every sweep and bill us for three search-backed engines
+   * against 25 questions each time. Set on upgrade, cleared on downgrade, moved
+   * forward a week by claim_due_checks().
    */
-  get_cited_expires_at: string | null;
+  next_check_at: string | null;
   created_at: string;
 };
 
@@ -198,32 +206,12 @@ export type CitationCheckRow = {
   checked_at: string;
 };
 
-/**
- * One scheduled check on a Get Cited site — see 0011.
+/*
+ * TrackingMilestoneRow is gone, with the table it described.
  *
- * ⚠️ `due_at` is when it was SUPPOSED to run and `finished_at` is when it did.
- * The sweep is daily and Vercel's Hobby tier fires within an hour of its slot,
- * so the two differ routinely. Anything shown to a customer uses `finished_at`;
- * a row that claims a check happened on day 7 when it ran on day 9 is a small
- * lie they can check against the dates on their own chart.
- *
- * SELECT-only for `authenticated`. A client that could insert here could
- * schedule itself unlimited engine calls, which is the budget bypassed in one
- * statement.
+ * 0011 modelled a FINITE schedule — four rows per site on days 7/30/60/90 —
+ * because Get Cited bought a fixed number of checks inside a fixed window. A
+ * subscription promises a cadence instead, so the schedule became a cursor:
+ * sites.next_check_at, moved forward a week by claim_due_checks(). See 0012 for
+ * why the objections 0011 raised against a column no longer hold.
  */
-export type TrackingMilestoneRow = {
-  id: string;
-  site_id: string;
-  user_id: string;
-  /** Days after get_cited_at. Constrained to 7 | 30 | 60 | 90 by the migration. */
-  day: number;
-  due_at: string;
-  status: 'pending' | 'running' | 'done' | 'skipped' | 'failed';
-  job_id: string | null;
-  checks_written: number | null;
-  started_at: string | null;
-  finished_at: string | null;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-};

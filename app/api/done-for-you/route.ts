@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { sendEmail } from '@/lib/email/client';
 import { doneForYouEmail } from '@/lib/email/templates';
 import {
-  DFY_GET_CITED_STATES,
+  DFY_PLAN_STATES,
   DFY_PLATFORMS,
 } from '@/lib/done-for-you';
 import { checkRateLimit, DONE_FOR_YOU_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     return fail('Invalid request body.');
   }
 
-  const { name, email, website, platform, getCited, notes, company } = (body ??
+  const { name, email, website, platform, plan, notes, company } = (body ??
     {}) as Record<string, unknown>;
 
   /*
@@ -118,10 +118,10 @@ export async function POST(request: Request) {
     return fail('Pick what your site is built on.');
   }
   if (
-    typeof getCited !== 'string' ||
-    !(DFY_GET_CITED_STATES as readonly string[]).includes(getCited)
+    typeof plan !== 'string' ||
+    !(DFY_PLAN_STATES as readonly string[]).includes(plan)
   ) {
-    return fail('Let me know whether you have bought Get Cited yet.');
+    return fail('Let me know whether you’re on Pro yet.');
   }
 
   // Optional — the only field somebody can legitimately leave blank.
@@ -159,7 +159,7 @@ export async function POST(request: Request) {
     email: theirEmail,
     website: theirWebsite,
     platform,
-    getCited,
+    plan,
     notes: theirNotes,
   });
 

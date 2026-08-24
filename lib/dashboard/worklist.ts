@@ -32,7 +32,7 @@
 import { EFFORT_COST } from '@/lib/audit/actions';
 import type { ActionItem, AuditReport } from '@/lib/audit/types';
 import { publishState } from './export';
-import { canTrack, hasGetCited } from './plans';
+import { isPro, PRO_PRICE } from './plans';
 import type { DiscoveredQuestion, FaqEntry, FaqGroup, Site, User } from './types';
 
 export type Task = {
@@ -53,7 +53,7 @@ export type Task = {
    * A locked task carries NO invented data. It names what the paid audit
    * covers; it never shows a count of findings we did not run.
    */
-  locked?: 'get_cited' | 'stay_cited';
+  locked?: 'pro';
 };
 
 export type WorklistInput = {
@@ -178,7 +178,7 @@ function productTasks(input: WorklistInput): Task[] {
     });
   }
 
-  if (groups.length === 0 && hasGetCited(site)) {
+  if (groups.length === 0 && site) {
     tasks.push({
       id: 'first-group',
       what: 'Choose the page your answers go on',
@@ -192,33 +192,40 @@ function productTasks(input: WorklistInput): Task[] {
   /*
     The upgrade rows.
 
-    Both describe the product rather than showing data we haven't got. A free
-    user's audit read one page and scored three checks; claiming "12 more
-    problems found" would be a number nobody measured. Naming the scope of the
-    paid audit is true and is the honest version of the same nudge.
-  */
-  if (!hasGetCited(site) && site) {
-    tasks.push({
-      id: 'unlock-full-audit',
-      what: 'See the whole picture, not just your home page',
-      why: 'The free check reads one page and scores three things. The full audit reads up to a hundred pages against 44 checks, finds the questions people ask in your category, and gives you the export that puts your answers where a crawler can read them.',
-      impact: null,
-      effort: '15 minutes',
-      locked: 'get_cited',
-      action: { kind: 'link', label: 'See what Get Cited covers', href: '/dashboard/audit' },
-    });
-  }
+    ⚠️ ONE PLAN TO SELL NOW, SO TWO ROWS BECAME TWO ANGLES ON THE SAME ONE. They
+    used to be a ladder — buy Get Cited, then later add Stay Cited — and showing
+    a free user both at once was impossible because the second one only made
+    sense after the first. Pro is a single step, so the question is not which
+    upgrade but which reason will land: somebody with nothing published cares
+    about seeing the whole site; somebody whose answers are live cares about
+    whether they are working.
 
-  if (hasGetCited(site) && !canTrack(site, user) && published.length > 0) {
-    tasks.push({
-      id: 'consider-stay-cited',
-      what: 'Keep this running after your 90 days',
-      why: 'Your answers are live. Stay Cited keeps new audits and fresh answers coming across every site on your account once the window closes.',
-      impact: null,
-      effort: '2 minutes',
-      locked: 'stay_cited',
-      action: { kind: 'link', label: 'About Stay Cited', href: '/dashboard/tracking' },
-    });
+    Both describe the product rather than showing data we haven't got. A free
+    account's audit read one page and scored three checks; claiming "12 more
+    problems found" would be a number nobody measured.
+  */
+  if (!isPro(user) && site) {
+    tasks.push(
+      published.length > 0
+        ? {
+            id: 'unlock-weekly-checks',
+            what: 'Find out whether your answers are actually working',
+            why: `Your answers are live. Pro watches 25 questions across ChatGPT, Perplexity and Google's Gemini every week, so you can see whether they start naming you — and which of your pages earns the mention.`,
+            impact: null,
+            effort: '2 minutes',
+            locked: 'pro',
+            action: { kind: 'link', label: `See Pro — $${PRO_PRICE.monthly}/month`, href: '/dashboard/plan' },
+          }
+        : {
+            id: 'unlock-full-audit',
+            what: 'See the whole picture, not just your home page',
+            why: 'Your free check reads one page. Pro reads every page on your site against the full checklist, finds the questions people ask in your category, and gives you the copy-and-paste code that puts your answers where AI can read them.',
+            impact: null,
+            effort: '15 minutes',
+            locked: 'pro',
+            action: { kind: 'link', label: `See Pro — $${PRO_PRICE.monthly}/month`, href: '/dashboard/plan' },
+          },
+    );
   }
 
   return tasks;

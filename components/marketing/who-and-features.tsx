@@ -52,23 +52,22 @@ const AUDIENCES: Audience[] = [
   },
 ];
 
-/* Paid features only — the free score and the generator sell themselves higher
-   up the page. Every line matches a bullet on a paid plan in
-   pricing-teaser.tsx, so the two sections can't drift apart. */
+/* Pro features only — the free score and the generator sell themselves higher
+   up the page. Every line matches a bullet on the Pro card in
+   pricing-teaser.tsx, so the two sections can't drift apart.
+
+   ⚠️ These lists drifted once already, under a comment promising they couldn't.
+   When you edit one, open the other in the next tab rather than trusting this
+   note. Same plain language: written for a plumber, not a marketer. */
 const FEATURES = [
-  // ⚠️ "Full audit — including whether AI cites you today" was here, and the
-  // pricing card had already deleted that exact line as untrue: the visibility
-  // pillar is `locked` at weight 0 unless the account has Stay Cited. The two
-  // lists drifted anyway, under a comment promising they couldn't — so when you
-  // edit one, open the other in the next tab rather than trusting the note.
-  'Full audit of what AI can and cannot read on your site',
-  'The questions people actually ask AI in your category',
-  'Answer-first Q&A written to be quoted',
-  'Publish-ready HTML for your own domain',
-  'Entity schema and llms.txt',
+  'Every page on your site checked, not just the home page',
+  'The questions people really ask AI in your line of work',
+  'Answers written to be quoted, not skimmed',
+  'Ready-to-paste code for your own website',
+  'An llms.txt file — a plain-text summary written for AI to read',
   // ⚠️ GEMINI, NOT AI OVERVIEWS. Overviews has no API and nobody can query it.
   // See the warning on ENGINES in lib/dashboard/types.ts.
-  'Citation tracking across ChatGPT, Perplexity and Gemini',
+  'Weekly checks across ChatGPT, Perplexity and Google’s Gemini',
 ];
 
 /** Small caps kicker above each column heading, as used on the AEO panels. */
@@ -121,7 +120,7 @@ export function WhoAndFeatures() {
                 which read as "none of this works yet". Everything in the list
                 below ships today, so the badge is gone rather than reworded. */}
             <Kicker>Features</Kicker>
-            <h3 className="mt-3 text-xl">What Get Cited and Stay Cited add</h3>
+            <h3 className="mt-3 text-xl">What Pro adds</h3>
 
             <ul className="mt-6 space-y-3">
               {FEATURES.map((feature) => (
