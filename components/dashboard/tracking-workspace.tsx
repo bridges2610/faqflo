@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { EngineMark } from '@/components/ui/ai-marks';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -171,8 +172,17 @@ function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.R
               <div className="flex flex-wrap items-center gap-2">
                 {/* The engine is named once here; the chip carries only the
                     verdict. The summary pill has to say both because it stands
-                    alone. */}
-                <p className="text-navy text-xs font-semibold">{engine}</p>
+                    alone.
+
+                    The mark is smaller than the one on the "By engine" card
+                    because this sits two levels in — inside an expanded
+                    question, under a row of pills that carry no mark at all.
+                    Matching the card's size here would make the deeper thing
+                    look louder than the summary above it. */}
+                <p className="text-navy flex items-center gap-1.5 text-xs font-semibold">
+                  <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
+                  {engine}
+                </p>
                 <OutcomeChip check={check} />
                 {check && check.sources.length > 0 && (
                   <p className="text-slate text-xs">
@@ -957,7 +967,15 @@ export function TrackingWorkspace() {
                 {byEngine.map((e) => (
                   <li key={e.engine} className="py-3.5">
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="text-navy text-sm font-semibold">
+                      {/* The mark, the name and the Gemini note are one line.
+
+                          `items-center` inside a row that aligns on the
+                          baseline: the logo has no baseline of its own, so it
+                          is centred against the name, and this box still hands
+                          the name's baseline up to the row so the percentage
+                          on the right stays level with it. */}
+                      <p className="text-navy flex items-center gap-2 text-sm font-semibold">
+                        <EngineMark engine={e.engine} className="h-4 w-4 shrink-0" />
                         {e.engine}
                         {/* ⚠️ Marked, never labelled with the country. Gemini
                             rejects a location parameter and the coordinate
@@ -968,7 +986,11 @@ export function TrackingWorkspace() {
                             targeted and the note would single one out for
                             nothing. */}
                         {site.country && e.engine === 'Gemini' && (
-                          <span className="text-slate ml-2 text-xs font-normal">
+                          // The ml-2 this used to carry is now the parent's
+                          // gap-2 — the row is flex, so a margin would stack
+                          // on top of the gap and set this note further out
+                          // than the mark is from the name.
+                          <span className="text-slate text-xs font-normal">
                             not location-targeted
                           </span>
                         )}

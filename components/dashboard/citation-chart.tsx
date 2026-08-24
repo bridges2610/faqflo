@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { EngineMark } from '@/components/ui/ai-marks';
 import { Card } from '@/components/ui/card';
 import { ENGINES, type CitationDay, type Engine } from '@/lib/dashboard/types';
 import { SectionTitle } from './section-title';
@@ -175,6 +176,18 @@ export function CitationChart({
         </button>
       </div>
 
+      {/* ⚠️ THE SWATCH IS NOT DECORATION, AND THE LOGO DOES NOT REPLACE IT.
+
+          The dot is the only thing tying a legend entry to its polyline.
+          Swapping it for the brand mark would leave the reader nothing to match
+          a line against, and would quietly undo the colour system this file's
+          header argues for at length.
+
+          The two colours also disagree, unavoidably: Perplexity's #20808D sits
+          beside its series teal #0891B2, OpenAI's black beside ChatGPT's blue.
+          Swatch first, mark second, name last — the larger, more saturated
+          shape is what the eye lands on, so the series colour stays the primary
+          read and the mark is recognition after it. */}
       <div className="mt-4 flex flex-wrap items-center gap-5">
         {ENGINES.map((engine) => (
           <span key={engine} className="text-slate flex items-center gap-2 text-sm">
@@ -183,6 +196,7 @@ export function CitationChart({
               style={{ backgroundColor: SERIES[engine] }}
               aria-hidden="true"
             />
+            <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
             {engine}
           </span>
         ))}
