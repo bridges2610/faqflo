@@ -1,0 +1,15 @@
+import { chromium } from 'playwright';
+const out = '/private/tmp/claude-501/-Users-beaubridges-Desktop-Claude-Code-FAQ-App/6861170c-ced0-4aee-86a1-ec766abc70f9/scratchpad';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1280, height: 1000 } });
+const errs = []; p.on('pageerror', e => errs.push(String(e)));
+await p.goto('https://www.faqflo.com/#pricing', { waitUntil: 'networkidle' });
+await p.locator('#pricing').scrollIntoViewIfNeeded();
+await p.waitForTimeout(800);
+await p.locator('#pricing button:has-text("Yearly")').click();
+await p.waitForTimeout(600);
+await p.locator('#pricing').screenshot({ path: `${out}/prod-yearly.png` });
+const t = await p.locator('#pricing').innerText();
+console.log('yearly state:', JSON.stringify(t.match(/\$32\.50|\$390 billed yearly[^\n]*|30-day money back[^\n]*/g)));
+console.log('errors:', errs.length ? errs.join(' | ') : 'none');
+await b.close();

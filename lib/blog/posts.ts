@@ -6,6 +6,7 @@ import * as aiReferral from '@/content/posts/why-getting-your-business-mentioned
 import * as forBusinessOwners from '@/content/posts/faqflo-for-business-owners.mdx';
 import * as faqPlugins from '@/content/posts/why-faq-plugins-arent-a-good-idea.mdx';
 import * as whatIsAeo from '@/content/posts/what-is-aeo.mdx';
+import * as aeoGeoGuide from '@/content/posts/simple-aeo-and-geo-guide-for-business-owners.mdx';
 
 /*
   The post registry.
@@ -59,6 +60,7 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  aeoGeoGuide,
   pickupTime,
   blockingChatgpt,
   elevatorPitch,
