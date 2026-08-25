@@ -1,4 +1,5 @@
 import { FaqGenerator } from '@/components/generator/faq-generator';
+import { BuiltForOwners } from '@/components/marketing/built-for-owners';
 import { FinalCta } from '@/components/marketing/final-cta';
 import { Hero } from '@/components/marketing/hero';
 import { HowItWorks } from '@/components/marketing/how-it-works';
@@ -83,12 +84,17 @@ export default function Home() {
 
       <Hero />
 
-      {/* The audit band that used to sit here now lives at /free-report.
+      {/* The audit band that used to sit here moved to /free-report — the hero
+          takes a domain and starts a real check itself now, so a second form
+          asking for the same thing four hundred pixels below it meant two ways
+          to begin with different outcomes.
 
-          It was the lead hook when the hero only had two buttons. The hero now
-          takes a domain and starts a real check with it, so keeping a second
-          form asking for the same thing directly underneath meant two ways to
-          begin, four hundred pixels apart, with different outcomes. */}
+          What fills the slot instead answers the question the hero raises but
+          never answers: what is this, and is it for me. On white, because the
+          hero is bloom over cloud and Stats below is tint-blue — white is the
+          only choice that keeps a seam on both sides. */}
+      <BuiltForOwners />
+
       <Stats />
       <WhyFaqs />
 
