@@ -52,7 +52,7 @@ export default async function SignUpPage({
           in five places. Saying so here stops the form reading as a wall in
           front of something that was advertised as open. */}
       <p className="text-slate mt-5 text-xs leading-relaxed">
-        Just want the free check? <AuthLink href="/#audit">Run it without an account</AuthLink>.
+        Just want the free check? <AuthLink href="/free-report">Run it without an account</AuthLink>.
       </p>
     </AuthCard>
   );

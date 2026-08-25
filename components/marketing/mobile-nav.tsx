@@ -137,7 +137,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
         <div className="border-line mt-auto flex flex-col gap-4 border-t pt-5">
           <NavAccountLink />
           <ButtonLink
-            href="/#audit"
+            href="/free-report"
             size="sm"
             arrow
             onClick={() => setOpen(false)}

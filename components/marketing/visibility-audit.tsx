@@ -110,19 +110,36 @@ export function VisibilityAudit() {
 
   const band = result ? scoreBand(result.score) : null;
 
+  /*
+    No id and no scroll-mt on the section any more. Both existed so that
+    /#audit could scroll to this band on the home page; it has its own URL now,
+    so there is nothing to scroll to and nothing to offset under the sticky
+    header.
+  */
   return (
-    <section id="audit" className="scroll-mt-24 bg-white px-5 py-20 sm:px-8 sm:py-24">
+    <section className="bg-white px-5 py-20 sm:px-8 sm:py-24">
       <div className="mx-auto max-w-4xl">
         <div className="mx-auto max-w-2xl text-center">
           <Badge tone="success">Free · No signup</Badge>
-          <h2 className="mt-5 text-[2rem] text-balance sm:text-[2.5rem]">
-            Can AI{' '}
+          {/* ⚠️ AN <h1>, BECAUSE THIS IS A PAGE NOW.
+
+              It was an <h2> while this was one band among ten on the home page,
+              under the hero's h1. It renders at app/(marketing)/free-report and
+              nowhere else, with nothing above it — so an h2 would leave that
+              page with no top-level heading at all. Put this component back
+              inside another page and this has to go back to an h2.
+
+              "Can AI read your site?" moved to the home page hero, which now
+              asks the question and starts the check. This names what the page
+              hands back instead. */}
+          <h1 className="mt-5 text-[2rem] text-balance sm:text-[2.5rem]">
+            See what AI{' '}
             <span className="relative inline-block">
-              read
+              sees
               <Underline className="text-accent absolute -bottom-2 left-0 h-3.5 w-full" />
             </span>{' '}
-            your site?
-          </h2>
+            on your site
+          </h1>
           <p className="text-slate mt-4 text-[1.0625rem] leading-relaxed">
             Enter your address. We&rsquo;ll fetch it the way an AI crawler does — no JavaScript —
             and tell you what it can and can&rsquo;t see.
@@ -142,8 +159,11 @@ export function VisibilityAudit() {
             placeholder="yourbusiness.com"
             className="border-line bg-cloud text-navy focus:border-primary min-w-0 flex-1 rounded-input border px-4 py-3 text-[0.9375rem] outline-none transition-colors duration-150"
           />
+          {/* The idle label names the thing you get; the pending one describes
+              what is happening. "Free Report…" would read as a noun with an
+              ellipsis stuck on it. */}
           <Button type="submit" size="lg" disabled={busy || !url.trim()}>
-            {busy ? 'Checking…' : 'Check my site'}
+            {busy ? 'Checking…' : 'Free Report'}
           </Button>
         </form>
 

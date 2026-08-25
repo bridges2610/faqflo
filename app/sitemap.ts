@@ -23,6 +23,10 @@ import { SITE_URL } from '@/lib/site';
 /** Static routes, highest intent first. */
 const PAGES: { path: string; changeFrequency: MetadataRoute.Sitemap[number]['changeFrequency']; priority: number }[] = [
   { path: '', changeFrequency: 'weekly', priority: 1 },
+  // The free report is the highest-intent page after the home page: it is what
+  // the nav, the footer and a dozen blog posts send people to, and it needs no
+  // account to use.
+  { path: '/free-report', changeFrequency: 'monthly', priority: 0.9 },
   { path: '/seo-guide', changeFrequency: 'monthly', priority: 0.8 },
   { path: '/done-for-you', changeFrequency: 'monthly', priority: 0.8 },
   { path: '/blog', changeFrequency: 'weekly', priority: 0.7 },

@@ -331,7 +331,7 @@ export default function DoneForYou() {
               interrupt someone who isn't. */}
           <p className="text-slate mt-7 text-[0.9375rem] leading-[1.8]">
             <strong className="text-navy">P.S.</strong> Not sure yet? Run the{' '}
-            <a href="/#audit" className="text-primary hover:text-primary-hover font-semibold">
+            <a href="/free-report" className="text-primary hover:text-primary-hover font-semibold">
               free visibility check
             </a>{' '}
             first — thirty seconds, no account. If AI can already read and cite you, I&rsquo;ll tell

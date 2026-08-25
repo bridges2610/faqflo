@@ -6,7 +6,6 @@ import { PricingTeaser } from '@/components/marketing/pricing-teaser';
 import { ProductShots } from '@/components/marketing/product-shots';
 import { SiteFaq } from '@/components/marketing/site-faq';
 import { Stats } from '@/components/marketing/stats';
-import { VisibilityAudit } from '@/components/marketing/visibility-audit';
 import { WhatIsAeo } from '@/components/marketing/what-is-aeo';
 import { WhoAndFeatures } from '@/components/marketing/who-and-features';
 import { WhyFaqs } from '@/components/marketing/why-faqs';
@@ -84,11 +83,12 @@ export default function Home() {
 
       <Hero />
 
-      {/* The lead hook goes directly under the hero: the headline makes a claim
-          about what AI can see, and this is where someone finds out whether it's
-          true of them. Everything else on the page argues; this measures. */}
-      <VisibilityAudit />
+      {/* The audit band that used to sit here now lives at /free-report.
 
+          It was the lead hook when the hero only had two buttons. The hero now
+          takes a domain and starts a real check with it, so keeping a second
+          form asking for the same thing directly underneath meant two ways to
+          begin, four hundred pixels apart, with different outcomes. */}
       <Stats />
       <WhyFaqs />
 

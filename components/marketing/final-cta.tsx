@@ -42,7 +42,7 @@ export function FinalCta() {
           </p>
         </div>
 
-        <ButtonLink href="/#audit" size="lg" arrow variant="dark" className="shrink-0">
+        <ButtonLink href="/free-report" size="lg" arrow variant="dark" className="shrink-0">
           Check my site
         </ButtonLink>
       </div>

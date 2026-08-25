@@ -601,7 +601,7 @@ export default function SeoGuide() {
                 the reason citations have to be measured separately. The only honest way to know is
                 to ask the engines the questions your customers ask and see whose name comes back —
                 which you can do by hand, for free, starting with the question in the checklist
-                below. <A href="/#audit">We&rsquo;ll also just run it for you.</A>
+                below. <A href="/free-report">We&rsquo;ll also just run it for you.</A>
               </Bridge>
             </Section>
 

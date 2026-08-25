@@ -5,7 +5,7 @@ const COLUMNS = [
   {
     heading: 'Product',
     links: [
-      { href: '/#audit', label: 'Free visibility check' },
+      { href: '/free-report', label: 'Free visibility check' },
       { href: '/#try', label: 'Free generator' },
       { href: '/#how', label: 'How it works' },
       { href: '/#pricing', label: 'Pricing' },

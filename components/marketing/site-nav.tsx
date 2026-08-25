@@ -64,7 +64,7 @@ export function SiteNav() {
         <div className="flex items-center gap-4 sm:gap-5">
           <div className="hidden items-center gap-4 sm:gap-5 md:flex">
             <NavAccountLink />
-            <ButtonLink href="/#audit" size="sm" arrow>
+            <ButtonLink href="/free-report" size="sm" arrow>
               Check my site
             </ButtonLink>
           </div>
