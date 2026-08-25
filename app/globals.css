@@ -130,6 +130,35 @@
 
 @layer utilities {
   /*
+    A progress bar arriving at its value, rather than being found at it.
+
+    ⚠️ THE FIRST AND ONLY @keyframes IN THIS CODEBASE, and it stays that way
+    unless something genuinely needs one. Every other piece of motion here is a
+    transition on hover or on a value change; a keyframe is for the one case a
+    transition cannot express — an element animating on first paint, with no
+    previous state to move from.
+
+    scaleX rather than width: it composites on the GPU and cannot reflow the
+    row of text beside it. `transform-origin: left` is applied by the utility
+    class in components/dashboard/meter.tsx, not here, so a bar that ever needs
+    to grow from the right can say so without a second keyframe.
+
+    Duration is deliberately close to the 500ms width transition the same fill
+    already uses, so a bar that mounts and a bar that updates move at the same
+    speed. The reduced-motion block above clamps this to 0.01ms like everything
+    else — the bar then simply starts full, which is the honest end state.
+  */
+  @keyframes meter-fill {
+    from {
+      transform: scaleX(0);
+    }
+  }
+
+  .motion-meter-fill {
+    animation: meter-fill 600ms var(--ease-bounce) both;
+  }
+
+  /*
     Fine film grain. Perfectly smooth gradients are one of the clearest signs a
     page was generated rather than made — real printed and photographed colour
     always has some noise in it. This is subtle by design: you shouldn't be able

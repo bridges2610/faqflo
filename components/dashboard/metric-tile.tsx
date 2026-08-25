@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Meter } from './meter';
 
 /*
   One figure in the row across the top of the dashboard.
@@ -29,6 +30,7 @@ export function MetricTile({
   icon,
   tint = 'bg-cloud text-slate border-line border',
   status,
+  progress,
 }: {
   /** Mono micro-label. Short — this is a column heading, not a sentence. */
   label: string;
@@ -58,6 +60,18 @@ export function MetricTile({
    * no word would be exactly the thing that note forbids.
    */
   status?: string;
+  /**
+   * A hairline bar under the figure, for a value that IS a ratio.
+   *
+   * ⚠️ ONLY when the tile's own value already prints both halves — "1/2" — so
+   * the bar is a second encoding of something readable rather than the only
+   * place the proportion exists. That is meter.tsx's standing contract.
+   *
+   * Most tiles must not have one. A count with no denominator ("5 answers",
+   * "5 gaps") has no proportion to draw, and a bar under it would invent a
+   * ceiling nobody set.
+   */
+  progress?: { value: number; total: number } | null;
 }) {
   const up = (change?.amount ?? 0) > 0;
 
@@ -99,6 +113,14 @@ export function MetricTile({
 
         {chart}
       </div>
+
+      {progress && progress.total > 0 && (
+        <Meter
+          className="mt-3"
+          value={(progress.value / progress.total) * 100}
+          animate
+        />
+      )}
 
       {footer && (
         <p className="text-slate mt-2 flex items-center gap-1.5 text-xs leading-relaxed">

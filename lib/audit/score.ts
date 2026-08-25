@@ -125,6 +125,67 @@ export function pillarBand(score: number | null): 'good' | 'mixed' | 'poor' | 'n
   return 'poor';
 }
 
+/**
+ * Plain-language banding for how often AI names you.
+ *
+ * ⚠️ THIS BANDS A RATE, NOT A SCORE, AND THE DIFFERENCE IS THE WHOLE POINT.
+ * scoreBand() above reads a weighted 0-100 built from findings. This reads a
+ * plain ratio — questions where an engine named you, over questions we asked —
+ * with both halves printed beside it wherever it is shown. Nothing is weighted,
+ * modelled or combined, which is what keeps it from being the "second scoring
+ * system that would disagree with the audit's" that
+ * components/dashboard/tracking-workspace.tsx rules out.
+ *
+ * It lives here, beside the other two vocabularies, so all the banding this
+ * product does is in one file and a fourth one is obviously a fourth one.
+ *
+ * ⚠️ THE THRESHOLDS ARE A JUDGEMENT, AND THE LABELS SAY ONLY WHAT THE RATIO
+ * SAYS. "Emerging" describes how often you were named. It does not promise a
+ * trend, predict anything, or claim a comparison against anybody else — there
+ * is no benchmark data behind it and inventing one would be exactly the kind of
+ * figure this product strips out of its own marketing.
+ *
+ * `tone` maps to Badge's tones. `dial` is the stroke for the ring, and both
+ * always travel with the label — colour never carries this alone.
+ */
+export function namedBand(rate: number): {
+  label: string;
+  headline: string;
+  tone: 'success' | 'cyan' | 'neutral';
+  dial: string;
+} {
+  if (rate >= 60) {
+    return {
+      label: 'Established',
+      headline: 'You are the answer more often than not',
+      tone: 'success',
+      dial: 'var(--color-success)',
+    };
+  }
+  if (rate >= 30) {
+    return {
+      label: 'Emerging',
+      headline: 'You are starting to show up',
+      tone: 'cyan',
+      dial: 'var(--color-accent)',
+    };
+  }
+  if (rate > 0) {
+    return {
+      label: 'Barely there',
+      headline: 'You are barely on the radar',
+      tone: 'neutral',
+      dial: 'var(--color-sky)',
+    };
+  }
+  return {
+    label: 'Not showing up',
+    headline: 'AI is not naming you yet',
+    tone: 'neutral',
+    dial: 'var(--color-line)',
+  };
+}
+
 export function pillarWeight(id: PillarId): number {
   return PILLARS.find((p) => p.id === id)?.weight ?? 0;
 }

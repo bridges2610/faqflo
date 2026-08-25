@@ -17,6 +17,18 @@
 
   A minimum width on the fill keeps a small non-zero value visible; a bar that
   renders as nothing for 1 out of 400 reads as zero, which is a different claim.
+
+  ⚠️ `animate` IS CSS-ONLY, AND THAT IS A CONSTRAINT RATHER THAN A PREFERENCE.
+
+  The obvious way to fill a bar on mount is to hold the width in state and set
+  it in an effect. That would make this a Client Component, and
+  run-progress.tsx renders it from a Server Component — so the whole file has to
+  stay free of hooks. A keyframe on the fill does the same job with no state,
+  no effect and nothing added to the bundle.
+
+  It also stays honest under prefers-reduced-motion for free: the global block
+  in globals.css clamps every animation-duration to 0.01ms, so the bar arrives
+  at its true width instantly rather than not arriving.
 */
 const TONES = {
   primary: 'bg-primary',
@@ -29,11 +41,22 @@ const TONES = {
 export function Meter({
   value,
   tone = 'primary',
+  animate = false,
   className = '',
 }: {
   /** 0–100. Clamped, so a caller's arithmetic can't overflow the track. */
   value: number;
   tone?: keyof typeof TONES;
+  /**
+   * Grow from empty on first paint.
+   *
+   * For bars that show a standing figure — how much of something is done — so
+   * the shape reads as progress rather than as a static block of colour. Leave
+   * it off for anything that updates in place: a bar already mid-flight, like
+   * a live scan or run, should move by its width transition from wherever it
+   * was, not restart from zero every time the number changes.
+   */
+  animate?: boolean;
   className?: string;
 }) {
   const pct = Math.max(0, Math.min(100, value));
@@ -44,7 +67,9 @@ export function Meter({
       aria-hidden="true"
     >
       <div
-        className={`h-full rounded-full transition-all duration-500 ${TONES[tone]}`}
+        className={`h-full origin-left rounded-full transition-all duration-500 ${TONES[tone]} ${
+          animate ? 'motion-meter-fill' : ''
+        }`}
         style={{ width: pct === 0 ? '0%' : `${Math.max(2, pct)}%` }}
       />
     </div>

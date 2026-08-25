@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { ScoreDial } from '@/components/ui/score-dial';
+import { Sparkle } from '@/components/ui/doodle';
 import { scoreBand } from '@/lib/audit/score';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
@@ -13,11 +15,14 @@ import { auditHistory } from '@/lib/dashboard/store';
 import type { AuditRunRow } from '@/lib/supabase/types';
 import { buildWorklist, setupSteps, standing } from '@/lib/dashboard/worklist';
 import { DoneForYouCard } from './done-for-you-card';
+import { VisibilityPanel } from './visibility-panel';
 import { MetricTile } from './metric-tile';
-import { AeoIcon, FaqIcon, GlobeIcon, SearchIcon } from './nav-icons';
+import { MicroLabel } from './micro-label';
+import { FaqIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { SetupChecklist } from './setup-checklist';
 import { Sparkline } from './sparkline';
+import { StatRow } from './stat-row';
 import { TaskRow } from './task-row';
 
 /*
@@ -51,19 +56,17 @@ function greeting(): string {
   return 'Good evening';
 }
 
-/**
- * The dot beside the score band.
- *
- * Thresholds match scoreBand() in lib/audit/score.ts so the colour and the word
- * can never disagree — a "Strong" label next to an amber dot is worse than no
- * dot at all. Cyan is a fill here, which is the only way --color-accent may be
- * used.
- */
-function bandDot(score: number): string {
-  if (score >= 85) return 'bg-success';
-  if (score >= 60) return 'bg-accent';
-  return 'bg-error';
-}
+/*
+  bandDot() used to live here — a coloured dot beside the score, with a note
+  explaining that its thresholds had to match scoreBand() so the colour and the
+  word could never disagree.
+
+  It went with the Visibility tile. The score card that replaced that tile leads
+  with the band WORD as its heading and the band's own summary sentence
+  underneath, so the verdict is now carried by language at full size. A dot
+  beside it would be a third encoding of something already said twice — and the
+  rule it was obeying (colour never alone) is satisfied more plainly without it.
+*/
 
 export function OverviewWorkspace() {
   const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
@@ -116,8 +119,6 @@ export function OverviewWorkspace() {
   const tasks = buildWorklist(input);
   const state = standing(input);
   const band = report ? scoreBand(report.score) : null;
-  const cited = tracking?.latest.filter((c) => c.outcome === 'cited').length ?? 0;
-  const checks = tracking?.latest.length ?? 0;
 
   /*
     ⚠️ SAME DEPTH ONLY, and this is where that rule is enforced for both the
@@ -156,29 +157,76 @@ export function OverviewWorkspace() {
       />
 
       {/*
-        One card, four cells, hairline dividers — not four floating cards. Four
-        shadows across the top of a page read as four separate things competing;
-        divided cells read as one row of figures, which is what they are.
+        Whether AI names you, first — it is what the subscription is for, and
+        the audit exists in service of it.
       */}
-      <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-4">
-        <MetricTile
-          label="Visibility"
-          icon={<AeoIcon className="h-3.5 w-3.5" />}
-          tint="bg-primary-soft text-primary"
-          value={report ? report.score : '—'}
-          footer={report ? `${band!.label} · ${timeAgo(report.checkedAt)}` : 'not checked yet'}
-          /* Colour beside the band WORD, never instead of it — see the note on
-             MetricTile's `status` prop. */
-          status={report ? bandDot(report.score) : undefined}
-          change={movement !== null ? { amount: movement, unit: 'pts' } : null}
-          chart={<Sparkline values={trend} label="Visibility score" />}
-          href="/dashboard/audit"
-        />
+      <VisibilityPanel tracking={tracking} />
+
+      {/*
+        Then whether AI can read you.
+
+        ⚠️ A STRIP, NOT A CARD, AND THE DEMOTION IS THE POINT. This was the
+        opener until the visibility panel arrived above it. Two full-height
+        score cards stacked would be the "identical full-width rectangles"
+        this file's header comment says made the screen feel unfinished — so
+        this one gives up its vertical padding and puts everything on one line.
+
+        It keeps the GRADIENT dial while the panel above uses a banded one.
+        That is not an inconsistency: this figure is also printed and
+        screenshotted on its own from the audit page, where no band word would
+        travel with it. See the header of score-dial.tsx.
+      */}
+      {report && (
+        <Card className="mb-5 px-5 py-4">
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
+            <ScoreDial score={report.score} size="sm" />
+
+            <div className="min-w-0 text-center sm:text-left">
+              <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
+                <MicroLabel>Can AI read your site</MicroLabel>
+                <h3 className="text-navy text-[1.0625rem] font-bold tracking-normal">
+                  {band!.label}
+                </h3>
+                {movement !== null && movement !== 0 && (
+                  <span
+                    className={`text-xs font-semibold ${movement > 0 ? 'text-success-ink' : 'text-error-ink'}`}
+                  >
+                    {movement > 0 ? 'Up' : 'Down'} {Math.abs(movement)} pts
+                  </span>
+                )}
+                <span className="text-slate text-xs">{timeAgo(report.checkedAt)}</span>
+                {/* Renders nothing under three comparable runs — see
+                    sparkline.tsx. Inline here so its absence closes up rather
+                    than leaving a hole. */}
+                <Sparkline values={trend} label="Visibility score" />
+              </div>
+
+              <p className="text-slate mt-1 max-w-xl text-sm leading-relaxed">{band!.summary}</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/*
+        One card, three cells, hairline dividers — not three floating cards.
+        Separate shadows across the top of a page read as separate things
+        competing; divided cells read as one row of figures, which is what they
+        are. (It was four until Visibility became the score card above.)
+      */}
+      <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-3">
         <MetricTile
           label="Pages live"
           icon={<GlobeIcon className="h-3.5 w-3.5" />}
           tint="bg-accent-soft text-teal-ink"
           value={state.totalGroups === 0 ? '—' : `${state.liveGroups}/${state.totalGroups}`}
+          /* The only tile whose value is a ratio, so the only one with a bar.
+             Guarded on totalGroups because a brand-new account shows "—" and an
+             empty track under a dash would claim a zero out of nothing. */
+          progress={
+            state.totalGroups > 0
+              ? { value: state.liveGroups, total: state.totalGroups }
+              : null
+          }
           footer={
             state.staleGroups > 0
               ? `${state.staleGroups} out of date`
@@ -233,7 +281,17 @@ export function OverviewWorkspace() {
           ) : (
             report && (
               <Card className="p-5 sm:p-7">
-                <h2 className="text-[0.9375rem] font-bold tracking-normal">Nothing needs you right now</h2>
+                {/* The one doodle in the dashboard, and it is here because this
+                    is the one screen state that marks something achieved rather
+                    than something to do. Everywhere else a hand-drawn mark
+                    would be decoration on a working tool — nav-icons.tsx says
+                    as much about why the loose marks are wrong for navigation.
+                    Fill-only cyan, as globals.css requires: it sits beside the
+                    words, never carrying them. */}
+                <h2 className="flex items-center gap-2 text-[0.9375rem] font-bold tracking-normal">
+                  <Sparkle className="text-accent h-4 w-4 shrink-0" />
+                  Nothing needs you right now
+                </h2>
                 <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
                   Your answers are live and current, and the last check found nothing worth
                   fixing. Come back after your next round of changes to the site.
@@ -246,32 +304,44 @@ export function OverviewWorkspace() {
         <div className="mt-5 space-y-5 lg:mt-0">
           {report && (
             <Card className="p-5">
-              <h2 className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-                About this site
-              </h2>
-              <dl className="divide-line mt-3 divide-y text-sm">
-                <Row
-                  term="Pages read"
-                  value={`${report.crawled.length} of ${Math.max(report.discovered, report.crawled.length)}`}
+              <MicroLabel>About this site</MicroLabel>
+
+              {/* ⚠️ THE RATIOS GET BARS; THE FACTS DO NOT.
+
+                  These rows used to be one undifferentiated list of
+                  right-aligned text, which made "1 of 4" and "Roofing
+                  contractor" look like the same kind of statement. The
+                  proportions now read as proportions; industry and service area
+                  are facts with no denominator, and a bar under either would be
+                  decoration pretending to be data.
+
+                  ⚠️ "AI citations" USED TO BE HERE AND DELIBERATELY IS NOT.
+                  It lives in the visibility panel at the top of the page now.
+                  Two reasons beyond tidiness: a citation count is not a fact
+                  about the crawl, and this whole card is gated on `report` —
+                  so an account that had been checked but never audited saw
+                  nothing at all from Results on this screen. */}
+              <div className="divide-line mt-2 divide-y">
+                <StatRow
+                  label="Pages read"
+                  value={report.crawled.length}
+                  total={Math.max(report.discovered, report.crawled.length)}
                 />
-                <Row
-                  term="With FAQ markup"
-                  value={report.pages ? `${pagesWithFaq} of ${report.pages.length}` : '—'}
+                <StatRow
+                  label="With FAQ markup"
+                  value={pagesWithFaq}
+                  total={report.pages ? report.pages.length : null}
+                  note="—"
                 />
-                {/* "Not set", not "unknown": on a site that has never run a
-                    full audit we did not look and fail — there was nothing to
-                    look at. "Unknown" implied a dead end, which is what this
-                    row used to be. */}
+              </div>
+
+              {/* "Not set", not "unknown": on a site that has never run a full
+                  audit we did not look and fail — there was nothing to look at.
+                  "Unknown" implied a dead end, which is what this row used to
+                  be. */}
+              <dl className="divide-line border-line mt-1 divide-y border-t text-sm">
                 <Row term="Industry" value={site.industry ?? 'Not set'} />
                 <Row term="Service area" value={site.location ?? 'Not set'} />
-                <Row
-                  term="AI citations"
-                  /* ⚠️ Honestly or not at all. Without a run behind it a zero
-                     would read as "nobody is citing you", which we would not have
-                     measured. `checks > 0` is what makes this a count rather than
-                     an assumption. */
-                  value={checks > 0 ? `${cited} of ${checks}` : 'not measured'}
-                />
               </dl>
 
               {/* ⚠️ Where these two values came from changes how much to trust
@@ -307,9 +377,7 @@ export function OverviewWorkspace() {
           )}
 
           <Card tone="cloud" className="p-5">
-            <h2 className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-              Learn
-            </h2>
+            <MicroLabel>Learn</MicroLabel>
             <ul className="mt-3 space-y-3.5">
               <LearnLink
                 href="/blog/what-is-aeo"

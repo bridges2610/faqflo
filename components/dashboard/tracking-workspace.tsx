@@ -19,6 +19,7 @@ import {
   type Engine,
   type SiteTracking,
 } from '@/lib/dashboard/types';
+import { groupByQuestion, type QuestionGroup } from '@/lib/dashboard/questions';
 import { AnswerText } from './answer-text';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
@@ -90,14 +91,6 @@ function prettyUrl(url: string): string {
 }
 
 
-/** Every check we hold for one question, in ENGINES order. */
-type QuestionGroup = {
-  question: string;
-  checks: CitationCheck[];
-  /** Most recent sighting across the group — what "2 days ago" should mean. */
-  checkedAt: string;
-  sources: number;
-};
 
 /**
  * One question, and what each engine said about it.
@@ -699,37 +692,18 @@ export function TrackingWorkspace() {
   const shareTop = Math.max(...shareRows.map((c) => c.citations), 1);
 
   /*
-    The evidence table's filter.
-
-    Row-per-engine rather than grouped by question: each row carries its own
-    answer text, its own source list and its own `citedInstead`, and those are
-    the things being examined. Grouping would have to throw two of the three
-    away to merge them.
-  */
-  /*
     One row per question, holding every engine's check.
 
     ⚠️ A CONTAINER, NOT A SUMMARY. Each check keeps its own answer, sources and
     `citedInstead` — see the note on QuestionRow. `latest` is untouched;
     everything else on this page still reads the deduped pair rows.
+
+    The grouping itself moved to lib/dashboard/questions.ts when Home grew a
+    per-question breakdown of its own. It is the same transform on both screens
+    deliberately: a second copy here would be free to disagree with that one
+    about how many questions a customer has.
   */
-  const groups: QuestionGroup[] = [];
-  {
-    const byQuestion = new Map<string, QuestionGroup>();
-    for (const check of latest) {
-      let group = byQuestion.get(check.question);
-      if (!group) {
-        group = { question: check.question, checks: [], checkedAt: check.checkedAt, sources: 0 };
-        byQuestion.set(check.question, group);
-        groups.push(group);
-      }
-      group.checks.push(check);
-      group.sources += check.sources.length;
-      // The freshest sighting, so "2 days ago" is the most recent evidence
-      // rather than whichever engine happened to be stored first.
-      if (check.checkedAt > group.checkedAt) group.checkedAt = check.checkedAt;
-    }
-  }
+  const groups = groupByQuestion(latest);
 
   /*
     Chips carry BOTH units, because the row and the tile above count different

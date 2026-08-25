@@ -5,12 +5,22 @@
  * it against and no series to plot. The ring exists to make the number feel
  * measured rather than asserted.
  *
- * The arc runs the brand gradient — primary into sky into accent — at every
- * value on purpose. Colouring it by band (red at 30, green at 90) would put
- * the verdict in hue alone, which carries no meaning for a colourblind reader
- * and none at all in print. The gradient is the same at 12 as it is at 98, so
- * it decorates without claiming anything; the band's meaning is stated in
- * words beside it instead.
+ * ⚠️ TWO TONES, AND THE RULE THEY BOTH OBEY IS THE SAME ONE.
+ *
+ * `gradient` (the default, and what the audit score uses) runs primary into sky
+ * into accent at EVERY value on purpose. The audit dial sits above a band label
+ * and a summary sentence, but it is also the thing people screenshot and print
+ * on its own — so its arc deliberately claims nothing. The gradient is the same
+ * at 12 as it is at 98, and the meaning is carried entirely by the words.
+ *
+ * `band` paints one flat colour chosen by the caller's banding. That is NOT a
+ * reversal of the rule above, which is that colour must never carry a verdict
+ * ALONE: the only caller is the visibility panel, where the band's word sits
+ * immediately beside the ring and the counts sit under it, so the hue is a
+ * third encoding of something already said twice. Put this tone anywhere the
+ * word is not adjacent and it becomes exactly what the gradient exists to
+ * avoid — a colourblind reader sees an arc of some length, and a printed page
+ * sees grey.
  */
 
 /*
@@ -24,16 +34,36 @@ const GRADIENT_ID = 'score-dial-arc';
 export function ScoreDial({
   score,
   size = 'md',
+  caption = 'out of 100',
+  stroke,
+  figure,
 }: {
+  /** 0–100. Drives the arc length whatever the caption says the unit is. */
   score: number;
   size?: 'sm' | 'md';
+  /** The mono line under the number. */
+  caption?: string;
+  /**
+   * A flat colour for the arc, from the caller's banding.
+   *
+   * ⚠️ Only legal where the band's WORD is adjacent — see the header. Omitted,
+   * the arc runs the brand gradient and claims nothing, which is the right
+   * default and what every existing call site gets.
+   *
+   * Passing this also paints a track behind the arc: a banded ring is being
+   * read as "how full", so the remainder needs to be visible. The gradient dial
+   * deliberately has no track — there the gap says the same thing the grey did.
+   */
+  stroke?: string;
+  /** Overrides the centre number, for a unit the score isn't in — "40%". */
+  figure?: string;
 }) {
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   const filled = (Math.max(0, Math.min(100, score)) / 100) * circumference;
 
   const box = size === 'sm' ? 'h-24 w-24' : 'h-32 w-32';
-  const figure = size === 'sm' ? 'text-[1.5rem]' : 'text-[2rem]';
+  const figureSize = size === 'sm' ? 'text-[1.5rem]' : 'text-[2rem]';
 
   return (
     <div className={`relative shrink-0 ${box}`}>
@@ -73,18 +103,33 @@ export function ScoreDial({
           </linearGradient>
         </defs>
 
-        {/* No track ring behind the arc. The unfilled remainder was the only
-            grey on the card, and leaving it out lets the arc read as a mark
-            rather than as a meter — the gap says the same thing the grey did.
+        {/* The track, and ONLY in band mode.
 
-            An SVG circle's path starts at 3 o'clock, so the arc is turned back
+            The gradient dial has none: its unfilled remainder was the only grey
+            on the card, and leaving it out lets the arc read as a mark rather
+            than as a meter — the gap says the same thing the grey did. A banded
+            ring is doing the opposite job. It is read as "how full", against a
+            band word that names how full is full, and a proportion with no
+            visible whole is half a statement. */}
+        {stroke && (
+          <circle
+            cx="60"
+            cy="60"
+            r={radius}
+            fill="none"
+            stroke="var(--color-line)"
+            strokeWidth="8"
+          />
+        )}
+
+        {/* An SVG circle's path starts at 3 o'clock, so the arc is turned back
             a quarter to begin at the top. */}
         <circle
           cx="60"
           cy="60"
           r={radius}
           fill="none"
-          stroke={`url(#${GRADIENT_ID})`}
+          stroke={stroke ?? `url(#${GRADIENT_ID})`}
           strokeWidth="8"
           /* A round cap on a zero-length dash still paints a dot, which reads
              as a rounding bug at the one score where the ring should be empty. */
@@ -94,11 +139,13 @@ export function ScoreDial({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`font-display text-navy leading-none font-extrabold tabular-nums ${figure}`}>
-          {score}
+        <span
+          className={`font-display text-navy leading-none font-extrabold tabular-nums ${figureSize}`}
+        >
+          {figure ?? score}
         </span>
         <span className="text-slate mt-1 font-mono text-[0.625rem] tracking-wide uppercase">
-          out of 100
+          {caption}
         </span>
       </div>
     </div>

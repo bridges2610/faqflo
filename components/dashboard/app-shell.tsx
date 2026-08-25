@@ -388,8 +388,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
  * losing the page is kinder than making someone guess.
  */
 function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void }) {
+  /*
+    rounded-xl, not `rounded-card`. That was a typo for a token which has never
+    existed — globals.css defines input/lg/xl/2xl/pill and no `card` — so
+    Tailwind emitted nothing for it and this panel rendered with square corners
+    while every other card on the screen was rounded. rounded-xl is the radius
+    Card itself uses.
+  */
   return (
-    <div role="alert" className="border-line rounded-card border bg-white p-6 sm:p-8">
+    <div role="alert" className="border-line rounded-xl border bg-white p-6 sm:p-8">
       <h1 className="text-navy text-lg font-semibold">We couldn&rsquo;t load your dashboard</h1>
       <p className="text-slate mt-2 text-sm leading-relaxed">
         Your pages, answers and questions are saved — we just couldn&rsquo;t reach them this time.
