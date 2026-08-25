@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { DoneForYouCard } from '@/components/dashboard/done-for-you-card';
 import { OnboardingStart } from '@/components/dashboard/onboarding-start';
 import { PageHeader } from '@/components/dashboard/page-header';
+import { currentUser } from '@/lib/auth/dal';
+import { canOfferDoneForYou } from '@/lib/auth/entitlements';
 
 export const metadata: Metadata = { title: 'Setting up' };
 
@@ -31,6 +33,13 @@ export default async function StartPage({
 }) {
   const { domain } = await searchParams;
 
+  /*
+    Only to decide whether the offer below renders. currentUser() is
+    cache()-wrapped and the (app) layout already awaited it in this request, so
+    this is a second read of the same row rather than a second query.
+  */
+  const user = await currentUser();
+
   return (
     <>
       <PageHeader
@@ -40,19 +49,30 @@ export default async function StartPage({
       <OnboardingStart domain={domain?.trim() || null} />
 
       {/*
-        Offered here because this is the one screen with nothing to do on it.
-        The scan is running and they are watching a progress bar — which is both
-        the calmest moment in the product to read an offer and the last one
-        before the work lands on them.
+        ⚠️ PRO ONLY, WHICH IN PRACTICE MEANS ALMOST NOBODY SEES IT HERE.
 
-        Static, so this page stays a server component.
+        This is where new free signups land, so the gate removes the offer from
+        onboarding for most of the people who reach this screen. That is the
+        intent, not an oversight: /done-for-you quotes $497 without mentioning
+        the subscription it sits on top of, and that page's own comment calls
+        "every reader already pays" a load-bearing assumption. A free account
+        reading the offer here is exactly the stranger that warning describes.
+
+        The placement argument still holds for whoever does see it — the scan is
+        running, they are watching a progress bar, and it is the calmest moment
+        in the product to read an offer. It just no longer applies to the free
+        account this screen was mostly built for.
+
+        The guard wraps the spacer too, so a hidden card leaves no gap.
       */}
-      <div className="mt-5">
-        <DoneForYouCard
-          title="Or skip the whole thing"
-          body="While that runs — if you’d rather not do any of this yourself, I’ll do it all by hand. A login and half an hour is all I need."
-        />
-      </div>
+      {canOfferDoneForYou(user) && (
+        <div className="mt-5">
+          <DoneForYouCard
+            title="Or skip the whole thing"
+            body="While that runs — if you’d rather not do any of this yourself, I’ll do it all by hand. A login and half an hour is all I need."
+          />
+        </div>
+      )}
     </>
   );
 }

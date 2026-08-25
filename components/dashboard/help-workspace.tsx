@@ -277,7 +277,14 @@ function firstName(name: string | null): string | null {
   return trimmed.split(/\s+/)[0] || null;
 }
 
-export function HelpWorkspace({ name }: { name: string | null }) {
+export function HelpWorkspace({
+  name,
+  /** Pro accounts only get the done-for-you offer above the contact form. */
+  pro,
+}: {
+  name: string | null;
+  pro: boolean;
+}) {
   const who = firstName(name);
 
   return (
@@ -844,13 +851,19 @@ export function HelpWorkspace({ name }: { name: string | null }) {
               it here means they get to choose. It does not replace the form —
               plenty of people scrolling past this genuinely just have a
               question.
+
+              Pro only, and the guard takes the spacer with it so a free
+              account gets the form straight after the paragraph rather than a
+              gap where an advert used to be.
             */}
-            <div className="mt-5">
-              <DoneForYouCard
-                title="Or don’t do any of it"
-                body="Don’t fancy working an audit and pasting HTML into your CMS? Completely fair. I’ll do the whole thing by hand instead."
-              />
-            </div>
+            {pro && (
+              <div className="mt-5">
+                <DoneForYouCard
+                  title="Or don’t do any of it"
+                  body="Don’t fancy working an audit and pasting HTML into your CMS? Completely fair. I’ll do the whole thing by hand instead."
+                />
+              </div>
+            )}
 
             <div className="mt-5">
               <ContactForm />

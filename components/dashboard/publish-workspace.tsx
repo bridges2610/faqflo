@@ -271,6 +271,14 @@ export function PublishWorkspace() {
             else do this?" occurs to anyone it is going to occur to. Only shown
             once there is something to publish; offering to do a job that does
             not exist yet is noise. */}
+        {/* ⚠️ PRO-ONLY BY SOMEBODY ELSE'S RULE. The card is gated everywhere it
+            renders, but this is the one place with no gate of its own:
+            canPublish(user) early-returns an UpgradeCard far above, so a free
+            account never reaches this line and a second check here would be
+            dead code. That makes the offer's visibility ride on canPublish —
+            whose own docblock says it "used to be [permanent], for a reason
+            that no longer holds", so it is a rule that has moved before. If it
+            ever admits free accounts, add canOfferDoneForYou(user) here. */}
         {groups.length > 0 && <DoneForYouCard />}
 
         {/* Site-wide, not per group: there is only one /llms.txt at a domain,

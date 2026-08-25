@@ -420,6 +420,29 @@ export function canPublish(user: User | null): boolean {
 }
 
 /**
+ * May we offer the done-for-you service to this account?
+ *
+ * ⚠️ THE ODD ONE OUT: IT GATES A PITCH, NOT A FEATURE. Everything else here
+ * answers "may they use this". Nobody is being denied anything by this one —
+ * DoneForYouCard is an advert, and hiding an advert takes nothing away.
+ *
+ * It is named rather than written as bare isPro() at four call sites because
+ * the reason lives in another file entirely. /done-for-you quotes $497 and
+ * deliberately does not mention the Pro subscription on top, on the stated
+ * grounds that every reader already pays — and calls that assumption
+ * load-bearing, because a stranger reads "$497 once" as all-in and the second
+ * charge becomes a refund. This function is that assumption. Loosen it and the
+ * order has to go back into that page's copy in the same commit.
+ *
+ * ⚠️ NOT AN EntitlementId. See the header of
+ * components/dashboard/done-for-you-card.tsx: the service never touches Stripe,
+ * so this must not grow into the checkout route or UpgradeCard.
+ */
+export function canOfferDoneForYou(user: User | null): boolean {
+  return isPro(user);
+}
+
+/**
  * May a check run for this account at all — by anyone, including the scheduler.
  *
  * True on free as well, and that is not a mistake: free buys one run, metered

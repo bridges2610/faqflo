@@ -7,7 +7,7 @@ import { Card } from '@/components/ui/card';
 import { scoreBand } from '@/lib/audit/score';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canTrack } from '@/lib/dashboard/plans';
+import { canOfferDoneForYou, canTrack } from '@/lib/dashboard/plans';
 import { timeAgo } from '@/lib/dashboard/format';
 import { auditHistory } from '@/lib/dashboard/store';
 import type { AuditRunRow } from '@/lib/supabase/types';
@@ -343,12 +343,18 @@ export function OverviewWorkspace() {
             would resolve to p-7 in here. Copy is shorter than the default for
             the same reason: this column is a third the width of the Publish
             page the default wording was written for.
+
+            Pro only. `user` is null for the provider's first frame and
+            isPro(null) is false, so the card stays out rather than appearing
+            and then vanishing once the plan loads.
           */}
-          <DoneForYouCard
-            tone="white"
-            compact
-            body="I’ll set the whole thing up by hand and get it live on your site."
-          />
+          {canOfferDoneForYou(user) && (
+            <DoneForYouCard
+              tone="white"
+              compact
+              body="I’ll set the whole thing up by hand and get it live on your site."
+            />
+          )}
         </div>
       </div>
 

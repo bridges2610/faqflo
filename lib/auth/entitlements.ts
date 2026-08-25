@@ -85,6 +85,20 @@ export function canPublish(user: ProfileRow | null): boolean {
 }
 
 /**
+ * May we offer the done-for-you service to this account?
+ *
+ * The twin of canOfferDoneForYou in lib/dashboard/plans.ts, which carries the
+ * reasoning. Unlike its neighbours here this enforces nothing — it decides
+ * whether an advert renders on the two dashboard screens that are Server
+ * Components, and there is no request to reject if somebody gets past it. A
+ * stranger who reaches /done-for-you anyway still meets the form's own "On Pro
+ * yet?" question, which is the actual backstop.
+ */
+export function canOfferDoneForYou(user: ProfileRow | null): boolean {
+  return isPro(user);
+}
+
+/**
  * May a check run for this account at all — by anyone, including the scheduler?
  *
  * ⚠️ TRUE ON FREE, AND ONLY BECAUSE OF THE METER. Free buys one run: five
