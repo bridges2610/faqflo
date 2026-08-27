@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   LANGUAGES,
+  MAX_FAQ_COUNT,
   MAX_FAQ_COUNT_PRO,
   DEFAULT_FAQ_COUNT_PRO,
   MIN_FAQ_COUNT,
@@ -15,6 +16,7 @@ import {
 } from '@/lib/faq';
 import type { FaqGroup } from '@/lib/dashboard/types';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { isPro } from '@/lib/dashboard/plans';
 import { SectionTitle } from './section-title';
 
 /*
@@ -29,10 +31,23 @@ import { SectionTitle } from './section-title';
 
 type Mode = 'text' | 'url';
 
-const COUNTS = Array.from(
-  { length: MAX_FAQ_COUNT_PRO - MIN_FAQ_COUNT + 1 },
-  (_, i) => MIN_FAQ_COUNT + i,
-);
+/*
+  How many answers this account may ask for in one go.
+
+  ⚠️ THE DROPDOWN MUST NOT OFFER WHAT THE SERVER WILL CLAMP. Free is capped at
+  MAX_FAQ_COUNT per call in app/api/dashboard/generate/route.ts, so a fixed
+  1–12 list would let a free user choose twelve, receive five, and have nothing
+  on screen explain the difference.
+
+  This panel used to have no plan awareness at all and a worse version of the
+  same problem: it rendered the full form to a free account whose first click
+  came back "Writing new answers is part of Pro." Generation is open to every
+  plan now; what differs is the ceiling, and the ceiling is visible.
+*/
+function countsFor(pro: boolean): number[] {
+  const max = pro ? MAX_FAQ_COUNT_PRO : MAX_FAQ_COUNT;
+  return Array.from({ length: max - MIN_FAQ_COUNT + 1 }, (_, i) => MIN_FAQ_COUNT + i);
+}
 
 export type GenerationMeta = { tone: Tone; language: Language };
 
@@ -58,11 +73,19 @@ export function GeneratorPanel({
   onTargetChange?: (id: string) => void;
   disabled?: boolean;
 }) {
-  const { site } = useDashboard();
+  const { site, user } = useDashboard();
+  const pro = isPro(user);
+  const counts = countsFor(pro);
+
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
-  const [count, setCount] = useState<number>(DEFAULT_FAQ_COUNT_PRO);
+  /* Clamped for the same reason the list is: the Pro default is above free's
+     ceiling, and an initial value the dropdown cannot show would submit a
+     number the server then quietly reduces. */
+  const [count, setCount] = useState<number>(
+    Math.min(DEFAULT_FAQ_COUNT_PRO, counts[counts.length - 1]),
+  );
   const [tone, setTone] = useState<Tone>('Professional');
   const [language, setLanguage] = useState<Language>('English');
   const [busy, setBusy] = useState(false);
@@ -240,7 +263,7 @@ export function GeneratorPanel({
             onChange={(e) => setCount(Number(e.target.value))}
             className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
           >
-            {COUNTS.map((n) => (
+            {counts.map((n) => (
               <option key={n} value={n}>
                 {n} questions
               </option>

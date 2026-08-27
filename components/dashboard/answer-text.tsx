@@ -18,7 +18,11 @@ import { parseAnswer, type Token } from '@/lib/dashboard/answer-markdown';
   lib/dashboard/answer-markdown.ts so it can be tested without a renderer.
 */
 
-function render(tokens: Token[], keyPrefix = ''): ReactNode {
+function render(
+  tokens: Token[],
+  keyPrefix = '',
+  isHighlighted?: (href: string) => boolean,
+): ReactNode {
   return tokens.map((token, i) => {
     const key = `${keyPrefix}${i}`;
 
@@ -26,25 +30,44 @@ function render(tokens: Token[], keyPrefix = ''): ReactNode {
       case 'bold':
         return (
           <strong key={key} className="text-navy font-semibold">
-            {render(token.children, `${key}.`)}
+            {render(token.children, `${key}.`, isHighlighted)}
           </strong>
         );
 
       case 'italic':
-        return <em key={key}>{render(token.children, `${key}.`)}</em>;
+        return <em key={key}>{render(token.children, `${key}.`, isHighlighted)}</em>;
 
-      case 'link':
+      case 'link': {
+        /*
+          The marked link is still a link, and still escaped.
+
+          ⚠️ THE HIGHLIGHT IS A CLASS ON THE SAME ANCHOR, NOT A WRAPPER AROUND
+          INJECTED MARKUP. Marking a name inside somebody else's answer is
+          exactly the feature that tempts a `dangerouslySetInnerHTML`, and the
+          header of this file rules that out. Deciding a boolean per token and
+          changing a className keeps the escaping React gives us for free.
+
+          bg-accent-soft with navy text: --color-accent is fill-only at 1.9:1,
+          so the tint carries the mark and the text stays readable.
+        */
+        const marked = isHighlighted?.(token.href) ?? false;
+
         return (
           <a
             key={key}
             href={token.href}
             target="_blank"
             rel="noreferrer"
-            className="text-primary hover:text-primary-hover underline underline-offset-2"
+            className={
+              marked
+                ? 'bg-accent-soft text-navy rounded px-1 font-semibold underline underline-offset-2'
+                : 'text-primary hover:text-primary-hover underline underline-offset-2'
+            }
           >
-            {render(token.children, `${key}.`)}
+            {render(token.children, `${key}.`, isHighlighted)}
           </a>
         );
+      }
 
       default:
         return <Fragment key={key}>{token.text}</Fragment>;
@@ -52,7 +75,28 @@ function render(tokens: Token[], keyPrefix = ''): ReactNode {
   });
 }
 
-export function AnswerText({ text, className = '' }: { text: string; className?: string }) {
+export function AnswerText({
+  text,
+  className = '',
+  highlightLink,
+}: {
+  text: string;
+  className?: string;
+  /**
+   * Mark the links this returns true for.
+   *
+   * Used by the Free page to point at the domain an engine cited instead of the
+   * customer. Optional, and off everywhere else: the Results page shows every
+   * answer in a list, where marking one name in each would be noise rather than
+   * a finding.
+   *
+   * ⚠️ A PREDICATE OVER hrefs, NOT A STRING TO FIND IN THE TEXT. Searching the
+   * prose for a name is the version of this feature that ends in a regex over
+   * untrusted model output and then in an HTML string. This never leaves the
+   * token tree — see the note on the link branch above.
+   */
+  highlightLink?: (href: string) => boolean;
+}) {
   const paragraphs = parseAnswer(text);
 
   return (
@@ -62,7 +106,7 @@ export function AnswerText({ text, className = '' }: { text: string; className?:
           {lines.map((line, l) => (
             <Fragment key={l}>
               {l > 0 && <br />}
-              {render(line, `${p}.${l}.`)}
+              {render(line, `${p}.${l}.`, highlightLink)}
             </Fragment>
           ))}
         </p>

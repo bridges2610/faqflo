@@ -89,7 +89,7 @@ const PLANS: Plan[] = [
       'Are the AI bots allowed in, or is your site accidentally shut to them?',
       `A sample of ${FREE_QUESTION_SAMPLE} questions people ask AI about businesses like yours`,
       `${FREE.promptCap} of those questions checked once against ChatGPT, Perplexity and Google’s Gemini`,
-      `Write up to ${FREE_FAQ_CAP} answers, and copy them out as plain text`,
+      `Up to ${FREE_FAQ_CAP} answers written for you, and copied out as plain text`,
     ],
   },
   {

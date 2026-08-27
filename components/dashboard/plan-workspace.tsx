@@ -41,7 +41,7 @@ const FREE_FEATURES = [
   'Are the AI bots allowed in?',
   `A sample of ${FREE_QUESTION_SAMPLE} questions people ask AI in your category`,
   `${FREE.promptCap} questions checked once, across all three AI engines`,
-  `Up to ${FREE_FAQ_CAP} answers, copied out as plain text`,
+  `Up to ${FREE_FAQ_CAP} answers written for you, and copied out as plain text`,
 ];
 
 const PRO_FEATURES = [

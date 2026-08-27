@@ -399,9 +399,29 @@ export function canDiscover(user: User | null): boolean {
   return isPro(user);
 }
 
-/** Regenerating an answer set — a model call, so it follows the plan. */
-export function canRegenerate(user: User | null): boolean {
-  return isPro(user);
+/**
+ * Writing answers with the model.
+ *
+ * ⚠️ TRUE ON EVERY PLAN, AND IT USED TO BE PRO-ONLY. It was named
+ * `canRegenerate` and it locked the dashboard generator entirely — while the
+ * generator on the public marketing home page wrote five answers for a total
+ * stranger, ungated. A signed-in free account therefore got less than someone
+ * who had never signed up, which is not a tier, it is a bug that had been
+ * reasoned about backwards.
+ *
+ * ⚠️ THE SPEND IS BOUNDED BY TWO OTHER THINGS, NOT BY THIS. A model call costs
+ * money, so opening the predicate only makes sense alongside the ceilings that
+ * hold it down: free is clamped to MAX_FAQ_COUNT per call and RATE_LIMIT per
+ * day — exactly the anonymous deal — in app/api/dashboard/generate/route.ts,
+ * and every answer it saves counts against FREE_FAQ_CAP in createFaqs(). Change
+ * either of those and this becomes an open tap.
+ *
+ * There is no separate "rewrite" capability to gate, and there never was: this
+ * predicate had exactly one consumer, and that route generates a fresh batch
+ * from pasted content rather than editing an existing answer.
+ */
+export function canGenerate(): boolean {
+  return true;
 }
 
 /** The content plan: which pages the site is missing, and what to write next. */

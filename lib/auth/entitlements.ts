@@ -66,8 +66,17 @@ export function canDiscover(user: ProfileRow | null): boolean {
   return isPro(user);
 }
 
-export function canRegenerate(user: ProfileRow | null): boolean {
-  return isPro(user);
+/**
+ * Writing answers with the model — true on every plan.
+ *
+ * The twin of canGenerate in lib/dashboard/plans.ts, which carries the
+ * reasoning. Like canTrack() it takes no argument, because the plan does not
+ * decide whether you may generate; it decides how MUCH, and that clamp lives at
+ * the call site in app/api/dashboard/generate/route.ts where the count and the
+ * daily limit are chosen.
+ */
+export function canGenerate(): boolean {
+  return true;
 }
 
 /**
