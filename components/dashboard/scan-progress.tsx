@@ -3,9 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { useScanJob } from '@/lib/dashboard/use-scan-job';
 import { ScanMeter, scanStatusLine } from './scan-meter';
+import { SiteForm } from './site-form';
 
 /*
   What the customer watches while their site is scanned for the first time.
@@ -35,7 +37,8 @@ const STAGES = [
 ] as const;
 
 export function ScanProgress({ siteId }: { siteId: string }) {
-  const { site } = useDashboard();
+  const { site, user } = useDashboard();
+  const pro = isPro(user);
   const { job, checked } = useScanJob(siteId);
 
   if (!checked) {
@@ -115,14 +118,30 @@ export function ScanProgress({ siteId }: { siteId: string }) {
         })}
       </ol>
 
+      {/*
+        ⚠️ ONE BUTTON ON FREE, AND IT IS NOT /dashboard/tracking. That route is
+        Pro-only and redirects a free account to /dashboard, so the primary
+        call to action at the end of their very first scan would have bounced
+        them — and the second button beside it went to the same place, making
+        the pair look like a choice that wasn't one. A free account's results
+        ARE the report on /dashboard.
+      */}
       {finished && (
         <div className="mt-6 flex flex-wrap gap-3">
-          <ButtonLink href="/dashboard/tracking" size="sm">
-            See your results
-          </ButtonLink>
-          <ButtonLink href="/dashboard" variant="ghost" size="sm">
-            Dashboard
-          </ButtonLink>
+          {pro ? (
+            <>
+              <ButtonLink href="/dashboard/tracking" size="sm">
+                See your results
+              </ButtonLink>
+              <ButtonLink href="/dashboard" variant="ghost" size="sm">
+                Dashboard
+              </ButtonLink>
+            </>
+          ) : (
+            <ButtonLink href="/dashboard" size="sm">
+              See your report
+            </ButtonLink>
+          )}
         </div>
       )}
     </Card>
@@ -208,17 +227,35 @@ function NoJob({ siteId }: { siteId: string }) {
   );
 }
 
-/** Shown when the customer lands here with no site at all. */
+/**
+ * Shown when the customer lands here with no site at all.
+ *
+ * ⚠️ THE FORM IS HERE ON FREE, NOT A LINK TO IT. /dashboard/sites is Pro-only
+ * and bounces a free account to /dashboard, whose own empty state sends them
+ * back to this page — a loop, and exactly the dead end the NoJob comment above
+ * says cost a real customer their purchase, rebuilt out of redirects.
+ *
+ * Pro keeps the link: it has a Sites page worth going to, because it can hold
+ * more than one.
+ */
 export function ScanStartEmpty() {
+  const { user } = useDashboard();
+
   return (
     <Card className="p-6 sm:p-8">
       <h2 className="text-navy text-lg font-semibold">Add your site to begin</h2>
       <p className="text-slate mt-2 text-sm leading-relaxed">
         We check what AI assistants say about one site at a time.
       </p>
-      <ButtonLink href="/dashboard/sites" className="mt-5" size="sm">
-        Add your site
-      </ButtonLink>
+      {isPro(user) ? (
+        <ButtonLink href="/dashboard/sites" className="mt-5" size="sm">
+          Add your site
+        </ButtonLink>
+      ) : (
+        <div className="mt-5">
+          <SiteForm />
+        </div>
+      )}
     </Card>
   );
 }

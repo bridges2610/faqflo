@@ -1,22 +1,17 @@
 'use client';
 
-import { ButtonLink } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { ScoreDial } from '@/components/ui/score-dial';
 import { plainFor, isHiddenInSummary } from '@/lib/audit/plain';
 import { scoreBand } from '@/lib/audit/score';
-import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { PRO_PRICE } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { groupByQuestion, namedIn } from '@/lib/dashboard/questions';
 import { pickProof } from '@/lib/dashboard/proof';
-import { setupSteps } from '@/lib/dashboard/worklist';
+import { FreeAnswers } from './free-answers';
 import { Meter } from './meter';
-import { MicroLabel } from './micro-label';
 import { PageHeader } from './page-header';
 import { ProofCard } from './proof-card';
-import { SectionTitle } from './section-title';
-import { SetupChecklist } from './setup-checklist';
+import { SiteForm } from './site-form';
 import { StatRow } from './stat-row';
 import { UpgradeCard } from './upgrade-card';
 
@@ -43,15 +38,24 @@ import { UpgradeCard } from './upgrade-card';
   here is why, here is what to do.
 */
 export function FreeHome() {
-  const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
+  const { site, tracking, data } = useDashboard();
 
   const report = site?.lastAudit ?? null;
-  const input = { report, site: site ?? null, user, groups, faqs, questions };
-  const steps = setupSteps({ ...input, siteCount: sites.length });
-  const firstName = data?.user.name.split(' ')[0] ?? '';
 
-  /* Same short-circuit as Pro's: an account with no site has nothing to say
-     about, and a page of empty shapes is worse than the checklist alone. */
+  /*
+    Nothing to report on yet.
+
+    ⚠️ NOT SetupChecklist, WHICH IS NOW A LIST OF FOUR DEAD ENDS. Its steps
+    point at /dashboard/sites, /audit, /faqs and /publish — every one of which
+    redirects a free account straight back here. A checklist whose only button
+    returns you to the checklist is worse than no checklist.
+
+    The form goes inline for the same reason answer-writing did: free is one
+    page, so "go and do it over there" has nowhere to point. SiteForm creates
+    the row, starts the first check and sends them to /dashboard/start to watch
+    it, which is the whole of a free account's setup in one step rather than
+    four.
+  */
   if (!site || !data) {
     return (
       <>
@@ -59,7 +63,7 @@ export function FreeHome() {
           title="Welcome to FaqFlo"
           description="Add your website and we’ll read it the way ChatGPT and Perplexity would, then tell you plainly what they can and can’t see."
         />
-        <SetupChecklist steps={steps} />
+        <SiteForm />
       </>
     );
   }
@@ -108,64 +112,74 @@ export function FreeHome() {
     .flatMap((p) => p.findings)
     .filter((f) => !isHiddenInSummary(f) && (f.status === 'fail' || f.status === 'warn'));
 
+  const today = new Date(report?.checkedAt ?? Date.now());
+
   return (
-    <>
-      <PageHeader
-        title={`${greetingFor(firstName)}`}
-        description={
-          isNamedAfterDomain(site.name, site.domain)
-            ? site.domain
-            : `${site.name} · ${site.domain}`
-        }
-      />
+    <article>
+      {/*
+        The masthead.
 
-      {/* a) The score, and what it rests on. The count is load-bearing: a free
-             report scores three checks of one page, and a bare 0–100 that does
-             not say so invites comparison with a full audit's number. */}
+        ⚠️ NOT PageHeader, AND NOT A GREETING. Every other dashboard screen
+        opens "Good morning, Beau" because it is a place you work. This is a
+        document about a website — it gets the subject, what it is, and when it
+        was taken, the way a report handed to somebody would.
+      */}
+      <header className="border-navy border-b-2 pb-4">
+        <p className="font-mono text-xs tracking-wide uppercase text-slate">
+          {site.domain}
+        </p>
+        <h1 className="text-navy mt-1 text-[1.75rem] sm:text-[2rem]">AI visibility report</h1>
+        <p className="text-slate mt-1 text-sm">
+          {today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+      </header>
+
+      {/* The score sits above the numbered sections: it is the report's
+          subject, not one of its findings. */}
       {report && band && (
-        <Card className="mb-5 p-5 sm:p-7">
-          <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-            <ScoreDial score={report.score} size="sm" />
-            <div className="min-w-0">
-              <MicroLabel>Can AI read your site</MicroLabel>
-              <h2 className="text-navy mt-1 text-[1.375rem] font-extrabold tracking-tight">
-                {band.label}
-              </h2>
-              <p className="text-slate mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed">
-                {band.summary}
-              </p>
-              <p className="text-slate mt-2 text-xs">
-                Based on {report.scoredCount} checks of your home page.
-              </p>
-            </div>
+        <div className="border-line flex flex-col items-center gap-5 border-b py-6 sm:flex-row sm:items-center">
+          <ScoreDial score={report.score} size="sm" />
+          <div className="min-w-0">
+            <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight">
+              {band.label}
+            </h2>
+            <p className="text-slate mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed">
+              {band.summary}
+            </p>
+            <p className="text-slate mt-2 text-xs">
+              Based on {report.scoredCount} checks of your home page.
+            </p>
           </div>
-        </Card>
-      )}
-
-      {/* b) The verdict, and c) the proof. Both from the same run, so they
-             appear and disappear together. */}
-      {asked ? (
-        <div className="mb-5 space-y-5">
-          <Verdict named={namedCount} asked={questionCount} />
-          {proof && <ProofCard proof={proof} siteName={site.name} />}
         </div>
-      ) : (
-        <Card tone="cloud" className="mb-5 p-5 sm:p-7">
-          <SectionTitle>Asking the engines about you</SectionTitle>
-          <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
-            We’re putting your questions to ChatGPT, Perplexity and Google’s Gemini and recording
-            who they name. It takes a few minutes — you can close this tab, it keeps running
-            without you.
-          </p>
-        </Card>
       )}
 
-      {/* d) and e) — the proof generalised, then who won instead. */}
-      {asked && (
-        <div className="mb-5 grid gap-5 lg:grid-cols-2">
-          <Card className="p-5 sm:p-7">
-            <SectionTitle>Every question we asked</SectionTitle>
-            <p className="text-slate mt-1 text-sm">
+      {asked ? (
+        <>
+          <Section n="01" title="The verdict">
+            <h3 className="text-navy text-[1.375rem] font-extrabold tracking-tight sm:text-[1.5rem]">
+              {namedCount === 0
+                ? 'Right now, AI doesn’t recommend your business.'
+                : namedCount === questionCount
+                  ? 'AI names you on every question we asked.'
+                  : `AI names you sometimes — on ${namedCount} of your ${questionCount} questions.`}
+            </h3>
+            <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
+              {namedCount === 0
+                ? `We asked ${questionCount} questions a customer might ask. Your name came back on none of them.`
+                : namedCount === questionCount
+                  ? `All ${questionCount} of them. Worth keeping an eye on — answers change as the engines re-read the web.`
+                  : `The other ${questionCount - namedCount} went to somebody else.`}
+            </p>
+          </Section>
+
+          {proof && (
+            <Section n="02" title="What AI said">
+              <ProofCard proof={proof} siteName={site.name} />
+            </Section>
+          )}
+
+          <Section n="03" title="Every question we asked">
+            <p className="text-slate text-sm">
               How many of the three engines named you, question by question.
             </p>
             <div className="divide-line mt-3 divide-y">
@@ -181,20 +195,18 @@ export function FreeHome() {
                 />
               ))}
             </div>
-          </Card>
+          </Section>
 
-          <Card className="p-5 sm:p-7">
-            <SectionTitle>Who’s getting named instead</SectionTitle>
-            <p className="text-slate mt-1 text-sm">
+          <Section n="04" title="Who’s getting named instead">
+            <p className="text-slate text-sm">
               Every source the engines drew on across your questions, most cited first.
             </p>
             {rivals.length > 0 ? (
-              /* ⚠️ NOT StatRow, AND THAT IS THE POINT. StatRow prints "N of M",
-                 which is a ratio — and these are counts. The bar is scaled to
-                 the biggest row so the shape is comparable, but "4 of 4" would
-                 say angi.com was cited every time it could have been, which is
-                 not what the number means. Same treatment as the share-of-voice
-                 card on Results: the count alone, and a bar for the shape. */
+              /* ⚠️ NOT StatRow. It prints "N of M", which is a ratio — and
+                 these are counts. The bar is scaled to the biggest row so the
+                 shape is comparable, but "4 of 4" would say angi.com was cited
+                 every time it could have been, which is not what the number
+                 means. Same treatment as share of voice on Results. */
               <ul className="divide-line mt-3 divide-y">
                 {rivals.map((c) => (
                   <li key={c.domain} className="py-2.5">
@@ -211,21 +223,25 @@ export function FreeHome() {
                 ))}
               </ul>
             ) : (
-              /* Sources are the only thing this card can be built from, and an
-                 answer can cite none. Saying so beats an empty list. */
               <p className="text-slate mt-3 text-sm">
                 None of the answers we saw linked a source we could read.
               </p>
             )}
-          </Card>
-        </div>
+          </Section>
+        </>
+      ) : (
+        <Section n="01" title="Asking the engines about you">
+          <p className="text-slate text-[0.9375rem] leading-relaxed">
+            We’re putting your questions to ChatGPT, Perplexity and Google’s Gemini and recording
+            who they name. It takes a few minutes — you can close this tab, it keeps running
+            without you.
+          </p>
+        </Section>
       )}
 
-      {/* f) Why — the failing checks, two lines each, no table. */}
       {problems.length > 0 && (
-        <Card className="mb-5 p-5 sm:p-7">
-          <SectionTitle>Why</SectionTitle>
-          <ul className="divide-line mt-3 divide-y">
+        <Section n={asked ? '05' : '02'} title="Why">
+          <ul className="divide-line divide-y">
             {problems.map((f) => (
               <li key={f.id} className="py-3.5 first:pt-0">
                 <p className="text-navy text-[0.9375rem] font-semibold">{f.label}</p>
@@ -233,71 +249,46 @@ export function FreeHome() {
               </li>
             ))}
           </ul>
-        </Card>
+        </Section>
       )}
 
-      {/* g) The fix, half-delivered. Writing answers is open on every plan now;
-             what Pro buys is the code that puts them where AI reads them. */}
-      <Card className="mb-5 p-5 sm:p-7">
-        <SectionTitle>What to do about it</SectionTitle>
-        <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
-          Answer the questions above in your own words, on your own site. We’ll write the first
-          draft — you correct the details only you know.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-3">
-          <ButtonLink href="/dashboard/faqs" size="md" arrow>
-            Write your answers
-          </ButtonLink>
-          <ButtonLink href="/dashboard/questions" size="md" variant="ghost">
-            See the questions
-          </ButtonLink>
-        </div>
-      </Card>
+      {/* Answer-writing lives here rather than a link away: free accounts have
+          one page, so a CTA pointing at /dashboard/faqs would be a dead end. */}
+      <Section n={asked ? '06' : '03'} title="Your answers">
+        <FreeAnswers />
+      </Section>
 
-      {/* The one lock, stated as what it is. Wording matches publish-workspace's
-          own upgrade card so the same feature is not described two ways. */}
-      <UpgradeCard
-        title="Ready-to-paste code for your website"
-        body={`Clean HTML with your answers in it, the behind-the-scenes code that tells AI who you are, and an llms.txt file — built per page and pasted onto your own site, so the mention goes to you. Pro also reads every page rather than just your home page, and watches 25 questions every week so you can see whether it worked. $${PRO_PRICE.monthly} a month.`}
-      />
-    </>
+      {/* The one lock, stated as what it is. Wording matches
+          publish-workspace's own upgrade card so the same feature is not
+          described two ways. */}
+      <div className="mt-8">
+        <UpgradeCard
+          title="Ready-to-paste code for your website"
+          body={`Clean HTML with your answers in it, the behind-the-scenes code that tells AI who you are, and an llms.txt file — built per page and pasted onto your own site, so the mention goes to you. Pro also reads every page rather than just your home page, and watches 25 questions every week so you can see whether it worked. $${PRO_PRICE.monthly} a month.`}
+        />
+      </div>
+    </article>
   );
 }
 
 /**
- * The headline, from the data.
+ * One numbered section of the report.
  *
- * ⚠️ NEVER HARDCODED. "Right now, AI doesn't recommend your business" is the
- * right sentence for an account nobody named, and a false one for an account
- * named on four questions out of five — which a free run produces often enough
- * that a fixed string would be wrong on a large share of this page's audience.
+ * A ruled heading and a number, not a card. The card metaphor is the app's, and
+ * globals.css already argues against it for anything meant to be read rather
+ * than worked in: "floating panels with shadows print as grey smudges", and
+ * what a report wants is "a masthead, ruled sections and one column of prose".
+ * That reasoning was scoped to print only because nothing on screen was a
+ * report. This is.
  */
-function Verdict({ named, asked }: { named: number; asked: number }) {
-  const all = named === asked && asked > 0;
-
+function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
   return (
-    <Card className="p-5 sm:p-7">
-      <h2 className="text-navy text-[1.5rem] font-extrabold tracking-tight sm:text-[1.75rem]">
-        {named === 0
-          ? 'Right now, AI doesn’t recommend your business.'
-          : all
-            ? 'AI names you on every question we asked.'
-            : `AI names you sometimes — on ${named} of your ${asked} questions.`}
-      </h2>
-      <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
-        {named === 0
-          ? `We asked ${asked} questions a customer might ask. Your name came back on none of them.`
-          : all
-            ? `All ${asked} of them. Worth keeping an eye on — answers change as the engines re-read the web.`
-            : `The other ${asked - named} went to somebody else.`}
-      </p>
-    </Card>
+    <section className="border-line border-b py-7 last-of-type:border-b-0">
+      <div className="flex items-baseline gap-3">
+        <span className="text-slate font-mono text-xs tabular-nums">{n}</span>
+        <h2 className="text-navy text-[0.9375rem] font-bold tracking-normal uppercase">{title}</h2>
+      </div>
+      <div className="mt-3">{children}</div>
+    </section>
   );
-}
-
-/** Time-of-day greeting — the same client-clock read Pro's Home documents. */
-function greetingFor(firstName: string): string {
-  const hour = new Date().getHours();
-  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  return firstName ? `${part}, ${firstName}` : part;
 }

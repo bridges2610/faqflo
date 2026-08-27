@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { ScanStart } from './scan-start';
+import { SiteForm } from './site-form';
 
 /*
   The step between "check my site" on the home page and a dashboard with
@@ -90,9 +91,17 @@ export function OnboardingStart({ domain }: { domain: string | null }) {
         <p role="alert" className="text-error-ink text-[0.9375rem] leading-relaxed">
           {error}
         </p>
+        {/* Was a sentence pointing at the Sites page, which is Pro-only now —
+            so for most people reading this error it named a page that would
+            send them straight back here. The recovery is the form itself
+            rather than directions to one: this is the screen where setting up
+            failed, and it is the screen that should be able to finish it. */}
         <p className="text-slate mt-3 text-sm leading-relaxed">
-          You can add your site by hand from the Sites page, and the check will start from there.
+          You can add it by hand instead — the check starts as soon as you do.
         </p>
+        <div className="mt-4">
+          <SiteForm />
+        </div>
       </Card>
     );
   }

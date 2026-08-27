@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation';
 import { AuditWorkspace } from '@/components/dashboard/audit-workspace';
 import { GroupWorkspace } from '@/components/dashboard/group-workspace';
 import { OverviewWorkspace } from '@/components/dashboard/overview-workspace';
+import { FreeHome } from '@/components/dashboard/free-home';
 import { TrackingWorkspace } from '@/components/dashboard/tracking-workspace';
 import { DashboardProvider } from '@/lib/dashboard/provider';
 import { buildSeed } from '@/lib/dashboard/seed';
@@ -194,6 +195,20 @@ export default function Shots() {
     { key: 'answers', offset: 960, node: <GroupWorkspace groupId={liveGroup.id} /> },
     { key: 'results', offset: 0, node: <TrackingWorkspace /> },
     { key: 'overview', offset: 0, node: <OverviewWorkspace /> },
+    /*
+      ⚠️ NOT A MARKETING SHOT, AND DELIBERATELY NOT IN scripts/shots.mjs.
+
+      PANELS there is a fixed list of four, so this renders here and is never
+      captured — which is the intent. The home page sells Pro; a screenshot of
+      the free report on it would advertise the tier with the lock in it.
+
+      It is here because the free report is otherwise only reachable by signing
+      in as an account whose profile row says 'free', which means editing the
+      database to look at your own UI. This gives it the same deterministic
+      fixture the other four get. If it ever should be captured, adding the key
+      to PANELS is the whole change.
+    */
+    { key: 'freehome', offset: 0, node: <FreeHome /> },
   ];
 
   return (

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
+import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { SiteIcon } from './site-icon';
 
@@ -14,13 +15,24 @@ import { SiteIcon } from './site-icon';
  * a static label — a one-option select is a control that does nothing.
  */
 export function SiteSwitcher() {
-  const { sites, site, selectSite } = useDashboard();
+  const { sites, site, selectSite, user } = useDashboard();
 
   if (!site) {
     return (
-      // Was /dashboard/setup, a route that has never existed — so an account
-      // with no sites clicked "Add your first site" and got a 404.
-      <Link href="/dashboard/sites" className="text-primary text-sm font-medium">
+      /*
+        Was /dashboard/setup, a route that has never existed — so an account
+        with no sites clicked "Add your first site" and got a 404.
+
+        ⚠️ AND /dashboard/sites IS NOW A 404 OF ITS OWN FOR FREE, which is the
+        same bug wearing a redirect instead of an error page. That route sends a
+        free account back to /dashboard, so this link would return them to the
+        page they clicked it from. /dashboard/start is where a free account
+        actually adds a site, and it is open to both plans.
+      */
+      <Link
+        href={isPro(user) ? '/dashboard/sites' : '/dashboard/start'}
+        className="text-primary text-sm font-medium"
+      >
         Add your first site →
       </Link>
     );

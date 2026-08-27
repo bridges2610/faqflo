@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { requirePro } from '@/lib/auth/pro-only';
 import { TrackingWorkspace } from '@/components/dashboard/tracking-workspace';
 
 // "Results", matching the sidebar. The route keeps its /tracking path — labels
@@ -6,6 +7,10 @@ import { TrackingWorkspace } from '@/components/dashboard/tracking-workspace';
 // and several places deep-link here.
 export const metadata: Metadata = { title: 'Results' };
 
-export default function TrackingPage() {
+export default async function TrackingPage() {
+  /* Pro only — a free account is redirected to its report.
+   See the reasoning in lib/auth/pro-only.ts. */
+  await requirePro();
+
   return <TrackingWorkspace />;
 }

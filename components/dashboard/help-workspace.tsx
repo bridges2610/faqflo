@@ -89,7 +89,13 @@ const meta = (id: SectionId) => SECTIONS.find((s) => s.id === id)!;
   ⚠️ setupSteps() in lib/dashboard/worklist.ts still carries the old reasoning in
   its own comment. Same correction wanted there.
 */
-const STEPS = [
+/**
+ * One setup step. `href` is optional because a free account has nowhere to send
+ * it — see the note on FREE_STEPS.
+ */
+type HelpStep = { label: string; body: string; href?: string };
+
+const STEPS: HelpStep[] = [
   {
     label: 'Add your website',
     href: '/dashboard/sites',
@@ -109,6 +115,38 @@ const STEPS = [
     label: 'Put them on your site',
     href: '/dashboard/publish',
     body: 'Nothing can be quoted until it is on your own domain. Copy the block, paste it onto the page, done.',
+  },
+];
+
+/*
+  The same four jobs, for an account whose whole product is one page.
+
+  ⚠️ NO HREFS, AND THAT IS THE ACCURATE SHAPE RATHER THAN A DEGRADED ONE. Every
+  destination in STEPS above is Pro-only and redirects a free account back to
+  /dashboard, so linked steps here would be four numbered cards that all go to
+  the same place — a worse lie than no link, because it looks like navigation.
+
+  The steps still earn their place: they are what happens, in order, and
+  somebody reading Help wants to know what the product does to their site even
+  when there is nowhere to click. The last one names the lock plainly instead of
+  pretending it is a step they can take.
+*/
+const FREE_STEPS: HelpStep[] = [
+  {
+    label: 'Your site gets read',
+    body: 'We fetch it the way an assistant would and score what it found. This runs once, by itself, when you add your site — there is nothing to start.',
+  },
+  {
+    label: 'We ask the engines about you',
+    body: 'Five questions a customer might ask, put to ChatGPT, Perplexity and Gemini. Your report shows who they named, in their own words.',
+  },
+  {
+    label: 'You write your answers',
+    body: 'On the report itself, at the bottom. We draft them, you correct the details only you know, and you copy them out as plain text — they are yours on any plan.',
+  },
+  {
+    label: 'Pro puts them on your site',
+    body: 'The ready-to-paste HTML, the schema that tells an assistant who you are, and the weekly re-check are what the paid plan adds. Everything above is yours without it.',
   },
 ];
 
@@ -328,13 +366,14 @@ export function HelpWorkspace({
           {/* ---------------------------------------------------- start here */}
           <Section id="start-here">
             <P>
-              Four steps, and you can stop after any of them — nothing here expires halfway
-              through. Most people do the first two in an evening and come back to the writing.
+              {pro
+                ? 'Four steps, and you can stop after any of them — nothing here expires halfway through. Most people do the first two in an evening and come back to the writing.'
+                : 'Four steps, and the first two happen without you. Your report has all of it on one page — there is nowhere else to go and nothing to set up.'}
             </P>
 
             <ol className="mt-6 space-y-4">
-              {STEPS.map((step, i) => (
-                <li key={step.href}>
+              {(pro ? STEPS : FREE_STEPS).map((step, i) => (
+                <li key={step.label}>
                   <Card className="flex gap-4 p-5">
                     <span
                       className="bg-primary-soft text-primary flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold"
@@ -343,12 +382,17 @@ export function HelpWorkspace({
                       {i + 1}
                     </span>
                     <div className="min-w-0">
-                      <Link
-                        href={step.href}
-                        className="text-navy hover:text-primary text-[0.9375rem] font-bold transition-colors duration-150"
-                      >
-                        {step.label} →
-                      </Link>
+                      {/* Linked only on Pro — see the note on FREE_STEPS. */}
+                      {step.href ? (
+                        <Link
+                          href={step.href}
+                          className="text-navy hover:text-primary text-[0.9375rem] font-bold transition-colors duration-150"
+                        >
+                          {step.label} →
+                        </Link>
+                      ) : (
+                        <p className="text-navy text-[0.9375rem] font-bold">{step.label}</p>
+                      )}
                       <p className="text-slate mt-1 text-[0.9375rem] leading-relaxed">
                         {step.body}
                       </p>
@@ -359,8 +403,9 @@ export function HelpWorkspace({
             </ol>
 
             <P className="mt-6">
-              Your dashboard home tracks these four for you and shows whichever is next, so you
-              don’t have to hold the order in your head.
+              {pro
+                ? 'Your dashboard home tracks these four for you and shows whichever is next, so you don’t have to hold the order in your head.'
+                : 'Your report is the only screen you need. It opens with the score, then what the engines actually said, then the answers you can write from it.'}
             </P>
           </Section>
 
@@ -384,6 +429,28 @@ export function HelpWorkspace({
             <SectionTitle as="h3" className="mt-8">
               Where things are
             </SectionTitle>
+
+            {/*
+              ⚠️ THE TABLE IS A DESCRIPTION OF PRO'S SIDEBAR, so it only renders
+              for Pro. A free account has one destination; showing it a map of
+              five, each linking somewhere that redirects back to the page it
+              started on, would be the single most confusing thing on this
+              screen — a help page teaching navigation that does not exist.
+            */}
+            {!pro ? (
+              <>
+                <P className="mt-2">
+                  Everything is on one screen: <strong>your report</strong>. If you read the
+                  marketing site first, its five-step loop — audit, discover, generate, publish,
+                  track — all lands there, in that order, top to bottom.
+                </P>
+                <P className="mt-4">
+                  Pro splits the same work across five screens, adds the pages beyond your home
+                  page, and re-checks every week. Your report says what it costs at the bottom.
+                </P>
+              </>
+            ) : (
+              <>
             <P className="mt-2">
               The sidebar has five destinations. If you read the marketing site first, its five-step
               loop maps onto them like this:
@@ -427,6 +494,8 @@ export function HelpWorkspace({
               Your sites live in the account menu, top right — you go there once to add a site and
               rarely again, so it isn’t one of the five.
             </P>
+              </>
+            )}
           </Section>
 
           {/* -------------------------------------------------- the audit */}

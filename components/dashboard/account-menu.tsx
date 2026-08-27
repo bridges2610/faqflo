@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/auth/actions';
+import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { PlanBadge } from './plan-badge';
 
@@ -140,24 +141,37 @@ export function AccountMenu() {
           {/* Sites moved here out of the sidebar. It is somewhere you go once,
               when you add a site — not one of the five places worth checking —
               and it sits with billing because both are account settings rather
-              than work. */}
+              than work.
+
+              ⚠️ PRO ONLY, because the page it opens is. A free account is
+              capped at one site and /dashboard/sites redirects it to
+              /dashboard, so this row would be a menu item that closes the menu
+              and goes nowhere. Their one site is named in the header beside
+              it. */}
           <div className="border-line mt-4 border-t pt-3">
-            <Link
-              href="/dashboard/sites"
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              className="text-slate hover:text-navy block text-sm font-medium transition-colors duration-150"
-            >
-              Your sites
-            </Link>
+            {isPro(user) && (
+              <Link
+                href="/dashboard/sites"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="text-slate hover:text-navy block text-sm font-medium transition-colors duration-150"
+              >
+                Your sites
+              </Link>
+            )}
             {/* Beside Sites rather than beside billing: this is the comparison
                 and the upgrade, which is a product decision. ManageBilling below
-                is the Stripe portal, which is only useful once you are paying. */}
+                is the Stripe portal, which is only useful once you are paying.
+
+                The top margin goes with Sites — on free this is the first row
+                in the group, and the gap would read as a missing item. */}
             <Link
               href="/dashboard/plan"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="text-slate hover:text-navy mt-2.5 block text-sm font-medium transition-colors duration-150"
+              className={`text-slate hover:text-navy block text-sm font-medium transition-colors duration-150 ${
+                isPro(user) ? 'mt-2.5' : ''
+              }`}
             >
               Your plan
             </Link>

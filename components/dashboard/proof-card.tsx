@@ -1,9 +1,7 @@
-import { Card } from '@/components/ui/card';
 import { EngineMark } from '@/components/ui/ai-marks';
 import { MAX_EXCERPT_CHARS } from '@/lib/dashboard/types';
 import { linkIsRival, type Proof } from '@/lib/dashboard/proof';
 import { AnswerText } from './answer-text';
-import { MicroLabel } from './micro-label';
 
 /**
  * Does this excerpt end mid-thought?
@@ -45,11 +43,16 @@ export function ProofCard({ proof, siteName }: { proof: Proof; siteName: string 
   const { check, citedInstead } = proof;
   const named = check.outcome === 'cited' || check.outcome === 'mentioned';
 
+  /*
+    ⚠️ NO CARD, DESPITE THE NAME. This sits inside a numbered section of a
+    report, and a white panel with a shadow floating in a flat document is the
+    card metaphor globals.css argues against for anything meant to be read
+    rather than worked in. The quote is set off by a rule, the way a quote in a
+    report is.
+  */
   return (
-    <Card className="p-5 sm:p-7">
-      <MicroLabel>What AI said about you</MicroLabel>
-
-      <p className="text-navy mt-2 text-[1.0625rem] font-semibold">
+    <div>
+      <p className="text-navy text-[1.0625rem] font-semibold">
         &ldquo;{check.question}&rdquo;
       </p>
 
@@ -88,6 +91,6 @@ export function ProofCard({ proof, siteName }: { proof: Proof; siteName: string 
            reading — not an empty chip, and not a rival we did not find. */
         <p className="text-navy mt-4 text-sm">It didn&rsquo;t mention you at all.</p>
       )}
-    </Card>
+    </div>
   );
 }

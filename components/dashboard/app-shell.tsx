@@ -77,12 +77,42 @@ function isActive(pathname: string, href: string): boolean {
   return (OWNS[href] ?? []).some((owned) => pathname.startsWith(owned));
 }
 
+/*
+  What a free account is offered.
+
+  ⚠️ ONE ITEM, AND THE REST ARE NOT MERELY HIDDEN — each gated route redirects
+  a free account back to /dashboard in its own page.tsx. Hiding a link that
+  still works would leave the nav lying about what exists; redirecting without
+  hiding would leave five links that all go to the same place. Both halves are
+  needed, and if one is changed the other has to move with it.
+
+  The free plan's whole product is a single report: one audit of one page, one
+  citation check, and the answers written from it — all of which now live on
+  /dashboard. There is no second screen to navigate to.
+
+  ⚠️ Home's label changes with it. "Home" implies somewhere else to go back
+  from, which is true on Pro's five-item nav and false here.
+*/
+const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: HomeIcon }];
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const { user } = useDashboard();
+
+  /*
+    ⚠️ isPro(null) is false, so the first frame shows the free nav.
+
+    That is the right way round: the provider resolves `user` a frame late, and
+    a free account briefly seeing five links it cannot use is worse than a Pro
+    account briefly seeing one. The page composition itself is chosen
+    server-side for exactly this reason — see app/(app)/dashboard/page.tsx —
+    but the sidebar is client-rendered and has no server equivalent.
+  */
+  const items = isPro(user) ? NAV : FREE_NAV;
 
   return (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ href, label, Icon }) => {
+      {items.map(({ href, label, Icon }) => {
         const active = isActive(pathname, href);
         return (
           <Link
