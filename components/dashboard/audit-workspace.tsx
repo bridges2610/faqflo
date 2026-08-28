@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScoreDial } from '@/components/ui/score-dial';
+import { STATUS_CHIP, STATUS_WORD, StatusIcon } from '@/components/ui/status-icon';
 import { useDashboard } from '@/lib/dashboard/provider';
 // pageBudgetFor is no longer imported here: the budget is the server's
 // decision now, and a client-side copy of it would only ever be a guess about
@@ -16,7 +17,7 @@ import { timeAgo } from '@/lib/dashboard/format';
 import { taskFromAction } from '@/lib/dashboard/worklist';
 import { buildActionPlan } from '@/lib/audit/actions';
 import { buildPillars, overallScore, pillarBand, scoreBand } from '@/lib/audit/score';
-import { PILLARS, type AuditReport, type CheckStatus, type Finding } from '@/lib/audit/types';
+import { PILLARS, type AuditReport, type Finding } from '@/lib/audit/types';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
 import { ChevronIcon } from './nav-icons';
@@ -37,47 +38,9 @@ import { SectionTitle } from './section-title';
   that justifies it — there to be checked, not to be waded through.
 */
 
-const STATUS_CHIP: Record<CheckStatus, string> = {
-  pass: 'bg-success/12 text-success-ink',
-  warn: 'bg-accent-soft text-teal-ink',
-  fail: 'bg-error/12 text-error-ink',
-  locked: 'bg-cloud text-slate border border-line',
-  na: 'bg-cloud text-slate border border-line',
-};
-
-const STATUS_WORD: Record<CheckStatus, string> = {
-  pass: 'Pass',
-  warn: 'Worth a look',
-  fail: 'Problem',
-  locked: 'Not checked',
-  na: 'Not applicable',
-};
-
-function StatusIcon({ status }: { status: CheckStatus }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-3.5 w-3.5"
-      aria-hidden="true"
-    >
-      {status === 'pass' && <polyline points="3 8.5 6.5 12 13 4.5" />}
-      {status === 'warn' && <path d="M8 4v5M8 11.5h.01" />}
-      {status === 'fail' && <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />}
-      {status === 'locked' && (
-        <>
-          <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-          <path d="M5.8 7V5.6a2.2 2.2 0 0 1 4.4 0V7" />
-        </>
-      )}
-      {status === 'na' && <path d="M4 8h8" />}
-    </svg>
-  );
-}
+/* The chip, the word and the glyph moved to components/ui/status-icon.tsx when
+   the free report needed a third copy. The `warn` chip changed colour in the
+   move — amber rather than the brand cyan it shared with the Pro lock. */
 
 function PillarCard({ pillar }: { pillar: ReturnType<typeof buildPillars>[number] }) {
   const [open, setOpen] = useState(false);

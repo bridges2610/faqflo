@@ -67,16 +67,16 @@ export function canDiscover(user: ProfileRow | null): boolean {
 }
 
 /**
- * Writing answers with the model — true on every plan.
+ * Writing answers with the model, in the dashboard — Pro only.
  *
  * The twin of canGenerate in lib/dashboard/plans.ts, which carries the
- * reasoning. Like canTrack() it takes no argument, because the plan does not
- * decide whether you may generate; it decides how MUCH, and that clamp lives at
- * the call site in app/api/dashboard/generate/route.ts where the count and the
- * daily limit are chosen.
+ * reasoning and the warning that goes with it: this gates
+ * /api/dashboard/generate and NOTHING ELSE. The public tool at /free-report
+ * posts to /api/generate and must stay open to strangers, or signing up makes
+ * somebody worse off than not signing up.
  */
-export function canGenerate(): boolean {
-  return true;
+export function canGenerate(user: ProfileRow | null): boolean {
+  return isPro(user);
 }
 
 /**
@@ -110,10 +110,11 @@ export function canOfferDoneForYou(user: ProfileRow | null): boolean {
 /**
  * May a check run for this account at all — by anyone, including the scheduler?
  *
- * ⚠️ TRUE ON FREE, AND ONLY BECAUSE OF THE METER. Free buys one run: five
- * questions across three engines, counted against the plan's checksPerPeriod
- * over a period that never resets (see trackingPeriod in plans.ts). The ceiling
- * is enforced in app/api/dashboard/tracking/route.ts and in lib/scan/run.ts.
+ * ⚠️ TRUE ON FREE, AND ONLY BECAUSE OF THE METER. Free buys three runs: three
+ * questions across three engines, three times, counted against the plan's
+ * checksPerPeriod over a period that never resets (see trackingPeriod in
+ * plans.ts). The ceiling is enforced in app/api/dashboard/tracking/route.ts
+ * and in lib/scan/run.ts.
  *
  * ⚠️ IF THAT ENFORCEMENT IS EVER REMOVED, THIS MUST GO BACK TO isPro. The two
  * changed together and only make sense together; an unmetered free tier is an
@@ -129,13 +130,24 @@ export function canTrack(): boolean {
  * May the CUSTOMER start a check right now?
  *
  * ⚠️ Distinct from canTrack, which asks whether a check may run at all — the
- * onboarding scan and the weekly cron need that one. Free's single run is
- * automatic and has no button, so the interactive route refuses it here rather
- * than relying on the UI to hide the control. A client that tells the server
- * which tier it is on is not authorization, it is a bypass with extra steps.
+ * onboarding scan and the weekly cron need that one. This one is about a
+ * person pressing a button.
+ *
+ * ⚠️ IT USED TO BE isPro, AND THE REASON EXPIRED RATHER THAN BEING OVERRULED.
+ * Free's run was automatic, single, and had no button, so the interactive route
+ * refused it here. Free buys three runs now and the report has a Run button, so
+ * refusing at this gate would refuse the feature.
+ *
+ * ⚠️ WHAT STILL REFUSES IS THE BUDGET, AND IT IS THE ONLY THING THAT NEEDS TO.
+ * app/api/dashboard/tracking/route.ts counts citation_checks against
+ * checksPerPeriod and 429s past it, and skips question/engine pairs already
+ * stored today. Those two are the enforcement; this predicate is the plan's
+ * permission. Do not fold the budget into it — a client that tells the server
+ * which tier it is on is not authorization, it is a bypass with extra steps,
+ * and the same is true of one that tells the server how much it has spent.
  */
-export function canRunCheckNow(user: ProfileRow | null): boolean {
-  return isPro(user);
+export function canRunCheckNow(): boolean {
+  return true;
 }
 
 /**

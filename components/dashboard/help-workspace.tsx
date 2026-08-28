@@ -800,8 +800,10 @@ export function HelpWorkspace({
               Your watch list
             </SectionTitle>
             <P className="mt-2">
-              Free watches <strong>{FREE.promptCap} questions</strong>, checked once when you sign
-              up. <strong>Pro</strong> widens that to <strong>{PRO.promptCap}</strong> —{' '}
+              Free watches <strong>{FREE.promptCap} questions</strong>, first checked when you sign
+              up and re-checkable <strong>{FREE.runsPerPeriod} times</strong> from your report — once
+              a day, so there is time to change something in between.{' '}
+              <strong>Pro</strong> widens that to <strong>{PRO.promptCap}</strong> —{' '}
               {PRO.discoveredCap} we find for you and {PRO.manualCap} you write yourself — and
               checks them every week. Use <strong>Find more questions</strong> for the first and{' '}
               <strong>Add your own question</strong> for the second; the second is for the ones you

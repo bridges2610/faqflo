@@ -47,28 +47,66 @@ export function ProofCard({ proof, siteName }: { proof: Proof; siteName: string 
     ⚠️ NO CARD, DESPITE THE NAME. This sits inside a numbered section of a
     report, and a white panel with a shadow floating in a flat document is the
     card metaphor globals.css argues against for anything meant to be read
-    rather than worked in. The quote is set off by a rule, the way a quote in a
-    report is.
+    rather than worked in.
+
+    ⚠️ THE OUTCOME LEADS, AND IT DID NOT USED TO. The order was question →
+    engine → six hundred characters of grey prose → what it meant. Everything
+    the reader came for was underneath the longest, least scannable thing on the
+    page, so the section read as a wall of text with a conclusion hidden at the
+    bottom. Now the finding is the first line, the quote is the evidence for it,
+    and somebody who reads one sentence and stops has still read the point.
   */
   return (
     <div>
-      <p className="text-navy text-[1.0625rem] font-semibold">
-        &ldquo;{check.question}&rdquo;
-      </p>
+      {/* The finding, in one line, at the top. */}
+      {named ? (
+        <p className="text-navy text-[1.0625rem] leading-snug font-semibold">
+          <span className="text-success-ink">{check.engine} named {siteName}.</span>
+        </p>
+      ) : citedInstead ? (
+        <p className="text-navy text-[1.0625rem] leading-snug font-semibold">
+          {check.engine} answered — and pointed at{' '}
+          <span className="bg-warn-soft text-warn-ink rounded px-1.5 py-0.5 font-mono text-[0.9375rem]">
+            {citedInstead}
+          </span>
+          , not you.
+        </p>
+      ) : (
+        /* No usable source in the answer. "Nobody in particular" is the honest
+           reading — not an empty chip, and not a rival we did not find. */
+        <p className="text-navy text-[1.0625rem] leading-snug font-semibold">
+          {check.engine} answered, and didn&rsquo;t mention you at all.
+        </p>
+      )}
 
-      <p className="text-slate mt-1 flex items-center gap-1.5 text-xs">
-        {/* The engine is named because the answer is its answer, not ours, and
-            the disclosure the Results page makes applies here too: we ask the
-            API, not the chat window. */}
+      {/* What was asked, and of whom. The engine is named because the answer is
+          its answer, not ours, and the disclosure the Results page makes applies
+          here too: we ask the API, not the chat window. */}
+      <p className="text-slate mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
         <EngineMark engine={check.engine} className="h-3.5 w-3.5 shrink-0" />
-        asked on {check.engine}
+        <span>We asked:</span>
+        <span className="text-navy font-medium">&ldquo;{check.question}&rdquo;</span>
       </p>
 
-      {/* The evidence itself. Left rule rather than quote marks — the text
-          already contains its own punctuation and often its own quotes. */}
-      <div className="border-line mt-4 border-l-2 pl-4">
+      {/*
+        The evidence itself, on its own surface.
+
+        ⚠️ A TINT AND A RULE, NOT A CARD. The panel is bg-cloud with an accent
+        edge — flat, no shadow — so it reads as a quotation inside the document
+        rather than as a floating widget on top of it. Bigger type than the old
+        13px too: this is the longest passage on the page and it was set
+        smallest, which is backwards.
+      */}
+      <blockquote className="border-accent bg-cloud mt-3 rounded-r-lg border-l-[3px] px-4 py-3">
+        {/* ⚠️ The child selector is deliberate and load-bearing. AnswerText puts
+            `text-sm` on every paragraph it renders and takes className on the
+            wrapper, so a size passed plainly would lose to it. `[&>p]` is one
+            specificity step higher and wins. Bumping the size matters here
+            because this is the longest passage on the page and it was set
+            smallest of anything on it. */}
         <AnswerText
           text={check.excerpt!}
+          className="[&>p]:text-[0.9375rem]"
           highlightLink={(href) => linkIsRival(href, citedInstead)}
         />
         {looksTruncated(check.excerpt!) && (
@@ -76,21 +114,7 @@ export function ProofCard({ proof, siteName }: { proof: Proof; siteName: string 
             Excerpt — we store the first {MAX_EXCERPT_CHARS} characters of each answer.
           </p>
         )}
-      </div>
-
-      {named ? (
-        <p className="text-success-ink mt-4 text-sm font-semibold">
-          It named {siteName}.
-        </p>
-      ) : citedInstead ? (
-        <p className="text-navy mt-4 text-sm">
-          AI cited <span className="font-mono font-semibold">{citedInstead}</span> instead of you.
-        </p>
-      ) : (
-        /* No usable source in the answer. "Nobody in particular" is the honest
-           reading — not an empty chip, and not a rival we did not find. */
-        <p className="text-navy mt-4 text-sm">It didn&rsquo;t mention you at all.</p>
-      )}
+      </blockquote>
     </div>
   );
 }

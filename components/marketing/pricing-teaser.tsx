@@ -4,13 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
-import {
-  FREE_FAQ_CAP,
-  FREE_QUESTION_SAMPLE,
-  GUARANTEE_DAYS,
-  PRO_PRICE,
-  TRACKING_PLANS,
-} from '@/lib/dashboard/plans';
+import { GUARANTEE_DAYS, PRO_PRICE, TRACKING_PLANS } from '@/lib/dashboard/plans';
 
 const FREE = TRACKING_PLANS.free;
 const PRO = TRACKING_PLANS.pro;
@@ -87,9 +81,9 @@ const PLANS: Plan[] = [
       'Your AI-visibility score, out of 100',
       'Can AI read your site, or does it just see a blank page?',
       'Are the AI bots allowed in, or is your site accidentally shut to them?',
-      `A sample of ${FREE_QUESTION_SAMPLE} questions people ask AI about businesses like yours`,
-      `${FREE.promptCap} of those questions checked once against ChatGPT, Perplexity and Google’s Gemini`,
-      `Up to ${FREE_FAQ_CAP} answers written for you, and copied out as plain text`,
+      `${FREE.promptCap} real questions a customer might ask, put to ChatGPT, Perplexity and Google’s Gemini`,
+      'See which of them named you — and who got named instead',
+      `Check again ${FREE.runsPerPeriod} times as you fix things, so you can watch it change`,
     ],
   },
   {
@@ -296,11 +290,17 @@ export function PricingTeaser() {
         {/* What free actually leaves you holding, said before anyone signs up
             rather than discovered on the day they cancel. Publishing is part of
             Pro now — under the old one-time product it was permanent, because
-            you cannot revoke something somebody bought outright. */}
+            you cannot revoke something somebody bought outright.
+
+            ⚠️ IT USED TO PROMISE THE ANSWERS. "The answers you write stay yours
+            — you can always copy them out as plain text" was true while free
+            had a generator, and became a refund the moment the free report
+            stopped having one. Free is a diagnosis; what it leaves you holding
+            is the reading, which stays readable for good. */}
         <p className="text-slate mx-auto mt-8 max-w-2xl text-center text-sm leading-relaxed">
-          Free is free forever, and the answers you write stay yours — you can always copy them out
-          as plain text. Pro adds the ready-to-paste code, the full site check, and the weekly
-          watching. Cancel whenever you like.
+          Free is free forever, and the results you have already collected stay readable — the plan
+          governs what may be run, never what may be read. Pro adds the answers, the ready-to-paste
+          code, the full site check, and the weekly watching. Cancel whenever you like.
         </p>
 
         {/*

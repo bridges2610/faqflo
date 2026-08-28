@@ -165,17 +165,33 @@ export type TrackingPlan = {
 /**
  * What each plan's tracking actually buys.
  *
- * ⚠️ FREE SPENDS REAL MONEY, WHICH IS WHY IT HAS A PLAN ENTRY AT ALL. Five
- * questions against three search-backed engines is fifteen billable calls per
- * free signup. It is bounded by being counted over a period that never resets —
- * see trackingPeriod() — so `checksPerPeriod` is a LIFETIME ceiling on free and
- * a monthly one on Pro. Same field, same enforcement, different window.
+ * ⚠️ FREE SPENDS REAL MONEY, WHICH IS WHY IT HAS A PLAN ENTRY AT ALL. Three
+ * questions against three search-backed engines, three times over, is
+ * twenty-seven billable calls per free signup. It is bounded by being counted
+ * over a period that never resets — see trackingPeriod() — so
+ * `checksPerPeriod` is a LIFETIME ceiling on free and a monthly one on Pro.
+ * Same field, same enforcement, different window.
  *
- * ⚠️ FREE'S manualCap IS 0 ON PURPOSE. The one run fires automatically during
- * the onboarding scan, before the customer has seen the dashboard, so a question
- * they typed afterwards could never be checked. A field that accepts input and
- * then never acts on it is worse than no field; the UI says "Pro watches
- * questions you write yourself" instead.
+ * ⚠️ FREE WAS 5 PROMPTS ONCE, AND IS NOW 3 PROMPTS THREE TIMES. The old shape
+ * gave a wider first look at a report nobody could change; the report shows a
+ * ranking table with a button under it now, so what free needs is the ability
+ * to fix something and look again. Fewer prompts pays for the re-runs: the two
+ * shapes are 15 calls and 27, and the second one is the one that can show a
+ * number moving.
+ *
+ * ⚠️ FREE'S manualCap IS 0 ON PURPOSE, AND THAT IS WHY THE BUTTON TAKES NO
+ * INPUT. The three prompts are the ones discovery already found and the
+ * onboarding scan already asked; the button re-asks exactly those. A field
+ * that accepts a typed question and then never checks it is worse than no
+ * field, so there isn't one — the UI says "Pro watches questions you write
+ * yourself" instead.
+ *
+ * ⚠️ FREE'S schedule STAYS 'once'. It describes the SCHEDULER, not the button:
+ * free still gets no automatic weekly re-check, which is most of what Pro
+ * sells, and flipping this would put free sites into the cron sweep in
+ * app/api/cron/tracking/route.ts. Whether a person may press Run is
+ * canRunCheckNow(), which is a different question and now has a different
+ * answer.
  *
  * ⚠️ PRO'S runsPerPeriod IS 5, NOT 4. A calendar month holds five weekly checks
  * often enough to matter, and a budget of four would refuse the fifth — a check
@@ -184,7 +200,7 @@ export type TrackingPlan = {
  * fifth run was the day-0 scan.
  */
 export const TRACKING_PLANS: Record<PlanId, TrackingPlan> = {
-  free: build('free', { promptCap: 5, manualCap: 0, runs: 1, schedule: 'once' }),
+  free: build('free', { promptCap: 3, manualCap: 0, runs: 3, schedule: 'once' }),
   pro: build('pro', { promptCap: 25, manualCap: 10, runs: 5, schedule: 'weekly' }),
 };
 
@@ -338,7 +354,7 @@ export const PLAN_COPY: Record<PlanId, { label: string; price: string; blurb: st
     label: 'Free',
     price: '$0',
     blurb:
-      'Where you stand right now: your AI-visibility score, whether AI can read your site and get in, a sample of what people ask in your category, and one citation check across ChatGPT, Perplexity and Google’s Gemini.',
+      'Where you stand right now: your AI-visibility score, whether AI can read your site and get in, and three real questions put to ChatGPT, Perplexity and Google’s Gemini — with who they named instead of you. Run it three times as you fix things.',
   },
   pro: {
     label: 'Pro',
@@ -400,28 +416,28 @@ export function canDiscover(user: User | null): boolean {
 }
 
 /**
- * Writing answers with the model.
+ * Writing answers with the model, in the dashboard.
  *
- * ⚠️ TRUE ON EVERY PLAN, AND IT USED TO BE PRO-ONLY. It was named
- * `canRegenerate` and it locked the dashboard generator entirely — while the
- * generator on the public marketing home page wrote five answers for a total
- * stranger, ungated. A signed-in free account therefore got less than someone
- * who had never signed up, which is not a tier, it is a bug that had been
- * reasoned about backwards.
+ * ⚠️ PRO ONLY AGAIN, AND THE HISTORY MATTERS BECAUSE IT NEARLY REPEATS. This
+ * was Pro-only as `canRegenerate`, then opened to every plan on the grounds
+ * that a signed-in free account was getting LESS than an anonymous stranger,
+ * who could use the ungated generator on the marketing home page. That argument
+ * was right and it still is — which is why what closes here is only the
+ * DASHBOARD generator.
  *
- * ⚠️ THE SPEND IS BOUNDED BY TWO OTHER THINGS, NOT BY THIS. A model call costs
- * money, so opening the predicate only makes sense alongside the ceilings that
- * hold it down: free is clamped to MAX_FAQ_COUNT per call and RATE_LIMIT per
- * day — exactly the anonymous deal — in app/api/dashboard/generate/route.ts,
- * and every answer it saves counts against FREE_FAQ_CAP in createFaqs(). Change
- * either of those and this becomes an open tap.
+ * ⚠️ THE PUBLIC TOOL AT /free-report IS UNTOUCHED AND MUST STAY THAT WAY. It
+ * posts to /api/generate, not /api/dashboard/generate, and needs no account.
+ * The moment this predicate is used to gate that route, the backwards tier is
+ * back: someone who signed up would be worse off than someone who did not.
  *
- * There is no separate "rewrite" capability to gate, and there never was: this
- * predicate had exactly one consumer, and that route generates a fresh batch
- * from pasted content rather than editing an existing answer.
+ * What changed is the free report itself. It is one page, and that page now
+ * ends in three prompts put to the engines rather than in an answer writer —
+ * so free is sold a diagnosis, and writing the answers is part of what Pro
+ * buys. FREE_FAQ_CAP and faqCapFor() stay as they are: accounts that wrote
+ * answers under the old shape still own those rows.
  */
-export function canGenerate(): boolean {
-  return true;
+export function canGenerate(user: User | null): boolean {
+  return isPro(user);
 }
 
 /** The content plan: which pages the site is missing, and what to write next. */
@@ -465,11 +481,12 @@ export function canOfferDoneForYou(user: User | null): boolean {
 /**
  * May a check run for this account at all — by anyone, including the scheduler.
  *
- * True on free as well, and that is not a mistake: free buys one run, metered
- * by the plan's checksPerPeriod counted over a period that never resets. The
- * ceiling is what makes it safe, exactly as it was when a one-off payment had
- * to fund a recurring cost. ⚠️ IF THAT METER IS EVER REMOVED, THIS MUST GO BACK
- * TO isPro — an unmetered free tier is an unbounded bill on somebody else's API.
+ * True on free as well, and that is not a mistake: free buys three runs,
+ * metered by the plan's checksPerPeriod counted over a period that never
+ * resets. The ceiling is what makes it safe, exactly as it was when a one-off
+ * payment had to fund a recurring cost. ⚠️ IF THAT METER IS EVER REMOVED, THIS
+ * MUST GO BACK TO isPro — an unmetered free tier is an unbounded bill on
+ * somebody else's API.
  *
  * For "may the customer press a button", see canRunCheckNow.
  */
@@ -480,15 +497,85 @@ export function canTrack(): boolean {
 /**
  * May this customer start a check themselves, right now?
  *
- * ⚠️ NOT THE SAME QUESTION AS canTrack, and keeping them apart is the point.
- * canTrack asks whether a check may run at all — the onboarding scan needs
- * that. This asks whether a PERSON may start one, which only Pro may do. Free
+ * ⚠️ NOT THE SAME QUESTION AS canTrack, and keeping them apart is still the
+ * point even though both now answer yes for free. canTrack asks whether a
+ * check may run at all — the onboarding scan needs that, and the scheduler
+ * asks it too. This asks whether a PERSON may start one.
+ *
+ * ⚠️ THIS USED TO BE isPro, FOR A REASON THAT NO LONGER HOLDS. It read: "Free
  * gets a single automatic run; a button beside it would spend the whole
  * allowance on the first click and then do nothing forever, which reads as
- * broken twice.
+ * broken twice." That was correct while free bought one run. It buys three, so
+ * the first click leaves two and the button has somewhere to go.
+ *
+ * ⚠️ IT IS NOT A BUDGET CHECK, AND MUST NOT BECOME ONE. This says the plan
+ * permits a person to press Run; whether there is anything left to spend is
+ * counted server-side against checksPerPeriod in
+ * app/api/dashboard/tracking/route.ts, from citation_checks rows. Deciding
+ * "runs remaining" here would mean a second implementation of the meter, on the
+ * client, reading numbers the client can't be trusted with. The UI derives a
+ * runs-left figure for display from the same rows — see runsLeftFor() — and
+ * the server still refuses independently.
+ *
+ * No argument, like canTrack() and canGenerate() beside it: a predicate that
+ * ignores its input should not accept one, or every call site implies a
+ * distinction that isn't there.
  */
-export function canRunCheckNow(user: User | null): boolean {
-  return isPro(user);
+export function canRunCheckNow(): boolean {
+  return true;
+}
+
+/**
+ * How many more times this account can press Run.
+ *
+ * ⚠️ DERIVED, NEVER STORED. This codebase does not keep progress flags — "a
+ * flag can disagree with reality, and the thing it would disagree about is
+ * already knowable". `checksUsed` is a count of citation_checks rows since the
+ * period start, which on free is the beginning of time, so the arithmetic below
+ * is a reading of what actually happened rather than a tally somebody has to
+ * remember to increment.
+ *
+ * ⚠️ FOR DISPLAY ONLY. The server refuses past the budget on its own; this
+ * exists so the page can say "2 checks left" instead of offering a button that
+ * fails. If the two ever disagree the server is right.
+ *
+ * A partly-failed run — Perplexity 429s through half of it — spends less than a
+ * whole run and therefore leaves more here. That is correct rather than
+ * generous: the route skips question/engine pairs it already has for today, so
+ * pressing again buys only what is missing.
+ */
+export function runsLeftFor(
+  tracking: { checksCap: number; checksUsed: number; promptCap: number } | null,
+): number {
+  if (!tracking) return 0;
+  const perRun = tracking.promptCap * ENGINES.length;
+  if (perRun <= 0) return 0;
+  return Math.max(0, Math.floor((tracking.checksCap - tracking.checksUsed) / perRun));
+}
+
+/**
+ * Has a check already run today?
+ *
+ * ⚠️ RUNS LEFT IS NOT THE ONLY LIMIT, AND THIS IS THE OTHER ONE. The tracking
+ * route skips any question/engine pair it already holds a row for since
+ * midnight UTC — "re-asking the same question twice in one day tells you
+ * nothing new and bills twice for it". So a second press on the same day
+ * returns `{checked: 0, done: true}` and changes nothing on screen.
+ *
+ * Without this the button would spend a click, report success and leave the
+ * table identical, which reads as broken. With it the page can say the run is
+ * available tomorrow — which is also the honest shape of the offer, since the
+ * point of a re-check is to see whether a fix moved anything.
+ *
+ * ⚠️ UTC, BECAUSE THE ROUTE IS. Comparing against local midnight would let the
+ * two disagree for hours either side of it, and the one that actually decides
+ * is the server's.
+ */
+export function checkedTodayUtc(latest: { checkedAt: string }[]): boolean {
+  const since = new Date();
+  since.setUTCHours(0, 0, 0, 0);
+  const iso = since.toISOString();
+  return latest.some((c) => c.checkedAt >= iso);
 }
 
 /**

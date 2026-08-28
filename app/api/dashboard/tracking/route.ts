@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { trackingPlanFor } from '@/lib/auth/entitlements';
+import { canRunCheckNow, trackingPlanFor } from '@/lib/auth/entitlements';
 import { trackingPeriod } from '@/lib/dashboard/plans';
 import type { Engine } from '@/lib/dashboard/types';
 import { checkRateLimit, limitKey, TRACKING_RATE_LIMIT } from '@/lib/rate-limit';
@@ -79,26 +79,34 @@ export async function POST(request: Request) {
   const plan = trackingPlanFor(user);
 
   /*
-    ⚠️ FREE HAS NO BUTTON, AND THIS IS WHERE THAT IS TRUE.
+    ⚠️ THIS USED TO READ `plan.schedule === 'once'`, WHICH WAS THE WRONG FIELD.
 
-    Its single check runs during the onboarding scan and the budget is sized to
-    exactly that. A manual run would find nothing left and refuse, which reads
-    as broken. The UI shows an upgrade card instead of a control, but hiding a
-    control is not enforcement: this route's own header says a client that tells
-    the server which tier it is on "is not authorization, it's a bypass with
-    extra steps".
+    It stood for "free has no button", and while free bought a single automatic
+    run that was true — a manual press would have found nothing left and
+    refused, which reads as broken. Free buys three runs now, so the premise is
+    gone.
 
-    ⚠️ REFUSED BEFORE THE UPSERT BELOW, DELIBERATELY. Further down this handler
-    writes `questions` into tracked_prompts. Refusing after that point would
-    leave this route usable as a side door for growing a free watch list past
-    its cap — the onboarding scan mirrors the question list itself, so nothing
-    is lost by closing it here.
+    But `schedule` never meant "may press the button" even when it gave the
+    right answer. It describes the SCHEDULER: 'once' says nothing re-runs this
+    account automatically, which is still true of free and is most of what Pro
+    sells. Reading it as a permission conflated two questions that only happened
+    to agree. canRunCheckNow() is the one actually being asked.
+
+    ⚠️ WHAT STOPS A FREE ACCOUNT SPENDING FOREVER IS BELOW, NOT HERE. The period
+    budget counts citation_checks against plan.checksPerPeriod — 27 on free,
+    over a window that never ends — and the pair skip refuses anything already
+    asked today. Those are the enforcement. This gate is the plan's permission,
+    and the two must not be merged: an entitlement that also counted spend would
+    have to be given the count, and the client is not allowed to supply it.
+
+    ⚠️ STILL REFUSED BEFORE THE UPSERT BELOW, DELIBERATELY. Further down this
+    handler writes `questions` into tracked_prompts. Refusing after that point
+    would leave this route usable as a side door for growing a watch list past
+    its cap. The cap itself (plan.promptCap, applied to `wanted`) is what holds
+    that line now that free is allowed through.
   */
-  if (plan.schedule === 'once') {
-    return fail(
-      'Your free check has already run. Pro re-checks every week, and whenever you press the button.',
-      403,
-    );
+  if (!canRunCheckNow()) {
+    return fail('Running a check yourself is part of Pro.', 403);
   }
 
   /*
@@ -110,7 +118,7 @@ export async function POST(request: Request) {
     on the column in 0006; trimming here would break the loop that marks a
     question covered.
 
-    The cap comes from the plan, not from a global: 25 on Pro and 5 on free,
+    The cap comes from the plan, not from a global: 25 on Pro and 3 on free,
     which is a good part of what the upgrade is sold on.
   */
   const wanted = Array.isArray(questions)

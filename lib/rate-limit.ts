@@ -148,6 +148,14 @@ export const DONE_FOR_YOU_RATE_LIMIT = 3;
  *
  *     12 runs/day × ceil(25 prompts / 5 per request) = 60
  *
+ * ⚠️ SIZED ON PRO, WHICH IS WHY FREE GAINING A BUTTON DID NOT MOVE IT. Free's
+ * cap is 3, so one of its runs is ceil(3 / 5) = a single request, and its whole
+ * lifetime allowance is three of them. It cannot approach this ceiling; the
+ * thing that stops a free account is checksPerPeriod (27, over a window that
+ * never resets), not this. A limit sized for the larger plan already covers the
+ * smaller one — but that is only true while free's cap stays below Pro's, so
+ * check both if either moves.
+ *
  * ⚠️ IT IS DERIVED FROM THE PROMPT CAP AND MUST BE REDONE WHEN THAT MOVES. It
  * was 84 while the cap was 35, and 60 before that when the cap was 25 — leaving
  * a stale value cuts a subscriber to fewer full runs a day than the comment

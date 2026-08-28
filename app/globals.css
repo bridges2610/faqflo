@@ -42,6 +42,35 @@
   --color-error-ink: #b91c1c; /* 6.47:1 on white */
 
   /*
+    Amber, for `warn` — the third state a check can be in.
+
+    ⚠️ IT EXISTED AS CYAN, WHICH IS WHY THIS IS A FIX RATHER THAN A NEW COLOUR.
+    Both audit renderers styled a warning as `bg-accent-soft text-teal-ink`,
+    the brand accent — the same treatment the Pro-lock chip uses. So a check
+    that needs a look and a feature you have not paid for were the same colour,
+    and pass/warn/fail was really pass/fail with a decoration. A checklist whose
+    three states are two states is the thing the colour rules exist to prevent.
+
+    Same `-ink` convention as the two above: the mid value is for fills and
+    icons, the ink for type.
+  */
+  --color-warn: #f59e0b;
+  --color-warn-ink: #b45309; /* 5.02:1 on white, 4.84:1 on --color-warn-soft */
+  --color-warn-soft: #fffbeb;
+
+  /*
+    Gemini's series colour, promoted from a hardcoded hex.
+
+    It has been sitting in components/dashboard/citation-chart.tsx as a literal
+    since that chart was written, under a comment recording that blue → teal →
+    violet was validated for colour-blindness and that THE ORDER IS LOAD-BEARING
+    (violet next to blue fails catastrophically for deuteranopia). Anything else
+    keying a colour by engine has to reuse that exact sequence rather than pick
+    its own, and it cannot do that while the third value lives in one file.
+  */
+  --color-violet: #7c3aed; /* 5.70:1 on white */
+
+  /*
     Shape — nothing sharp anywhere.
 
     Note there is no `--radius-DEFAULT`: Tailwind v4 has no such concept, and

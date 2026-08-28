@@ -11,8 +11,8 @@ export const metadata: Metadata = { title: 'Dashboard' };
 
   Free and Pro land on this route wanting different things. Pro's Home is where
   the weekly email arrives — somebody who already pays, checking what moved.
-  Free's is a conversion page: one check, ever, and a decision to make about
-  whether any of it is real. Those are different arguments in a different order,
+  Free's is a conversion page: a diagnosis they can re-run three times, and a
+  decision to make about whether any of it is real. Those are different arguments in a different order,
   so they are two compositions over the same blocks rather than one screen with
   a branch inside every card.
 

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { isPro, nextCheckDate, PRO_PRICE } from '@/lib/dashboard/plans';
+import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { RunNotice } from './run-notice';
@@ -86,9 +86,10 @@ function isActive(pathname: string, href: string): boolean {
   hiding would leave five links that all go to the same place. Both halves are
   needed, and if one is changed the other has to move with it.
 
-  The free plan's whole product is a single report: one audit of one page, one
-  citation check, and the answers written from it — all of which now live on
-  /dashboard. There is no second screen to navigate to.
+  The free plan's whole product is a single report: one audit of one page, and
+  three prompts put to the engines that the reader can re-run as they fix
+  things. All of it lives on /dashboard. There is no second screen to navigate
+  to.
 
   ⚠️ Home's label changes with it. "Home" implies somewhere else to go back
   from, which is true on Pro's five-item nav and false here.
@@ -151,7 +152,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 function NextCheckNotice() {
   const { site, user } = useDashboard();
 
-  // Free gets one check, taken at signup. There is no next one to promise.
+  // Free's checks are pressed by hand on its own report, never scheduled — so
+  // there is no next one to promise here. See TRACKING_PLANS.free.schedule.
   if (!site || !isPro(user)) return null;
 
   const due = nextCheckDate(site);
@@ -208,7 +210,14 @@ function PlanFooter() {
     `checksUsed` is the count the meter on Results is drawn from, so the sidebar
     and that page cannot disagree about whether a check has happened.
   */
-  const spent = (tracking?.checksUsed ?? 0) > 0;
+  /*
+    ⚠️ THE COUNT IS DERIVED, NOT A FLAG, and it is now a number rather than a
+    yes/no. Free used to buy exactly one check, so "has it been spent" was the
+    whole story. It buys three, so the honest line is how many are left — and
+    runsLeftFor() reads that off the stored rows for the same reason `spent`
+    did: a flag can disagree with reality, and this one is already knowable.
+  */
+  const left = runsLeftFor(tracking);
 
   return (
     <div className="border-line bg-cloud rounded-xl border p-4">
@@ -217,9 +226,9 @@ function PlanFooter() {
       <p className="text-slate mt-1 text-xs leading-relaxed">
         {pro
           ? 'Checked automatically every week'
-          : spent
-            ? 'Your one check has run'
-            : 'Includes one free check'}
+          : left > 0
+            ? `${left} of ${TRACKING_PLANS.free.runsPerPeriod} checks left`
+            : 'You’ve used all three checks'}
       </p>
       {/* Straight to the in-app plan page, not out to /#pricing. Sending a
           signed-in customer back to the marketing site to buy means they land on

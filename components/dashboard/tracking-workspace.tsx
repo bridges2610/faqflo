@@ -521,13 +521,21 @@ export function TrackingWorkspace() {
       canRunNow   — may this customer start a check by hand, right now?
 
     They were both the same predicate, which was fine while every plan had a
-    button. Free's single check runs itself and has none, and collapsing these
-    again would silently switch question discovery off for free accounts — a
-    feature that costs an Opus call rather than engine calls.
+    button. Collapsing them again would silently switch question discovery off
+    for free accounts — a feature that costs an Opus call rather than engine
+    calls.
+
+    ⚠️ canRunNow IS TRUE FOR EVERYONE NOW, AND THE VARIABLE STAYS ANYWAY. Free
+    gained a Run button on its own report, so the predicate stopped
+    discriminating — but this route is Pro-only, so the branches below that test
+    it are unreachable rather than wrong. Left standing because the question is
+    still the right one to ask here: if the entitlement ever tightens again this
+    page reads correctly without being rewritten, and inlining `true` would lose
+    the reason the check exists.
   */
   const pro = isPro(user);
   const canGrowList = pro;
-  const canRunNow = canRunCheckNow(user);
+  const canRunNow = canRunCheckNow();
   const oneShot = trackingPlanFor(user).schedule === 'once';
 
   const daily = tracking?.daily ?? [];
@@ -560,7 +568,10 @@ export function TrackingWorkspace() {
             body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else. It takes a minute or two.`}
             action={
               canRunNow ? (
-                <Button onClick={runTracking} disabled={run.busy}>
+                /* ⚠️ `() => runTracking()`, never `onClick={runTracking}`. It
+                   takes an optional question list now, so passing the handler
+                   bare hands it the MouseEvent as that list. */
+                <Button onClick={() => void runTracking()} disabled={run.busy}>
                   {runningHere
                     ? 'Checking…'
                     : run.busy
@@ -736,11 +747,17 @@ export function TrackingWorkspace() {
       <PageHeader
         title="Results"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
-        /* Free has no button — its one check has already run. The upgrade is the
-           honest answer to what the button was for. */
+        /* This route is Pro-only, so canRunNow is always true here now — see
+           the note where it is derived. The branch stays because the question
+           is still the right one for this screen to ask. */
         action={
           canRunNow ? (
-            <Button variant="ghost" size="sm" onClick={runTracking} disabled={run.busy}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => void runTracking()}
+              disabled={run.busy}
+            >
               {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
             </Button>
           ) : (

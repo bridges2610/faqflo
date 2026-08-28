@@ -4,14 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Check } from '@/components/ui/check';
-import {
-  FREE_FAQ_CAP,
-  FREE_QUESTION_SAMPLE,
-  GUARANTEE_DAYS,
-  isPro,
-  PRO_PRICE,
-  TRACKING_PLANS,
-} from '@/lib/dashboard/plans';
+import { GUARANTEE_DAYS, isPro, PRO_PRICE, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { SectionTitle } from './section-title';
 
@@ -39,9 +32,9 @@ const FREE_FEATURES = [
   'Your AI-visibility score, out of 100',
   'Can AI read your site, or does it just see a blank page?',
   'Are the AI bots allowed in?',
-  `A sample of ${FREE_QUESTION_SAMPLE} questions people ask AI in your category`,
-  `${FREE.promptCap} questions checked once, across all three AI engines`,
-  `Up to ${FREE_FAQ_CAP} answers written for you, and copied out as plain text`,
+  `${FREE.promptCap} real questions put to ChatGPT, Perplexity and Google’s Gemini`,
+  'See which of them named you — and who got named instead',
+  `Check again ${FREE.runsPerPeriod} times as you fix things`,
 ];
 
 const PRO_FEATURES = [

@@ -1,18 +1,17 @@
 'use client';
 
 import { ScoreDial } from '@/components/ui/score-dial';
-import { plainFor, isHiddenInSummary } from '@/lib/audit/plain';
 import { scoreBand } from '@/lib/audit/score';
 import { PRO_PRICE } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { groupByQuestion, namedIn } from '@/lib/dashboard/questions';
 import { pickProof } from '@/lib/dashboard/proof';
-import { FreeAnswers } from './free-answers';
-import { Meter } from './meter';
+import { NextSteps, nextStepsFor } from './next-steps';
 import { PageHeader } from './page-header';
+import { PromptRanking } from './prompt-ranking';
 import { ProofCard } from './proof-card';
+import { ReadabilityChecklist, readabilityRows } from './readability-checklist';
 import { SiteForm } from './site-form';
-import { StatRow } from './stat-row';
 import { UpgradeCard } from './upgrade-card';
 
 /*
@@ -21,7 +20,8 @@ import { UpgradeCard } from './upgrade-card';
   ⚠️ A SEPARATE COMPOSITION, NOT A GATED OverviewWorkspace, AND THE TWO PAGES
   HAVE DIFFERENT JOBS. Pro's Home is where a weekly email lands — somebody who
   already pays, arriving to see what moved. This is a conversion page: somebody
-  who has had one check, ever, and is deciding whether any of this is real.
+  who has had one check so far, can run three, and is deciding whether any of
+  this is real.
   Gating one screen into serving both would have meant every block carrying a
   branch, and the honest version of each is a different block.
 
@@ -33,9 +33,21 @@ import { UpgradeCard } from './upgrade-card';
   it from the provider, which resolves the plan a frame late — and a paying
   customer would see this page flash before Pro's replaced it.
 
-  Order is one argument, in sequence: how readable are you, does AI actually
-  name you, here is the proof, here is every question, here is who is winning,
-  here is why, here is what to do.
+  Order is one argument, in sequence: here is the verdict, here is whether AI
+  can read you at all, here is one answer in full as proof, here is who ranks
+  for your prompts, here is what to do about it.
+
+  ⚠️ IT USED TO END IN AN ANSWER WRITER, AND THAT WAS THE WRONG LAST STEP. The
+  page finished with a generator — write some FAQs, copy them out — which put
+  the work before the reason for it. Somebody who has not yet seen an assistant
+  name a directory instead of them has no reason to write anything. Free is a
+  diagnosis now; writing the answers is part of what Pro buys, and the pricing
+  page was changed in the same commit to say so.
+
+  ⚠️ TWO SECTIONS BECAME ONE. "Every question we asked" listed ratios and
+  "Who's getting named instead" listed domains — the same run, split across two
+  places, neither of which showed the comparison. PromptRanking is one grid: a
+  row reads "no engine names me", a column reads "Perplexity never does".
 */
 export function FreeHome() {
   const { site, tracking, data } = useDashboard();
@@ -88,46 +100,38 @@ export function FreeHome() {
 
   const proof = asked ? pickProof(tracking?.latest ?? []) : null;
 
-  /* Worst first — the rows worth acting on are the ones nobody named you for,
-     and best-first buries them under the wins. */
-  const rankedQuestions = [...groupsByQuestion].sort(
-    (a, b) => namedIn(a) / a.checks.length - namedIn(b) / b.checks.length,
-  );
-
-  /* Everyone the engines drew on, us excluded — "who is getting named instead"
-     is a question about them. Already sorted descending by the store. */
-  const rivals = (tracking?.competitors ?? []).filter((c) => !c.isYou).slice(0, 5);
-  const rivalTop = Math.max(...rivals.map((c) => c.citations), 1);
-
-  /*
-    Why, in the customer's words rather than the checklist's.
-
-    plainFor() is the audit page's own plain-English rendering of a finding, so
-    the two screens cannot describe the same problem differently.
-    isHiddenInSummary() drops the locked citation finding and anything marked
-    not-worth-saying. A free report scores three checks, so this is at most
-    three rows and usually one or two.
-  */
-  const problems = (report?.pillars ?? [])
-    .flatMap((p) => p.findings)
-    .filter((f) => !isHiddenInSummary(f) && (f.status === 'fail' || f.status === 'warn'));
+  /* Both derived here rather than inside their components, so the sections that
+     wrap them can be gated on whether there is anything to show. */
+  const readability = report ? readabilityRows(report) : [];
+  const steps = report ? nextStepsFor(report) : [];
 
   const today = new Date(report?.checkedAt ?? Date.now());
+  const firstName = data.user.name.split(' ')[0] ?? '';
 
   return (
     <article>
       {/*
-        The masthead.
+        The masthead, and a welcome above it.
 
-        ⚠️ NOT PageHeader, AND NOT A GREETING. Every other dashboard screen
-        opens "Good morning, Beau" because it is a place you work. This is a
-        document about a website — it gets the subject, what it is, and when it
-        was taken, the way a report handed to somebody would.
+        ⚠️ THERE IS A GREETING NOW, AND THE OLD NOTE HERE SAID THERE MUST NOT
+        BE. It argued this is "a document about a website" rather than "a place
+        you work", so it should open with its subject the way a report handed to
+        somebody would. That is still what the masthead does — the greeting sits
+        above it as a line of welcome, not in place of it.
+
+        ⚠️ NOT A TIME-OF-DAY GREETING, WHICH IS THE PART WORTH KEEPING OUT. Pro's
+        Home says "Good morning, Beau" from the client clock, and the shots page
+        carries a comment complaining that regenerating in the afternoon changes
+        that file. A plain welcome reads the same at any hour and renders
+        identically on the server and the client.
       */}
-      <header className="border-navy border-b-2 pb-4">
-        <p className="font-mono text-xs tracking-wide uppercase text-slate">
-          {site.domain}
-        </p>
+      <p className="text-slate text-[0.9375rem]">
+        Welcome{firstName ? `, ${firstName}` : ''} — here&rsquo;s what AI can see about your
+        business today.
+      </p>
+
+      <header className="border-navy mt-4 border-b-2 pb-4">
+        <p className="text-slate font-mono text-xs tracking-wide uppercase">{site.domain}</p>
         <h1 className="text-navy mt-1 text-[1.75rem] sm:text-[2rem]">AI visibility report</h1>
         <p className="text-slate mt-1 text-sm">
           {today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -153,84 +157,62 @@ export function FreeHome() {
         </div>
       )}
 
-      {asked ? (
-        <>
-          <Section n="01" title="The verdict">
-            <h3 className="text-navy text-[1.375rem] font-extrabold tracking-tight sm:text-[1.5rem]">
-              {namedCount === 0
-                ? 'Right now, AI doesn’t recommend your business.'
-                : namedCount === questionCount
-                  ? 'AI names you on every question we asked.'
-                  : `AI names you sometimes — on ${namedCount} of your ${questionCount} questions.`}
-            </h3>
-            <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
-              {namedCount === 0
-                ? `We asked ${questionCount} questions a customer might ask. Your name came back on none of them.`
-                : namedCount === questionCount
-                  ? `All ${questionCount} of them. Worth keeping an eye on — answers change as the engines re-read the web.`
-                  : `The other ${questionCount - namedCount} went to somebody else.`}
-            </p>
-          </Section>
+      {/*
+        ⚠️ THE VERDICT IS FIRST AND STAYS FIRST. It is the sentence the whole
+        page exists to earn, and it must never be hardcoded: "Right now, AI
+        doesn't recommend your business" is right for an account nobody named
+        and false for one named on two prompts out of three.
+      */}
+      {asked && (
+        <Section n="01" title="The verdict">
+          <h3 className="text-navy text-[1.375rem] font-extrabold tracking-tight sm:text-[1.5rem]">
+            {namedCount === 0
+              ? 'Right now, AI doesn’t recommend your business.'
+              : namedCount === questionCount
+                ? 'AI names you on every question we asked.'
+                : `AI names you sometimes — on ${namedCount} of your ${questionCount} questions.`}
+          </h3>
+          <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
+            {namedCount === 0
+              ? `We asked ${questionCount} questions a customer might ask. Your name came back on none of them.`
+              : namedCount === questionCount
+                ? `All ${questionCount} of them. Worth keeping an eye on — answers change as the engines re-read the web.`
+                : `The other ${questionCount - namedCount} went to somebody else.`}
+          </p>
+        </Section>
+      )}
 
-          {proof && (
-            <Section n="02" title="What AI said">
-              <ProofCard proof={proof} siteName={site.name} />
-            </Section>
-          )}
+      {/* Can AI read the site — the three checks a free audit scores, as boxes
+          rather than as prose. This replaced a "Why" section that listed only
+          the failures: a reader counting three boxes learns more than one
+          reading two paragraphs about what went wrong.
 
-          <Section n="03" title="Every question we asked">
-            <p className="text-slate text-sm">
-              How many of the three engines named you, question by question.
-            </p>
-            <div className="divide-line mt-3 divide-y">
-              {rankedQuestions.map((g) => (
-                <StatRow
-                  key={g.question}
-                  label={g.question}
-                  value={namedIn(g)}
-                  /* That group's own length, never ENGINES.length — a question
-                     one engine failed on was asked of fewer than three. */
-                  total={g.checks.length}
-                  tone={namedIn(g) > 0 ? 'primary' : 'line'}
-                />
-              ))}
-            </div>
-          </Section>
+          ⚠️ Gated on the rows, not on `report`. A heading with nothing under it
+          claims a check we did not take. */}
+      {readability.length > 0 && (
+        <Section n={asked ? '02' : '01'} title="Can AI read your site?">
+          <ReadabilityChecklist rows={readability} />
+        </Section>
+      )}
 
-          <Section n="04" title="Who’s getting named instead">
-            <p className="text-slate text-sm">
-              Every source the engines drew on across your questions, most cited first.
-            </p>
-            {rivals.length > 0 ? (
-              /* ⚠️ NOT StatRow. It prints "N of M", which is a ratio — and
-                 these are counts. The bar is scaled to the biggest row so the
-                 shape is comparable, but "4 of 4" would say angi.com was cited
-                 every time it could have been, which is not what the number
-                 means. Same treatment as share of voice on Results. */
-              <ul className="divide-line mt-3 divide-y">
-                {rivals.map((c) => (
-                  <li key={c.domain} className="py-2.5">
-                    <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-slate min-w-0 truncate font-mono text-sm">
-                        {c.domain}
-                      </span>
-                      <span className="text-navy shrink-0 text-sm font-semibold tabular-nums">
-                        {c.citations}
-                      </span>
-                    </div>
-                    <Meter className="mt-2" value={(c.citations / rivalTop) * 100} animate />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-slate mt-3 text-sm">
-                None of the answers we saw linked a source we could read.
-              </p>
-            )}
-          </Section>
-        </>
-      ) : (
-        <Section n="01" title="Asking the engines about you">
+      {asked && proof && (
+        <Section n="03" title="What AI said">
+          <ProofCard proof={proof} siteName={site.name} />
+        </Section>
+      )}
+
+      {/* ⚠️ THIS SUBSUMES TWO OLD SECTIONS. "Every question we asked" was a list
+          of ratios and "Who's getting named instead" was a list of domains; the
+          table carries both facts in one grid, which is the comparison somebody
+          actually wants and one fewer thing to scroll past. */}
+      {asked && (
+        <Section n="04" title="Who ranks for your prompts">
+          <PromptRanking tracking={tracking} />
+        </Section>
+      )}
+
+      {!asked && (
+        <Section n="02" title="Asking the engines about you">
           <p className="text-slate text-[0.9375rem] leading-relaxed">
             We’re putting your questions to ChatGPT, Perplexity and Google’s Gemini and recording
             who they name. It takes a few minutes — you can close this tab, it keeps running
@@ -239,24 +221,17 @@ export function FreeHome() {
         </Section>
       )}
 
-      {problems.length > 0 && (
-        <Section n={asked ? '05' : '02'} title="Why">
-          <ul className="divide-line divide-y">
-            {problems.map((f) => (
-              <li key={f.id} className="py-3.5 first:pt-0">
-                <p className="text-navy text-[0.9375rem] font-semibold">{f.label}</p>
-                <p className="text-slate mt-1 text-sm leading-relaxed">{plainFor(f)}</p>
-              </li>
-            ))}
-          </ul>
+      {/* Deliberately last of the numbered sections: what to do only means
+          something once the reader has seen what is wrong.
+
+          ⚠️ Gated on the steps. A site that passes all three checks has nothing
+          to do, which is a real and good outcome — but "05 WHAT TO DO NEXT"
+          over a blank space reads as a page that failed to load. */}
+      {steps.length > 0 && (
+        <Section n={asked ? '05' : '03'} title="What to do next">
+          <NextSteps steps={steps} />
         </Section>
       )}
-
-      {/* Answer-writing lives here rather than a link away: free accounts have
-          one page, so a CTA pointing at /dashboard/faqs would be a dead end. */}
-      <Section n={asked ? '06' : '03'} title="Your answers">
-        <FreeAnswers />
-      </Section>
 
       {/* The one lock, stated as what it is. Wording matches
           publish-workspace's own upgrade card so the same feature is not

@@ -6,8 +6,9 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Underline } from '@/components/ui/doodle';
 import { ScoreDial } from '@/components/ui/score-dial';
+import { STATUS_CHIP, STATUS_WORD, StatusIcon } from '@/components/ui/status-icon';
 import { scoreBand } from '@/lib/audit/score';
-import type { AuditReport, CheckStatus, Finding } from '@/lib/audit/types';
+import type { AuditReport, Finding } from '@/lib/audit/types';
 
 /*
   The lead hook: type an address, find out whether AI can read your site.
@@ -17,38 +18,12 @@ import type { AuditReport, CheckStatus, Finding } from '@/lib/audit/types';
   tool — a free checker that guesses is worth less than no checker.
 */
 
-const STATUS_STYLES: Record<CheckStatus, { chip: string; word: string }> = {
-  pass: { chip: 'bg-success/12 text-success-ink', word: 'Pass' },
-  warn: { chip: 'bg-accent-soft text-teal-ink', word: 'Needs a look' },
-  fail: { chip: 'bg-error/12 text-error-ink', word: 'Problem' },
-  locked: { chip: 'bg-cloud text-slate border border-line', word: 'Not checked' },
-  na: { chip: 'bg-cloud text-slate border border-line', word: 'Not applicable' },
-};
-
-function StatusIcon({ status }: { status: CheckStatus }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-3.5 w-3.5"
-      aria-hidden="true"
-    >
-      {status === 'pass' && <polyline points="3 8.5 6.5 12 13 4.5" />}
-      {status === 'warn' && <path d="M8 4v5M8 11.5h.01" />}
-      {status === 'fail' && <path d="M4.5 4.5l7 7M11.5 4.5l-7 7" />}
-      {status === 'locked' && (
-        <>
-          <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" />
-          <path d="M5.8 7V5.6a2.2 2.2 0 0 1 4.4 0V7" />
-        </>
-      )}
-    </svg>
-  );
-}
+/* The chip, the word and the glyph moved to components/ui/status-icon.tsx when
+   the free report needed a third copy of them. Two things changed with the
+   move, both of them fixes: `warn` is amber rather than the brand cyan it
+   shared with the Pro-lock chip, and its word is "Worth a look" — this file
+   said "Needs a look" and the dashboard said "Worth a look", so one finding
+   described itself two ways depending on whether the reader had signed up. */
 
 /** The report groups findings by pillar; the teaser shows them as one list. */
 function findingsOf(report: AuditReport): Finding[] {
@@ -56,19 +31,17 @@ function findingsOf(report: AuditReport): Finding[] {
 }
 
 function CheckRow({ check }: { check: Finding }) {
-  const style = STATUS_STYLES[check.status];
-
   return (
     <li className="flex gap-3 py-3.5">
       <span
-        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${style.chip}`}
+        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${STATUS_CHIP[check.status]}`}
       >
         <StatusIcon status={check.status} />
       </span>
       <div className="min-w-0">
         <p className="text-navy text-[0.9375rem] font-semibold">
           {check.label}
-          <span className="sr-only"> — {style.word}</span>
+          <span className="sr-only"> — {STATUS_WORD[check.status]}</span>
         </p>
         <p className="text-slate mt-0.5 text-sm leading-relaxed">{check.detail}</p>
       </div>

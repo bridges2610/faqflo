@@ -1,0 +1,131 @@
+'use client';
+
+import { Button } from '@/components/ui/button';
+import { buildActionPlan } from '@/lib/audit/actions';
+import { plainAction } from '@/lib/audit/plain';
+import type { ActionItem, AuditReport } from '@/lib/audit/types';
+import { useCopy } from '@/lib/dashboard/use-copy';
+import { CopyIcon, TickIcon } from './nav-icons';
+
+/** At most this many. "Show opportunities, but limit this." */
+const LIMIT = 3;
+
+/*
+  What to do next, on a page with nowhere to send anybody.
+
+  ⚠️ report.actions IS EMPTY ON FREE, STRUCTURALLY, so this builds its own.
+  lib/audit/run.ts line 104 reads `actions: depth === 'quick' ? [] : buildActionPlan(...)`
+  and lib/scan/run.ts gives free `depth: 'quick'`. Reading report.actions here
+  would render nothing, forever, on every free account — and it would look like
+  a site with no problems rather than a field that was never filled.
+
+  ⚠️ GATED LINKS LOSE THEIR BUTTON, THEY DO NOT LOSE THE STEP — AND THE FIRST
+  VERSION OF THIS FILE GOT THAT WRONG. Two of the recipes that fire on free's
+  findings point at /dashboard/faqs and /dashboard/publish, which redirect a
+  free account back to this page, so they were filtered out entirely. Rendering
+  the free report showed what that costs: a site whose only problem is `qa-markup`
+  fires exactly those two and nothing else, so the section disappeared on the
+  most common free result there is — the reader is told what is wrong and then
+  shown nothing to do about it.
+
+  The advice was never the part that was gated. "Publish a set of question-and-
+  answer content" is true and worth reading whether or not we hand over a
+  button, so the step stays and the action is dropped to `none`. What the button
+  would have opened is the upgrade, and UpgradeCard at the foot of the report
+  makes that case once, properly, instead of as a broken link here.
+
+  ⚠️ NOT TaskRow, AND NOT BY OVERSIGHT. audit-summary.tsx explains: TaskRow
+  prints "+N points" and an effort band, which is the vocabulary of the
+  technical report. This reader has a three-check audit and no points to reason
+  about.
+*/
+/**
+ * The steps, derived — exported so the caller can decide whether to draw a
+ * heading at all.
+ *
+ * ⚠️ NOTHING TO DO IS A REAL OUTCOME, AND AN EMPTY SECTION IS NOT HOW TO SAY
+ * IT. On a three-check audit a site can genuinely pass everything, and this
+ * returns []. Were the emptiness decided inside the component, the report would
+ * render "05 WHAT TO DO NEXT" over a blank space — a heading promising content
+ * that does not exist, which reads as a loading bug rather than as good news.
+ * The caller gates the whole section on `.length`, so the derivation has to be
+ * available before the render.
+ */
+export function nextStepsFor(report: AuditReport): ActionItem[] {
+  const findings = report.pillars.flatMap((p) => p.findings);
+
+  /*
+    The hrefs are required by the type and never rendered: every link action is
+    flattened to `none` below. They point at the plan page rather than at the
+    gated routes so that a future change which stops flattening fails safe —
+    landing on the upgrade page rather than in a redirect loop.
+  */
+  const plan = buildActionPlan(findings, {
+    domain: report.domain,
+    faqsHref: '/dashboard/plan',
+    publishHref: '/dashboard/plan',
+    questionsHref: '/dashboard/plan',
+  });
+
+  return plan
+    .map(
+      (item): ActionItem =>
+        item.action.kind === 'link' ? { ...item, action: { kind: 'none' } } : item,
+    )
+    .slice(0, LIMIT);
+}
+
+export function NextSteps({ steps }: { steps: ActionItem[] }) {
+  return (
+    <ol className="divide-line divide-y">
+      {steps.map((item, i) => (
+        <StepRow key={item.id} item={item} index={i} />
+      ))}
+    </ol>
+  );
+}
+
+function StepRow({ item, index }: { item: ActionItem; index: number }) {
+  const { copied, copy } = useCopy();
+  const { what, why } = plainAction(item);
+
+  return (
+    <li className="py-4 first:pt-0">
+      <div className="flex gap-3.5">
+        <span className="bg-primary-soft text-primary font-display mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-extrabold">
+          {index + 1}
+        </span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 className="text-navy text-[1.0625rem] leading-snug font-semibold">{what}</h3>
+            <span className="text-slate text-xs">about {item.effort}</span>
+          </div>
+          <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">{why}</p>
+
+          {item.action.kind === 'copy' && (
+            <div className="mt-3">
+              <p className="text-slate text-sm">{item.action.where}</p>
+              {/* The one place jargon survives: text that has to be pasted
+                  somewhere exactly as written. */}
+              <pre className="border-line bg-cloud mt-2 overflow-auto rounded-lg border p-3">
+                <code className="text-navy font-mono text-[0.6875rem] leading-relaxed whitespace-pre">
+                  {item.action.snippet}
+                </code>
+              </pre>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-2"
+                onClick={() => copy(item.action.kind === 'copy' ? item.action.snippet : '')}
+              >
+                {copied ? <TickIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
+                {copied ? 'Copied' : 'Copy this'}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}

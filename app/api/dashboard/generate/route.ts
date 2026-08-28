@@ -11,7 +11,7 @@ import {
   type Faq,
 } from '@/lib/faq';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { isPro } from '@/lib/auth/entitlements';
+import { canGenerate, isPro } from '@/lib/auth/entitlements';
 import { checkRateLimit, DASHBOARD_RATE_LIMIT, limitKey, RATE_LIMIT } from '@/lib/rate-limit';
 
 /*
@@ -22,22 +22,28 @@ import { checkRateLimit, DASHBOARD_RATE_LIMIT, limitKey, RATE_LIMIT } from '@/li
   tells the server which tier it is on is not authorization — it's a bypass with
   extra steps." Tier comes from the account row.
 
-  ⚠️ THE PLAN SETS THE CEILING, IT DOES NOT SET THE LOCK — AND THAT IS A
-  REVERSAL. This route used to refuse free accounts outright, while the
-  generator on the public marketing home page wrote five answers for a total
-  stranger with no account at all. Signing up therefore took something away,
-  which is the wrong shape for a free tier and made the dashboard's own
-  generator panel a trap: it rendered a full form with no client-side gate, and
-  answered a free user's first click with a 403.
+  ⚠️ PRO ONLY, AND THIS HAS NOW BEEN BOTH WAYS — READ BEFORE CHANGING IT BACK.
 
-  So free gets exactly the anonymous deal — MAX_FAQ_COUNT per call, RATE_LIMIT
-  per day — except that what it writes lands in their account and counts against
-  FREE_FAQ_CAP when saved. Pro keeps the paid ceiling and the far higher limit.
+  It refused free accounts once, was opened to every plan, and is closed again.
+  The middle step was not a mistake: at the time the free dashboard ENDED in an
+  answer writer, and refusing here while the public marketing generator wrote
+  five answers for a total stranger meant signing up took something away.
 
-  ⚠️ BOTH CLAMPS ARE LOAD-BEARING. A model call costs money and nothing else in
-  the request bounds it: the count decides the size of one call and the rate
-  limit decides how many. Widening either for free without widening the other
-  is how this becomes an open tap.
+  What changed is not the argument, it is the product. The free report is one
+  page and it ends in three prompts put to the engines — a diagnosis. Writing
+  the answers is part of what Pro buys, and the pricing page says so in the same
+  commit as this line.
+
+  ⚠️ THE ANONYMOUS DEAL IS STILL ANONYMOUS, WHICH IS WHY THAT ARGUMENT DOES NOT
+  APPLY. /free-report posts to /api/generate, not here, and is untouched. A
+  stranger still gets five answers with no account. Gate that route too and the
+  backwards tier is back — signing up would leave somebody worse off than not
+  signing up, which is the shape this comment exists to prevent recurring.
+
+  ⚠️ THE CLAMPS BELOW STAY EVEN THOUGH ONLY PRO REACHES THEM. A model call costs
+  money and nothing else in the request bounds it: the count decides the size of
+  one call and the rate limit decides how many. They are not free-tier
+  scaffolding to be cleared away now that free is gone from this route.
 */
 
 const MODEL = 'claude-haiku-4-5';
@@ -49,6 +55,13 @@ function fail(message: string, status: number) {
 export async function POST(request: Request) {
   const user = await currentUser();
   if (!user) return fail('Sign in to generate answers.', 401);
+
+  /* Hiding the panel is not enforcement — the free report no longer renders a
+     generator at all, and this is where that is true rather than merely
+     displayed. See canGenerate() in lib/auth/entitlements.ts. */
+  if (!canGenerate(user)) {
+    return fail('Writing answers is part of Pro.', 403);
+  }
 
   /*
     Both ceilings come from the plan, and they are read once here so the count

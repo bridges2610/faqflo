@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { RunProgress } from './run-progress';
 
@@ -19,7 +20,7 @@ import { RunProgress } from './run-progress';
  * than to let someone discover it by closing the tab at 80%.
  */
 export function RunNotice() {
-  const { trackingRun, sites } = useDashboard();
+  const { trackingRun, sites, user } = useDashboard();
 
   if (!trackingRun.busy) return null;
 
@@ -31,12 +32,23 @@ export function RunNotice() {
         <p className="text-navy text-sm font-semibold">
           Checking {site ? site.name : 'your site'} against the answer engines
         </p>
-        <Link
-          href="/dashboard/tracking"
-          className="text-primary hover:text-primary-hover text-sm font-semibold"
-        >
-          View results
-        </Link>
+        {/*
+          ⚠️ PRO ONLY, AND THIS NOTICE ONLY RECENTLY BECAME REACHABLE WITHOUT
+          PRO. /dashboard/tracking redirects a free account back to /dashboard,
+          so this was a dead link — it just could not be reached, because
+          runTracking() was callable only from the Results page, which is
+          gated. The free report has a Run button now, so the accident that
+          protected it is gone. A free account's results are the report it is
+          already looking at, which is why there is no link for it here.
+        */}
+        {isPro(user) && (
+          <Link
+            href="/dashboard/tracking"
+            className="text-primary hover:text-primary-hover text-sm font-semibold"
+          >
+            View results
+          </Link>
+        )}
       </div>
 
       <RunProgress run={trackingRun} className="mt-2" />

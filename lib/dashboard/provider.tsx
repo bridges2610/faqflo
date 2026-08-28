@@ -104,8 +104,17 @@ type Ctx = {
   refreshTracking: () => Promise<SiteTracking | null>;
   /** A tracking run in flight, or the idle shape. Survives navigation. */
   trackingRun: TrackingRun;
-  /** Start a run for the selected site. A no-op while one is already going. */
-  runTracking: () => Promise<void>;
+  /**
+   * Start a run for the selected site. A no-op while one is already going.
+   *
+   * `only` overrides which questions are asked. Omitted — what Results does —
+   * it asks every question tracked for the site, which is that screen's whole
+   * subject. The free report passes the three it is displaying: it renders a
+   * table of specific prompts with a button under it, and a button that
+   * refreshes something other than the thing above it is a bug the reader
+   * cannot see. The route still caps whatever arrives at the plan's promptCap.
+   */
+  runTracking: (only?: string[]) => Promise<void>;
   /** The generated content plan for the active site; null until one is made. */
   contentPlan: ContentPlan | null;
 
@@ -429,7 +438,7 @@ export function DashboardProvider({
   */
   const running = useRef(false);
 
-  const runTracking = useCallback(async () => {
+  const runTracking = useCallback(async (only?: string[]) => {
     if (running.current) return;
 
     /*
@@ -439,9 +448,25 @@ export function DashboardProvider({
       because the questions come from the client by design.
     */
     const startedSite = site;
-    const asked = startedSite
-      ? questions.filter((q) => q.siteId === startedSite.id).map((q) => q.question)
-      : [];
+
+    /*
+      ⚠️ `only` IS NOT A SHORTCUT PAST THE CAP, AND CANNOT BE. The route reads
+      the plan off the profile row and slices whatever arrives to promptCap, so
+      the worst a caller can do here is choose WHICH questions get asked, not
+      how many. That is the same trust boundary the unfiltered path already sits
+      on — the route's own header says the body may not decide "which site, how
+      many prompts, or whether the customer is allowed".
+
+      It exists because the free report shows three named prompts and a button.
+      Falling back to every tracked question would have that button refresh rows
+      the table is not displaying, on an account whose allowance is three runs
+      in total.
+    */
+    const asked =
+      only ??
+      (startedSite
+        ? questions.filter((q) => q.siteId === startedSite.id).map((q) => q.question)
+        : []);
 
     if (!startedSite || asked.length === 0) return;
 
