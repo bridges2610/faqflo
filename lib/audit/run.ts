@@ -2,10 +2,15 @@
  * Running an audit end to end.
  *
  * Two depths, one engine. The free teaser on the marketing page and the full
- * audit inside the dashboard run the same checks over the same parser — the
- * difference is how many pages get fetched and how many findings are kept.
- * That's deliberate: two implementations would eventually disagree, and the
- * one a stranger sees first is the one that has to be right.
+ * audit inside the dashboard run the same checks over the same parser. That's
+ * deliberate: two implementations would eventually disagree, and the one a
+ * stranger sees first is the one that has to be right.
+ *
+ * ⚠️ THE DIFFERENCE IS HOW MANY PAGES ARE FETCHED. It used to be that plus a
+ * filter that kept three of the quick run's findings and discarded the rest;
+ * see quickFindings below for what that cost. Quick reads one page and asks it
+ * everything a single page can answer. Full walks the site, and earns the two
+ * check families — citation and authority — that only a site can answer.
  */
 
 import { buildActionPlan, type ActionContext } from './actions';
@@ -26,7 +31,6 @@ import { isQuestion, schemaNodes } from './parse';
 import { businessProfile, profileHint } from './profile';
 import { buildPillars, overallScore } from './score';
 import {
-  QUICK_FINDING_IDS,
   type AuditDepth,
   type AuditReport,
   type Finding,
@@ -189,16 +193,38 @@ function toContent(page: FetchedPage): PageContent {
 }
 
 /**
- * The free check: three findings from a single page, plus the locked one.
+ * One page, checked properly.
  *
- * Pulled from the same technical/structure modules rather than reimplemented,
- * so a wording or threshold change lands in both places at once.
+ * ⚠️ IT USED TO COMPUTE ALL OF THIS AND THEN THROW MOST OF IT AWAY. The old
+ * body ran technicalChecks and structureChecks — every one of them — and
+ * filtered the result down to three ids. The checks had already run against a
+ * page already in memory, so the discarded twenty cost exactly as much to
+ * produce as the three that were kept.
+ *
+ * What that cost instead was downstream: buildActionPlan can only propose a fix
+ * for a finding it can see, so a free account's "what to do next" was drawn
+ * from a pool of three. Two of the four matching recipes collide on `qa-markup`
+ * and the second is dropped as already-claimed, so a site with readable content
+ * and open crawlers got exactly ONE recommendation, forever.
+ *
+ * ⚠️ WHAT MAKES THIS QUICK IS THE CRAWL, NOT THE CHECKS. fetchQuick reads one
+ * page; fetchPageSet walks up to the plan's budget. That is the real cost and
+ * the real difference, and it is untouched. Running more assertions over one
+ * already-fetched document is free.
+ *
+ * ⚠️ CITATION AND AUTHORITY STAY OUT, and that is deliberate rather than
+ * leftover. Both reason about a SITE — pages linking to each other, an about
+ * page, contact details, consistency across pages — and answering them from a
+ * single page would mean reporting a site-wide verdict from one document. The
+ * full audit gets them because it has the pages to earn them.
  */
 function quickFindings(set: PageSet): Finding[] {
-  const all = [...technicalChecks(set), ...structureChecks(set)];
-  const wanted = new Set<string>(QUICK_FINDING_IDS);
-
-  return [...all.filter((f) => wanted.has(f.id)), LOCKED_VISIBILITY];
+  return [
+    ...technicalChecks(set),
+    ...structureChecks(set),
+    ...seoChecks(set),
+    LOCKED_VISIBILITY,
+  ];
 }
 
 function fullFindings(set: PageSet, visibility?: Finding[]): Finding[] {

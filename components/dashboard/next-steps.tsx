@@ -5,7 +5,7 @@ import { buildActionPlan } from '@/lib/audit/actions';
 import { plainAction } from '@/lib/audit/plain';
 import type { ActionItem, AuditReport } from '@/lib/audit/types';
 import { useCopy } from '@/lib/dashboard/use-copy';
-import { Disclosure } from './disclosure';
+import { Disclosure } from '@/components/ui/disclosure';
 import { CopyIcon, TickIcon } from './nav-icons';
 
 /** At most this many. "Show opportunities, but limit this." */
@@ -21,13 +21,12 @@ const LIMIT = 3;
   a site with no problems rather than a field that was never filled.
 
   ⚠️ GATED LINKS LOSE THEIR BUTTON, THEY DO NOT LOSE THE STEP — AND THE FIRST
-  VERSION OF THIS FILE GOT THAT WRONG. Two of the recipes that fire on free's
-  findings point at /dashboard/faqs and /dashboard/publish, which redirect a
-  free account back to this page, so they were filtered out entirely. Rendering
-  the free report showed what that costs: a site whose only problem is `qa-markup`
-  fires exactly those two and nothing else, so the section disappeared on the
-  most common free result there is — the reader is told what is wrong and then
-  shown nothing to do about it.
+  VERSION OF THIS FILE GOT THAT WRONG. Several recipes point at /dashboard/faqs
+  and /dashboard/publish, which redirect a free account back to this page, so
+  they were filtered out entirely. Back when a quick audit kept only three
+  findings that emptied the section completely on the commonest free result
+  there is: a site whose only fault is `qa-markup` fires exactly those two
+  recipes and nothing else.
 
   The advice was never the part that was gated. "Publish a set of question-and-
   answer content" is true and worth reading whether or not we hand over a
@@ -37,17 +36,16 @@ const LIMIT = 3;
 
   ⚠️ NOT TaskRow, AND NOT BY OVERSIGHT. audit-summary.tsx explains: TaskRow
   prints "+N points" and an effort band, which is the vocabulary of the
-  technical report. This reader has a three-check audit and no points to reason
-  about.
+  technical report. This reader is not reasoning about points.
 */
 /**
  * The steps, derived — exported so the caller can decide whether to draw a
  * heading at all.
  *
  * ⚠️ NOTHING TO DO IS A REAL OUTCOME, AND AN EMPTY SECTION IS NOT HOW TO SAY
- * IT. On a three-check audit a site can genuinely pass everything, and this
+ * IT. A site can genuinely pass everything a single page can be asked, and this
  * returns []. Were the emptiness decided inside the component, the report would
- * render "05 WHAT TO DO NEXT" over a blank space — a heading promising content
+ * render "What to do next" over a blank space — a heading promising content
  * that does not exist, which reads as a loading bug rather than as good news.
  * The caller gates the whole section on `.length`, so the derivation has to be
  * available before the render.

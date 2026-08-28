@@ -86,9 +86,21 @@ export function technicalChecks(set: PageSet): Finding[] {
       pillar: P,
       label: 'Googlebot allowed',
       status: allowed ? 'pass' : 'fail',
+      /*
+        ⚠️ "Google's AI answers", NEVER "AI Overviews" — the name is banned
+        product-wide and this was the last place still using it. It went
+        unnoticed because a quick audit used to discard this finding, so the
+        string only ever reached the dashboard; widening the quick audit put it
+        on the public marketing teaser, which is where the rule is strictest.
+
+        The ban is about not promising a measurement nobody can take: AI
+        Overviews has no API, so naming it invites the reading that we watch it.
+        See the warning on ENGINES in lib/dashboard/types.ts. "Google's AI
+        answers" is the phrasing the rest of the site already uses.
+      */
       detail: allowed
-        ? 'Googlebot can crawl the site, which is what feeds AI Overviews as well as ordinary search.'
-        : 'robots.txt blocks Googlebot, so neither search nor AI Overviews can use this site.',
+        ? 'Googlebot can crawl the site, which is what feeds Google’s AI answers as well as ordinary search.'
+        : 'robots.txt blocks Googlebot, so neither search nor Google’s AI answers can use this site.',
       weight: 2,
     });
   }

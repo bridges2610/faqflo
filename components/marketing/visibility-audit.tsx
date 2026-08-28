@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Underline } from '@/components/ui/doodle';
 import { ScoreDial } from '@/components/ui/score-dial';
+import { Disclosure } from '@/components/ui/disclosure';
 import { STATUS_CHIP, STATUS_WORD, StatusIcon } from '@/components/ui/status-icon';
 import { scoreBand } from '@/lib/audit/score';
 import type { AuditReport, Finding } from '@/lib/audit/types';
@@ -82,6 +83,28 @@ export function VisibilityAudit() {
   }
 
   const band = result ? scoreBand(result.score) : null;
+
+  /*
+    Problems in full, passes behind a count, not-applicable dropped.
+
+    ⚠️ `na` IS NOT A PROBLEM AND NOT A PASS, SO IT IS NEITHER. Its own type says
+    "doesn't apply to this site, so counting it either way would be wrong", and
+    the scorer already leaves it out of the denominator entirely. A first pass
+    here filtered on `status !== 'pass'`, which put eight "not applicable" rows
+    at the top of a stranger's first result — the loudest position on the page,
+    spent on checks we deliberately did not count. plain.ts's isHiddenInSummary()
+    draws the same line for the dashboard's plain view.
+
+    ⚠️ THE LOCKED CITATION ROW DOES STAY WITH THE PROBLEMS. It is the one row
+    selling the paid audit — "are you cited today?" — and hiding it behind
+    "checks you already pass" would bury the pitch and imply we had checked and
+    found nothing. It says out loud that it was not measured.
+  */
+  const all = result ? findingsOf(result) : [];
+  const working = all.filter((f) => f.status === 'pass');
+  const problems = all
+    .filter((f) => f.status === 'fail' || f.status === 'warn' || f.status === 'locked')
+    .sort((a, b) => (a.status === b.status ? b.weight - a.weight : a.status === 'fail' ? -1 : 1));
 
   /*
     No id and no scroll-mt on the section any more. Both existed so that
@@ -166,17 +189,42 @@ export function VisibilityAudit() {
               </div>
             </div>
 
-            <ul className="divide-line mt-6 divide-y border-t border-line pt-2">
-              {findingsOf(result).map((check) => (
+            {/*
+              ⚠️ SPLIT, BECAUSE THIS LIST GOT MUCH LONGER. A quick audit used to
+              keep three findings; it now keeps everything one page can be
+              asked, which is around twenty. Rendered flat that is a wall a
+              stranger scrolls past — and the three or four rows that are
+              actually wrong would be buried among the passes.
+
+              Same shape audit-summary.tsx uses for the same reason: the
+              problems in full, the passes behind a count. Worst first, fails
+              before warnings, which is the order somebody should read them in.
+            */}
+            <ul className="divide-line border-line mt-6 divide-y border-t pt-2">
+              {problems.map((check) => (
                 <CheckRow key={check.id} check={check} />
               ))}
             </ul>
 
+            {working.length > 0 && (
+              <Disclosure
+                label={`Show the ${working.length} ${working.length === 1 ? 'check' : 'checks'} you already pass`}
+                className="mt-4"
+              >
+                <ul className="divide-line divide-y">
+                  {working.map((check) => (
+                    <CheckRow key={check.id} check={check} />
+                  ))}
+                </ul>
+              </Disclosure>
+            )}
+
             {/* Names what the paid audit adds, without pretending this was it. */}
             <p className="border-line text-slate mt-6 border-t pt-5 text-sm leading-relaxed">
-              This is the quick check on one page. The full audit reads your other pages too —
-              structure, titles, identity and trust — and turns what it finds into a ranked list of
-              what to fix first.{' '}
+              This is the quick check on one page. The full audit reads your other pages too, and
+              adds the two things a single page cannot answer — whether AI cites you today, and
+              whether the web treats you as a real business. It turns what it finds into a ranked
+              list of what to fix first.{' '}
               <a href="#pricing" className="text-primary hover:text-primary-hover font-semibold">
                 See what it covers →
               </a>

@@ -16,7 +16,7 @@ import {
   publishState,
 } from '@/lib/dashboard/export';
 import type { FaqGroup, Site } from '@/lib/dashboard/types';
-import { Disclosure } from './disclosure';
+import { Disclosure } from '@/components/ui/disclosure';
 import { DoneForYouCard } from './done-for-you-card';
 import { EmbedInstructions } from './embed-instructions';
 import { EmptyState } from './empty-state';
@@ -163,8 +163,8 @@ function GroupSection({ site, group }: { site: Site; group: FaqGroup }) {
             answers into a native text section as text — which a script tag
             can't survive.
           */}
-          {/* The classes moved to components/dashboard/disclosure.tsx when the
-              free report needed the same toggle. Same markup, same behaviour. */}
+          {/* The classes moved to components/ui/disclosure.tsx when the free
+              report needed the same toggle. Same markup, same behaviour. */}
           <Disclosure label="Need them separately?" className="mt-5">
             <p className="text-slate text-sm leading-relaxed">
               Only if your builder strips the{' '}

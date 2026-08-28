@@ -250,10 +250,24 @@ export const PILLARS: { id: PillarId; label: string; weight: number; blurb: stri
 ];
 
 /**
- * Findings the free teaser shows — the cheap, single-page ones.
+ * The three checks that answer "can AI read this site at all".
  *
- * They're real check ids from the full engine, not a parallel set: the teaser
- * is a subset of the audit, so a stranger's first result can never contradict
- * what the paid audit later says.
+ * ⚠️ THIS WAS `QUICK_FINDING_IDS`, AND THE RENAME IS THE POINT. It used to be
+ * the whole of what a quick audit kept: runAudit computed every technical and
+ * structure check on the page it had already fetched, then filtered down to
+ * these three and threw the rest away.
+ *
+ * That starved everything downstream. buildActionPlan can only propose a fix
+ * for a finding it can see, and with three findings only four recipes could
+ * ever fire — two of which collide on `qa-markup`, so the free report's "what
+ * to do next" showed exactly ONE item on any site that was not badly broken.
+ *
+ * A quick audit now keeps what it computes (see quickFindings in run.ts), and
+ * this list has one job left: the readability checklist on the free report,
+ * which is a fixed set of three by design. Anything wanting "what a free audit
+ * covers" should read the report's own findings, not this.
+ *
+ * They're real check ids from the full engine, not a parallel set — so a
+ * stranger's first result can never contradict what the paid audit later says.
  */
-export const QUICK_FINDING_IDS = ['raw-html', 'crawlers', 'qa-markup'] as const;
+export const READABILITY_IDS = ['raw-html', 'crawlers', 'qa-markup'] as const;

@@ -1,13 +1,13 @@
 import { STATUS_CHIP, STATUS_WORD, StatusIcon } from '@/components/ui/status-icon';
 import { plainFor } from '@/lib/audit/plain';
-import { QUICK_FINDING_IDS, type AuditReport, type Finding } from '@/lib/audit/types';
+import { READABILITY_IDS, type AuditReport, type Finding } from '@/lib/audit/types';
 
-type QuickId = (typeof QUICK_FINDING_IDS)[number];
+type QuickId = (typeof READABILITY_IDS)[number];
 
 /**
  * Small counts as words.
  *
- * Only goes as far as the list can — QUICK_FINDING_IDS is three long — and the
+ * Only goes as far as the list can — READABILITY_IDS is three long — and the
  * call site falls back to the digit, so a fourth check added later degrades to
  * "1 of the 4" rather than to a blank.
  *
@@ -35,7 +35,7 @@ function cap(s: string): string {
   ⚠️ SO isHiddenInSummary() IS DELIBERATELY NOT USED HERE. It exists to drop
   findings whose plain entry is an empty string — "true, but not worth a
   business owner's attention" — and applying it would let a row vanish from a
-  fixed list of three. QUICK_FINDING_IDS is exactly what a free audit scores
+  fixed list of three. READABILITY_IDS is exactly that fixed set
   (see lib/audit/types.ts), so asking for those three by name gives a list whose
   length does not depend on the result.
 
@@ -68,7 +68,7 @@ const ASKS: Record<QuickId, string> = {
  */
 export function readabilityRows(report: AuditReport): Finding[] {
   const byId = new Map(report.pillars.flatMap((p) => p.findings).map((f) => [f.id, f]));
-  return QUICK_FINDING_IDS.map((id) => byId.get(id)).filter((f): f is Finding => f !== undefined);
+  return READABILITY_IDS.map((id) => byId.get(id)).filter((f): f is Finding => f !== undefined);
 }
 
 export function ReadabilityChecklist({ rows }: { rows: Finding[] }) {
