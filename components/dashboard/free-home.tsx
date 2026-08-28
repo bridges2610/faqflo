@@ -372,8 +372,26 @@ function Section({
       {/* 20px display, sentence case. Sits deliberately below the verdict's
           24/28px and above body copy, so the page has one clear outline.
           `inline-block` is what keeps it a chip: on a block h2 the fill would
-          run the width of the column and become the band above. */}
-      <h2 className="bg-primary rounded-lg inline-block px-3.5 py-1.5 text-[1.25rem] tracking-tight text-white">
+          run the width of the column and become the band above.
+
+          ⚠️ THE RADIUS AND THE TILT ARE BOTH BORROWED FROM THE WORDMARK, which
+          is already a blue chip with white type — components/ui/wordmark.tsx's
+          "Flo" tile. Matching its 10px makes these read as siblings of the
+          logo rather than as a fifth radius; the theme's own scale starts at
+          14px and would have been rounder than asked for.
+
+          ⚠️ tilt-a (-1.1°), NOT the wordmark's -rotate-3. The utility's comment
+          sets the rule — "kept under 1.5° so it reads as craft, not as a
+          mistake" — and 3° is only forgiving because "Flo" is 40px wide. On a
+          300px chip the same angle swings the far corner about 16px and reads
+          as a mistake. Same idea, sized for the element.
+
+          ⚠️ PADDING IS WHAT KEEPS THE ROTATED CORNERS CLEAR. The wordmark says
+          it: the tilt "needs a touch of padding around the chip so the rotated
+          corners never clip against neighbouring content". The lede's mt-3
+          below clears the ~3px the rotation adds; tighten either and they
+          touch. */}
+      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-4 py-2.5 text-[1.25rem] tracking-tight text-white">
         {title}
       </h2>
       {lede && <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{lede}</p>}
