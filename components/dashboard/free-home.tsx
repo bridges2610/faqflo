@@ -5,6 +5,7 @@ import { scoreBand } from '@/lib/audit/score';
 import { PRO_PRICE } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { groupByQuestion, namedIn } from '@/lib/dashboard/questions';
+import { formatPlainDate } from '@/lib/dashboard/format';
 import { pickProof } from '@/lib/dashboard/proof';
 import { NextSteps, nextStepsFor } from './next-steps';
 import { PageHeader } from './page-header';
@@ -105,7 +106,6 @@ export function FreeHome() {
   const readability = report ? readabilityRows(report) : [];
   const steps = report ? nextStepsFor(report) : [];
 
-  const today = new Date(report?.checkedAt ?? Date.now());
   const firstName = data.user.name.split(' ')[0] ?? '';
 
   return (
@@ -170,38 +170,87 @@ export function FreeHome() {
         </span>
       </p>
 
-      <header className="border-navy mt-4 border-b-2 pb-4">
-        {/* 11px, not text-xs. micro-label.tsx names the 12px spelling as the
-            rounded-off one that four call sites had drifted into; this was a
-            fifth. Same string as MicroLabel renders, kept inline because the
-            masthead is not a labelled field. */}
-        <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-          {site.domain}
-        </p>
-        <h1 className="text-navy mt-1 text-[1.75rem] sm:text-[2rem]">AI visibility report</h1>
-        <p className="text-slate mt-1 text-sm">
-          {today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-        </p>
-      </header>
+      {/*
+        The masthead: identity, title, date, score and verdict in one block.
 
-      {/* The score sits above the numbered sections: it is the report's
-          subject, not one of its findings. */}
-      {report && band && (
-        <div className="flex flex-col items-center gap-5 py-7 sm:flex-row sm:items-center">
-          <ScoreDial score={report.score} size="sm" />
+        ⚠️ IT IS A FULL-WIDTH FILLED BLOCK, WHICH THE Section NOTE BELOW SAYS TO
+        BE CAREFUL OF. That note sets three tests for a filled surface in the app
+        shell — inline rather than full-width, on a page read once, and replacing
+        structure rather than decorating it — and this passes two. The argument
+        for the third:
+
+        overview-workspace.tsx's banner verdict is about REPETITION. It objects
+        to "six identical full-width rectangles stacked down the page" — a
+        rhythm, not a block. This is one masthead with nothing like it below, and
+        the tests it does pass govern headings INSIDE the flow. A masthead sits
+        above the flow and is the document's title block; a report cover being a
+        solid field is the oldest convention in the form.
+
+        And it does replace structure: a border-b-2 rule and a separate score row
+        collapsed into this. Nothing was added on top of something that worked.
+
+        ⚠️ NAVY, NOT THE GRADIENT, AND THE CHIPS BELOW STAY bg-primary. The
+        gradient's cyan end takes navy text only — final-cta.tsx has the numbers
+        — so a gradient masthead could not carry white type. Navy is the one dark
+        surface this codebase already knows: bg-navy + shadow-hero + grain +
+        rounded-2xl is how-it-works.tsx's panel, verbatim.
+
+        ⚠️ EVERY CHILD NEEDS `relative`. .grain is an absolute ::after at inset-0
+        and paints over anything that is not in its own stacking context.
+
+        ⚠️ print: OVERRIDES ARE NOT OPTIONAL. globals.css forces the page white
+        for print but does not strip bg-navy, and the white children keep their
+        colour — so without these the whole header prints white on white. This
+        page has no print button, but Cmd+P is always there.
+      */}
+      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-6 sm:p-8 print:bg-white print:shadow-none">
+        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
-            <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight">
-              {band.label}
-            </h2>
-            <p className="text-slate mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed">
-              {band.summary}
+            {/* Cyan is legal as type here and nowhere else light: 9.43:1 on
+                navy, against 1.9:1 on white. how-it-works.tsx does the same. */}
+            <p className="text-accent font-mono text-[0.6875rem] tracking-wide uppercase print:text-slate">
+              {site.domain}
             </p>
-            <p className="text-slate mt-2 text-xs">
-              We checked {report.scoredCount} things on your home page.
-            </p>
+            <h1 className="mt-1.5 text-[1.75rem] text-white sm:text-[2rem] print:text-navy">
+              AI visibility report
+            </h1>
+            {/* ⚠️ formatPlainDate, not toLocaleDateString. The helper pins
+                timeZone: 'UTC' because "a date rendered in the browser's zone
+                can land on the previous day" — this was hand-rolling the same
+                format without that pin. Rendered only when there IS a report:
+                falling back to today would date a reading that does not exist. */}
+            {report?.checkedAt && (
+              <p className="mt-1 text-sm text-white/60 print:text-slate">
+                {formatPlainDate(report.checkedAt)}
+              </p>
+            )}
+
+            {band && (
+              <>
+                <p className="mt-6 text-[1.375rem] font-extrabold tracking-tight text-white print:text-navy">
+                  {band.label}
+                </p>
+                <p className="mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed text-white/75 print:text-slate">
+                  {band.summary}
+                </p>
+              </>
+            )}
+            {report && (
+              <p className="mt-3 text-xs text-white/50 print:text-slate">
+                We checked {report.scoredCount} things on your home page.
+              </p>
+            )}
           </div>
+
+          {/* `reverse` because the figure is text-navy in its own template
+              literal — a text-white here would lose to it. See score-dial.tsx. */}
+          {report && (
+            <div className="relative shrink-0">
+              <ScoreDial score={report.score} reverse />
+            </div>
+          )}
         </div>
-      )}
+      </header>
 
       {/*
         ⚠️ THE VERDICT IS FIRST AND STAYS FIRST. It is the sentence the whole

@@ -37,6 +37,7 @@ export function ScoreDial({
   caption = 'out of 100',
   stroke,
   figure,
+  reverse = false,
 }: {
   /** 0–100. Drives the arc length whatever the caption says the unit is. */
   score: number;
@@ -57,6 +58,22 @@ export function ScoreDial({
   stroke?: string;
   /** Overrides the centre number, for a unit the score isn't in — "40%". */
   figure?: string;
+  /**
+   * For dark surfaces — flips the centre number and caption to white.
+   *
+   * ⚠️ IT HAS TO BE A PROP; A PARENT CLASS CANNOT DO THIS. The figure carries
+   * `text-navy` and the caption `text-slate` in their own template literals, so
+   * a `text-white` on any ancestor loses to them and the number renders
+   * invisible on navy. That is the same trap components/ui/button.tsx documents
+   * for its `light` variant: "overriding primary's colours through className is
+   * a coin-flip — both land at the same specificity and whichever Tailwind
+   * emits last wins."
+   *
+   * Named after Wordmark's `reverse`, which exists for exactly this and states
+   * the rule: DARK backgrounds only. The arc needs no variant — its gradient
+   * runs primary → sky → accent, all of which clear 7.9:1 on navy.
+   */
+  reverse?: boolean;
 }) {
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
@@ -139,12 +156,26 @@ export function ScoreDial({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {/* white 17.04:1 and white/60 6.79:1 on --color-navy; navy 17.04:1 and
+            slate 7.46:1 on white. Every combination clears 4.5:1.
+
+            ⚠️ REVERSE NEEDS A print: PARTNER, AND THIS WAS FOUND BY PRINTING.
+            @media print forces the page white but leaves an explicit text-white
+            alone, so a reversed dial rendered its number white on white — the
+            figure simply vanished from the page. The caller cannot fix it from
+            outside for the same reason `reverse` exists at all. */}
         <span
-          className={`font-display text-navy leading-none font-extrabold tabular-nums ${figureSize}`}
+          className={`font-display leading-none font-extrabold tabular-nums ${
+            reverse ? 'text-white print:text-navy' : 'text-navy'
+          } ${figureSize}`}
         >
           {figure ?? score}
         </span>
-        <span className="text-slate mt-1 font-mono text-[0.625rem] tracking-wide uppercase">
+        <span
+          className={`mt-1 font-mono text-[0.625rem] tracking-wide uppercase ${
+            reverse ? 'text-white/60 print:text-slate' : 'text-slate'
+          }`}
+        >
           {caption}
         </span>
       </div>
