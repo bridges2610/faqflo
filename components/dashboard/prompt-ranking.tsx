@@ -5,7 +5,8 @@ import { ButtonLink } from '@/components/ui/button';
 import { EngineMark } from '@/components/ui/ai-marks';
 import { checkedTodayUtc, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { groupByQuestion, type QuestionGroup } from '@/lib/dashboard/questions';
+import { cellFor, groupByQuestion, insteadFor } from '@/lib/dashboard/questions';
+import { ENGINE_TINT, Outcome } from './engine-outcome';
 import { ENGINES, type CitationCheck, type Engine, type SiteTracking } from '@/lib/dashboard/types';
 
 /*
@@ -31,66 +32,20 @@ import { ENGINES, type CitationCheck, type Engine, type SiteTracking } from '@/l
 
 const PRO = TRACKING_PLANS.pro;
 
-/** What one cell can say. `null` is a gap, not a zero — see CELL below. */
-type Cell = 'named' | 'absent' | null;
-
 /*
-  ⚠️ THE GLYPH IS NOT THE MEANING, THE `sr-only` WORD IS.
+  ⚠️ THE MARKS AND THEIR READING BOTH LIVE ELSEWHERE NOW, AND THAT WAS THE
+  POINT. `CELL`, `ENGINE_TINT`, `cellFor` and `insteadFor` were all local to
+  this file, holding the rules that a glyph is never the meaning and that a
+  missing check is never a cross. They held because one call site remembered
+  them. The pure functions are now in lib/dashboard/questions.ts beside
+  groupByQuestion, and the marks are <Outcome/>, which cannot render a glyph
+  without its sr-only word.
 
-  A tick and a cross at 14px are the same smudge to a colourblind reader and
-  identical in a greyscale print, and this grid has no other text in its cells —
-  so unlike a chip with a label beside it, there is genuinely nothing else
-  carrying the outcome. Every cell states its word.
-
-  ⚠️ AND `null` MUST NEVER RENDER AS A CROSS. An engine can fail on its own — a
-  429 mid-run — and the row for it is simply absent. A cross would claim we
-  asked and were not named; we did not ask. Results states the same rule for its
-  NOT_CHECKED pill.
+  The move was prompted by /dashboard/plan briefly rendering the same marks.
+  That page has since become a plain pricing page and no longer does, so this is
+  the only consumer again — which does not undo the reason. See the note in
+  engine-outcome.tsx.
 */
-const CELL: Record<'named' | 'absent' | 'gap', { glyph: string; word: string; className: string }> =
-  {
-    named: { glyph: '✓', word: 'named you', className: 'text-success-ink' },
-    absent: { glyph: '✗', word: 'did not name you', className: 'text-slate/50' },
-    gap: { glyph: '–', word: 'not checked', className: 'text-slate/40' },
-  };
-
-/**
- * Which engine gets which colour.
- *
- * ⚠️ THE SEQUENCE IS BORROWED, NOT CHOSEN. citation-chart.tsx assigns blue →
- * teal → violet by engine and records that the ORDER IS LOAD-BEARING: violet
- * beside blue is a 0.4 ΔE collision under deuteranopia, and the arrangement it
- * uses was validated against that. A second surface keying colour by engine has
- * to reuse the same mapping or the two disagree about what Gemini looks like.
- *
- * Used on the marks' backing only — the outcome in each cell is never coloured
- * by engine.
- */
-const ENGINE_TINT: Record<Engine, string> = {
-  ChatGPT: 'text-primary',
-  Perplexity: 'text-teal-ink',
-  Gemini: 'text-violet',
-};
-
-function cellFor(group: QuestionGroup, engine: Engine): Cell {
-  const check = group.checks.find((c) => c.engine === engine);
-  if (!check) return null;
-  return check.outcome === 'cited' || check.outcome === 'mentioned' ? 'named' : 'absent';
-}
-
-/**
- * Who the engines pointed at instead, for one prompt.
- *
- * ⚠️ NO CATEGORY CLAIMED. `citedInstead` is the top source in the engine's own
- * ranking that is not the customer's domain, which is a lead-generation
- * directory at least as often as it is a rival business — so the column is
- * headed "Named instead" and the cell is a bare domain. proof-card.tsx carries
- * the long form of this warning; calling these "competitors" would be
- * confidently wrong on a large share of local-services accounts.
- */
-function insteadFor(group: QuestionGroup): string | null {
-  return group.checks.find((c) => c.outcome !== 'cited' && c.citedInstead)?.citedInstead ?? null;
-}
 
 export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
   const { trackingRun, runTracking } = useDashboard();
@@ -141,7 +96,7 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
 
               <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
                 {ENGINES.map((engine) => {
-                  const style = CELL[cellFor(group, engine) ?? 'gap'];
+                  const outcome = cellFor(group, engine);
 
                   return (
                     <span key={engine} className="flex items-center gap-1.5">
@@ -149,12 +104,7 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
                       <span className={`text-xs font-semibold ${ENGINE_TINT[engine]}`}>
                         {engine}
                       </span>
-                      <span className={`text-base font-semibold ${style.className}`}>
-                        <span aria-hidden="true">{style.glyph}</span>
-                        <span className="sr-only">
-                          {engine} {style.word}
-                        </span>
-                      </span>
+                      <Outcome engine={engine} outcome={outcome} />
                     </span>
                   );
                 })}
@@ -210,17 +160,11 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
                   <td className="text-navy py-3 pr-4 align-middle text-sm">{group.question}</td>
 
                   {ENGINES.map((engine) => {
-                    const cell = cellFor(group, engine);
-                    const style = CELL[cell ?? 'gap'];
+                    const outcome = cellFor(group, engine);
 
                     return (
                       <td key={engine} className="px-2 py-3 text-center align-middle">
-                        <span className={`text-base font-semibold ${style.className}`}>
-                          <span aria-hidden="true">{style.glyph}</span>
-                          <span className="sr-only">
-                            {engine} {style.word}
-                          </span>
-                        </span>
+                        <Outcome engine={engine} outcome={outcome} />
                       </td>
                     );
                   })}

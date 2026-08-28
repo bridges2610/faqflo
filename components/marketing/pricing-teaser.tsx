@@ -4,10 +4,7 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
-import { GUARANTEE_DAYS, PRO_PRICE, TRACKING_PLANS } from '@/lib/dashboard/plans';
-
-const FREE = TRACKING_PLANS.free;
-const PRO = TRACKING_PLANS.pro;
+import { GUARANTEE_DAYS, PLAN_COPY, planProse, PRO_PRICE } from '@/lib/dashboard/plans';
 
 /*
   ⚠️ THESE FIGURES ARE NOT DERIVED FROM STRIPE, AND STRIPE DOES NOT READ THEM.
@@ -45,6 +42,19 @@ const PRO = TRACKING_PLANS.pro;
   something that works today, which is the only state this card is allowed to
   be in. If something aspirational needs listing again, bring the flag back
   rather than ticking it.
+
+  ⚠️ THE TICKS COME FROM PLAN_FEATURES AND ARE NOT TYPED HERE. They used to be
+  two arrays in this file and two more in plan-workspace.tsx, each under a
+  comment promising the other would be edited in the same commit — and they
+  drifted anyway: this page said "Are the AI bots allowed in, or is your site
+  accidentally shut to them?" where the dashboard said "Are the AI bots allowed
+  in?". who-and-features.tsx warns that these lists "drifted once already, under
+  a comment promising they couldn't", so the promise is now the module system.
+  Edit the rows in lib/dashboard/plans.ts and both surfaces move together.
+
+  "Everything in Free, plus:" is prepended here rather than stored as a row,
+  because it is this card's reading order and not a feature — the dashboard
+  shows the same rows as a table, where it would be meaningless.
 */
 
 type Price = { kind: 'free' } | { kind: 'subscription'; monthly: number; annualTotal: number };
@@ -72,24 +82,17 @@ const PLANS: Plan[] = [
   {
     name: 'Free',
     price: { kind: 'free' },
-    blurb: 'Find out where you stand.',
+    blurb: PLAN_COPY.free.tagline,
     cta: 'Check my site free',
     href: '/sign-up',
     featured: false,
     note: null,
-    features: [
-      'Your AI-visibility score, out of 100',
-      'Can AI read your site, or does it just see a blank page?',
-      'Are the AI bots allowed in, or is your site accidentally shut to them?',
-      `${FREE.promptCap} real questions a customer might ask, put to ChatGPT, Perplexity and Google’s Gemini`,
-      'See which of them named you — and who got named instead',
-      `Check again ${FREE.runsPerPeriod} times as you fix things, so you can watch it change`,
-    ],
+    features: planProse('free'),
   },
   {
     name: 'Pro',
     price: { kind: 'subscription', monthly: PRO_PRICE.monthly, annualTotal: PRO_PRICE.annualTotal },
-    blurb: 'Get quoted by AI, and stay quoted.',
+    blurb: PLAN_COPY.pro.tagline,
     cta: 'Start Pro',
     /*
       The in-app plan page, not straight to Stripe.
@@ -102,20 +105,7 @@ const PLANS: Plan[] = [
     href: '/dashboard/plan',
     featured: true,
     note: 'Most popular',
-    features: [
-      'Everything in Free, plus:',
-      'A full check of every page on your site, not just the home page',
-      'The questions people really ask AI in your line of work',
-      'The pages your industry expects — and which of yours are missing',
-      'A complete set of answers, written to be quoted',
-      'Ready-to-paste code for your own website, whoever built it',
-      'An llms.txt file — a plain-text summary written for AI to read',
-      `${PRO.promptCap} questions watched — ${PRO.discoveredCap} we find for you, ${PRO.manualCap} you write yourself`,
-      'Checked automatically every week, and any time you press the button',
-      'Who gets quoted instead of you, ranked',
-      'Which of your pages earn a mention, and what the AI actually said',
-      'Unlimited re-checks and rewrites',
-    ],
+    features: ['Everything in Free, plus:', ...planProse('pro')],
   },
 ];
 

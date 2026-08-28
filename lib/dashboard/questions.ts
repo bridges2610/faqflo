@@ -1,4 +1,4 @@
-import type { CitationCheck } from './types';
+import type { CitationCheck, Engine } from './types';
 
 /*
   One question, and every engine's answer to it.
@@ -79,4 +79,45 @@ export function groupByQuestion(latest: CitationCheck[]): QuestionGroup[] {
  */
 export function namedIn(group: QuestionGroup): number {
   return group.checks.filter((c) => c.outcome === 'cited' || c.outcome === 'mentioned').length;
+}
+
+/**
+ * What one engine did on one question.
+ *
+ * ⚠️ `null` IS A GAP, NOT A NO, AND EVERY CALLER MUST KEEP THEM APART. An
+ * engine can fail on its own — a 429 mid-run — and that question simply has no
+ * row for it. Rendering the absence as "did not name you" claims we asked and
+ * were refused; we did not ask. components/dashboard/engine-outcome.tsx is
+ * where that distinction becomes pixels, and Results states the same rule for
+ * its NOT_CHECKED pill.
+ *
+ * ⚠️ NAMED MEANS CITED **OR** MENTIONED, matching namedIn above. The two must
+ * agree or a question can be "named" by one and not the other.
+ *
+ * Lived in prompt-ranking.tsx until the plan page needed the same reading of
+ * the same data. It is a pure function over a QuestionGroup with nothing
+ * presentational in it, so it belongs beside groupByQuestion rather than in
+ * whichever component happened to need it first.
+ */
+export function cellFor(group: QuestionGroup, engine: Engine): EngineOutcome {
+  const check = group.checks.find((c) => c.engine === engine);
+  if (!check) return null;
+  return check.outcome === 'cited' || check.outcome === 'mentioned' ? 'named' : 'absent';
+}
+
+/** What one engine did, or `null` when it was never asked. */
+export type EngineOutcome = 'named' | 'absent' | null;
+
+/**
+ * Who the engines pointed at instead, for one prompt.
+ *
+ * ⚠️ NO CATEGORY CLAIMED. `citedInstead` is the top source in the engine's own
+ * ranking that is not the customer's domain, which is a lead-generation
+ * directory at least as often as it is a rival business — so surfaces call this
+ * "named instead" and render a bare domain. proof-card.tsx carries the long
+ * form of this warning; calling these "competitors" would be confidently wrong
+ * on a large share of local-services accounts.
+ */
+export function insteadFor(group: QuestionGroup): string | null {
+  return group.checks.find((c) => c.outcome !== 'cited' && c.citedInstead)?.citedInstead ?? null;
 }

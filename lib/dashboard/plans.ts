@@ -348,21 +348,313 @@ export function nextCheckDate(site: Site | null): Date | null {
  * disappears — are STILL NOT BUILT and are named nowhere. Nothing in this file
  * or on the pricing page may imply we email you about a result; you find out by
  * looking. If alerting ships, the pricing card and this block change together.
+ *
+ * ⚠️ `tagline` AND `blurb` ARE TWO DIFFERENT LENGTHS FOR TWO DIFFERENT JOBS,
+ * AND COLLAPSING THEM BREAKS A PAGE. `tagline` is one line under a plan name on
+ * a pricing card. `blurb` is a paragraph, and help-workspace.tsx prints it whole
+ * in the plan explainer while upgrade-card.tsx uses it as body copy — neither
+ * has anything else to say about the plan, so a one-liner there would leave the
+ * Help page's plan section a heading with nothing under it. Keep both.
+ *
+ * ⚠️ THE TAGLINES LIVE HERE BECAUSE THEY USED TO LIVE IN TWO PLACES. They were
+ * literals inside pricing-teaser.tsx's local PLANS array — the same shape the
+ * feature bullets were in before they moved, two hand-kept copies of one
+ * sentence with nothing but memory keeping them equal. Both surfaces read these.
+ *
+ * ⚠️ ONE VALUE SENTENCE EACH, AND THEY WERE FRAGMENTS. "Find out where you
+ * stand." and "Get quoted by AI, and stay quoted." were positioning, not
+ * value — they told you the posture of the plan without telling you what you
+ * get. Each now says the thing the plan is actually for, in one sentence.
+ *
+ * ⚠️ NEITHER PROMISES A RESULT, and that line is thin here. "Get named" is the
+ * same aspirational register the pricing page has always used; "get named more
+ * often" or any figure attached to it would be a performance claim, which
+ * /about calls out by name — anyone guaranteeing citations is selling
+ * something — and /terms carries a No Guarantee of Results section. "Proof of
+ * whether it worked" is deliberately two-sided: the tracking shows you when it
+ * did not.
  */
-export const PLAN_COPY: Record<PlanId, { label: string; price: string; blurb: string }> = {
+export const PLAN_COPY: Record<
+  PlanId,
+  { label: string; price: string; tagline: string; blurb: string }
+> = {
   free: {
     label: 'Free',
     price: '$0',
+    tagline: 'See how AI answers about your business today.',
     blurb:
       'Where you stand right now: your AI-visibility score, whether AI can read your site and get in, and three real questions put to ChatGPT, Perplexity and Google’s Gemini — with who they named instead of you. Run it three times as you fix things.',
   },
   pro: {
     label: 'Pro',
     price: `$${PRO_PRICE.monthly}/month`,
+    tagline: 'Everything it takes to get named, and proof of whether it worked.',
     blurb:
       'The full check of every page, answers written to be quoted, publish-ready code for your own site, and 25 questions watched every week so you can see whether the engines start naming you.',
   },
 };
+
+/**
+ * What each plan buys, as one table both surfaces read.
+ *
+ * ⚠️ THIS EXISTS BECAUSE THREE HAND-KEPT COPIES DRIFTED, UNDER COMMENTS SAYING
+ * THEY WOULD NOT. plan-workspace.tsx and pricing-teaser.tsx each held their own
+ * array, each under a note promising the other would be edited in the same
+ * commit, and they still ended up disagreeing: one said "Are the AI bots
+ * allowed in?" where the other said "Are the AI bots allowed in, or is your
+ * site accidentally shut to them?". who-and-features.tsx says the quiet part —
+ * "these lists drifted once already, under a comment promising they couldn't"
+ * — and built-for-owners.tsx refuses to add a fourth on the grounds that "a
+ * third copy is a third thing to keep in step".
+ *
+ * So the rule is no longer a promise, it is the module system. A bullet cannot
+ * change on one surface only, because there is only one surface.
+ *
+ * ⚠️ EVERY NUMBER INTERPOLATES FROM THE CONSTANT THE APP ENFORCES — not from a
+ * literal typed to match it. Change a cap and the sales copy follows in the
+ * same edit; that is the entire point, and typing "25" here would quietly undo
+ * it. Same reason PLAN_COPY reads PRO_PRICE.
+ *
+ * ⚠️ EVERY ROW MUST BE TRUE TODAY, which is PLAN_COPY's rule above and applies
+ * with more force here because this table is also the public pricing page.
+ * Alerts are still not built and are named nowhere. No row may imply we email
+ * anyone about a result.
+ *
+ * ⚠️ `free` IS WHAT FREE ACTUALLY GETS, NOT A DASH. A comparison whose left
+ * column is empty is an advert wearing a table's clothes, and the free tier
+ * genuinely does most of these — it does them once, on one page. Where free
+ * gets nothing at all, say so in words.
+ *
+ * ⚠️ THE PROSE IS SHORT ON PURPOSE, AND IT USED TO BE SENTENCES. Lines like
+ * "Are the AI bots allowed in, or is your site accidentally shut to them?" read
+ * fine at 14px in a wide column and wrapped to three lines in a plan card. A
+ * feature list is scanned, not read: the second clause was explaining the
+ * stakes, which is the report's job, not the price card's. Keep new lines to
+ * about six words, and put the explanation on the screen that has room.
+ *
+ * ⚠️ NOT EVERY ROW EARNS A BULLET, AND FOUR NO LONGER HAVE ONE. Pro's list was
+ * eleven lines, which is a spec sheet rather than something a roofer scans. Two
+ * were merged into neighbours that already implied them — ready-to-paste code
+ * belongs to "answers written for you", and "checked every week" belongs to the
+ * line about how many questions get asked. Two were dropped outright: the
+ * llms.txt file and "the pages your industry expects" were the lines a business
+ * owner could not act on.
+ *
+ * ⚠️ A MISSING `prosePro` DOES NOT MEAN A MISSING FEATURE. All four still
+ * happen, and the rows are still here — they simply are not sold as bullets.
+ * planProse() skips rows without prose, which is the same mechanism that keeps
+ * the paid done-for-you extra off the public pricing card.
+ *
+ * ⚠️ AND DROPPING llms.txt SATISFIES THE JARGON RULE RATHER THAN BREAKING IT.
+ * The pricing page requires that where a technical term is used it is explained
+ * in the same breath; not using it clears that bar outright.
+ *
+ * ⚠️ ONLY THE PROSE IS RENDERED TODAY. `label`, `free` and `pro` fed a
+ * Free-vs-Pro matrix on /dashboard/plan; that page became a two-card pricing
+ * layout and the matrix went with it, so nothing reads those three fields at
+ * the moment. They are kept because they are the honest structured form of each
+ * row — a comparison is the obvious thing to want back, and reconstructing it
+ * from prose would mean guessing what free gets. Fill them on any new row.
+ */
+export type PlanFeature = {
+  /** The thing being compared, short enough to be a table row header. */
+  label: string;
+  /** What Free gets. `null` means genuinely nothing — render it as such. */
+  free: string | null;
+  pro: string;
+  /**
+   * The prose form, for the marketing card, which reads as a list of promises
+   * rather than as a grid. Derived from the same row so the two cannot say
+   * different things about one feature.
+   */
+  proseFree?: string;
+  prosePro?: string;
+};
+
+export const PLAN_FEATURES: PlanFeature[] = [
+  {
+    /*
+      ⚠️ FIRST ON PURPOSE, AND IT WAS SECOND FROM LAST. This is the row that
+      says somebody else is being recommended in your place, which is the whole
+      reason a reader is on this page — buried under twelve rows about file
+      formats, it was doing none of that work.
+
+      ⚠️ AND IT USED TO SAY "Yes" ON FREE, which quietly closed the gap it
+      exists to open: a tick beside a tick reads as parity. The honest
+      difference is scope, not presence — free gets this on its three
+      questions, Pro on all twenty-five and ranked.
+
+      ⚠️ "On your 3 questions", NOT "You see 1". The draft of this row
+      understated free, and understating free is the same failure as
+      overstating Pro pointed the other way. Free really does get the
+      named-instead result on every question it runs — the report the reader
+      just came from shows that column on all three — so a table claiming
+      otherwise is contradicted one click away.
+    */
+    label: 'Who got named instead of you',
+    free: `On your ${TRACKING_PLANS.free.promptCap} questions`,
+    pro: `On all ${TRACKING_PLANS.pro.promptCap}, ranked`,
+    proseFree: 'Who got named instead of you',
+    prosePro: 'Who gets named instead of you, ranked',
+  },
+  {
+    label: 'Pages checked',
+    free: PAGE_BUDGET.free === 1 ? 'Your home page' : `${PAGE_BUDGET.free} pages`,
+    pro: 'Every page on your site',
+    proseFree: 'Your visibility score, out of 100',
+    prosePro: 'Every page on your site checked, not just the home page',
+  },
+  {
+    /* Scoped rather than ticked: the raw-HTML check runs per page, so free
+       genuinely answers this for one page and Pro for all of them. */
+    label: 'Can AI read your site',
+    free: 'Yes, on one page',
+    pro: 'Yes, on every page',
+    proseFree: 'Whether AI can read your site',
+  },
+  {
+    /*
+      ⚠️ "Yes" ON BOTH SIDES, AND IT STAYS THAT WAY. Every other bare tick in
+      this column was rewritten to state its scope, because free was reading as
+      equal to Pro on rows where it is not. This row is the exception: the check
+      reads a single robots.txt for the whole domain, so free and Pro get the
+      identical answer and there is no scope to narrow. Making it look weaker on
+      free would mean inventing a difference, which is the one thing this file
+      is not allowed to do. Leave it.
+    */
+    label: 'Are the AI bots allowed in',
+    free: 'Yes',
+    pro: 'Yes',
+    proseFree: 'Whether AI is allowed to read it',
+  },
+  {
+    /* "industry", not "trade" — the row below already said industry, and this
+       list is read by clinics and e-commerce as well as the trades. */
+    label: 'Questions people ask in your industry',
+    free: `You see ${FREE_QUESTION_SAMPLE}`,
+    pro: 'All of them',
+    prosePro: 'The questions customers really ask in your industry',
+  },
+  {
+    label: 'Pages your industry expects',
+    free: null,
+    pro: 'Yes, and which of yours are missing',
+    /* Dropped from the bullet list — see the note above PLAN_FEATURES. */
+  },
+  {
+    label: 'Answers written to be quoted',
+    free: null,
+    pro: 'A complete set',
+    prosePro: 'Answers written for you, ready to paste on your site',
+  },
+  {
+    label: 'Code to paste on your site',
+    free: null,
+    pro: 'Ready to paste, whoever built it',
+    /* Absorbed by the answers line above. */
+  },
+  {
+    /*
+      ⚠️ THE LABEL SAYS WHAT IT DOES; THE PROSE KEEPS THE NAME. This read
+      "llms.txt file", which was the one line in a plain-language table that a
+      roofer could not parse — sitting between "Code to paste on your site" and
+      "Questions put to AI". The marketing card's rule is that a technical term
+      "gets explained in the same breath rather than assumed", and prosePro
+      already does that; the table label was the half that never got the memo.
+      Do not put the filename back as the label.
+    */
+    label: 'A file that tells AI what’s on your site',
+    free: null,
+    pro: 'Yes',
+    /* Dropped from the bullet list — see the note above PLAN_FEATURES. */
+  },
+  {
+    label: 'Questions put to AI',
+    free: `${TRACKING_PLANS.free.promptCap}`,
+    pro: `${TRACKING_PLANS.pro.promptCap}`,
+    proseFree: `${TRACKING_PLANS.free.promptCap} real questions your customers ask`,
+    prosePro: `${TRACKING_PLANS.pro.promptCap} questions asked every week — ${TRACKING_PLANS.pro.manualCap} of them yours`,
+  },
+  {
+    label: 'Questions you write yourself',
+    /* manualCap is 0 on free, and a field that accepts a typed question and
+       never checks it is worse than no field — see the note on manualCap. */
+    free: null,
+    pro: `${TRACKING_PLANS.pro.manualCap}`,
+  },
+  {
+    label: 'How often it is checked',
+    /* ⚠️ Free CAN press the button — canRunCheckNow() is true for both plans.
+       What free does not get is the automatic weekly run, and that distinction
+       is most of what Pro sells. Do not write this row as "Pro can re-check". */
+    free: `${TRACKING_PLANS.free.runsPerPeriod} times, whenever you like`,
+    pro: 'Every week automatically, plus any time you press the button',
+    proseFree: `Check again ${TRACKING_PLANS.free.runsPerPeriod} times as you fix things`,
+    /* Absorbed by the questions line above. */
+  },
+  {
+    /*
+      ⚠️ THE TREND IS THE THING WEEKLY CHECKING IS FOR, AND IT WAS MISSING FROM
+      THE LIST. Every other Pro line describes a single reading — who was named,
+      what was said. None of them said that the readings stack up into a line
+      you can watch move, which is what `schedule: 'weekly'` above calls "most
+      of what the upgrade sells: a single reading versus a line on a chart".
+
+      ⚠️ IT IS A REAL SCREEN, NOT AN ASPIRATION. CitationChart plots citations
+      per engine across the last thirty days on /dashboard/tracking, and that
+      route calls requirePro(), so free genuinely cannot reach it. Free's own
+      schedule is 'once', which is why the chart's span prop reads "from your
+      one check" for that plan — a reading, not a trend.
+    */
+    label: 'Where you show up over time',
+    free: 'One reading at a time',
+    pro: 'Charted, week by week',
+    prosePro: 'Where you show up, charted week by week',
+  },
+  {
+    /* Scoped to match the first row: same three questions, same twenty-five. */
+    label: 'What the AI actually said',
+    free: `On your ${TRACKING_PLANS.free.promptCap} questions`,
+    pro: 'Every week, and which of your pages earned it',
+    prosePro: 'What AI said, and which of your pages it used',
+  },
+  {
+    label: 'Re-checks and rewrites',
+    free: null,
+    pro: 'Unlimited',
+    prosePro: 'Unlimited re-checks and rewrites',
+  },
+  {
+    label: 'Want it done for you',
+    free: null,
+    pro: 'Available as a paid extra',
+    /*
+      ⚠️ NO prosePro, AND THE OMISSION IS THE POINT — DO NOT "COMPLETE" THIS ROW.
+
+      Every other row's prose becomes a ticked bullet on the public pricing card,
+      where pricing-teaser.tsx's rule is that "every tick below is something that
+      works today" — meaning included in the price beside it. This is not
+      included in anything: it is a separate service, quoted and invoiced by
+      hand. A tick for it under "$39/month" would be a false claim to a stranger,
+      and planProse() skips rows without prose, so leaving this field out is what
+      keeps it off that card.
+
+      ⚠️ NO PRICE AND NO LINK, EITHER, and that is what makes the row safe on a
+      page free accounts read. canOfferDoneForYou() exists because /done-for-you
+      quotes $497 without mentioning the subscription it sits on top of — it
+      opens by telling the reader "You've got Pro running", which is false for
+      anyone who has not paid. A cell stating that a paid extra exists sends
+      nobody there and quotes nothing, so none of that applies. Add a price or a
+      link and all of it does.
+    */
+  },
+];
+
+/** The marketing card's list for one plan, in the order the table declares. */
+export function planProse(plan: PlanId): string[] {
+  const key = plan === 'pro' ? 'prosePro' : 'proseFree';
+  return PLAN_FEATURES.map((row) => row[key]).filter((line): line is string => Boolean(line));
+}
 
 /* ----------------------------------------------------------- the plan --- */
 
