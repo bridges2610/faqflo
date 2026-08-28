@@ -111,6 +111,35 @@ export function FreeHome() {
   return (
     <article>
       {/*
+        A lighter page, for this route only.
+
+        ⚠️ NOT A CHANGE TO --color-cloud, AND THAT IS THE WHOLE POINT. The token
+        does two unrelated jobs: it is the page canvas, and it is "a surface
+        slightly recessed from white". Around thirty of its sixty-odd uses want
+        the second — segmented-control tracks whose active tab is signalled only
+        by bg-white sitting on them, unfilled Meter tracks with no border, the
+        sixteen <Card tone="cloud"> that exist precisely so as not to be white
+        beside a white card. Lighten the token and every one of those collapses.
+
+        ⚠️ NOT A WRAPPER AROUND THIS ARTICLE EITHER. AppShell's <main> carries
+        its own px/py, so an opaque wrapper here would render as an inset slab
+        with the old background still showing in the gutters — and the body wash
+        is background-attachment: fixed, which globals.css warns "would
+        otherwise cut off as a hard colour band".
+
+        Fixed matches that attachment exactly, so there is no seam at any scroll
+        position. It is behind everything (-z-10) and cannot be clicked. The
+        sidebar paints its own white and the header its own tint, so both sit on
+        top of this untouched.
+
+        ⚠️ WHITE RATHER THAN A THIRD TINT. The print block already forces
+        `html, body { background: #fff }`, so this narrows the gap between how
+        the report looks on screen and on paper instead of inventing a surface
+        that exists in neither.
+      */}
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-white" aria-hidden="true" />
+
+      {/*
         The masthead, and a welcome above it.
 
         ⚠️ THERE IS A GREETING NOW, AND THE OLD NOTE HERE SAID THERE MUST NOT
@@ -158,7 +187,7 @@ export function FreeHome() {
       {/* The score sits above the numbered sections: it is the report's
           subject, not one of its findings. */}
       {report && band && (
-        <div className="border-line flex flex-col items-center gap-5 border-b py-6 sm:flex-row sm:items-center">
+        <div className="flex flex-col items-center gap-5 py-7 sm:flex-row sm:items-center">
           <ScoreDial score={report.score} size="sm" />
           <div className="min-w-0">
             <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight">
@@ -181,7 +210,7 @@ export function FreeHome() {
         and false for one named on two prompts out of three.
       */}
       {asked && (
-        <section className="border-line border-b py-7">
+        <section className="pt-3 pb-2">
           {/* The page's one big statement, and the only h2 at this size. It
               used to sit as an h3 INSIDE a section whose own h2 was 15px — the
               outline said the heading was the small uppercase label and the
@@ -284,10 +313,33 @@ export function FreeHome() {
  * One section of the report: a question, a line saying what you're looking at,
  * then the thing itself.
  *
- * A ruled heading, not a card. The card metaphor is the app's, and globals.css
- * already argues against it for anything meant to be read rather than worked
- * in: "floating panels with shadows print as grey smudges", and what a report
- * wants is "a masthead, ruled sections and one column of prose".
+ * Not a card. The card metaphor is the app's, and globals.css already argues
+ * against it for anything meant to be read rather than worked in: "floating
+ * panels with shadows print as grey smudges".
+ *
+ * ⚠️ IT WAS A RULED HEADING AND NOW IT IS A CHIP, SO WHITESPACE IS THE ONLY
+ * SEPARATOR LEFT. Every hairline on this page is gone — under the score, under
+ * the verdict, and between each section — which means `pt` here is doing the
+ * work a border used to. Trim it and the sections run together; there is
+ * nothing else holding them apart. The print stylesheet had already reached
+ * this conclusion for the verdict block: "it leads, so it gets air and no rule
+ * of its own".
+ *
+ * ⚠️ A CHIP THAT HUGS ITS TEXT, NEVER A FULL-WIDTH BAND — AND THE DIFFERENCE
+ * IS RECORDED. overview-workspace.tsx went through a banner phase and came back
+ * out of it: "the band made a working screen look like the marketing site, and
+ * it was covering for the real problem underneath". Three things make this the
+ * other case. It is inline, so it labels rather than divides. It is on a
+ * conversion page somebody reads once, not a screen they work in. And it
+ * REPLACES the structure the rules were providing rather than decorating on top
+ * of structure that already worked. Widen it and that note applies again.
+ *
+ * ⚠️ bg-primary WITH text-white, NEVER THE GRADIENT AND NEVER accent. White on
+ * #2563EB is 5.17:1. The gradient's cyan end and --color-accent are both
+ * fill-only at roughly 1.9:1 and take navy text instead — see the note at the
+ * top of globals.css and the VARIANTS comment in components/ui/button.tsx.
+ * There is no other filled heading in this codebase; the house pattern is a
+ * soft tint with dark ink. Keep this spelling to this one file.
  *
  * ⚠️ THE NUMBERS ARE GONE, AND THAT FIXED A BUG AS WELL AS A TONE. This
  * rendered `01` in mono beside a 15px UPPERCASE title — the look of a document
@@ -316,11 +368,15 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-line border-b py-7 last-of-type:border-b-0">
+    <section className="pt-11">
       {/* 20px display, sentence case. Sits deliberately below the verdict's
-          24/28px and above body copy, so the page has one clear outline. */}
-      <h2 className="text-navy text-[1.25rem] tracking-tight">{title}</h2>
-      {lede && <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">{lede}</p>}
+          24/28px and above body copy, so the page has one clear outline.
+          `inline-block` is what keeps it a chip: on a block h2 the fill would
+          run the width of the column and become the band above. */}
+      <h2 className="bg-primary rounded-lg inline-block px-3.5 py-1.5 text-[1.25rem] tracking-tight text-white">
+        {title}
+      </h2>
+      {lede && <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{lede}</p>}
       <div className="mt-4">{children}</div>
     </section>
   );
