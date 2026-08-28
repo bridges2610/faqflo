@@ -8,7 +8,8 @@ import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
-import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
+import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, LockIcon, SearchIcon } from './nav-icons';
+import { MicroLabel } from './micro-label';
 import { AccountMenu } from './account-menu';
 import { RunNotice } from './run-notice';
 import { ScanNotice } from './scan-notice';
@@ -78,7 +79,7 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 /*
-  What a free account is offered.
+  What a free account can actually go to.
 
   ⚠️ ONE ITEM, AND THE REST ARE NOT MERELY HIDDEN — each gated route redirects
   a free account back to /dashboard in its own page.tsx. Hiding a link that
@@ -95,6 +96,42 @@ function isActive(pathname: string, href: string): boolean {
   from, which is true on Pro's five-item nav and false here.
 */
 const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: HomeIcon }];
+
+/*
+  What Pro adds, shown to a free account underneath its one real destination.
+
+  ⚠️ THE NOTE ABOVE REJECTED TWO OPTIONS AND THIS IS A THIRD. It weighed hiding
+  the links against leaving them working, and ruled out "redirecting without
+  hiding" because that leaves five links that all go to the same place. That is
+  still true and still bad — when the links look like navigation. These do not.
+  A padlock on every row under a heading that says With Pro is what makes one
+  shared destination legible: nobody reads these as four ways to four screens.
+
+  ⚠️ IT IS AN ADVERT IN THE NAV, NOT NAVIGATION, and the distinction is what
+  keeps the 8→5 pruning argument at the top of this file intact. A free
+  account's real destination count is still one. Nothing here is a place to
+  check; it is a description of the plan they are not on, placed where the
+  question "what else is there?" actually occurs to somebody.
+
+  ⚠️ DERIVED FROM NAV, NEVER RETYPED. A second literal list would drift from
+  the first the moment a destination is renamed, and the drift would be
+  invisible — an advert promising a screen that no longer exists by that name.
+
+  ⚠️ LOCKED IS NOT DISABLED. These are ordinary full-opacity links with the same
+  text-slate as any inactive nav row; the lock and the heading do the work.
+  copy-html-button.tsx settled this for its own padlock, and
+  prompt-ranking.tsx states the rule: "a greyed-out control with a tooltip makes
+  the reader hunt for why". They also genuinely go somewhere, which is what
+  account-menu.tsx's note about "a menu item that closes the menu and goes
+  nowhere" requires of anything Pro-shaped in a nav.
+
+  ⚠️ THE PATTERN WAS ALREADY WRITTEN AND NEVER RAN. worklist.ts has a
+  `locked: 'pro'` task type and task-row.tsx has the styling for it, but
+  buildWorklist's only consumer is Pro's Home, so the free branch is dead code.
+  This is the first live use; it follows those conventions rather than inventing
+  new ones, and if that branch ever wakes up the two should still agree.
+*/
+const PRO_TEASE: NavItem[] = NAV.filter((item) => item.href !== '/dashboard');
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -132,6 +169,42 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
           </Link>
         );
       })}
+
+      {/*
+        ⚠️ `user &&`, NOT JUST `!isPro(user)`. The note above records that
+        isPro(null) is false, so the first frame renders the free nav — and
+        without this a PAYING customer would flash four padlocks before the
+        provider resolved and swapped them out. Waiting for a resolved user
+        means the null frame shows one item and nothing else, which is the same
+        thing it showed before this group existed.
+
+        ⚠️ NO isActive AND NO aria-current. Every row here points at
+        /dashboard/plan, so isActive() would light up all four the moment
+        somebody is on the plan page. None of them is ever "current".
+
+        ⚠️ THE aria-label CARRIES THE MEANING. LockIcon inherits aria-hidden
+        from nav-icons' shared BASE, so the padlock says nothing to a screen
+        reader — same reason copy-html-button.tsx spells out "needs Pro" in its
+        own label. "part of Pro" is the phrase five API routes already use.
+      */}
+      {user && !isPro(user) && (
+        <>
+          <MicroLabel className="mt-6 mb-1.5 px-3">With Pro</MicroLabel>
+          {PRO_TEASE.map(({ href, label, Icon }) => (
+            <Link
+              key={href}
+              href="/dashboard/plan"
+              onClick={onNavigate}
+              aria-label={`${label} is part of Pro`}
+              className="text-slate hover:text-navy hover:bg-cloud flex items-center gap-3 rounded-input px-3 py-2 text-sm transition-colors duration-150"
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="flex-1">{label}</span>
+              <LockIcon className="text-slate/60 h-4 w-4 shrink-0" />
+            </Link>
+          ))}
+        </>
+      )}
     </nav>
   );
 }
