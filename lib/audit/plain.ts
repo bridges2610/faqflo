@@ -268,11 +268,31 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
  * sentence asks the reader to already know what a meta description is, which is
  * the whole problem this page exists to solve. Keyed by the recipe id from
  * actions.ts; anything without an entry keeps its technical wording.
+ *
+ * ⚠️ `where` AND `label` WERE THE HOLE IN THIS, AND IT WAS A STRUCTURAL ONE.
+ * The dictionary translated `what` and `why` and stopped, so a reader who got
+ * as far as acting on a step met "Inside the <head> of each page" and a button
+ * reading "Copy the robots.txt rules" — the two strings closest to actually
+ * doing the work were the two that never went through the plain layer. Four
+ * recipes had no `label` at all and fell through to the technical one, under a
+ * comment in plainAction() saying exactly why they must not.
+ *
+ * ⚠️ THESE ARE ALLOWED TO NAME A FILE, UNLIKE ANYTHING ELSE HERE. A `where`
+ * points at a real place on a real server, and vagueness there is not
+ * kindness — it is a step nobody can follow. The rule the pricing page sets
+ * applies instead: where a technical term is genuinely the name of the thing,
+ * explain it in the same breath rather than assuming it.
  */
-const PLAIN_ACTIONS: Record<string, { what: string; why?: string; label?: string }> = {
+const PLAIN_ACTIONS: Record<
+  string,
+  { what: string; why?: string; label?: string; where?: string }
+> = {
   'unblock-crawlers': {
     what: 'Let the AI assistants read your site',
     why: 'Right now your site turns them away. Nothing else on this list matters until it stops.',
+    label: 'Copy these lines',
+    where:
+      'These go in a file called robots.txt, at the top level of your site. Whoever looks after your website will know where that is.',
   },
   'server-render': {
     what: 'Get your words into the page itself',
@@ -294,6 +314,9 @@ const PLAIN_ACTIONS: Record<string, { what: string; why?: string; label?: string
   titles: {
     what: 'Give every page a proper title',
     why: 'The title is how a search engine decides what a page is about. Some of yours are missing or repeated.',
+    label: 'Copy this',
+    where:
+      'This goes near the top of each page, in the part visitors don’t see. One per page, and each one different.',
   },
   'answer-first': {
     what: 'Say the answer in the first two sentences',
@@ -302,6 +325,9 @@ const PLAIN_ACTIONS: Record<string, { what: string; why?: string; label?: string
   'meta-descriptions': {
     what: 'Write the one-line summary that shows under your search result',
     why: 'Without it, search engines write their own from whatever text they find first — usually your menu.',
+    label: 'Copy this',
+    where:
+      'This goes near the top of each page, in the part visitors don’t see. Write a fresh sentence for each page.',
   },
   'llms-txt': {
     what: 'Add the small summary file AI assistants look for',
@@ -315,6 +341,8 @@ const PLAIN_ACTIONS: Record<string, { what: string; why?: string; label?: string
   sitemap: {
     what: 'Give search engines a list of your pages',
     why: 'It’s how they find the pages nothing links to prominently.',
+    label: 'Copy this line',
+    where: 'Add this to the end of your robots.txt file, at the top level of your site.',
   },
   freshness: {
     what: 'Show when your content was last updated',
@@ -326,9 +354,15 @@ const PLAIN_ACTIONS: Record<string, { what: string; why?: string; label?: string
   },
 };
 
-export function plainAction(item: ActionItem): { what: string; why: string; label: string } {
+export function plainAction(item: ActionItem): {
+  what: string;
+  why: string;
+  label: string;
+  where: string;
+} {
   const entry = PLAIN_ACTIONS[item.id];
   const label = item.action.kind === 'none' ? '' : item.action.label;
+  const where = item.action.kind === 'copy' ? item.action.where : '';
 
   return {
     what: entry?.what ?? item.what,
@@ -336,6 +370,17 @@ export function plainAction(item: ActionItem): { what: string; why: string; labe
     // Button labels naming a file or a format ("Get your llms.txt", "Get the
     // schema block") are jargon on a page whose whole job is not to use any.
     label: entry?.label ?? label,
+    /*
+      Where to put the snippet. Empty for any action that hands over nothing to
+      paste, so a caller can render it unconditionally.
+
+      ⚠️ THIS ONE MAY NAME A FILE, AND THE OTHERS MAY NOT. Every string above
+      answers "so what?" and can afford to avoid a filename. This answers
+      "where exactly?", and a reader who has got this far needs a real place,
+      not a gentler description of one. It still explains the name rather than
+      assuming it — the rule pricing-teaser.tsx sets for llms.txt.
+    */
+    where: entry?.where ?? where,
   };
 }
 

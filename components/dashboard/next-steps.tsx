@@ -5,6 +5,7 @@ import { buildActionPlan } from '@/lib/audit/actions';
 import { plainAction } from '@/lib/audit/plain';
 import type { ActionItem, AuditReport } from '@/lib/audit/types';
 import { useCopy } from '@/lib/dashboard/use-copy';
+import { Disclosure } from './disclosure';
 import { CopyIcon, TickIcon } from './nav-icons';
 
 /** At most this many. "Show opportunities, but limit this." */
@@ -77,17 +78,38 @@ export function nextStepsFor(report: AuditReport): ActionItem[] {
 
 export function NextSteps({ steps }: { steps: ActionItem[] }) {
   return (
-    <ol className="divide-line divide-y">
-      {steps.map((item, i) => (
-        <StepRow key={item.id} item={item} index={i} />
-      ))}
-    </ol>
+    <>
+      <ol className="divide-line divide-y">
+        {steps.map((item, i) => (
+          <StepRow key={item.id} item={item} index={i} />
+        ))}
+      </ol>
+
+      {/*
+        The other way out, said ONCE under the list.
+
+        ⚠️ IT WAS PER-STEP AND THAT WAS WORSE. Rendering it on every row put the
+        same sentence on screen three times in a column, which reads as nagging
+        rather than as help — and it is the same offer each time, so repeating
+        it adds nothing. Once, at the end, is where somebody who has read the
+        list and decided it is not for them actually is.
+
+        ⚠️ AND IT COVERS THE STEPS WITH NO CODE, WHICH IS THE POINT. A step with
+        a snippet is one somebody might attempt. "Get your words into the page
+        itself" is one they almost certainly cannot do alone — its own `why`
+        already ends "your web developer will know what this means" — and it has
+        no snippet to sit under.
+      */}
+      <p className="text-slate mt-4 text-[0.9375rem] leading-relaxed">
+        Not sure about any of these? Send them to whoever looks after your website.
+      </p>
+    </>
   );
 }
 
 function StepRow({ item, index }: { item: ActionItem; index: number }) {
   const { copied, copy } = useCopy();
-  const { what, why } = plainAction(item);
+  const { what, why, label, where } = plainAction(item);
 
   return (
     <li className="py-4 first:pt-0">
@@ -103,27 +125,41 @@ function StepRow({ item, index }: { item: ActionItem; index: number }) {
           </div>
           <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">{why}</p>
 
+          {/*
+            ⚠️ THE CODE IS BEHIND A DOOR, AND THE DOOR IS WHAT MAKES THE JARGON
+            LEGAL. audit-summary.tsx allows exactly one exception to the plain
+            rule — "text the customer has to paste somewhere, which has to be
+            exact" — but on a page read by a roofer, a raw <meta> tag sitting
+            open in the flow is the thing that makes the whole report feel like
+            it was written for somebody else. Opening a drawer marked "the code"
+            is consent to see code, so `where` and the snippet can be precise
+            once you are inside it.
+
+            Closed, every step reads as a plain sentence and a time estimate.
+            That is the page a business owner should be able to finish.
+          */}
           {item.action.kind === 'copy' && (
             <div className="mt-3">
-              <p className="text-slate text-sm">{item.action.where}</p>
-              {/* The one place jargon survives: text that has to be pasted
-                  somewhere exactly as written. */}
-              <pre className="border-line bg-cloud mt-2 overflow-auto rounded-lg border p-3">
-                <code className="text-navy font-mono text-[0.6875rem] leading-relaxed whitespace-pre">
-                  {item.action.snippet}
-                </code>
-              </pre>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mt-2"
-                onClick={() => copy(item.action.kind === 'copy' ? item.action.snippet : '')}
-              >
-                {copied ? <TickIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
-                {copied ? 'Copied' : 'Copy this'}
-              </Button>
+              <Disclosure label="Show me the code">
+                <p className="text-slate text-sm leading-relaxed">{where}</p>
+                <pre className="border-line bg-cloud mt-2 overflow-auto rounded-lg border p-3">
+                  <code className="text-navy font-mono text-[0.6875rem] leading-relaxed whitespace-pre">
+                    {item.action.snippet}
+                  </code>
+                </pre>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="mt-2"
+                  onClick={() => copy(item.action.kind === 'copy' ? item.action.snippet : '')}
+                >
+                  {copied ? <TickIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
+                  {copied ? 'Copied' : label}
+                </Button>
+              </Disclosure>
             </div>
           )}
+
         </div>
       </div>
     </li>

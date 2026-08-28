@@ -16,6 +16,7 @@ import {
   publishState,
 } from '@/lib/dashboard/export';
 import type { FaqGroup, Site } from '@/lib/dashboard/types';
+import { Disclosure } from './disclosure';
 import { DoneForYouCard } from './done-for-you-card';
 import { EmbedInstructions } from './embed-instructions';
 import { EmptyState } from './empty-state';
@@ -162,40 +163,29 @@ function GroupSection({ site, group }: { site: Site; group: FaqGroup }) {
             answers into a native text section as text — which a script tag
             can't survive.
           */}
-          <details className="group mt-5">
-            <summary className="text-slate hover:text-primary flex cursor-pointer list-none items-center gap-1.5 text-sm transition-colors duration-150 [&::-webkit-details-marker]:hidden">
-              <span
-                className="text-slate/60 transition-transform duration-200 group-open:rotate-90"
-                aria-hidden="true"
-              >
-                ▸
-              </span>
-              Need them separately?
-            </summary>
-
-            <p className="text-slate mt-2 pl-5 text-sm leading-relaxed">
-              Only if your builder strips the <code className="text-navy font-mono text-xs">
-                &lt;script&gt;
-              </code>{' '}
-              tag, or you&rsquo;re pasting the answers into a plain text section. Otherwise the one
-              block above is the whole job.
+          {/* The classes moved to components/dashboard/disclosure.tsx when the
+              free report needed the same toggle. Same markup, same behaviour. */}
+          <Disclosure label="Need them separately?" className="mt-5">
+            <p className="text-slate text-sm leading-relaxed">
+              Only if your builder strips the{' '}
+              <code className="text-navy font-mono text-xs">&lt;script&gt;</code> tag, or
+              you&rsquo;re pasting the answers into a plain text section. Otherwise the one block
+              above is the whole job.
             </p>
 
-            <div className="pl-5">
-              <CopyBlock
-                title="The answers"
-                description="Paste this into the page where the answers should appear. Plain semantic HTML — it picks up your site's own styling."
-                code={html}
-                language="HTML"
-              />
-              <CopyBlock
-                title="The schema"
-                description="Paste this on the same page, anywhere. It tells a machine which text is a question, which is the answer, and which business they belong to."
-                code={schema}
-                language="JSON-LD"
-              />
-            </div>
-          </details>
+            <CopyBlock
+              title="The answers"
+              description="Paste this into the page where the answers should appear. Plain semantic HTML — it picks up your site's own styling."
+              code={html}
+              language="HTML"
+            />
+            <CopyBlock
+              title="The schema"
+              description="Paste this on the same page, anywhere. It tells a machine which text is a question, which is the answer, and which business they belong to."
+              code={schema}
+              language="JSON-LD"
+            />
+          </Disclosure>
         </>
       )}
     </Card>

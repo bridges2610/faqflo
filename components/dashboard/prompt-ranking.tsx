@@ -110,35 +110,32 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
 
   return (
     <>
-      <p className="text-slate text-sm">
-        We put these to {ENGINES.join(', ')} and recorded who each one named.
-      </p>
-
       {/* ⚠️ The table scrolls inside this box rather than widening the report.
           Five columns do not fit a phone, and a page that scrolls sideways as a
           whole is worse than one panel that does. */}
-      <div className="mt-4 -mx-1 overflow-x-auto px-1">
+      <div className="-mx-1 overflow-x-auto px-1">
         <table className="w-full min-w-[34rem] border-collapse text-left">
           <thead>
+            {/*
+              ⚠️ SENTENCE CASE AND NO MONO, WHICH BREAKS THE HOUSE <th> STYLE ON
+              PURPOSE. Every other table in the app heads its columns with the
+              same 11px mono uppercase string MicroLabel uses, and that is right
+              where the thing IS a data table. This one is the centre of a report
+              a roofer reads once, and mono small-caps is most of what made it
+              look like something to be decoded rather than read. The rest of the
+              table keeps the house conventions.
+            */}
             <tr className="border-line border-b">
-              <th className="text-slate py-2 pr-4 font-mono text-[0.6875rem] tracking-wide uppercase">
-                Prompt
-              </th>
+              <th className="text-slate py-2 pr-4 text-xs font-semibold">Question</th>
               {ENGINES.map((engine) => (
                 <th key={engine} className="px-2 py-2 text-center align-bottom">
                   <span className="flex flex-col items-center gap-1">
                     <EngineMark engine={engine} className="h-4 w-4" />
-                    <span
-                      className={`font-mono text-[0.6875rem] tracking-wide uppercase ${ENGINE_TINT[engine]}`}
-                    >
-                      {engine}
-                    </span>
+                    <span className={`text-xs font-semibold ${ENGINE_TINT[engine]}`}>{engine}</span>
                   </span>
                 </th>
               ))}
-              <th className="text-slate py-2 pl-4 font-mono text-[0.6875rem] tracking-wide uppercase">
-                Named instead
-              </th>
+              <th className="text-slate py-2 pl-4 text-xs font-semibold">Who it named instead</th>
             </tr>
           </thead>
 
@@ -248,11 +245,13 @@ function RunControl({
           account would actually get.
         */
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <p className="text-slate text-sm">
-            That’s all three of your checks. With Pro you ask your own questions —{' '}
-            <span className="text-navy font-semibold">{PRO.manualCap} you write yourself</span>,
-            alongside the {PRO.discoveredCap} we find — and all {PRO.promptCap} get re-checked
-            every week.
+          {/* Three sentences rather than one. plain.ts sets the rule: past
+              about fifteen words the grade level climbs on sentence length
+              alone, whatever the vocabulary is doing. */}
+          <p className="text-slate text-sm leading-relaxed">
+            That’s all three of your checks. With Pro you write your own questions —{' '}
+            <span className="text-navy font-semibold">{PRO.manualCap} of them</span>, alongside the{' '}
+            {PRO.discoveredCap} we find. Every one is re-checked each week.
           </p>
           <ButtonLink href="/dashboard/plan" size="sm" variant="ghost">
             See what Pro includes

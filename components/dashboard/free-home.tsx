@@ -142,7 +142,13 @@ export function FreeHome() {
       </p>
 
       <header className="border-navy mt-4 border-b-2 pb-4">
-        <p className="text-slate font-mono text-xs tracking-wide uppercase">{site.domain}</p>
+        {/* 11px, not text-xs. micro-label.tsx names the 12px spelling as the
+            rounded-off one that four call sites had drifted into; this was a
+            fifth. Same string as MicroLabel renders, kept inline because the
+            masthead is not a labelled field. */}
+        <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+          {site.domain}
+        </p>
         <h1 className="text-navy mt-1 text-[1.75rem] sm:text-[2rem]">AI visibility report</h1>
         <p className="text-slate mt-1 text-sm">
           {today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -162,7 +168,7 @@ export function FreeHome() {
               {band.summary}
             </p>
             <p className="text-slate mt-2 text-xs">
-              Based on {report.scoredCount} checks of your home page.
+              We checked {report.scoredCount} things on your home page.
             </p>
           </div>
         </div>
@@ -175,22 +181,26 @@ export function FreeHome() {
         and false for one named on two prompts out of three.
       */}
       {asked && (
-        <Section n="01" title="The verdict">
-          <h3 className="text-navy text-[1.375rem] font-extrabold tracking-tight sm:text-[1.5rem]">
+        <section className="border-line border-b py-7">
+          {/* The page's one big statement, and the only h2 at this size. It
+              used to sit as an h3 INSIDE a section whose own h2 was 15px — the
+              outline said the heading was the small uppercase label and the
+              conclusion was subordinate to it, which is backwards. */}
+          <h2 className="text-navy text-[1.5rem] font-extrabold tracking-tight sm:text-[1.75rem]">
             {namedCount === 0
               ? 'Right now, AI doesn’t recommend your business.'
               : namedCount === questionCount
                 ? 'AI names you on every question we asked.'
                 : `AI names you sometimes — on ${namedCount} of your ${questionCount} questions.`}
-          </h3>
-          <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
+          </h2>
+          <p className="text-slate mt-2.5 text-[1.0625rem] leading-relaxed">
             {namedCount === 0
               ? `We asked ${questionCount} questions a customer might ask. Your name came back on none of them.`
               : namedCount === questionCount
-                ? `All ${questionCount} of them. Worth keeping an eye on — answers change as the engines re-read the web.`
+                ? `All ${questionCount} of them. Worth keeping an eye on — answers change as the assistants re-read the web.`
                 : `The other ${questionCount - namedCount} went to somebody else.`}
           </p>
-        </Section>
+        </section>
       )}
 
       {/* Can AI read the site — the three checks a free audit scores, as boxes
@@ -201,13 +211,16 @@ export function FreeHome() {
           ⚠️ Gated on the rows, not on `report`. A heading with nothing under it
           claims a check we did not take. */}
       {readability.length > 0 && (
-        <Section n={asked ? '02' : '01'} title="Can AI read your site?">
+        <Section
+          title="Can AI actually read your site?"
+          lede="Three things decide it. Here’s how yours did."
+        >
           <ReadabilityChecklist rows={readability} />
         </Section>
       )}
 
       {asked && proof && (
-        <Section n="03" title="What AI said">
+        <Section title="What AI said about you" lede="One real question, and the answer it gave.">
           <ProofCard proof={proof} siteName={site.name} />
         </Section>
       )}
@@ -217,17 +230,20 @@ export function FreeHome() {
           table carries both facts in one grid, which is the comparison somebody
           actually wants and one fewer thing to scroll past. */}
       {asked && (
-        <Section n="04" title="Who ranks for your prompts">
+        <Section
+          title="Who AI names for your questions"
+          lede="A tick means it named you. A cross means it named somebody else."
+        >
           <PromptRanking tracking={tracking} />
         </Section>
       )}
 
       {!asked && (
-        <Section n="02" title="Asking the engines about you">
+        <Section title="We’re asking AI about you now" lede="This takes a few minutes.">
+          {/* Three sentences, not one of thirty-two words. Same facts. */}
           <p className="text-slate text-[0.9375rem] leading-relaxed">
-            We’re putting your questions to ChatGPT, Perplexity and Google’s Gemini and recording
-            who they name. It takes a few minutes — you can close this tab, it keeps running
-            without you.
+            We’re putting your questions to ChatGPT, Perplexity and Google’s Gemini. We’ll record
+            who each one names. You can close this tab — it keeps running without you.
           </p>
         </Section>
       )}
@@ -239,7 +255,10 @@ export function FreeHome() {
           to do, which is a real and good outcome — but "05 WHAT TO DO NEXT"
           over a blank space reads as a page that failed to load. */}
       {steps.length > 0 && (
-        <Section n={asked ? '05' : '03'} title="What to do next">
+        <Section
+          title="What to do next"
+          lede="Start at the top — that’s the order we’d do them in."
+        >
           <NextSteps steps={steps} />
         </Section>
       )}
@@ -250,7 +269,11 @@ export function FreeHome() {
       <div className="mt-8">
         <UpgradeCard
           title="Ready-to-paste code for your website"
-          body={`Clean HTML with your answers in it, the behind-the-scenes code that tells AI who you are, and an llms.txt file — built per page and pasted onto your own site, so the mention goes to you. Pro also reads every page rather than just your home page, and watches 25 questions every week so you can see whether it worked. $${PRO_PRICE.monthly} a month.`}
+          /* ⚠️ llms.txt IS EXPLAINED IN THE SAME BREATH, not assumed. That is
+             the rule pricing-teaser.tsx sets for exactly this word, and this
+             card was naming the file without it. Also four sentences now
+             instead of three long ones. */
+          body={`Your answers, ready to paste onto your own site — so the mention goes to you. You also get the code that tells AI which business you are. And an llms.txt file: a plain-text summary written for AI to read. Pro reads every page, not just your home page. It watches 25 questions every week, so you can see whether any of it worked. $${PRO_PRICE.monthly} a month.`}
         />
       </div>
     </article>
@@ -258,23 +281,47 @@ export function FreeHome() {
 }
 
 /**
- * One numbered section of the report.
+ * One section of the report: a question, a line saying what you're looking at,
+ * then the thing itself.
  *
- * A ruled heading and a number, not a card. The card metaphor is the app's, and
- * globals.css already argues against it for anything meant to be read rather
- * than worked in: "floating panels with shadows print as grey smudges", and
- * what a report wants is "a masthead, ruled sections and one column of prose".
- * That reasoning was scoped to print only because nothing on screen was a
- * report. This is.
+ * A ruled heading, not a card. The card metaphor is the app's, and globals.css
+ * already argues against it for anything meant to be read rather than worked
+ * in: "floating panels with shadows print as grey smudges", and what a report
+ * wants is "a masthead, ruled sections and one column of prose".
+ *
+ * ⚠️ THE NUMBERS ARE GONE, AND THAT FIXED A BUG AS WELL AS A TONE. This
+ * rendered `01` in mono beside a 15px UPPERCASE title — the look of a document
+ * to be decoded rather than read, on a page whose reader runs a roofing
+ * company. lib/audit/plain.ts has held that line for its own sentences since it
+ * was written; this file's own strings were never held to it.
+ *
+ * The bug: every number was a hardcoded literal, but four of the five sections
+ * are conditional. A site that passed all three readability checks rendered
+ * 01, 03, 04 and no 02 — a gap in the one thing a numbered document cannot have
+ * a gap in. Numbering by position would have fixed it; not numbering removes
+ * the class of bug and reads better, so it did both.
+ *
+ * ⚠️ THE LEDE IS NOT DECORATION. It is the connective tissue: without it each
+ * section starts cold with a table or a checklist and the reader has to work
+ * out what they are looking at before they can read it. One sentence, and it
+ * says what this is rather than repeating the heading.
  */
-function Section({ n, title, children }: { n: string; title: string; children: React.ReactNode }) {
+function Section({
+  title,
+  lede,
+  children,
+}: {
+  title: string;
+  lede?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="border-line border-b py-7 last-of-type:border-b-0">
-      <div className="flex items-baseline gap-3">
-        <span className="text-slate font-mono text-xs tabular-nums">{n}</span>
-        <h2 className="text-navy text-[0.9375rem] font-bold tracking-normal uppercase">{title}</h2>
-      </div>
-      <div className="mt-3">{children}</div>
+      {/* 20px display, sentence case. Sits deliberately below the verdict's
+          24/28px and above body copy, so the page has one clear outline. */}
+      <h2 className="text-navy text-[1.25rem] tracking-tight">{title}</h2>
+      {lede && <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">{lede}</p>}
+      <div className="mt-4">{children}</div>
     </section>
   );
 }

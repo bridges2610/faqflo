@@ -91,13 +91,23 @@ export function scoreIfFixed(findings: Finding[], fixIds: string[]): number {
   return overallScore(buildPillars(fixed));
 }
 
-/** Plain-language banding, so the number arrives with a meaning attached. */
+/**
+ * Plain-language banding, so the number arrives with a meaning attached.
+ *
+ * ⚠️ READ BY THREE SURFACES, ONE OF THEM A STRANGER'S FIRST IMPRESSION. The
+ * free report, Pro's audit page, and the marketing teaser all print these, so a
+ * word changed here changes all three — which is the point, not a hazard. They
+ * had drifted out of the register lib/audit/plain.ts sets for exactly this
+ * audience: "AI crawler" and "cited" are the vocabulary of the technical
+ * report, and the Invisible summary is the sentence somebody reads about their
+ * own site in the worst case.
+ */
 export function scoreBand(score: number): { label: string; summary: string } {
   if (score >= 85) {
     return {
       label: 'Strong',
       summary:
-        'The foundations are in place. What is left is depth — more questions answered, and more of them cited.',
+        'The foundations are in place. What is left is depth — more questions answered, and more of them quoted.',
     };
   }
   if (score >= 60) {
@@ -114,7 +124,7 @@ export function scoreBand(score: number): { label: string; summary: string } {
   }
   return {
     label: 'Invisible',
-    summary: 'As far as an AI crawler is concerned, there is very little here it can use.',
+    summary: 'As far as an AI assistant is concerned, there is very little here it can use.',
   };
 }
 

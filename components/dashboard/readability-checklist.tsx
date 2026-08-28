@@ -4,6 +4,24 @@ import { QUICK_FINDING_IDS, type AuditReport, type Finding } from '@/lib/audit/t
 
 type QuickId = (typeof QUICK_FINDING_IDS)[number];
 
+/**
+ * Small counts as words.
+ *
+ * Only goes as far as the list can — QUICK_FINDING_IDS is three long — and the
+ * call site falls back to the digit, so a fourth check added later degrades to
+ * "1 of the 4" rather than to a blank.
+ *
+ * Lowercase, with the sentence's first word capitalised at the call site. One
+ * map serving both halves of "Two of the three" would have to pick a case and
+ * be wrong in one of the two places.
+ */
+const WORD: Record<number, string> = { 0: 'none', 1: 'one', 2: 'two', 3: 'three' };
+
+/** First letter up, for a count that opens a sentence. */
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 /*
   Can AI read your site — the three checks, as boxes.
 
@@ -59,12 +77,17 @@ export function ReadabilityChecklist({ rows }: { rows: Finding[] }) {
   return (
     <>
       {/* The count in text, above the boxes. The ticks are a second reading of
-          this number, not the only place it exists. */}
-      <p className="text-slate text-sm">
-        <span className="text-navy font-semibold tabular-nums">
-          {clear} of {rows.length}
+          this number, not the only place it exists.
+
+          ⚠️ SPELLED OUT, NOT "2 of 3". Digits are right where a figure is being
+          compared or scanned — the table below, the score, every Meter caption.
+          Here the number is part of a sentence somebody reads once, and at
+          counts this small the words read warmer and no less precisely. */}
+      <p className="text-slate text-[0.9375rem] leading-relaxed">
+        <span className="text-navy font-semibold">
+          {cap(WORD[clear] ?? String(clear))} of the {WORD[rows.length] ?? rows.length}
         </span>{' '}
-        clear.
+        {clear === 1 ? 'is' : 'are'} in good shape.
       </p>
 
       <ul className="divide-line mt-3 divide-y">
