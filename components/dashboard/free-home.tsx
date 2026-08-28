@@ -124,10 +124,21 @@ export function FreeHome() {
         carries a comment complaining that regenerating in the afternoon changes
         that file. A plain welcome reads the same at any hour and renders
         identically on the server and the client.
+
+        ⚠️ AND NO YEAR IN THE GOAL LINE, UNLIKE THE HOME PAGE'S. Marketing says
+        "more customers in {year}" and built-for-owners.tsx spends a paragraph on
+        what that costs: the year is stamped at build time on a prerendered page
+        and goes stale if deploys get sparse. This page is dynamic, so the date
+        would be right — but it is rendered on the server and again on the
+        client, which is a hydration mismatch waiting for New Year's Eve, in
+        exchange for a word nobody needs. The goal is the same goal without it.
       */}
-      <p className="text-slate text-[0.9375rem]">
+      <p className="text-slate text-[0.9375rem] leading-relaxed">
         Welcome{firstName ? `, ${firstName}` : ''} — here&rsquo;s what AI can see about your
-        business today.
+        business today.{' '}
+        <span className="text-navy font-semibold">
+          Our goal is simple: get you more customers.
+        </span>
       </p>
 
       <header className="border-navy mt-4 border-b-2 pb-4">

@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { ButtonLink } from '@/components/ui/button';
 import { EngineMark } from '@/components/ui/ai-marks';
-import { checkedTodayUtc, runsLeftFor } from '@/lib/dashboard/plans';
+import { checkedTodayUtc, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { groupByQuestion, type QuestionGroup } from '@/lib/dashboard/questions';
 import { ENGINES, type CitationCheck, type Engine, type SiteTracking } from '@/lib/dashboard/types';
@@ -28,6 +28,8 @@ import { ENGINES, type CitationCheck, type Engine, type SiteTracking } from '@/l
   measurements that were taken and paid for. Whatever `latest` holds is what the
   table renders.
 */
+
+const PRO = TRACKING_PLANS.pro;
 
 /** What one cell can say. `null` is a gap, not a zero — see CELL below. */
 type Cell = 'named' | 'absent' | null;
@@ -234,9 +236,23 @@ function RunControl({
       )}
 
       {spent ? (
+        /*
+          ⚠️ THE PITCH IS THE PROMPTS, NOT THE SCHEDULE. This said "Pro re-checks
+          every week, on its own" — true, and the wrong offer in this spot. The
+          reader has just run out of checks on three questions WE chose for
+          them, and the thing they cannot do is ask their own. Selling a faster
+          cadence answers a question they did not ask; selling their own prompts
+          answers the one the table just raised.
+
+          Numbers come from the plan so the copy cannot drift from what the
+          account would actually get.
+        */
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <p className="text-slate text-sm">
-            That’s all three of your checks. Pro re-checks every week, on its own.
+            That’s all three of your checks. With Pro you ask your own questions —{' '}
+            <span className="text-navy font-semibold">{PRO.manualCap} you write yourself</span>,
+            alongside the {PRO.discoveredCap} we find — and all {PRO.promptCap} get re-checked
+            every week.
           </p>
           <ButtonLink href="/dashboard/plan" size="sm" variant="ghost">
             See what Pro includes
