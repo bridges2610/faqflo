@@ -235,9 +235,9 @@ export function trackingPlanFor(user: User | null): TrackingPlan {
 /**
  * The window a tracking budget is counted over.
  *
- * `end` is null when the budget never resets, which is how free's single run is
- * enforced: fifteen engine calls counted from the day the account was made,
- * against a ceiling of fifteen, forever.
+ * `end` is null when the budget never resets, which is how free's three runs are
+ * enforced: twenty-seven engine calls counted from the day the account was made,
+ * against a ceiling of twenty-seven, forever.
  */
 export type TrackingPeriod = { start: Date; end: Date | null };
 

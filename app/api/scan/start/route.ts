@@ -47,7 +47,7 @@ export async function POST(request: Request) {
     MERELY DISPLAYED.
 
     A scan is the expensive end of the product: a crawl, an Opus discovery call,
-    and five questions across three search-backed engines. Free buys exactly one
+    and three questions across three search-backed engines. Free buys exactly one
     of those, taken automatically at signup. The UI shows an upgrade card instead
     of a button, but a POST straight to this endpoint is one line of fetch, and
     the cost of getting this wrong is a loop somebody else pays for.

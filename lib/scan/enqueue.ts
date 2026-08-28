@@ -14,11 +14,31 @@ import { createAdminClient } from '@/lib/supabase/admin';
   ⚠️ THE TRIGGER MOVED FROM PAYMENT TO SIGNUP, AND THAT IS THE COST DECISION
   BEHIND THE FREE TIER. Stripe fulfilment used to queue this the moment somebody
   paid $129, so every scan was funded before it ran. Now every free signup gets
-  one: a one-page crawl, an Opus discovery call, and five questions across three
-  engines — roughly $0.50–$1.00 of somebody else's API per account, spent whether
-  or not they ever come back. What bounds it is hasScanned() below, the
-  per-account check meter, and SITE_CAP. Removing any of those three makes free
-  signup an unbounded bill.
+  one: a one-page crawl, an Opus discovery call, and three questions across three
+  engines — nine billable engine calls, spent whether or not they ever come back.
+
+  ⚠️ ABOUT $0.25 A SIGNUP AT AUGUST 2026 LIST PRICES, AND THE FIGURE IS MODELLED
+  RATHER THAN MEASURED. Nothing in this codebase records token usage — every
+  adapter in lib/tracking parses the vendor's `usage` block away — so that is
+  arithmetic over published rates, not a reading off a bill. Treat it as an
+  order of magnitude.
+
+  Most of it is the per-search fee on each engine call ($8–$14 per thousand),
+  not tokens; search costs 10–30x what the tokens do. The one item that can
+  swing is the Opus call, because max_tokens caps thinking and text together at
+  12k — three cents of output typically, thirty at the ceiling. An account that
+  comes back and spends its other two runs reaches 27 engine calls, or roughly
+  $0.55 all in.
+
+  ⚠️ THE NOTE HERE USED TO SAY $0.50–$1.00 FOR A SIGNUP, AND IT WAS RIGHT WHEN
+  WRITTEN. Two things moved under it: Opus went from $15/$75 per Mtok to $5/$25,
+  and free went from asking five questions once to asking three, three times. So
+  a signup got cheaper while the lifetime ceiling went up. Prices move again —
+  Gemini's grounded rate is promotional until 1 Jan 2027 — so re-derive rather
+  than trusting this line if the number matters.
+
+  What bounds it is hasScanned() below, the per-account check meter, and
+  SITE_CAP. Removing any of those three makes free signup an unbounded bill.
 */
 
 /**
@@ -99,7 +119,8 @@ export async function hasScanned(siteId: string): Promise<boolean> {
  * a person accepting it first. The group is an empty page waiting for them.
  *
  * ⚠️ CALLERS ARE RESPONSIBLE FOR ENTITLEMENT. This spends money — a crawl, an
- * Opus call and fifteen search-backed engine calls — and deliberately does not
+ * Opus call, and a run of search-backed engine calls whose size comes from the
+ * plan: nine on free, about forty-five on Pro — and deliberately does not
  * check the plan itself, because its callers ask different questions: onboarding
  * asks "is this account allowed a first scan", /api/scan/start asks "is this
  * account allowed ANOTHER one". Both go through hasScanned() and isPro(). A

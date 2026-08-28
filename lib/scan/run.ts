@@ -274,9 +274,9 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
 
       This used to slice to the caller's discoveredCap, which was right when
       discovery only ran for a plan that had paid for it. It runs for free
-      signups now, and a free account's cap is 5 — so slicing here would throw
-      away ten questions this one model call already produced and already paid
-      for, then charge a second call to get them back the moment somebody
+      signups now, and a free account's cap is 3 — so slicing here would throw
+      away twelve questions this one model call already produced and already
+      paid for, then charge a second call to get them back the moment somebody
       upgrades.
 
       What free actually gets is a SAMPLE: the rows are all stored, and
