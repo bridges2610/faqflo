@@ -203,53 +203,64 @@ export function FreeHome() {
         colour — so without these the whole header prints white on white. This
         page has no print button, but Cmd+P is always there.
       */}
-      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-6 sm:p-8 print:bg-white print:shadow-none">
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            {/* Cyan is legal as type here and nowhere else light: 9.43:1 on
-                navy, against 1.9:1 on white. how-it-works.tsx does the same. */}
-            <p className="text-accent font-mono text-[0.6875rem] tracking-wide uppercase print:text-slate">
-              {site.domain}
-            </p>
-            <h1 className="mt-1.5 text-[1.75rem] text-white sm:text-[2rem] print:text-navy">
-              AI visibility report
-            </h1>
-            {/* ⚠️ formatPlainDate, not toLocaleDateString. The helper pins
-                timeZone: 'UTC' because "a date rendered in the browser's zone
-                can land on the previous day" — this was hand-rolling the same
-                format without that pin. Rendered only when there IS a report:
-                falling back to today would date a reading that does not exist. */}
-            {report?.checkedAt && (
-              <p className="mt-1 text-sm text-white/60 print:text-slate">
-                {formatPlainDate(report.checkedAt)}
-              </p>
-            )}
+      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-6 sm:p-7 print:bg-white print:shadow-none">
+        {/*
+          ⚠️ THE WHOLE IDENTITY IS ONE SMALL LINE, AND THE h1 IS IT. "AI
+          visibility report" was the biggest thing on the page and the least
+          interesting thing on it — a document title where the news is the
+          verdict. It keeps the h1 because a page still owes a screen reader a
+          title, and a heading reading "Hard to quote" with no subject is worse
+          than a quiet one; it just stops being 32px.
 
-            {band && (
-              <>
-                <p className="mt-6 text-[1.375rem] font-extrabold tracking-tight text-white print:text-navy">
-                  {band.label}
-                </p>
-                <p className="mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed text-white/75 print:text-slate">
-                  {band.summary}
-                </p>
-              </>
-            )}
-            {report && (
-              <p className="mt-3 text-xs text-white/50 print:text-slate">
+          font-normal and tracking-wide are overrides, not tidying: globals.css
+          sets every h1 to weight 800 at -0.02em, which at 11px reads as a
+          smudge. Same reason section-title.tsx exists.
+        */}
+        <h1 className="text-accent relative font-mono text-[0.6875rem] font-normal tracking-wide uppercase print:text-slate">
+          {site.domain}
+          {/* ⚠️ formatPlainDate, not toLocaleDateString. The helper pins
+              timeZone: 'UTC' because "a date rendered in the browser's zone can
+              land on the previous day". Rendered only when there IS a report:
+              falling back to today would date a reading that does not exist. */}
+          <span className="text-white/60 print:text-slate">
+            {' · '}AI visibility report
+            {report?.checkedAt ? ` · ${formatPlainDate(report.checkedAt)}` : ''}
+          </span>
+        </h1>
+
+        {/*
+          ⚠️ THE RING SITS WITH THE VERDICT BECAUSE THEY ARE ONE IDEA. It was
+          pinned to the far edge by justify-between, which put the number and
+          the words that explain it at opposite ends of the card. Beside the
+          text it also cannot collide with the right edge at any width, which
+          is what the old arrangement did first as the viewport narrowed.
+
+          ⚠️ THE NUMBER IS SUPPORTING, NOT STRUCTURAL. Small ring, words leading
+          — so retiring the score from this surface later is deleting one
+          element rather than redesigning the header around its absence.
+        */}
+        {report && band && (
+          <div className="relative mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+            {/* `reverse` because the figure is text-navy in its own template
+                literal — a text-white here would lose to it. */}
+            <ScoreDial score={report.score} size="sm" reverse />
+
+            <div className="min-w-0">
+              <p className="text-[1.5rem] font-extrabold tracking-tight text-white print:text-navy">
+                {band.label}
+              </p>
+              <p className="mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed text-white/80 print:text-slate">
+                {band.summary}
+              </p>
+              {/* ⚠️ /70, NOT /50. The same measured ratio reads dimmer on a dark
+                  surface than on a light one — 5.11:1 passed and still looked
+                  muddy here. Muted on navy starts higher than muted on white. */}
+              <p className="mt-2 text-xs text-white/70 print:text-slate">
                 We checked {report.scoredCount} things on your home page.
               </p>
-            )}
-          </div>
-
-          {/* `reverse` because the figure is text-navy in its own template
-              literal — a text-white here would lose to it. See score-dial.tsx. */}
-          {report && (
-            <div className="relative shrink-0">
-              <ScoreDial score={report.score} reverse />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </header>
 
       {/*
