@@ -37,8 +37,16 @@ export function UpgradeCard({
 }) {
   const pro = PLAN_COPY.pro;
 
+  /*
+    ⚠️ `p-5 sm:p-7`, NOT `p-7`. `compact` is a CONTAINER decision made by the
+    caller; the sm: is a VIEWPORT one, and the two are independent. This card
+    carried a bare p-7 while seven-plus siblings had already moved —
+    done-for-you-card.tsx's own note says "same problem and same prop name as
+    UpgradeCard, which got here first", so this is the one that never got the fix
+    it inspired. At 360px p-7 left the copy a ~218px column.
+  */
   return (
-    <Card tone="cloud" className={compact ? 'p-5' : 'p-7'}>
+    <Card tone="cloud" className={compact ? 'p-5' : 'p-5 sm:p-7'}>
       <div className="flex gap-4">
         <span className="bg-accent-soft text-teal-ink flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
           <LockIcon className="h-4.5 w-4.5" />

@@ -207,7 +207,11 @@ export function FreeHome() {
         colour — so without these the whole header prints white on white. This
         page has no print button, but Cmd+P is always there.
       */}
-      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-6 sm:p-7 print:bg-white print:shadow-none">
+      {/* ⚠️ p-5 sm:p-7, AND IT USED TO BE p-6 sm:p-7 — a padding that only ever
+          grew. 24px of inset on each side of a 360px screen is 15% of the
+          viewport spent on nothing, inside the block that was already the
+          tallest thing on the page. */}
+      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-5 sm:p-7 print:bg-white print:shadow-none">
         {/*
           ⚠️ THE WHOLE IDENTITY IS ONE SMALL LINE, AND THE h1 IS IT. "AI
           visibility report" was the biggest thing on the page and the least
@@ -242,18 +246,41 @@ export function FreeHome() {
           ⚠️ THE NUMBER IS SUPPORTING, NOT STRUCTURAL. Small ring, words leading
           — so retiring the score from this surface later is deleting one
           element rather than redesigning the header around its absence.
+
+          ⚠️ A GRID, NOT A FLEX ROW, AND THAT IS WHAT FIXED THE PHONE. This was
+          `flex-col sm:flex-row`, which on a phone put the 96px ring on its own
+          line ABOVE the verdict — 112px of height spent before the reader saw a
+          word, and most of why this header measured 324px at 360px against
+          185px on a desktop.
+
+          Two columns solve it without a second layout to maintain. On a phone
+          the ring and the verdict share row one and the summary spans both
+          columns underneath, so the ring costs no vertical space at all and the
+          sentence still gets the full width to wrap in. From `sm` up the ring
+          spans both rows and it renders exactly as it did before.
+
+          ⚠️ THE SUMMARY MUST SPAN. Putting it in column two under the verdict
+          would leave it a ~190px gutter on a 360px screen, which is worse than
+          what this replaced — the ring would have stopped costing height and
+          started costing width instead.
         */}
         {report && band && (
-          <div className="relative mt-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
+          <div className="relative mt-4 grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-2.5 sm:mt-5 sm:gap-x-5 sm:gap-y-1.5">
             {/* `reverse` because the figure is text-navy in its own template
                 literal — a text-white here would lose to it. */}
-            <ScoreDial score={report.score} size="sm" reverse />
+            <ScoreDial
+              score={report.score}
+              size="sm"
+              reverse
+              className="sm:row-span-2"
+            />
 
-            <div className="min-w-0">
-              <p className="text-[1.5rem] font-extrabold tracking-tight text-white print:text-navy">
-                {band.label}
-              </p>
-              <p className="mt-1.5 max-w-xl text-[0.9375rem] leading-relaxed text-white/80 print:text-slate">
+            <p className="min-w-0 text-[1.25rem] font-extrabold tracking-tight text-white sm:text-[1.5rem] print:text-navy">
+              {band.label}
+            </p>
+
+            <div className="col-span-2 min-w-0 sm:col-span-1 sm:col-start-2">
+              <p className="max-w-xl text-[0.9375rem] leading-relaxed text-white/80 print:text-slate">
                 {band.summary}
               </p>
               {/* ⚠️ /70, NOT /50. The same measured ratio reads dimmer on a dark
@@ -281,19 +308,28 @@ export function FreeHome() {
             small uppercase label and the conclusion was subordinate to it,
             which is backwards.
 
-            ⚠️ ONE SIZE, NOT TWO, AND IT SITS BETWEEN THE OTHER TWO HEADINGS.
-            It was 1.5/1.75rem and read as a shout. The page now steps cleanly
-            down — masthead band 1.5rem, this 1.375rem, section chips 1.25rem —
-            with no tie at any width. Dropping the sm bump rather than the base
-            is what keeps that true on a phone: at 1.25rem this would have been
-            the same size as the chips below it, and a finding that measures the
-            same as a section label stops reading as a finding.
+            ⚠️ IT SITS BETWEEN THE OTHER TWO HEADINGS, AND THE LADDER IS NOW
+            KEPT AT TWO WIDTHS RATHER THAN PINNED AT ONE.
+
+              masthead band   1.25rem  →  1.5rem
+              this            1.125rem →  1.375rem
+              section chips   1rem     →  1.25rem
+
+            Three distinct steps on a phone and three on a desktop, no tie at
+            either. This previously carried no sm: bump on purpose, and the
+            reasoning was sound at the time: scaling THIS alone would have
+            dropped it to 1.25rem and tied it with the chips, and a finding that
+            measures the same as a section label stops reading as a finding.
+            That argument was about scaling one rung of a ladder. All three move
+            together now, so the ordering the rule protects is intact — but if
+            you ever change one of these sizes, change all three or the rule
+            breaks silently.
 
             The masthead's label being the larger of the two is not an
             inversion. It carries a solid navy card behind it; this one gets its
             prominence from position and from being dark type on white.
           */}
-          <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight">
+          <h2 className="text-navy text-[1.125rem] font-extrabold tracking-tight sm:text-[1.375rem]">
             {namedCount === 0
               ? 'Right now, AI doesn’t recommend your business.'
               : namedCount === questionCount
@@ -313,7 +349,7 @@ export function FreeHome() {
             with it — so it now says what "somebody else" usually means and
             points at the table that names them.
           */}
-          <p className="text-slate mt-2.5 text-[1.0625rem] leading-relaxed">
+          <p className="text-slate mt-2.5 text-[1rem] leading-relaxed sm:text-[1.0625rem]">
             {namedCount === 0
               ? `We asked ${questionCount} questions a customer might ask. Your name came back on none of them.`
               : namedCount === questionCount
@@ -459,11 +495,21 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="pt-11">
-      {/* 20px display, sentence case. Sits deliberately below the verdict's
-          24/28px and above body copy, so the page has one clear outline.
+    <section className="pt-8 sm:pt-11">
+      {/* 16px on a phone, 20px from sm up — the bottom rung of the ladder the
+          verdict heading's comment describes, and it moves with the other two.
+          Sits deliberately below the verdict and above body copy at both
+          widths, so the page has one clear outline.
           `inline-block` is what keeps it a chip: on a block h2 the fill would
           run the width of the column and become the band above.
+
+          ⚠️ THE SIZE DROP ON MOBILE IS WHAT KEEPS IT A CHIP AT ALL. At 20px the
+          longest titles here — "Can AI actually read your site?" and "Who AI
+          names for your questions", both 31 characters — wrap to two lines in a
+          328px column and the fill stretches to nearly the full width. That is
+          the band this comment says inline-block exists to prevent: the rule
+          was being enforced by the element's display and quietly broken by its
+          type size. Measure before lengthening a title.
 
           ⚠️ THE RADIUS AND THE TILT ARE BOTH BORROWED FROM THE WORDMARK, which
           is already a blue chip with white type — components/ui/wordmark.tsx's
@@ -482,7 +528,7 @@ function Section({
           corners never clip against neighbouring content". The lede's mt-3
           below clears the ~3px the rotation adds; tighten either and they
           touch. */}
-      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-4 py-2.5 text-[1.25rem] tracking-tight text-white">
+      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-3.5 py-2 text-[1rem] tracking-tight text-white sm:px-4 sm:py-2.5 sm:text-[1.25rem]">
         {title}
       </h2>
       {lede && <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{lede}</p>}

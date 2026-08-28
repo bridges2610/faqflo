@@ -110,10 +110,72 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
 
   return (
     <>
-      {/* ⚠️ The table scrolls inside this box rather than widening the report.
-          Five columns do not fit a phone, and a page that scrolls sideways as a
-          whole is worse than one panel that does. */}
-      <div className="-mx-1 overflow-x-auto px-1">
+      {/*
+        ⚠️ TWO RENDERINGS OF ONE DATA SET, AND THE SPLIT IS AT sm.
+
+        Five columns do not fit a phone. That was true when this was a table in
+        a scroll box, and the scroll box was the right answer at the time: a
+        page that scrolls sideways as a whole is worse than one panel that does.
+        But "one panel that does" still means a roofer swiping a table to find
+        out what Gemini said, on the screen that IS the free product.
+
+        So below sm the same rows render as blocks — question, then its three
+        engine outcomes, then who was named instead — and nothing scrolls in any
+        direction. From sm up the table is unchanged, scroll box and all,
+        because at that width the grid genuinely reads better than four stacked
+        cards would.
+
+        ⚠️ NO LOGIC LIVES IN EITHER BRANCH. Both call cellFor(), insteadFor(),
+        CELL and ENGINES; only the markup differs. A second copy of the
+        "null is a gap, not a cross" rule is exactly the drift that would make
+        one of these two lie, and it is the one rule in this file that must not
+        be restated anywhere.
+      */}
+      <ul className="divide-line divide-y sm:hidden">
+        {groups.map((group) => {
+          const instead = insteadFor(group);
+
+          return (
+            <li key={group.question} className="py-4 first:pt-0">
+              <p className="text-navy text-sm font-medium">{group.question}</p>
+
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+                {ENGINES.map((engine) => {
+                  const style = CELL[cellFor(group, engine) ?? 'gap'];
+
+                  return (
+                    <span key={engine} className="flex items-center gap-1.5">
+                      <EngineMark engine={engine} className="h-4 w-4" />
+                      <span className={`text-xs font-semibold ${ENGINE_TINT[engine]}`}>
+                        {engine}
+                      </span>
+                      <span className={`text-base font-semibold ${style.className}`}>
+                        <span aria-hidden="true">{style.glyph}</span>
+                        <span className="sr-only">
+                          {engine} {style.word}
+                        </span>
+                      </span>
+                    </span>
+                  );
+                })}
+              </div>
+
+              <p className="text-slate mt-2.5 text-xs">
+                Named instead:{' '}
+                {instead ? (
+                  /* break-all because a domain has no break opportunities and
+                     this column is ~290px on a phone. */
+                  <span className="text-slate font-mono break-all">{instead}</span>
+                ) : (
+                  <span className="text-slate/50">nobody in particular</span>
+                )}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+
+      <div className="-mx-1 hidden overflow-x-auto px-1 sm:block">
         <table className="w-full min-w-[34rem] border-collapse text-left">
           <thead>
             {/*
@@ -165,7 +227,7 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
 
                   <td className="py-3 pl-4 align-middle">
                     {instead ? (
-                      <span className="text-slate font-mono text-xs">{instead}</span>
+                      <span className="text-slate font-mono text-xs break-all">{instead}</span>
                     ) : (
                       /* No usable source in any answer. Honest reading: nobody
                          in particular — not an empty cell, and not a rival we

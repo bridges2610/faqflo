@@ -56,7 +56,12 @@ export function Disclosure({
         {label}
       </summary>
 
-      <div className="mt-3 pl-5">{children}</div>
+      {/* ⚠️ The indent is what ties the panel to its toggle, so it stays — but
+          it shrinks on a phone. This wraps code blocks: 20px here, nested
+          inside a card's own padding, was leaving a preformatted snippet about
+          240px of visible width at 360px. The indent still reads at 12px, and
+          the content that needed the room gets it back. */}
+      <div className="mt-3 pl-3 sm:pl-5">{children}</div>
     </details>
   );
 }

@@ -9,7 +9,6 @@ import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, LockIcon, SearchIcon } from './nav-icons';
-import { MicroLabel } from './micro-label';
 import { AccountMenu } from './account-menu';
 import { RunNotice } from './run-notice';
 import { ScanNotice } from './scan-notice';
@@ -98,32 +97,86 @@ function isActive(pathname: string, href: string): boolean {
 const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: HomeIcon }];
 
 /*
+  What each locked row is actually worth, in the reader's terms.
+
+  ⚠️ THE LABELS ALONE DO NOT SELL ANYTHING. "Opportunities" means nothing to a
+  plumber, and neither does "Your site" — they are names for screens, chosen for
+  a Pro account that has already paid and needs to find things. A free account
+  has not paid and is not navigating; it is deciding. So each row gets a second
+  line that says what the screen DOES, and that second line is the reason this
+  block earns space in a 256px column instead of being four dead menu items.
+
+  ⚠️ NO NUMBERS HERE, DELIBERATELY, AND THE FIRST DRAFT HAD THEM. "All 44
+  checks" and "the 4 you're missing" were both considered and both rejected.
+  44 is a real count — it is exactly how many findings the four check modules
+  emit — but the report itself says "Based on N checks" where N is the SCORED
+  count, which can never reach 44 (coverage is always unscored) and lands
+  somewhere in the thirties. Two true numbers that disagree on screen read as
+  one wrong number. It also derives from no constant, so adding a check would
+  silently make this copy stale; help-workspace.tsx:52 declines to repeat the
+  figure for that exact reason and this is not the place to overrule it.
+
+  The "4 you're missing" was worse: it looks like it ties to the report's "the
+  other 4 went to somebody else", but that 4 is questions no engine named you
+  on — a tracking result — while Opportunities holds discovered questions you
+  have not answered. They would match only by coincidence.
+
+  General copy has neither failure mode, needs nothing from useDashboard(), and
+  cannot flash a zero while the provider resolves.
+
+  ⚠️ ≤30 CHARACTERS EACH, AND THAT IS MEASURED, NOT A STYLE PREFERENCE. The
+  aside is w-64 (256px); minus its p-5 (40) and the row's px-3 (24) leaves
+  192px, and minus the icon and gap leaves ~160px — about 30 characters at
+  11px. Longer copy wraps to a third line and the row stops reading as one
+  thing. The budget was ~26 while these sat in a padded box; losing the box and
+  dropping to 11px bought the rest. Re-measure before writing longer copy —
+  every string here is well inside the limit and none of them should crowd it.
+*/
+const PRO_VALUE: Record<string, string> = {
+  '/dashboard/audit': 'Every page, not just one',
+  '/dashboard/faqs': 'Written and ready to paste',
+  '/dashboard/questions': 'Questions you’re missing',
+  '/dashboard/tracking': 'Re-checked every week',
+};
+
+/*
   What Pro adds, shown to a free account underneath its one real destination.
 
   ⚠️ THE NOTE ABOVE REJECTED TWO OPTIONS AND THIS IS A THIRD. It weighed hiding
   the links against leaving them working, and ruled out "redirecting without
   hiding" because that leaves five links that all go to the same place. That is
   still true and still bad — when the links look like navigation. These do not.
-  A padlock on every row under a heading that says With Pro is what makes one
-  shared destination legible: nobody reads these as four ways to four screens.
 
-  ⚠️ IT IS AN ADVERT IN THE NAV, NOT NAVIGATION, and the distinction is what
-  keeps the 8→5 pruning argument at the top of this file intact. A free
-  account's real destination count is still one. Nothing here is a place to
-  check; it is a description of the plan they are not on, placed where the
-  question "what else is there?" actually occurs to somebody.
+  ⚠️ WHAT MAKES ONE SHARED DESTINATION LEGIBLE IS THE CONTAINER, AND IT USED TO
+  BE FOUR PADLOCKS. The earlier version put a lock on every row under a mono
+  "WITH PRO" label, on the reasoning that a padlock per row is what stops these
+  reading as four ways to four screens. It stopped them reading as navigation
+  and started them reading as four denials — the same refusal, refused four
+  times. The tint now does the grouping, one padlock on the header does the
+  gating, and the value lines describe rather than point. Do not put the
+  per-row padlocks back without also removing the container; they were two
+  answers to one question and having both is what made it feel like a wall.
+
+  ⚠️ IT IS AN ADVERT, NOT NAVIGATION, and the distinction is what keeps the 8→5
+  pruning argument at the top of this file intact. A free account's real
+  destination count is still one. Nothing here is a place to check; it is a
+  description of the plan they are not on, placed where the question "what else
+  is there?" actually occurs to somebody. It renders OUTSIDE the <nav> for that
+  reason — inside, a screen reader's navigation landmark would list five
+  destinations for an account that has one.
 
   ⚠️ DERIVED FROM NAV, NEVER RETYPED. A second literal list would drift from
   the first the moment a destination is renamed, and the drift would be
   invisible — an advert promising a screen that no longer exists by that name.
+  Only the value line is looked up, and a renamed route loses its line rather
+  than keeping a stale one.
 
-  ⚠️ LOCKED IS NOT DISABLED. These are ordinary full-opacity links with the same
-  text-slate as any inactive nav row; the lock and the heading do the work.
-  copy-html-button.tsx settled this for its own padlock, and
-  prompt-ranking.tsx states the rule: "a greyed-out control with a tooltip makes
-  the reader hunt for why". They also genuinely go somewhere, which is what
-  account-menu.tsx's note about "a menu item that closes the menu and goes
-  nowhere" requires of anything Pro-shaped in a nav.
+  ⚠️ LOCKED IS NOT DISABLED. These are ordinary full-opacity links; the tint,
+  the header lock and the heading do the work. copy-html-button.tsx settled this
+  for its own padlock, and prompt-ranking.tsx states the rule: "a greyed-out
+  control with a tooltip makes the reader hunt for why". They also genuinely go
+  somewhere, which is what account-menu.tsx's note about "a menu item that
+  closes the menu and goes nowhere" requires of anything Pro-shaped in a nav.
 
   ⚠️ THE PATTERN WAS ALREADY WRITTEN AND NEVER RAN. worklist.ts has a
   `locked: 'pro'` task type and task-row.tsx has the styling for it, but
@@ -131,7 +184,10 @@ const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: H
   This is the first live use; it follows those conventions rather than inventing
   new ones, and if that branch ever wakes up the two should still agree.
 */
-const PRO_TEASE: NavItem[] = NAV.filter((item) => item.href !== '/dashboard');
+const PRO_TEASE = NAV.filter((item) => item.href !== '/dashboard').map((item) => ({
+  ...item,
+  value: PRO_VALUE[item.href],
+}));
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -149,63 +205,118 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const items = isPro(user) ? NAV : FREE_NAV;
 
   return (
-    <nav className="flex flex-col gap-1">
-      {items.map(({ href, label, Icon }) => {
-        const active = isActive(pathname, href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            onClick={onNavigate}
-            aria-current={active ? 'page' : undefined}
-            className={`flex items-center gap-3 rounded-input px-3 py-2 text-sm transition-colors duration-150 ${
-              active
-                ? 'bg-primary-soft text-primary font-semibold'
-                : 'text-slate hover:text-navy hover:bg-cloud'
-            }`}
-          >
-            <Icon className="h-5 w-5 shrink-0" />
-            {label}
-          </Link>
-        );
-      })}
+    <>
+      <nav className="flex flex-col gap-1.5">
+        {items.map(({ href, label, Icon }) => {
+          const active = isActive(pathname, href);
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onNavigate}
+              aria-current={active ? 'page' : undefined}
+              className={`flex items-center gap-3 rounded-input px-3 py-2.5 text-sm transition-colors duration-150 ${
+                active
+                  ? 'bg-primary-soft text-primary font-semibold'
+                  : 'text-slate hover:text-navy hover:bg-cloud'
+              }`}
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
 
       {/*
         ⚠️ `user &&`, NOT JUST `!isPro(user)`. The note above records that
         isPro(null) is false, so the first frame renders the free nav — and
-        without this a PAYING customer would flash four padlocks before the
-        provider resolved and swapped them out. Waiting for a resolved user
-        means the null frame shows one item and nothing else, which is the same
-        thing it showed before this group existed.
+        without this a PAYING customer would flash an upgrade panel before the
+        provider resolved and swapped it out. Waiting for a resolved user means
+        the null frame shows one item and nothing else, which is the same thing
+        it showed before this group existed.
 
         ⚠️ NO isActive AND NO aria-current. Every row here points at
         /dashboard/plan, so isActive() would light up all four the moment
         somebody is on the plan page. None of them is ever "current".
 
-        ⚠️ THE aria-label CARRIES THE MEANING. LockIcon inherits aria-hidden
-        from nav-icons' shared BASE, so the padlock says nothing to a screen
-        reader — same reason copy-html-button.tsx spells out "needs Pro" in its
-        own label. "part of Pro" is the phrase five API routes already use.
+        ⚠️ THE aria-label CARRIES THE MEANING, AND IT MATTERS MORE NOW THAN IT
+        DID. LockIcon inherits aria-hidden from nav-icons' shared BASE, so the
+        padlock says nothing to a screen reader — and with one lock on the
+        header instead of four on the rows, this label is the ONLY per-row
+        signal that a row is gated. Same reason copy-html-button.tsx spells out
+        "needs Pro" in its own label. "part of Pro" is the phrase five API
+        routes already use.
+
+        ⚠️ NOT <MicroLabel>, AND THAT IS THE POINT OF THE HEADING. MicroLabel is
+        mono/uppercase/slate by definition, which is exactly the treatment this
+        replaced: mono uppercase reads as a field label, and this is a promise.
+        Do not "restore consistency" by swapping it back.
+
+        ⚠️ NO CONTAINER AT ALL — NO FILL AND NO BORDER — AND IT HAS HAD BOTH.
+        It was a cloud fill when the sidebar was white, then an outline when the
+        sidebar went grey. What groups these rows now is the heading, the value
+        lines and the gap above: four rows that each say what they do are not
+        mistakable for four broken menu items, which is the only thing a box was
+        ever protecting against. The chrome was scaffolding for copy that had
+        not been written yet. Do not re-add a box without first checking whether
+        the copy still does the job.
+
+        ⚠️ THE ROWS SHARE THE NAV'S INDENT NOW, and that is safe only because
+        this is the free sidebar. px-3 aligns them under the one real
+        destination above, which on a Pro nav would be five real links and a
+        genuine ambiguity. There is exactly one link above them, it is styled
+        active, and every row here carries a second line no nav row has.
       */}
       {user && !isPro(user) && (
-        <>
-          <MicroLabel className="mt-6 mb-1.5 px-3">With Pro</MicroLabel>
-          {PRO_TEASE.map(({ href, label, Icon }) => (
-            <Link
-              key={href}
-              href="/dashboard/plan"
-              onClick={onNavigate}
-              aria-label={`${label} is part of Pro`}
-              className="text-slate hover:text-navy hover:bg-cloud flex items-center gap-3 rounded-input px-3 py-2 text-sm transition-colors duration-150"
-            >
-              <Icon className="h-5 w-5 shrink-0" />
-              <span className="flex-1">{label}</span>
-              <LockIcon className="text-slate/60 h-4 w-4 shrink-0" />
-            </Link>
-          ))}
-        </>
+        <div className="mt-7">
+          <div className="mb-2 flex items-center gap-2 px-3">
+            <LockIcon className="text-slate h-3.5 w-3.5 shrink-0" />
+            <p className="text-navy text-sm font-semibold">What Pro unlocks</p>
+          </div>
+          <ul className="flex flex-col gap-1.5">
+            {PRO_TEASE.map(({ href, label, Icon, value }) => (
+              <li key={href}>
+                <Link
+                  href="/dashboard/plan"
+                  onClick={onNavigate}
+                  aria-label={`${label} is part of Pro`}
+                  className="rounded-input flex gap-3 px-3 py-2 transition-colors duration-150 hover:bg-cloud"
+                >
+                  <Icon className="text-slate mt-0.5 h-5 w-5 shrink-0" />
+                  <span className="min-w-0">
+                    {/* ⚠️ text-slate, NOT text-navy, AND THE HEADING KEEPS THE
+                        NAVY. These labels were navy — darker and heavier than
+                        the real destination above them whenever that one was
+                        inactive, which put the advert on top of the thing the
+                        customer actually came for. Slate is the same colour an
+                        inactive nav row uses, so the block now reads under the
+                        nav rather than over it. The heading stays navy because
+                        it is what anchors the group. */}
+                    <span className="text-slate block text-sm leading-snug font-medium">{label}</span>
+                    {/* 11px, the smallest type in the sidebar. It is a
+                        supporting line under a label, not a second label —
+                        at text-xs the two lines competed and the row read as
+                        two entries rather than one. Same size MicroLabel uses,
+                        which is the floor this codebase already sets.
+
+                        ⚠️ SAME SLATE AS THE LABEL, ON PURPOSE. Size and weight
+                        already separate the two lines, and slate is 7.46:1
+                        here. Going lighter to separate them by colour as well
+                        runs out of room fast: slate/85 measures 5.07:1 on this
+                        surface and slate/75 only 3.95:1, which fails AA for
+                        type this small. */}
+                    {value && (
+                      <span className="text-slate block text-[0.6875rem] leading-snug">{value}</span>
+                    )}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
-    </nav>
+    </>
   );
 }
 
@@ -292,8 +403,19 @@ function PlanFooter() {
   */
   const left = runsLeftFor(tracking);
 
+  /*
+    ⚠️ NO FILL, AND IT HAD ONE. This was `bg-cloud`, from when the sidebar was
+    white and a tint was how a box announced itself. Against `bg-shell` that
+    fill is very nearly the surface it sits on, and the border alone says
+    everything the box needs to say.
+
+    ⚠️ IT IS NOW THE ONLY BORDERED THING IN THE SIDEBAR, which is deliberate and
+    is why the Pro block above it has no border. Two outlined boxes in a 256px
+    column read as a pair of equals; only one of these is a place the customer's
+    own state lives. The advert is grouped by its copy instead.
+  */
   return (
-    <div className="border-line bg-cloud rounded-xl border p-4">
+    <div className="border-line rounded-xl border p-4">
       <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Your plan</p>
       <p className="text-navy mt-1 text-sm font-semibold">{pro ? 'Pro' : 'Free'}</p>
       <p className="text-slate mt-1 text-xs leading-relaxed">
@@ -334,7 +456,7 @@ function HelpLink({ onNavigate }: { onNavigate?: () => void }) {
     <Link
       href="/dashboard/help"
       onClick={onNavigate}
-      className="text-slate hover:text-navy hover:bg-cloud mb-2 flex items-center gap-3 rounded-input px-3 py-2 text-sm transition-colors duration-150"
+      className="text-slate hover:text-navy hover:bg-cloud mb-2 flex items-center gap-3 rounded-input px-3 py-2.5 text-sm transition-colors duration-150"
     >
       <DocIcon className="h-4 w-4 shrink-0" />
       Help
@@ -389,7 +511,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         footer no longer fit. Sticky and overflow on the SAME element is fine —
         only an ancestor with overflow breaks stickiness.
       */}
-      <aside className="border-line sticky top-0 hidden h-dvh w-64 shrink-0 flex-col justify-between overflow-y-auto border-r bg-white p-5 lg:flex">
+      {/*
+        ⚠️ bg-shell, AND EVERY HOVER IN THIS FILE DEPENDS ON IT. See the token's
+        own note in globals.css: it sits between white and cloud, which leaves
+        too little room for a white hover, so every row in this sidebar hovers
+        DARKER, to cloud. Changing this surface means re-picking those.
+
+        It was briefly `bg-cloud`, which is also what <body> paints — so on Pro
+        screens the sidebar and the content beside it were one flat surface with
+        only `border-r` between them. Shell is lighter than the content on Pro
+        and greyer than the content on the free report, which paints its own
+        white backdrop. It is the only value that separates from both.
+      */}
+      <aside className="border-line sticky top-0 hidden h-dvh w-64 shrink-0 flex-col justify-between overflow-y-auto border-r bg-shell p-5 lg:flex">
         <div>
           <Wordmark className="text-[1.25rem]" />
           <div className="mt-8">
@@ -410,7 +544,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             aria-label="Close menu"
             className="bg-navy/40 absolute inset-0 backdrop-blur-[2px]"
           />
-          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col justify-between bg-white p-5 shadow-lift">
+          {/* Cloud, to match the permanent sidebar — it is the same nav, and
+              the hovers inside it are written for a cloud surface. */}
+          <div className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col justify-between bg-shell p-5 shadow-lift">
             <div>
               <div className="flex items-center justify-between">
                 <Wordmark className="text-[1.25rem]" />

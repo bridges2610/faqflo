@@ -28,6 +28,20 @@
   --color-navy: #0b1b3a;
   --color-slate: #475569;
   --color-cloud: #f6f8fc;
+  /*
+    The app chrome — the dashboard sidebar and its mobile drawer.
+
+    ⚠️ IT SITS BETWEEN WHITE AND CLOUD, AND THAT NARROW GAP IS THE WHOLE POINT.
+    The nav wanted to read as a very light grey rather than as a panel, but
+    `cloud` is also what <body> paints, so a cloud nav and the content beside it
+    were one flat surface. This is light enough to separate from cloud content
+    and grey enough to separate from the white report.
+
+    ⚠️ ANYTHING HOVERING ON THIS SURFACE GOES DARKER, TO CLOUD — NOT LIGHTER TO
+    WHITE. There is only ~1.5% luminance between this and #fff, so a white
+    hover is invisible; cloud is the nearest token with a delta you can see.
+  */
+  --color-shell: #fbfcfe;
   --color-tint-cyan: #ecfeff;
   --color-tint-blue: #eff6ff;
   --color-line: #e2e8f0;

@@ -38,6 +38,7 @@ export function ScoreDial({
   stroke,
   figure,
   reverse = false,
+  className = '',
 }: {
   /** 0–100. Drives the arc length whatever the caption says the unit is. */
   score: number;
@@ -74,16 +75,34 @@ export function ScoreDial({
    * runs primary → sky → accent, all of which clear 7.9:1 on navy.
    */
   reverse?: boolean;
+  /** Grid/flex placement from the caller. Layout only — never colours. */
+  className?: string;
 }) {
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   const filled = (Math.max(0, Math.min(100, score)) / 100) * circumference;
 
+  /*
+    ⚠️ NEITHER SIZE IS RESPONSIVE, AND 80px WAS TRIED AND MEASURED BACK OUT.
+
+    Shrinking `sm` to h-20 on phones looks obvious and does not work: the
+    caption is a fixed 10px mono line that is absolutely positioned OVER the
+    ring rather than laid out inside it, and "out of 100" measures 63px. At
+    96px the arc's clear inner span is ~77px and the caption sits inside it; at
+    80px that span drops to ~64px and the caption touches the stroke on both
+    sides, which reads as a rendering bug rather than as a smaller dial.
+
+    A smaller ring would therefore mean a smaller or absent caption, and a bare
+    "71" with no unit is the thing this component exists not to be. The 16px it
+    would have saved is not worth either trade — free-home's masthead got its
+    height back by putting the ring BESIDE the verdict instead of above it,
+    which costs no vertical space at all.
+  */
   const box = size === 'sm' ? 'h-24 w-24' : 'h-32 w-32';
   const figureSize = size === 'sm' ? 'text-[1.5rem]' : 'text-[2rem]';
 
   return (
-    <div className={`relative shrink-0 ${box}`}>
+    <div className={`relative shrink-0 ${box} ${className}`}>
       <svg viewBox="0 0 120 120" className="h-full w-full" aria-hidden="true">
         <defs>
           {/*
