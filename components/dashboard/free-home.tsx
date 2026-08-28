@@ -281,13 +281,19 @@ export function FreeHome() {
             small uppercase label and the conclusion was subordinate to it,
             which is backwards.
 
-            ⚠️ IT MATCHES THE MASTHEAD'S VERDICT AT sm+, RATHER THAN BEATING IT.
-            At 1.75rem it was the loudest thing on the page by a clear step.
-            These are two findings of the same kind — whether AI can read you,
-            and whether AI names you — so they read as peers at 1.5rem, with the
-            section chips a step below at 1.25rem. Three sizes, one scale.
+            ⚠️ ONE SIZE, NOT TWO, AND IT SITS BETWEEN THE OTHER TWO HEADINGS.
+            It was 1.5/1.75rem and read as a shout. The page now steps cleanly
+            down — masthead band 1.5rem, this 1.375rem, section chips 1.25rem —
+            with no tie at any width. Dropping the sm bump rather than the base
+            is what keeps that true on a phone: at 1.25rem this would have been
+            the same size as the chips below it, and a finding that measures the
+            same as a section label stops reading as a finding.
+
+            The masthead's label being the larger of the two is not an
+            inversion. It carries a solid navy card behind it; this one gets its
+            prominence from position and from being dark type on white.
           */}
-          <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight sm:text-[1.5rem]">
+          <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight">
             {namedCount === 0
               ? 'Right now, AI doesn’t recommend your business.'
               : namedCount === questionCount
