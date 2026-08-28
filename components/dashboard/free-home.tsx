@@ -101,6 +101,10 @@ export function FreeHome() {
 
   const proof = asked ? pickProof(tracking?.latest ?? []) : null;
 
+  /* Questions no engine named this business on. Spelled out at one, because
+     "The other 1 went to somebody else" reads as a placeholder. */
+  const missed = questionCount - namedCount;
+
   /* Both derived here rather than inside their components, so the sections that
      wrap them can be gated on whether there is anything to show. */
   const readability = report ? readabilityRows(report) : [];
@@ -163,7 +167,7 @@ export function FreeHome() {
         exchange for a word nobody needs. The goal is the same goal without it.
       */}
       <p className="text-slate text-[0.9375rem] leading-relaxed">
-        Welcome{firstName ? `, ${firstName}` : ''} — here&rsquo;s what AI can see about your
+        Welcome{firstName ? `, ${firstName}` : ''} 👋 — here&rsquo;s what AI can see about your
         business today.{' '}
         <span className="text-navy font-semibold">
           Our goal is simple: get you more customers.
@@ -270,24 +274,45 @@ export function FreeHome() {
         and false for one named on two prompts out of three.
       */}
       {asked && (
-        <section className="pt-3 pb-2">
-          {/* The page's one big statement, and the only h2 at this size. It
-              used to sit as an h3 INSIDE a section whose own h2 was 15px — the
-              outline said the heading was the small uppercase label and the
-              conclusion was subordinate to it, which is backwards. */}
-          <h2 className="text-navy text-[1.5rem] font-extrabold tracking-tight sm:text-[1.75rem]">
+        <section className="pt-8 pb-2">
+          {/*
+            The page's headline finding. It used to sit as an h3 INSIDE a
+            section whose own h2 was 15px — the outline said the heading was the
+            small uppercase label and the conclusion was subordinate to it,
+            which is backwards.
+
+            ⚠️ IT MATCHES THE MASTHEAD'S VERDICT AT sm+, RATHER THAN BEATING IT.
+            At 1.75rem it was the loudest thing on the page by a clear step.
+            These are two findings of the same kind — whether AI can read you,
+            and whether AI names you — so they read as peers at 1.5rem, with the
+            section chips a step below at 1.25rem. Three sizes, one scale.
+          */}
+          <h2 className="text-navy text-[1.375rem] font-extrabold tracking-tight sm:text-[1.5rem]">
             {namedCount === 0
               ? 'Right now, AI doesn’t recommend your business.'
               : namedCount === questionCount
                 ? 'AI names you on every question we asked.'
                 : `AI names you sometimes — on ${namedCount} of your ${questionCount} questions.`}
           </h2>
+          {/*
+            ⚠️ "SOMEBODY ELSE", AND NEVER "YOUR COMPETITOR". citedInstead is the
+            top source in the engine's own ranking that is not this domain, and
+            proof-card.tsx records what that turns out to be: "a lead-generation
+            directory at least as often as it is a rival business". Naming a
+            category we did not measure would be confidently wrong on a large
+            share of local-services accounts.
+
+            The middle branch used to be six words. It is the commonest result
+            there is, and it left the reader with the fact and nothing to do
+            with it — so it now says what "somebody else" usually means and
+            points at the table that names them.
+          */}
           <p className="text-slate mt-2.5 text-[1.0625rem] leading-relaxed">
             {namedCount === 0
               ? `We asked ${questionCount} questions a customer might ask. Your name came back on none of them.`
               : namedCount === questionCount
                 ? `All ${questionCount} of them. Worth keeping an eye on — answers change as the assistants re-read the web.`
-                : `The other ${questionCount - namedCount} went to somebody else.`}
+                : `The other ${missed === 1 ? 'one' : missed} went to somebody else. Often that’s a directory rather than a business like yours. The table below shows who, question by question.`}
           </p>
         </section>
       )}
