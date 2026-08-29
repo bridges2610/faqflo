@@ -8,6 +8,7 @@ import * as faqPlugins from '@/content/posts/why-faq-plugins-arent-a-good-idea.m
 import * as whatIsAeo from '@/content/posts/what-is-aeo.mdx';
 import * as aeoGeoGuide from '@/content/posts/simple-aeo-and-geo-guide-for-business-owners.mdx';
 import * as whyCareAboutAi from '@/content/posts/why-business-owners-should-care-about-ai.mdx';
+import * as vsPaidAds from '@/content/posts/why-ai-recommendations-are-better-than-paid-ads.mdx';
 
 /*
   The post registry.
@@ -61,6 +62,7 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  vsPaidAds,
   whyCareAboutAi,
   aeoGeoGuide,
   pickupTime,
