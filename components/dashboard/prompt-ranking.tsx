@@ -126,7 +126,7 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
       </ul>
 
       <div className="-mx-1 hidden overflow-x-auto px-1 sm:block">
-        <table className="w-full min-w-[34rem] border-collapse text-left">
+        <table className="w-full min-w-136 border-collapse text-left">
           <thead>
             {/*
               ⚠️ SENTENCE CASE AND NO MONO, WHICH BREAKS THE HOUSE <th> STYLE ON

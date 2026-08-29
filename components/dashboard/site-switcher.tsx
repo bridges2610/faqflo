@@ -65,7 +65,7 @@ export function SiteSwitcher() {
       <select
         value={site.id}
         onChange={(e) => selectSite(e.target.value)}
-        className="border-line text-navy focus:border-primary max-w-[12rem] truncate rounded-input border bg-white px-3 py-1.5 text-sm font-semibold outline-none transition-colors duration-150"
+        className="border-line text-navy focus:border-primary max-w-48 truncate rounded-input border bg-white px-3 py-1.5 text-sm font-semibold outline-none transition-colors duration-150"
       >
         {sites.map((s) => (
           <option key={s.id} value={s.id}>

@@ -70,7 +70,7 @@ export function NavAccountLink() {
     the space costs the same and says nothing.
   */
   const className =
-    'text-slate hover:text-primary inline-block min-w-[4.5rem] text-sm font-medium transition-colors duration-150';
+    'text-slate hover:text-primary inline-block min-w-18 text-sm font-medium transition-colors duration-150';
 
   if (state === 'unknown') {
     return <span className={className} aria-hidden="true" />;
