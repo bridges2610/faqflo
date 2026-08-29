@@ -115,6 +115,22 @@ export function TrashIcon({ className = '' }: IconProps) {
   );
 }
 
+/**
+ * Save a copy.
+ *
+ * ⚠️ ARROW INTO A TRAY, NOT A BARE ARROW-DOWN. ArrowDownIcon already exists and
+ * means "move this down" — it is the reorder control on answers and groups. A
+ * download that borrowed it would be the same glyph for two unrelated verbs on
+ * screens a customer moves between.
+ */
+export function DownloadIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <path d="M10 3v9M6.5 8.5 10 12l3.5-3.5M3.5 13.5v2a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-2" />
+    </svg>
+  );
+}
+
 export function ArrowUpIcon({ className = '' }: IconProps) {
   return (
     <svg {...BASE} className={className}>

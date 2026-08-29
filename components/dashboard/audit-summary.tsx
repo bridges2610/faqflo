@@ -200,7 +200,7 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
   });
 
   return (
-    <div className="print-report space-y-5">
+    <div className="print-report print-sections space-y-5">
       {/*
         Masthead, print only.
 
@@ -226,7 +226,7 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
 
       <div className="flex justify-end print:hidden">
         <Button size="sm" variant="ghost" onClick={() => window.print()}>
-          Print or save as PDF
+          Download PDF
         </Button>
       </div>
 

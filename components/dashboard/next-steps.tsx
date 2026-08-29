@@ -136,8 +136,17 @@ function StepRow({ item, index }: { item: ActionItem; index: number }) {
             Closed, every step reads as a plain sentence and a time estimate.
             That is the page a business owner should be able to finish.
           */}
+          {/* ⚠️ print:hidden, AND IT WOULD OTHERWISE PRINT BLANK ANYWAY.
+              Disclosure is a native <details>, and its own note says closed
+              content "is in the DOM but window.print() will not reveal it… No
+              caller of this is printable today. If one becomes printable, it
+              needs that component, not this one." The free report became
+              printable, so that note came due — and the answer is that a
+              JSON-LD blob is not something anyone acts on from paper. The step,
+              its timing and its instructions all still print; the code stays in
+              the dashboard, where the copy button works. */}
           {item.action.kind === 'copy' && (
-            <div className="mt-3">
+            <div className="mt-3 print:hidden">
               <Disclosure label="Show me the code">
                 <p className="text-slate text-sm leading-relaxed">{where}</p>
                 <pre className="border-line bg-cloud mt-2 overflow-auto rounded-lg border p-3">

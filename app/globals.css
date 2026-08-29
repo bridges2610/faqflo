@@ -295,9 +295,24 @@
     margin: 14mm 14mm 16mm;
   }
 
-  /* App chrome, and anything that can't be clicked on paper. */
+  /*
+    App chrome, and anything that can't be clicked on paper.
+
+    ⚠️ `header` USED TO BE IN THIS LIST AND HAD TO COME OUT. It was here to
+    strip the sticky top bar, but it is an element selector and the free
+    report's own masthead is a <header> — so the domain, the date, the score
+    and the verdict were all deleted from every printed copy, along with the
+    six print: overrides on that block whose comment calls them "not optional".
+    They had never run. The chrome header carries print:hidden explicitly now;
+    see components/dashboard/app-shell.tsx.
+
+    ⚠️ `button` IS IN IT, and that is what the comment above has always meant:
+    a control that cannot be pressed on paper is furniture. It covers the
+    re-run controls and the upgrade links inside the free report. Anything that
+    must survive printing needs to not be a <button>.
+  */
   aside,
-  header,
+  button,
   nextjs-portal,
   .print\:hidden {
     display: none !important;
@@ -331,7 +346,25 @@
     border-radius: 0 !important;
   }
 
-  .print-report > div {
+  /*
+    ⚠️ THE RULED-SECTION LAYOUT IS A SEPARATE CLASS, AND SPLITTING IT IS WHAT
+    LET A SECOND REPORT USE THIS STYLESHEET.
+
+    Everything above is generic: type sizes, break rules, flattened cards. What
+    follows is not — it keys off `> div` and off child POSITION, which is a
+    contract with one component's DOM. audit-summary.tsx satisfies it because
+    every child it renders is a Card, and a Card is a div.
+
+    free-home.tsx is a <p>, a <header> and several <section>s, and its first
+    child is a fixed backdrop div. Under `> div:first-child` that backdrop
+    would take the masthead treatment — and hiding it does not help, because
+    :first-child is structural and matches a display:none element just the same.
+
+    So a report that wants the ruled-section look opts into `.print-sections`
+    as well. One that only wants readable type on paper takes `.print-report`
+    alone. Do not merge these back together.
+  */
+  .print-sections > div {
     background: #fff !important;
     border: 0 !important;
     border-top: 1px solid #d1d5db !important;
@@ -343,7 +376,7 @@
   }
 
   /* The masthead: no rule above it, and it sets the tone for the document. */
-  .print-report > div:first-child {
+  .print-sections > div:first-child {
     border-top: 0 !important;
     padding-top: 0 !important;
     margin-top: 0 !important;
@@ -352,7 +385,7 @@
   }
 
   /* The verdict block leads, so it gets air and no rule of its own. */
-  .print-report > div:nth-child(2) {
+  .print-sections > div:nth-child(2) {
     border-top: 0 !important;
     margin-top: 4mm !important;
   }
@@ -365,6 +398,35 @@
     font-size: 12pt;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+  }
+
+  /*
+    ⚠️ AN EYEBROW IS NOT A TITLE, AND THE h1 RULE ABOVE ASSUMES IT IS. 20pt is
+    right for audit-summary's h1, which is the report's name. free-home's h1 is
+    the line above the score — domain, document, date — set at 11px on screen
+    and printing at 20pt, where it wrapped over two lines and became the loudest
+    thing on the sheet, above a verdict set smaller than it.
+
+    Small and quiet, the way it reads on screen. It is still the h1, so it is
+    still the document's title for anything reading structure rather than size.
+  */
+  .print-report h1.print-eyebrow {
+    font-size: 9pt;
+    letter-spacing: 0.04em;
+  }
+
+  /*
+    ⚠️ THE REPORT'S FINDING IS NOT A SECTION LABEL. The h2 rule above is 12pt
+    uppercase with wide tracking, which suits a heading that introduces a block.
+    free-home.tsx uses h2 for that AND for the one sentence the whole report
+    exists to deliver — "AI names you sometimes, on 3 of your 5 questions" —
+    which printed as small caps and read like a form field. A page that uses one
+    tag for two jobs has to name the exception.
+  */
+  .print-report h2.print-headline {
+    font-size: 15pt;
+    text-transform: none;
+    letter-spacing: -0.01em;
   }
 
   .print-report h3 {
@@ -395,6 +457,20 @@
   .print-report p {
     orphans: 2;
     widows: 2;
+  }
+
+  /*
+    ⚠️ THE HAND-PLACED TILT COMES OUT ON PAPER, AND A UTILITY CANNOT DO IT.
+    .tilt-a/.tilt-b set `transform`, while Tailwind v4's rotate-* utilities set
+    the separate `rotate` property — so `print:rotate-0` composes with the tilt
+    instead of cancelling it, and the chips printed still crooked. Undoing a
+    transform takes a transform.
+
+    On screen the angle reads as craft. On paper it reads as a scanning error.
+  */
+  .print-report .tilt-a,
+  .print-report .tilt-b {
+    transform: none !important;
   }
 
   /* Surfaces that exist to tint the screen just cost ink. */

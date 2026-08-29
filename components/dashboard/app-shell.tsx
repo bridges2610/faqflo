@@ -571,7 +571,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="border-line bg-cloud/85 sticky top-0 z-40 border-b backdrop-blur-md">
+        {/* ⚠️ print:hidden EXPLICITLY, BECAUSE THE BLANKET RULE THAT COVERED
+            THIS IS GONE. globals.css used to hide every <header> when printing;
+            it caught the free report's own masthead too and deleted the title
+            block from every printed copy. The rule is scoped to real chrome
+            now, which means chrome has to say so itself. */}
+        <header className="border-line bg-cloud/85 sticky top-0 z-40 border-b backdrop-blur-md print:hidden">
           <div className="flex h-16 items-center justify-between gap-3 px-4 sm:px-6">
             <div className="flex min-w-0 items-center gap-3">
               <button
@@ -600,7 +605,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ShellSkeleton />
             ) : (
               <>
-                <NextCheckNotice />
+                {/* ⚠️ The three notices are about what the app is doing right
+                    now — a run in flight, a scan queued, the next check due.
+                    None of that is true of a sheet of paper, and they sit above
+                    the report so they would print as a preamble to it. */}
+                <div className="print:hidden">
+                  <NextCheckNotice />
                 {/* Same slot, same argument as the countdown above: a run that
                     only reports on the page that started it is one you assume
                     died when you clicked away.
@@ -608,8 +618,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     Two notices, and their advice is deliberately contradictory:
                     tracking runs from the browser and needs the tab, the first
                     scan runs on the server and does not. See scan-notice.tsx. */}
-                <ScanNotice />
-                <RunNotice />
+                  <ScanNotice />
+                  <RunNotice />
+                </div>
                 {children}
               </>
             )}

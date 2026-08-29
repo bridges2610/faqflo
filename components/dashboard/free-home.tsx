@@ -1,6 +1,7 @@
 'use client';
 
 import { ScoreDial } from '@/components/ui/score-dial';
+import { DownloadIcon } from './nav-icons';
 import { scoreBand } from '@/lib/audit/score';
 import { PRO_PRICE } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
@@ -113,7 +114,7 @@ export function FreeHome() {
   const firstName = data.user.name.split(' ')[0] ?? '';
 
   return (
-    <article>
+    <article className="print-report">
       {/*
         A lighter page, for this route only.
 
@@ -166,7 +167,10 @@ export function FreeHome() {
         client, which is a hydration mismatch waiting for New Year's Eve, in
         exchange for a word nobody needs. The goal is the same goal without it.
       */}
-      <p className="text-slate text-[0.9375rem] leading-relaxed">
+      {/* ⚠️ print:hidden. A printed report opens with its masthead, not with
+          hello — and a greeting addressed to the reader is odd on a sheet they
+          may be handing to somebody else. */}
+      <p className="text-slate text-[0.9375rem] leading-relaxed print:hidden">
         Welcome{firstName ? `, ${firstName}` : ''} 👋 — here&rsquo;s what AI can see about your
         business today.{' '}
         <span className="text-navy font-semibold">
@@ -211,7 +215,7 @@ export function FreeHome() {
           grew. 24px of inset on each side of a 360px screen is 15% of the
           viewport spent on nothing, inside the block that was already the
           tallest thing on the page. */}
-      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-5 sm:p-7 print:bg-white print:shadow-none">
+      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-5 sm:p-7 print:mt-0 print:rounded-none print:bg-white print:p-0 print:shadow-none print:[&>*:after]:hidden">
         {/*
           ⚠️ THE WHOLE IDENTITY IS ONE SMALL LINE, AND THE h1 IS IT. "AI
           visibility report" was the biggest thing on the page and the least
@@ -224,17 +228,51 @@ export function FreeHome() {
           sets every h1 to weight 800 at -0.02em, which at 11px reads as a
           smudge. Same reason section-title.tsx exists.
         */}
-        <h1 className="text-accent relative font-mono text-[0.6875rem] font-normal tracking-wide uppercase print:text-slate">
-          {site.domain}
-          {/* ⚠️ formatPlainDate, not toLocaleDateString. The helper pins
-              timeZone: 'UTC' because "a date rendered in the browser's zone can
-              land on the previous day". Rendered only when there IS a report:
-              falling back to today would date a reading that does not exist. */}
-          <span className="text-white/60 print:text-slate">
-            {' · '}AI visibility report
-            {report?.checkedAt ? ` · ${formatPlainDate(report.checkedAt)}` : ''}
-          </span>
-        </h1>
+        <div className="relative flex items-start justify-between gap-4">
+          {/* ⚠️ print-eyebrow OPTS OUT OF THE 20pt h1 RULE. .print-report h1 is
+              sized for a report TITLE, which is what audit-summary's h1 is.
+              This one is an eyebrow — domain, document name, date — at 11px on
+              screen, and 20pt turned it into the loudest thing on the printed
+              page, wrapping across two lines above a quieter verdict. */}
+          <h1 className="print-eyebrow text-accent font-mono text-[0.6875rem] font-normal tracking-wide uppercase print:text-slate">
+            {site.domain}
+            {/* ⚠️ formatPlainDate, not toLocaleDateString. The helper pins
+                timeZone: 'UTC' because "a date rendered in the browser's zone can
+                land on the previous day". Rendered only when there IS a report:
+                falling back to today would date a reading that does not exist. */}
+            <span className="text-white/60 print:text-slate">
+              {' · '}AI visibility report
+              {report?.checkedAt ? ` · ${formatPlainDate(report.checkedAt)}` : ''}
+            </span>
+          </h1>
+
+          {/*
+            Save a copy, in the report's own header — a download belongs with
+            the document it saves, not beside the greeting above it.
+
+            ⚠️ window.print(), NOT A GENERATED FILE. Nothing here builds a PDF,
+            and the report's data is client-only: the provider loads it in an
+            effect after mount, so a server route would have nothing to render.
+            Printing the live DOM reuses what is already on screen, which is what
+            audit-summary.tsx does too.
+
+            ⚠️ ICON ONLY, SO THE LABEL HAS TO LIVE IN aria-label AND title. One
+            is for a screen reader, the other is the hover tooltip a sighted
+            reader needs to know what an unlabelled glyph does.
+
+            print:hidden is belt and braces — the print block strips every
+            <button> — but it says the intent at the call site.
+          */}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            aria-label="Download this report as a PDF"
+            title="Download PDF"
+            className="rounded-input shrink-0 p-2 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white print:hidden"
+          >
+            <DownloadIcon className="h-5 w-5" />
+          </button>
+        </div>
 
         {/*
           ⚠️ THE RING SITS WITH THE VERDICT BECAUSE THEY ARE ONE IDEA. It was
@@ -329,7 +367,13 @@ export function FreeHome() {
             inversion. It carries a solid navy card behind it; this one gets its
             prominence from position and from being dark type on white.
           */}
-          <h2 className="text-navy text-[1.125rem] font-extrabold tracking-tight sm:text-[1.375rem]">
+          {/* ⚠️ print-headline OPTS THIS OUT OF THE SECTION-HEADING TREATMENT.
+              .print-report h2 sets 12pt uppercase with wide tracking, which is
+              right for the section chips below and wrong for this: it is the
+              report's finding, not a label, and printing it as small caps
+              demoted the one sentence the whole page exists to say. This file
+              uses h2 for both jobs, so the exception has to be named. */}
+          <h2 className="print-headline text-navy text-[1.125rem] font-extrabold tracking-tight sm:text-[1.375rem]">
             {namedCount === 0
               ? 'Right now, AI doesn’t recommend your business.'
               : namedCount === questionCount
@@ -422,7 +466,10 @@ export function FreeHome() {
       {/* The one lock, stated as what it is. Wording matches
           publish-workspace's own upgrade card so the same feature is not
           described two ways. */}
-      <div className="mt-8">
+      {/* ⚠️ NOT ON PAPER. A printed report that ends in an advert reads as an
+          advert stapled to a document, and the reader has the dashboard if they
+          want the offer. On screen it stays exactly where it was. */}
+      <div className="mt-8 print:hidden">
         <UpgradeCard
           title="Ready-to-paste code for your website"
           /* ⚠️ llms.txt IS EXPLAINED IN THE SAME BREATH, not assumed. That is
@@ -528,7 +575,14 @@ function Section({
           corners never clip against neighbouring content". The lede's mt-3
           below clears the ~3px the rotation adds; tighten either and they
           touch. */}
-      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-3.5 py-2 text-[1rem] tracking-tight text-white sm:px-4 sm:py-2.5 sm:text-[1.25rem]">
+      {/* ⚠️ THE CHIP UNDOES ITSELF IN PRINT, AND THE ROTATION NEEDS ITS OWN
+          RESET. bg-primary is not in the print block's tint-stripping list — it
+          covers the soft tints, not the solid brand blue — so without this the
+          page prints five solid blue bars. And tilt-a is a `transform`, which a
+          background override does not touch: `print:rotate-0` is what flattens
+          it. What is left is a plain heading, which .print-report h2 then sets
+          in 12pt uppercase. */}
+      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-3.5 py-2 text-[1rem] tracking-tight text-white sm:px-4 sm:py-2.5 sm:text-[1.25rem] print:rounded-none print:bg-transparent print:px-0 print:py-0 print:text-navy">
         {title}
       </h2>
       {lede && <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{lede}</p>}

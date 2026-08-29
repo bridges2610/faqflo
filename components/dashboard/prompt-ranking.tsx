@@ -230,8 +230,13 @@ function RunControl({
 }) {
   const spent = runsLeft <= 0;
 
+  /* ⚠️ THE WHOLE CONTROL IS print:hidden, NOT JUST ITS BUTTON. Every branch
+     here is about what you can do next — run another check, how many are left,
+     what Pro would add — and none of it is true of a sheet of paper. The print
+     block strips <button> on its own, which would have left the sentences
+     beside a missing control and a rule with nothing under it. */
   return (
-    <div className="border-line mt-5 border-t pt-4">
+    <div className="border-line mt-5 border-t pt-4 print:hidden">
       {error && (
         <p role="alert" className="text-error-ink mb-3 text-sm">
           {error}
