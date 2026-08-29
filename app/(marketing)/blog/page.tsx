@@ -19,7 +19,7 @@ export default function Blog() {
         {/*
           ⚠️ THE FREE REPORT'S CHIP, IN THE REPORT'S OWN MASTHEAD COLOUR. The
           shape is free-home.tsx's <Section> h2 — the wordmark's 10px radius,
-          tilt-a, white type — but filled with bg-navy rather than that chip's
+          the tilt, white type — but filled with bg-navy rather than that chip's
           bg-primary, which is the same navy free-home's masthead uses. So the
           archive reads as the same product as the report it is selling.
 
@@ -35,11 +35,24 @@ export default function Blog() {
           2.5rem this headline sits on one line inside max-w-184 with room to
           spare — 2.75rem overflows it and wraps. Measure before lengthening.
 
-          Below sm it does wrap to two lines and the chip does fill the column.
-          That is accepted here and nowhere else: at 28px this is the page's
-          masthead rather than one of five section markers down a report, so a
-          filled block reads as deliberate. Anything longer than this title
-          makes it three lines, which does not.
+          ⚠️ AND BELOW sm IT CANNOT HUG, SO THE TILT COMES OFF. text-balance
+          evens the two lines but does not shrink the box: an inline-block that
+          has to wrap takes the full available width, measured at 100.4% of the
+          column at every size from 1.25rem up. So on a phone this is a band,
+          not a chip — and a band the exact width of the column has no room to
+          rotate. tilt-a swung the corners past both gutters (281.6px inside a
+          280px column at 320px wide), which is the clipping free-home.tsx's
+          chip comment says the padding exists to prevent. Craft at 600px reads
+          as a printing error at 280px.
+
+          The tilt is therefore sm-and-up, and it is written as
+          `sm:rotate-[-1.1deg]` rather than tilt-a because that utility is a
+          plain class in a layer, not an `@utility` — `sm:tilt-a` would generate
+          nothing. Same -1.1° from the same comment, via v4's `rotate` property.
+
+          1.5rem rather than 1.75rem for the same reason: once it is a band, the
+          only thing left to tune is how much of the phone it eats. 77px tall
+          instead of 91px.
         */}
         {/* ⚠️ THE WRAPPER IS NOT DECORATION. An inline-block h1 joins the
             inline flow of whatever precedes it — without this div the chip sat
@@ -47,7 +60,7 @@ export default function Blog() {
             correct on mobile because there was no room for both. The block box
             is what puts the headline back on a line of its own. */}
         <div className="mt-5">
-          <h1 className="bg-navy tilt-a inline-block rounded-[10px] px-4 py-2.5 text-[1.75rem] tracking-tight text-balance text-white sm:px-6 sm:py-3 sm:text-[2.5rem]">
+          <h1 className="bg-navy inline-block rounded-[10px] px-4 py-2.5 text-[1.5rem] tracking-tight text-balance text-white sm:rotate-[-1.1deg] sm:px-6 sm:py-3 sm:text-[2.5rem]">
             Insights to Get You Listed in AI
           </h1>
         </div>
