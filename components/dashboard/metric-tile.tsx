@@ -32,7 +32,21 @@ export function MetricTile({
   status,
   progress,
 }: {
-  /** Mono micro-label. Short — this is a column heading, not a sentence. */
+  /**
+   * The label above the figure. Short — this is a column heading, not a
+   * sentence.
+   *
+   * ⚠️ SENTENCE CASE, NOT THE MONO SMALL-CAPS IT WAS. `font-mono uppercase
+   * tracking-wide` is the house micro-label, and it is right on things that
+   * ARE machine output — a status column, a code block's caption. These tiles
+   * are the headline figures a business owner reads first, and small-caps mono
+   * made "LINKED TO YOU" look like a system field rather than a sentence about
+   * their business. Written as a normal label, it reads as one.
+   *
+   * Three screens carry these tiles — Results, Home and Opportunities — and the
+   * objection applied equally to all three, which is why this changed in the
+   * component rather than behind a prop.
+   */
   label: string;
   value: string | number;
   footer?: string;
@@ -86,7 +100,7 @@ export function MetricTile({
             {icon}
           </span>
         )}
-        <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">{label}</p>
+        <p className="text-slate text-xs font-semibold">{label}</p>
       </div>
 
       <div className="mt-2.5 flex items-end justify-between gap-3">

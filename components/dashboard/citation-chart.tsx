@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { EngineMark } from '@/components/ui/ai-marks';
 import { Card } from '@/components/ui/card';
 import { ENGINES, type CitationDay, type Engine } from '@/lib/dashboard/types';
+import { ChartIcon } from './nav-icons';
 import { SectionTitle } from './section-title';
 
 /*
@@ -163,9 +164,11 @@ export function CitationChart({
     <Card className="p-5 sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <SectionTitle>Citations over time</SectionTitle>
+          <SectionTitle icon={<ChartIcon className="h-4 w-4" />} tint="bg-primary-soft text-primary">
+            Is it getting better?
+          </SectionTitle>
           <p className="text-slate mt-1 text-sm">
-            Questions where your domain was named as a source, per engine, {span}.
+            How many questions each AI linked you on, {span}.
           </p>
         </div>
         <button

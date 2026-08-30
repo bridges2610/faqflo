@@ -71,6 +71,22 @@ const OWNS: Record<string, string[]> = {
 };
 
 /** Home owns the exact path; the rest own their subtree, plus anything above. */
+/**
+ * Routes that drop the 64rem reading measure and use the whole window.
+ *
+ * ⚠️ max-w-5xl IS THE DEFAULT FOR A REASON — it is a reading measure. Every
+ * screen here is mostly prose and cards of prose, and a paragraph run to 1900px
+ * on a wide monitor is genuinely harder to read than the same paragraph at
+ * 1024. So this is an opt-in list of the screens that are a WIDE GRID rather
+ * than a column of text, not a setting anyone should flip on by default.
+ *
+ * Results qualifies: its evidence section is a matrix of prompts against every
+ * engine, and the extra width is what stops that table needing a scroll box.
+ * Matched exactly, so /dashboard/tracking widens and any child route does not
+ * inherit it by accident.
+ */
+const WIDE = new Set(['/dashboard/tracking']);
+
 function isActive(pathname: string, href: string): boolean {
   if (href === '/dashboard') return pathname === href;
   if (pathname.startsWith(href)) return true;
@@ -351,7 +367,7 @@ function NextCheckNotice() {
   const today = due.getTime() <= Date.now();
 
   return (
-    <div className="border-line bg-cloud mb-6 rounded-xl border p-4">
+    <div className="border-line bg-cloud mb-3 rounded-xl border p-3.5">
       <p className="text-navy text-sm font-semibold">
         {today
           ? `Next check for ${site.name} runs tonight`
@@ -597,8 +613,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 px-4 py-8 sm:px-6 sm:py-10">
-          <div className="mx-auto max-w-5xl">
+        {/* ⚠️ THE SIDE PADDING GREW WITH THE WIDE ROUTES. At max-w-5xl the
+            content was centred with slack either side, so px-6 was plenty. A
+            full-width page has no slack — its cards run to whatever the window
+            is — and 24px of air between a card edge and the browser edge reads
+            as broken rather than roomy. lg:px-10 is for the widths where that
+            actually bites. */}
+        <main className="min-w-0 flex-1 px-6 py-8 sm:px-10 sm:py-10 lg:px-16">
+          <div className={`mx-auto ${WIDE.has(pathname) ? '' : 'max-w-5xl'}`}>
             {loadError ? (
               <LoadFailed message={loadError} onRetry={retryLoad} />
             ) : loading ? (

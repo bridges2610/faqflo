@@ -26,7 +26,7 @@ import type { DashboardData, FaqGroup, Site, SiteTracking, User } from './types'
 const LOCKED: Finding = {
   id: 'cited',
   pillar: 'visibility',
-  label: 'Cited in AI answers today',
+  label: 'AI linking to your site',
   status: 'locked',
   detail:
     'Asking ChatGPT, Perplexity and Gemini what they say about you costs money per question, so it runs from the Results page rather than on every audit.',
@@ -74,39 +74,41 @@ export function visibilityFindings(
     {
       id: 'cited',
       pillar: 'visibility',
-      label: 'Cited in AI answers',
+      label: 'AI linking to your site',
       status: rate >= 0.4 ? 'pass' : rate > 0 ? 'warn' : 'fail',
       detail:
         cited > 0
-          ? `Your domain was named as a source in ${cited} of the ${checks.length} answers we checked.`
-          : `None of the ${checks.length} answers we checked named your domain. Someone else was cited instead.`,
+          ? `AI pointed people at your website in ${cited} of the ${checks.length} answers we checked.`
+          : `In all ${checks.length} answers we checked, AI sent people to somebody else's website instead of yours.`,
       weight: 3,
-      evidence: [`${cited} cited · ${mentioned} named without a link · ${checks.length} checked`],
+      evidence: [
+        `${cited} linked to you · ${mentioned} named you without a link · ${checks.length} answers checked`,
+      ],
     },
     {
       id: 'engine-spread',
       pillar: 'visibility',
-      label: 'Cited by more than one engine',
+      label: 'More than one AI naming you',
       status: engines.length >= 2 ? 'pass' : engines.length === 1 ? 'warn' : 'fail',
       detail:
         engines.length >= 2
-          ? `Cited by ${engines.join(' and ')}. Breadth matters — each engine reads and ranks differently.`
+          ? `${engines.join(' and ')} both link to you. That matters — each one reads the web differently, so customers on one are not the customers on the other.`
           : engines.length === 1
-            ? `Only ${engines[0]} is citing you so far. That is a start, not a spread.`
-            : 'No engine is citing you yet.',
+            ? `Only ${engines[0]} links to you so far. That is a start, not a spread.`
+            : 'No AI is linking to you yet.',
       weight: 2,
     },
     {
       id: 'share-of-voice',
       pillar: 'visibility',
-      label: 'Share of the answers',
+      label: 'Your share of the answers',
       status: share >= 0.4 ? 'pass' : share > 0 ? 'warn' : 'fail',
       detail:
         total === 0
-          ? 'No citations recorded yet for anyone on your questions.'
-          : `You hold ${Math.round(share * 100)}% of the citations across your questions; the rest go to ${
+          ? 'AI has not linked to anyone yet on your questions.'
+          : `${Math.round(share * 100)}% of the websites AI used to answer your questions were yours. The rest went to ${
               tracking.competitors.filter((c) => !c.isYou).length
-            } other domains.`,
+            } other sites.`,
       weight: 2,
       evidence: tracking.competitors
         .slice(0, 4)

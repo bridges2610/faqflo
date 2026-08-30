@@ -6,29 +6,39 @@ import { EngineMark } from '@/components/ui/ai-marks';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Disclosure } from '@/components/ui/disclosure';
+import { ScoreDial } from '@/components/ui/score-dial';
+import { StatusIcon, STATUS_WORD } from '@/components/ui/status-icon';
 import { pillarBand, scoreOf } from '@/lib/audit/score';
+import type { CheckStatus } from '@/lib/audit/types';
 import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
 import { canRunCheckNow, isPro, trackingPlanFor } from '@/lib/dashboard/plans';
 import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
+import { ENGINES, type SiteTracking } from '@/lib/dashboard/types';
 import {
-  ENGINES,
-  MAX_EXCERPT_CHARS,
-  type CitationCheck,
-  type Engine,
-  type SiteTracking,
-} from '@/lib/dashboard/types';
-import { groupByQuestion, type QuestionGroup } from '@/lib/dashboard/questions';
-import { AnswerText } from './answer-text';
+  checksByEngine,
+  groupByQuestion,
+  insteadFor,
+  sortByCitations,
+  type QuestionGroup,
+} from '@/lib/dashboard/questions';
 import { CitationChart } from './citation-chart';
 import { DraftIntoGroup } from './draft-into-group';
+import {
+  EngineDetailList,
+  EnginePill,
+  OutcomeBar,
+  OutcomeLegend,
+  type OutcomeSplit,
+} from './engine-detail';
+import { PromptMatrix } from './prompt-matrix';
 import { EmptyState } from './empty-state';
-import { MetricTile } from './metric-tile';
 import { Meter } from './meter';
 import { RunProgress } from './run-progress';
 import { countryLabel } from './search-country';
-import { AeoIcon, ChartIcon, ChevronIcon, GlobeIcon, SearchIcon } from './nav-icons';
+import { AeoIcon, ChevronIcon, DocIcon, FaqIcon, GlobeIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
 import { SectionTitle } from './section-title';
@@ -44,34 +54,6 @@ import { SectionTitle } from './section-title';
      buys a finite number of them — a customer who runs out should find out from
      the UI, not from results quietly going stale.
 */
-
-/**
- * A source URL as it should be read: host and path, no query string.
- *
- * Keeps the host, unlike prettyUrl below — a source list names other people's
- * sites, so the domain is the most important part of the line.
- */
-function displayUrl(url: string): string {
-  try {
-    const parsed = new URL(url);
-    const path = parsed.pathname.replace(/\/$/, '');
-    return `${parsed.hostname.replace(/^www\./, '')}${path}`;
-  } catch {
-    return url;
-  }
-}
-
-/**
- * Does this excerpt end mid-thought?
- *
- * A cheap heuristic, and deliberately so: it decides whether to print a caveat,
- * never what the data means. Answers stored before the word-boundary cut landed
- * simply stop at 600 characters, and there is no flag on the row to consult.
- */
-function looksTruncated(excerpt: string): boolean {
-  const end = excerpt.trimEnd().slice(-1);
-  return excerpt.length >= MAX_EXCERPT_CHARS - 1 && !'.!?"”)'.includes(end);
-}
 
 /**
  * A cited URL, shortened to the part that identifies the page.
@@ -107,14 +89,11 @@ function prettyUrl(url: string): string {
  * was previously spread across three rows a customer had to hunt for.
  */
 function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.ReactNode }) {
-  const byEngine = ENGINES.map((engine) => ({
-    engine,
-    check: group.checks.find((c) => c.engine === engine) ?? null,
-  }));
+  const byEngine = checksByEngine(group);
 
   // Who took the click, from the first engine that named someone else. One
   // rival stands for the group; the per-engine detail is in the expansion.
-  const instead = group.checks.find((c) => c.outcome !== 'cited' && c.citedInstead)?.citedInstead;
+  const instead = insteadFor(group);
 
   return (
     <li className="py-4">
@@ -149,7 +128,7 @@ function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.R
                 {instead && (
                   <>
                     {' '}
-                    · cited <span className="font-mono">{instead}</span> instead
+                    · AI sent people to <span className="text-navy font-medium">{instead}</span>
                   </>
                 )}
               </p>
@@ -159,142 +138,11 @@ function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.R
           </div>
         </summary>
 
-        <div className="divide-line mt-3 divide-y">
-          {byEngine.map(({ engine, check }) => (
-            <div key={engine} className="py-3 first:pt-0">
-              <div className="flex flex-wrap items-center gap-2">
-                {/* The engine is named once here; the chip carries only the
-                    verdict. The summary pill has to say both because it stands
-                    alone.
-
-                    The mark is smaller than the one on the "By engine" card
-                    because this sits two levels in — inside an expanded
-                    question, under a row of pills that carry no mark at all.
-                    Matching the card's size here would make the deeper thing
-                    look louder than the summary above it. */}
-                <p className="text-navy flex items-center gap-1.5 text-xs font-semibold">
-                  <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
-                  {engine}
-                </p>
-                <OutcomeChip check={check} />
-                {check && check.sources.length > 0 && (
-                  <p className="text-slate text-xs">
-                    {check.sources.length} {check.sources.length === 1 ? 'source' : 'sources'}
-                  </p>
-                )}
-                {check && check.outcome !== 'cited' && check.citedInstead && (
-                  <p className="text-slate text-xs">
-                    cited <span className="font-mono">{check.citedInstead}</span> instead
-                  </p>
-                )}
-              </div>
-
-              {!check ? (
-                /* ⚠️ A gap, not a zero. An engine can fail on its own — a 429
-                   during the run — and rendering "absent" here would claim a
-                   measurement we never took. */
-                <p className="text-slate mt-1.5 text-sm italic">
-                  Not checked on this engine yet.
-                </p>
-              ) : check.excerpt ? (
-                <div className="border-line mt-1.5 border-l-2 pl-3">
-                  <AnswerText text={check.excerpt} />
-                  {looksTruncated(check.excerpt) && (
-                    <p className="text-slate/70 mt-1.5 text-xs">
-                      Excerpt — we store the first {MAX_EXCERPT_CHARS} characters of each answer.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <p className="text-slate mt-1.5 text-sm italic">
-                  No answer text was stored for this check.
-                </p>
-              )}
-
-              {check && check.sources.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {check.sources.map((url) => (
-                    <li key={url} className="min-w-0 truncate">
-                      {/* Display is cleaned; the href is the stored URL,
-                          untouched. `?utm_source=openai` is the engine tagging
-                          its own referral and makes two links to one page look
-                          like two — but the source list is evidence, so what we
-                          LINK to stays exactly what was recorded. */}
-                      <a
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-slate hover:text-primary font-mono text-xs"
-                      >
-                        {displayUrl(url)}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+        <div className="mt-3">
+          <EngineDetailList group={group} />
         </div>
       </details>
     </li>
-  );
-}
-
-/**
- * The outcome words and their tints, shared by the pill and the chip.
- *
- * ⚠️ THE WORD IS NOT DECORATION. Colour alone must never carry this: `cited`
- * and `absent` are separated by a tint some readers cannot distinguish, and it
- * is the figure the customer acts on. The tint is a second encoding of a label
- * that is already readable — the same rule components/dashboard/meter.tsx
- * states for its bars.
- */
-const OUTCOME_STYLE: Record<CitationCheck['outcome'], { label: string; className: string }> = {
-  cited: { label: 'cited', className: 'bg-success/12 text-success-ink' },
-  mentioned: { label: 'named', className: 'bg-accent-soft text-navy' },
-  absent: { label: 'absent', className: 'text-slate border-line border bg-white' },
-};
-
-/** Not an outcome — the absence of one. Kept visually quieter than any verdict. */
-const NOT_CHECKED = { label: 'not checked', className: 'text-slate/80 border-line border bg-white' };
-
-/**
- * One engine's verdict on one question, at a glance.
- *
- * ⚠️ ITS OWN COMPONENT RATHER THAN A SMALLER <Badge>. Badge hardcodes
- * `px-3 py-1 text-[0.8125rem]` and emits its tone classes BEFORE `className`,
- * so passing `px-2 text-xs` would not reliably win — conflicting Tailwind
- * utilities resolve by their order in the generated stylesheet, not by their
- * order in the class attribute. A pill that is smaller only sometimes is worse
- * than one that owns its own size, and shrinking Badge would shrink it on every
- * other screen too.
- *
- * Three of these sit under every question, so they are deliberately quiet: the
- * question is what you read, these are what you scan.
- */
-function EnginePill({ engine, check }: { engine: Engine; check: CitationCheck | null }) {
-  const { label, className } = check ? OUTCOME_STYLE[check.outcome] : NOT_CHECKED;
-
-  return (
-    <span
-      className={`rounded-pill inline-flex items-center gap-1 px-2 py-0.5 text-[0.6875rem] leading-none font-medium ${className}`}
-    >
-      <span className="font-semibold">{engine}</span>
-      {label}
-    </span>
-  );
-}
-
-/** The same verdict, inside an open row where the engine is already named. */
-function OutcomeChip({ check }: { check: CitationCheck | null }) {
-  const { label, className } = check ? OUTCOME_STYLE[check.outcome] : NOT_CHECKED;
-
-  return (
-    <span
-      className={`rounded-pill inline-flex items-center px-2 py-0.5 text-[0.6875rem] leading-none font-medium ${className}`}
-    >
-      {label}
-    </span>
   );
 }
 
@@ -302,13 +150,15 @@ type OutcomeFilter = 'all' | 'cited' | 'mentioned' | 'absent';
 
 const FILTERS: { id: OutcomeFilter; label: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'cited', label: 'Cited' },
-  { id: 'mentioned', label: 'Named' },
-  { id: 'absent', label: 'Absent' },
+  /* The same four words the cells use — a filter labelled differently from the
+     thing it filters is a puzzle. See OUTCOME_STYLE in engine-detail.tsx. */
+  { id: 'cited', label: 'Linked' },
+  { id: 'mentioned', label: 'Named only' },
+  { id: 'absent', label: 'Not named' },
 ];
 
 /** Rows per page. Forty answers at once is a data dump, not a report. */
-const PAGE = 12;
+const PAGE = 10;
 
 /**
  * A change since the last run, or nothing at all.
@@ -316,12 +166,17 @@ const PAGE = 12;
  * ⚠️ NOTHING, not "0%" and not "—". A placeholder in the shape of a statistic
  * gets read as one; an absent delta reads as "no trend yet", which is the true
  * state of a site that has run checks once.
+ *
+ * ⚠️ NO LEADING " · ". It returned one while this was appended to a footer
+ * sentence; it now stands alone under a figure, where a separator with nothing
+ * before it is just a stray dot. One caller, so the function changed rather
+ * than the call site.
  */
 function deltaLabel(delta: number | null): string {
   if (delta === null) return '';
   const rounded = Math.round(delta);
-  if (rounded === 0) return ' · no change since the last run';
-  return ` · ${rounded > 0 ? '+' : ''}${rounded}% since the last run`;
+  if (rounded === 0) return 'No change since the last run';
+  return `${rounded > 0 ? '+' : ''}${rounded}% since the last run`;
 }
 
 /**
@@ -623,7 +478,6 @@ export function TrackingWorkspace() {
     tool's needs to know which one they are holding.
   */
   const mentions = cited + mentioned;
-  const visibilityRate = latest.length ? (mentions / latest.length) * 100 : 0;
 
   /*
     Share of voice: our source appearances against every source appearance.
@@ -653,6 +507,7 @@ export function TrackingWorkspace() {
   const appearances = tracking?.sourceAppearances ?? { ours: 0, total: 0 };
   const shareOfVoice = appearances.total ? (appearances.ours / appearances.total) * 100 : 0;
 
+
   /*
     Change since the previous run-day.
 
@@ -675,14 +530,86 @@ export function TrackingWorkspace() {
   };
 
   const citedDelta = latestDay && previousDay ? deltaOf(latestDay.cited, previousDay.cited) : null;
-  const mentionsDelta =
-    latestDay && previousDay
-      ? deltaOf(latestDay.cited + latestDay.mentioned, previousDay.cited + previousDay.mentioned)
-      : null;
 
   const competitors = tracking?.competitors ?? [];
   const citedPages = tracking?.citedPages ?? [];
   const byEngine = tracking?.byEngine ?? [];
+  /*
+    The three rows of the score card, as figures rather than sentences.
+
+    ⚠️ STATUS FROM THE FINDING, FIGURE FROM THE DATA, AND NEITHER IS RESTATED.
+    `visibility` is what scoreOf() weighs, so taking each row's status from it
+    is what stops the icons and the number disagreeing — a green tick beside a
+    score of 31 is the kind of thing nobody reports and everybody stops
+    trusting. The figures are counted here from the same `tracking` those
+    findings counted, so there is no second source and no prose to keep in step.
+
+    ⚠️ EVERY ROW IS A RATIO, WHICH IS WHY EVERY ROW MAY HAVE A BAR. meter.tsx
+    only permits one where the proportion is already readable beside it. "3 of
+    14" and "25%" both print their own halves; a bare count would not, and a bar
+    under one would invent a ceiling nobody set.
+  */
+  const statusOf = (id: string): CheckStatus =>
+    visibility.find((f) => f.id === id)?.status ?? 'na';
+
+
+  const enginesNaming = byEngine.filter((e) => e.cited + e.mentioned > 0).length;
+
+  /*
+    Every answer, split three ways.
+
+    ⚠️ EXHAUSTIVE BY CONSTRUCTION, NOT BY ARITHMETIC. CitationCheck['outcome']
+    is 'cited' | 'mentioned' | 'absent' and these three counts are filtered from
+    the same array, so they sum to latest.length without anything here having to
+    subtract. The old "Left you out" tile was `absent` printed as if it were an
+    independent measurement; it is the remainder, and a bar is the honest way to
+    show a remainder.
+  */
+  const split: OutcomeSplit[] = [
+    { outcome: 'cited', count: cited, note: deltaLabel(citedDelta) },
+    { outcome: 'mentioned', count: mentioned },
+    { outcome: 'absent', count: absent },
+  ];
+
+  /*
+    ⚠️ THE `cited` FINDING IS NOT LISTED HERE ANY MORE, AND IT HAS NOT BEEN
+    DROPPED — it is the bar. "15 of 81 answers linked to you" was a row here AND
+    a tile below AND, as its own complement, a second tile reading "left you
+    out: 66". Those are one number split three ways, so they are now one split
+    bar. What is left in this list is the two facts that are genuinely separate
+    from that split: how many AI tools name you at all, and how much of the
+    source pool is yours.
+
+    `statusOf('cited')` still feeds the score through visibilityFindings; it is
+    only its ROW that went.
+  */
+  /*
+    ⚠️ ONE SENTENCE EACH, NOT A LABEL WITH ITS NUMBER PUSHED TO THE FAR RIGHT.
+    "Websites AI used that are yours ........................ 3%" makes the
+    reader carry a label across the card to meet its figure. A sentence carries
+    both at once, and these two are supporting facts — the split above is what
+    the card is for.
+
+    They also lost their Meters. meter.tsx PERMITS a bar where the value prints
+    both halves; it does not require one. Two bars down here competed with the
+    one bar that is the point of the card, which is what made this read as two
+    designs stacked.
+  */
+  const headline = [
+    {
+      id: 'engine-spread',
+      sentence:
+        enginesNaming === ENGINES.length
+          ? `All ${ENGINES.length} AI tools name you`
+          : `${enginesNaming} of ${ENGINES.length} AI tools name you`,
+      status: statusOf('engine-spread'),
+    },
+    {
+      id: 'share-of-voice',
+      sentence: `${shareOfVoice.toFixed(0)}% of the websites AI used are yours`,
+      status: statusOf('share-of-voice'),
+    },
+  ];
 
   /*
     The ranking, trimmed to a readable length.
@@ -693,7 +620,7 @@ export function TrackingWorkspace() {
     omit the reader is worse than no board, and "you: 47th" is precisely the
     fact they came for.
   */
-  const SHARE_ROWS = 12;
+  const SHARE_ROWS = 10;
   const ranked = competitors.map((c, i) => ({ ...c, rank: i + 1 }));
   const shareRows = ranked.slice(0, SHARE_ROWS);
   const you = ranked.find((c) => c.isYou);
@@ -718,10 +645,14 @@ export function TrackingWorkspace() {
 
   /*
     Chips carry BOTH units, because the row and the tile above count different
-    things and both are true: one engine citing you on a question the other two
-    missed is one check and one question, while two engines citing the same
-    question is two checks and one question. Printing one number and letting the
-    reader assume the other is how "these don't add up" starts.
+    things and both are true: one AI linking to you on a question the other two
+    missed is one answer and one question, while two AIs linking on the same
+    question is two answers and one question. Printing one number and letting
+    the reader assume the other is how "these don't add up" starts.
+
+    Questions lead, answers follow. A customer thinks in questions — they are
+    what gets watched and what the plan is sold in — so the answer count is the
+    supporting detail rather than the headline.
   */
   const countFor = (id: OutcomeFilter) => {
     const checks = id === 'all' ? latest : latest.filter((c) => c.outcome === id);
@@ -736,15 +667,44 @@ export function TrackingWorkspace() {
     grouping exists to provide — "cited by Perplexity, absent on ChatGPT" is one
     finding, and you cannot see it if the filter removes half of it.
   */
-  const filtered =
-    filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter));
+  /* ⚠️ SORTED AFTER FILTERING, AND BOTH LAYOUTS GET THE SAME ARRAY. Best
+     results lead — most citations, then most mentions — so the top of the table
+     is the proof the subscription bought. Pagination slices this, so "Show 12
+     more" reveals progressively weaker rows rather than an arbitrary tail. */
+  const filtered = sortByCitations(
+    filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter)),
+  );
   const visible = filtered.slice(0, shown);
+
+  /*
+    The loop closing: see you weren't cited, write the answer, the question
+    stops being open.
+
+    ONE button per question, not one per engine. The draft answers the question,
+    not the engine — three identical buttons on one question was always wrong,
+    and grouping is what made it obvious. Offered whenever any engine failed to
+    cite you, since that is the gap the answer would close.
+
+    It is a function rather than JSX because both layouts below need their own
+    instance of it per row, and the two must offer the identical button.
+  */
+  const draftAction = (group: QuestionGroup) =>
+    group.checks.some((c) => c.outcome !== 'cited') ? (
+      <DraftIntoGroup
+        question={group.question}
+        onDrafted={async () => {
+          const match = questions.find((q) => q.question === group.question);
+          if (match) await coverQuestion(match.id);
+        }}
+      />
+    ) : undefined;
   // The bar tracks prompts — the thing bought — not the checks they cost.
   const usedPct = tracking ? (tracking.promptsTracked / tracking.promptCap) * 100 : 0;
 
   return (
     <>
       <PageHeader
+        className="mb-3"
         title="Results"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
         /* This route is Pro-only, so canRunNow is always true here now — see
@@ -768,38 +728,52 @@ export function TrackingWorkspace() {
         }
       />
 
-      {/* ⚠️ Stated in the open, not in a footnote.
+      {/* ⚠️ COLLAPSED, NOT CUT, AND THE DISTINCTION MATTERS.
 
           We query each vendor's API — the OpenAI API with web search, Gemini
           with Google Search grounding — not chatgpt.com or gemini.google.com.
           Different system prompt, different retrieval, no personalisation. It
           is the closest honest proxy that can be measured, and calling it "what
           ChatGPT told your customer" would be exactly the overclaim this
-          product stripped out of its own pricing page. */}
-      <p className="text-slate mb-5 text-sm leading-relaxed">
-        We ask each engine&rsquo;s API directly, so these are the answers a machine gets rather than
-        a recording of anyone&rsquo;s chat window. Close to what a customer would see, not identical
-        to it.{' '}
-        {/* ⚠️ The country belongs in the same breath as "how we asked", not in
-            a settings screen the customer has already left. Results asked from
-            the US and from the UK are different measurements — see the country
-            column on citation_checks and the note on audit_runs.depth. */}
-        {site.country ? (
-          <>
-            Asked as someone in{' '}
-            <span className="text-navy font-medium">{countryLabel(site.country)}</span> — except
-            Gemini, which can&rsquo;t be given a location.
-          </>
-        ) : (
-          <>
-            No country is set, so each engine answers from wherever it defaults to.{' '}
+          product stripped out of its own pricing page. So it is still said, in
+          full, in the reader's own words — it just no longer costs 76 words at
+          the top of the page before a single result.
+
+          ⚠️ The country stays inside it. Results asked from the US and from the
+          UK are different measurements — see the country column on
+          citation_checks — so it belongs with "how we asked", not in a settings
+          screen. The no-country branch is the exception and stays OUTSIDE the
+          disclosure below: it is not a caveat, it is a thing to go and fix. */}
+      {/* ⚠️ ONE BLOCK, ONE MARGIN. These are one idea — how we asked — and they
+          each carried their own mb-5, which with the header's mb-8 and the
+          notice's mb-6 above them stacked to 289px of gap before the first
+          number on the page. Measured, not estimated. */}
+      <div className="mb-5 space-y-2">
+        <Disclosure label="How we check">
+          <p className="text-slate text-sm leading-relaxed">
+            We ask each AI the same questions a customer would. We save what it says.
+          {site.country ? (
+            <>
+              {' '}
+              We ask as someone in{' '}
+              <span className="text-navy font-medium">{countryLabel(site.country)}</span>. Gemini
+              is the exception. It cannot be given a location.
+            </>
+          ) : null}{' '}
+          The answers are very close to what a customer sees. They are not word for word.
+        </p>
+        </Disclosure>
+
+        {!site.country && (
+          <p className="text-slate text-sm leading-relaxed">
+            No country is set, so each AI answers from wherever it defaults to.{' '}
             <Link href="/dashboard/sites" className="text-primary hover:text-primary-hover">
               Set your market
             </Link>{' '}
-            to see what your customers would be told.
-          </>
+            to see what your customers are told.
+          </p>
         )}
-      </p>
+      </div>
 
       {(run.error || run.notes.length > 0 || run.unreadable || runningHere) && (
         <div className="mb-5">
@@ -825,98 +799,85 @@ export function TrackingWorkspace() {
       {/* The score, with its own reasoning attached.
 
           A number on its own invites the question "based on what?" and answers
-          nothing. These three findings ARE the score — same weights, same
-          arithmetic — so the card explains itself rather than asking for
-          trust. */}
+          nothing. These three rows ARE the score — same findings, same weights,
+          same arithmetic — so the card explains itself rather than asking for
+          trust.
+
+          ⚠️ THE ROWS SHOW NUMBERS, NOT THE FINDINGS' SENTENCES, AND THE
+          SENTENCES ARE NOT GONE. visibilityFindings() also feeds Your site
+          (audit-workspace.tsx), which renders `detail` in full and should. This
+          card printed three sentences of 15 to 26 words each and made the
+          reader parse "3 of the 14 answers we checked" out of prose to get a
+          figure that fits in four characters. So the STATUS comes from the
+          finding — the icon and the score can never disagree — and the FIGURE
+          is derived here from the same `tracking` the finding counted. Nothing
+          is restated in two voices, because nothing is restated at all. */}
       {visibilityScore !== null && (
         <Card className="mb-5 p-5 sm:p-7">
-          <div className="sm:flex sm:items-start sm:gap-7">
-            <div className="shrink-0">
-              <p className="text-slate text-xs font-semibold tracking-wide uppercase">
-                AI visibility
-              </p>
-              <p className="text-navy mt-1 text-4xl font-semibold tabular-nums">
-                {visibilityScore}
-                <span className="text-slate text-lg font-normal">/100</span>
-              </p>
-              <Badge
-                tone={band === 'good' ? 'success' : band === 'mixed' ? 'cyan' : undefined}
-                className="mt-2"
-              >
-                {band === 'good' ? 'Strong' : band === 'mixed' ? 'Mixed' : 'Low'}
-              </Badge>
+          <div className="sm:flex sm:items-center sm:gap-8">
+            <div className="flex shrink-0 items-center gap-4 sm:block">
+              {/* ⚠️ NO `stroke`, SO THE ARC RUNS THE BRAND GRADIENT AND CLAIMS
+                  NOTHING. score-dial.tsx only permits a banded colour where the
+                  band's WORD is adjacent; the word is the Badge below, but the
+                  gradient is the documented default and the safer one. */}
+              <ScoreDial score={visibilityScore} size="sm" caption="out of 100" />
+              <div className="sm:mt-3">
+                {/* Sentence case, to match the tiles below. The small-caps
+                    version of this sat directly above four tiles that had just
+                    stopped shouting, which made it the last thing on the page
+                    still dressed as a system field. */}
+                <p className="text-slate text-xs font-semibold">AI visibility</p>
+                <Badge
+                  tone={band === 'good' ? 'success' : band === 'mixed' ? 'cyan' : undefined}
+                  className="mt-1.5"
+                >
+                  {band === 'good' ? 'Strong' : band === 'mixed' ? 'Mixed' : 'Low'}
+                </Badge>
+              </div>
             </div>
 
-            <ul className="divide-line mt-5 flex-1 divide-y sm:mt-0">
-              {visibility.map((f) => (
-                <li key={f.id} className="py-2.5 first:pt-0">
-                  <div className="flex items-baseline gap-2">
-                    <span
-                      aria-hidden
-                      className={`mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full ${
-                        f.status === 'pass'
-                          ? 'bg-success'
-                          : f.status === 'warn'
-                            ? 'bg-accent'
-                            : 'bg-error-ink'
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <p className="text-navy text-sm font-semibold">{f.label}</p>
-                      <p className="text-slate mt-0.5 text-sm leading-relaxed">{f.detail}</p>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-5 flex-1 sm:mt-0">
+              {/* The split, first and largest. This is the answer to "how am I
+                  doing" — everything below it is a qualifier on it. */}
+              <p className="text-navy text-sm font-semibold">
+                Of the {formatNumber(latest.length)}{' '}
+                {latest.length === 1 ? 'answer' : 'answers'} we checked
+              </p>
+              <OutcomeBar splits={split} total={latest.length} className="mt-2.5" />
+
+              <ul className="border-line mt-5 space-y-2 border-t pt-4">
+                {headline.map((row) => (
+                  <li key={row.id} className="flex items-center gap-2.5">
+                    {/* ⚠️ THE ICON IS aria-hidden AND OWES A WORD, and the word
+                        goes INSIDE the sentence, not in front of it.
+                        status-icon.tsx states the debt — "a tick and a cross at
+                        14px are the same smudge to a colourblind reader" — and
+                        audit-workspace.tsx and readability-checklist.tsx both
+                        pay it by appending "— Pass" to the label. Written as a
+                        standalone span before it, as this was, the word becomes
+                        its own line: copying the card produced "Pass:" on one
+                        line and the sentence on the next. */}
+                    <StatusIcon status={row.status} className="h-4 w-4 shrink-0" />
+                    <p className="text-navy text-sm">
+                      {row.sentence}
+                      <span className="sr-only"> — {STATUS_WORD[row.status]}</span>
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </Card>
       )}
 
-      {/* One card, four cells, hairline dividers — the same row the dashboard
-          home uses. Four separate cards read as four competing things. */}
-      <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-4">
-        <MetricTile
-          label="Citations"
-          icon={<ChartIcon className="h-3.5 w-3.5" />}
-          tint="bg-success/12 text-success-ink"
-          value={cited}
-          footer={`of ${latest.length} checks${deltaLabel(citedDelta)} · you were the source`}
-        />
-        <MetricTile
-          label="Mentions"
-          icon={<SearchIcon className="h-3.5 w-3.5" />}
-          tint="bg-accent-soft text-teal-ink"
-          value={mentions}
-          footer={
-            mentioned > 0
-              ? `named at all${deltaLabel(mentionsDelta)} · ${mentioned} without a link`
-              : `named at all, linked or not${deltaLabel(mentionsDelta)}`
-          }
-        />
-        <MetricTile
-          label="Share of voice"
-          icon={<AeoIcon className="h-3.5 w-3.5" />}
-          tint="bg-primary-soft text-primary"
-          value={`${shareOfVoice.toFixed(1)}%`}
-          // The counts, always. A percentage of an unstated denominator is the
-          // kind of figure this product strips out of its own marketing.
-          footer={`${formatNumber(appearances.ours)} of ${formatNumber(appearances.total)} sources cited`}
-        />
-        <MetricTile
-          label="Visibility rate"
-          icon={<GlobeIcon className="h-3.5 w-3.5" />}
-          value={`${visibilityRate.toFixed(0)}%`}
-          footer={`of checks name you · ${absent} don’t`}
-        />
-      </Card>
 
-      {/* Main column and rail.
+      {/* The trend, and the two things you act on beside it.
 
-          Ordered by whose question it answers: the chart and the two lists
-          below it are about THIS business — is it working, and where is it
-          nearly working. Share-of-voice is context about everyone else, so it
-          comes last. The rail holds the two things you act on. */}
+          The chart is the only thing left in the left column — the per-engine
+          summary moved out below the matrix, so this grid is now exactly what
+          its name says: one chart, one rail. The rail holds the budget and the
+          add-a-question form, which are what you DO after reading the trend. */}
+
       <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         <div className="space-y-5">
           <CitationChart
@@ -940,278 +901,6 @@ export function TrackingWorkspace() {
             </p>
           )}
 
-          {/* Per engine.
-
-              The tiles above average the three together, which hides the most
-              useful shape in the data: being cited on one engine and invisible
-              on another is a different problem from being invisible everywhere,
-              and it is fixable. Denominators are per engine and never assumed
-              equal — a run where one engine 429s leaves it genuinely behind. */}
-          {byEngine.some((e) => e.checked > 0) && (
-            <Card className="p-5 sm:p-7">
-              <SectionTitle>By engine</SectionTitle>
-              <p className="text-slate mt-1 text-sm">
-                Where you stand on each one, from the most recent check of every question.
-              </p>
-
-              <ul className="divide-line mt-3 divide-y">
-                {byEngine.map((e) => (
-                  <li key={e.engine} className="py-3.5">
-                    <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      {/* The mark, the name and the Gemini note are one line.
-
-                          `items-center` inside a row that aligns on the
-                          baseline: the logo has no baseline of its own, so it
-                          is centred against the name, and this box still hands
-                          the name's baseline up to the row so the percentage
-                          on the right stays level with it. */}
-                      <p className="text-navy flex items-center gap-2 text-sm font-semibold">
-                        <EngineMark engine={e.engine} className="h-4 w-4 shrink-0" />
-                        {e.engine}
-                        {/* ⚠️ Marked, never labelled with the country. Gemini
-                            rejects a location parameter and the coordinate
-                            route was tested and does not localise, so putting
-                            "United Kingdom" on this row would claim a
-                            targeting that did not happen. Only shown when a
-                            country is set — with none set, no engine is
-                            targeted and the note would single one out for
-                            nothing. */}
-                        {site.country && e.engine === 'Gemini' && (
-                          // The ml-2 this used to carry is now the parent's
-                          // gap-2 — the row is flex, so a margin would stack
-                          // on top of the gap and set this note further out
-                          // than the mark is from the name.
-                          <span className="text-slate text-xs font-normal">
-                            not location-targeted
-                          </span>
-                        )}
-                      </p>
-                      <p className="text-slate text-xs">
-                        {e.checked === 0 ? (
-                          // Not a zero — a gap. Saying "0 citations" for an
-                          // engine we never heard from would be a measurement
-                          // we did not take.
-                          <span className="text-error-ink">no answers stored</span>
-                        ) : (
-                          <>
-                            <span className="text-success-ink font-semibold">
-                              {(((e.cited + e.mentioned) / e.checked) * 100).toFixed(0)}%
-                            </span>{' '}
-                            name you · {e.cited} cited
-                            {e.mentioned > 0 && <> · {e.mentioned} named</>} · of {e.checked}
-                          </>
-                        )}
-                      </p>
-                    </div>
-                    {e.checked > 0 && (
-                      <Meter
-                        className="mt-1.5"
-                        value={((e.cited + e.mentioned) / e.checked) * 100}
-                        tone={e.cited > 0 ? 'primary' : 'line'}
-                      />
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {/* Every check, filterable — one table instead of three cards.
-
-              ⚠️ THREE CARDS SPLIT THE EVIDENCE BY ANSWER, WHICH IS THE ONE WAY
-              IT SHOULD NOT BE SPLIT. "Cited for", "Named but not linked" and
-              "Not cited for" were three lists of the same rows sliced by
-              outcome, so comparing them meant scrolling between cards, and
-              nothing showed what the engine had actually said. A filter does
-              the slicing without hiding the whole from you. */}
-          <Card className="p-5 sm:p-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <SectionTitle>Every answer we checked</SectionTitle>
-              <Badge tone="cyan">
-                {formatNumber(groups.length)} {groups.length === 1 ? 'question' : 'questions'}
-              </Badge>
-            </div>
-            <p className="text-slate mt-1 text-sm">
-              One row per question, newest first. Open any of them to read what{' '}
-              {ENGINES.join(', ')} each said, side by side, and which sources each one used.
-            </p>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {FILTERS.map((f) => {
-                const { checks, questions } = countFor(f.id);
-                return (
-                  <button
-                    key={f.id}
-                    type="button"
-                    onClick={() => setFilter(f.id)}
-                    aria-pressed={filter === f.id}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                      filter === f.id
-                        ? 'border-primary bg-primary-soft text-primary'
-                        : 'border-line text-slate hover:text-navy'
-                    }`}
-                  >
-                    {f.label} · {checks} {checks === 1 ? 'check' : 'checks'}, {questions}{' '}
-                    {questions === 1 ? 'question' : 'questions'}
-                  </button>
-                );
-              })}
-            </div>
-
-            {visible.length === 0 ? (
-              <p className="text-slate mt-4 text-sm">
-                {filter === 'cited'
-                  ? 'No engine has cited you yet on the questions we watch. Publishing answers is what changes this — an engine can only cite text it can read on your own domain.'
-                  : filter === 'mentioned'
-                    ? 'Nothing here. Every mention we found was linked.'
-                    : 'Nothing in this view.'}
-              </p>
-            ) : (
-              <ul className="divide-line mt-2 divide-y">
-                {visible.map((group) => (
-                  <QuestionRow
-                    key={group.question}
-                    group={group}
-                    action={
-                      /* The loop closing: see you weren't cited, write the
-                         answer, the question stops being open.
-
-                         ONE button per question now, not one per engine. The
-                         draft answers the question, not the engine — three
-                         identical buttons on one question was always wrong, and
-                         grouping is what made it obvious. Offered whenever any
-                         engine failed to cite you, since that is the gap the
-                         answer would close. */
-                      group.checks.some((c) => c.outcome !== 'cited') ? (
-                        <DraftIntoGroup
-                          question={group.question}
-                          onDrafted={async () => {
-                            const match = questions.find((q) => q.question === group.question);
-                            if (match) await coverQuestion(match.id);
-                          }}
-                        />
-                      ) : undefined
-                    }
-                  />
-                ))}
-              </ul>
-            )}
-
-            {visible.length > 0 && shown < filtered.length && (
-              <button
-                type="button"
-                onClick={() => setShown((n) => n + PAGE)}
-                className="text-primary hover:text-primary-hover mt-4 text-sm font-semibold"
-              >
-                Show {Math.min(PAGE, filtered.length - shown)} more of {filtered.length}
-              </button>
-            )}
-
-            {mentioned > 0 && (
-              <p className="text-slate mt-4 text-sm leading-relaxed">
-                Named but not linked usually means the answer isn&rsquo;t on a page the engine can
-                point at. Check that the block covering those questions is pasted and current on{' '}
-                <Link
-                  href="/dashboard/publish"
-                  className="text-primary hover:text-primary-hover font-semibold"
-                >
-                  your published pages
-                </Link>
-                .
-              </p>
-            )}
-          </Card>
-
-          {/* Which of our own pages earned the citations.
-
-              The actionable half. "You were cited five times" is a score; "this
-              page was cited five times" is an instruction — it says which piece
-              of content is doing the work and therefore what to write more of.
-              Costs nothing to show: the full URLs were already stored on every
-              check. */}
-          {citedPages.length > 0 && (
-            <Card className="p-5 sm:p-7">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <SectionTitle>Pages earning citations</SectionTitle>
-                <Badge tone="success">{citedPages.length}</Badge>
-              </div>
-              <p className="text-slate mt-1 text-sm">
-                The exact URLs engines linked to. More citations than checks is normal — one
-                answer can cite two of your pages.
-              </p>
-
-              <ul className="divide-line mt-3 divide-y">
-                {citedPages.map((page) => (
-                  <li
-                    key={page.url}
-                    className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3.5"
-                  >
-                    <a
-                      href={page.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-primary hover:text-primary-hover min-w-0 flex-1 truncate text-sm"
-                    >
-                      {prettyUrl(page.url)}
-                    </a>
-                    <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
-                      {page.citations}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-
-          {/* Share of voice.
-
-              ⚠️ COUNTS EVERY SOURCE IN EVERY ANSWER, not one per check. That is
-              the difference between ranking against the handful of rivals who
-              happened to take first place and ranking against the whole field
-              the engines actually drew from. */}
-          <Card className="p-5 sm:p-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <SectionTitle>Who gets cited</SectionTitle>
-              <Badge tone="cyan">{formatNumber(competitors.length)} domains</Badge>
-            </div>
-            <p className="text-slate mt-1 text-sm">
-              Every source the engines used across {site.name}&rsquo;s questions —{' '}
-              {formatNumber(appearances.total)} citations in all, ranked by how often each domain
-              was drawn on.
-            </p>
-
-            <ul className="mt-5 space-y-4">
-              {shareRows.map((c) => (
-                <li key={c.domain}>
-                  <div className="flex items-baseline justify-between gap-4">
-                    <p
-                      className={`min-w-0 truncate text-sm ${
-                        c.isYou ? 'text-navy font-semibold' : 'text-slate'
-                      }`}
-                    >
-                      {c.rank}. {c.domain}
-                      {c.isYou && ' (you)'}
-                    </p>
-                    <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
-                      {c.citations}
-                    </p>
-                  </div>
-                  <Meter
-                    className="mt-1.5"
-                    value={(c.citations / shareTop) * 100}
-                    tone={c.isYou ? 'primary' : 'line'}
-                  />
-                </li>
-              ))}
-            </ul>
-
-            {competitors.length > shareRows.length && (
-              <p className="text-slate mt-4 text-xs">
-                and {formatNumber(competitors.length - shareRows.length)} more domains cited at
-                least once.
-              </p>
-            )}
-          </Card>
         </div>
 
         <div className="mt-5 space-y-5 lg:mt-0">
@@ -1234,7 +923,7 @@ export function TrackingWorkspace() {
               <div className="min-w-0">
                 <p className="text-navy text-sm font-semibold">
                   {formatNumber(tracking.promptsTracked)} of {formatNumber(tracking.promptCap)}{' '}
-                  prompts tracked
+                  questions watched
                 </p>
                 {/* ⚠️ The ceiling comes from the plan now, not from multiplying
                     three fields back together here. The two plans have different
@@ -1245,12 +934,23 @@ export function TrackingWorkspace() {
                     never refills. Printing "resets" against a missing date would
                     promise a top-up that never comes, so the sentence branches on
                     the value rather than on the plan. */}
+                {/* Three facts, three lines. They were one 20-word run of
+                    dot-separated clauses, which is a paragraph pretending to be
+                    a data row — and the one thing on this page that still read
+                    above the reading-level target. */}
                 <p className="text-slate mt-0.5 text-xs">
-                  {formatNumber(tracking.checksUsed)} of {formatNumber(tracking.checksCap)} engine
-                  checks · each prompt is asked {ENGINES.length} engines × {tracking.runsPerPeriod}{' '}
-                  {tracking.runsPerPeriod === 1 ? 'time' : 'times'}
-                  {tracking.periodResetsAt ? ` · resets ${timeUntil(tracking.periodResetsAt)}` : ''}
+                  {formatNumber(tracking.checksUsed)} of {formatNumber(tracking.checksCap)} answers
+                  collected.
                 </p>
+                <p className="text-slate mt-0.5 text-xs">
+                  Every question goes to {ENGINES.length} AI tools, {tracking.runsPerPeriod}{' '}
+                  {tracking.runsPerPeriod === 1 ? 'time' : 'times'}.
+                </p>
+                {tracking.periodResetsAt && (
+                  <p className="text-slate mt-0.5 text-xs">
+                    Resets {timeUntil(tracking.periodResetsAt)}.
+                  </p>
+                )}
               </div>
               <Meter className="mt-3" value={usedPct} />
 
@@ -1261,8 +961,8 @@ export function TrackingWorkspace() {
               <div className="border-line mt-4 border-t pt-4">
                 {!canGrowList ? (
                   <p className="text-slate text-xs">
-                    Finding more questions is part of Pro — your existing list and results
-                    stay here either way.
+                    Finding more questions is part of Pro. Your list and results stay
+                    here either way.
                   </p>
                 ) : more.room === 0 ? (
                   // ⚠️ "Discovery is full", NOT "your watch list is full". With
@@ -1271,8 +971,8 @@ export function TrackingWorkspace() {
                   // would send someone to delete a question they didn't need to.
                   <p className="text-slate text-xs">
                     We&rsquo;ve found the {formatNumber(tracking.promptCap - tracking.manualCap)}{' '}
-                    questions this plan looks for. You can still add{' '}
-                    {formatNumber(tracking.manualCap)} of your own below, or retire one on{' '}
+                    questions this plan looks for. You can add{' '}
+                    {formatNumber(tracking.manualCap)} of your own, or retire one on{' '}
                     <Link
                       href="/dashboard/questions"
                       className="text-primary hover:text-primary-hover font-semibold"
@@ -1285,8 +985,8 @@ export function TrackingWorkspace() {
                   // The route rejects an empty page list, so say why here
                   // rather than spending a round trip to be told.
                   <p className="text-slate text-xs">
-                    Run a full check of your site first — finding more questions means reading your
-                    pages.
+                    Run a full check of your site first. Finding questions means reading
+                    your pages.
                   </p>
                 ) : (
                   <>
@@ -1300,8 +1000,8 @@ export function TrackingWorkspace() {
                       {more.busy ? 'Looking…' : `Find ${more.room} more questions`}
                     </Button>
                     <p className="text-slate mt-2 text-xs">
-                      Asks for questions you aren&rsquo;t already watching. They join the list
-                      straight away and are checked on your next run.
+                      Finds questions you aren&rsquo;t watching yet. They go on your next
+                      run.
                     </p>
                   </>
                 )}
@@ -1316,7 +1016,7 @@ export function TrackingWorkspace() {
                   <p className="text-slate mt-2 text-xs">
                     {more.added === 0
                       ? // Not a failure: every suggestion was one we already watch.
-                        'Nothing new came back — the questions found were ones you already track.'
+                        'Nothing new. Every question we found was one you already watch.'
                       : `Added ${more.added}. They have no results yet — run a check to ask the engines.`}
                   </p>
                 )}
@@ -1334,8 +1034,8 @@ export function TrackingWorkspace() {
 
                 {!canGrowList ? (
                   <p className="text-slate text-xs">
-                    You can add your own questions again once the window is open — there would be
-                    nothing to check them with right now.
+                    You can add your own again when the window opens. Right now there is
+                    nothing to check them with.
                   </p>
                 ) : manual.room === 0 ? (
                   <p className="text-slate mt-1 text-xs">
@@ -1405,8 +1105,331 @@ export function TrackingWorkspace() {
         </div>
       </div>
 
+      {/* ⚠️ ABOVE THE CHART, NOT BELOW IT, AND FULL WIDTH.
+
+          This is the answer to the question the customer opened the page
+          with — which of my questions does AI name me on. It used to sit
+          under a 30-day trend line and a per-engine summary, so the evidence
+          came third and the reader had to scroll past two abstractions of it
+          to reach it. The chart is a good second question ("is it getting
+          better?") and a bad first one, because a trend of a number you have
+          not seen yet means nothing.
+
+          It is outside the 1fr+20rem grid below because the matrix needs the
+          whole width — in that grid's left column it is 632px on a 1280px
+          laptop, narrower than the table's own minimum, and it scrolled. */}
+      {/* Every check, filterable — one table instead of three cards.
+
+          ⚠️ THREE CARDS SPLIT THE EVIDENCE BY ANSWER, WHICH IS THE ONE WAY
+          IT SHOULD NOT BE SPLIT. "Cited for", "Named but not linked" and
+          "Not cited for" were three lists of the same rows sliced by
+          outcome, so comparing them meant scrolling between cards, and
+          nothing showed what the engine had actually said. A filter does
+          the slicing without hiding the whole from you. */}
+      <Card className="mt-6 p-5 sm:p-7">
+        {/* ⚠️ THE TINTS ARE IDENTITY, NOT STATE — see the note on
+            SectionTitle's `tint`. They reuse the exact pairs the metric tiles
+            above already carry, so a reader who has learned "green means the
+            AI linked to you" on a tile is not taught something else here.
+            bg-accent-soft takes -ink text: --color-accent is fill-only at
+            1.9:1 and never a text colour. */}
+        <SectionTitle icon={<FaqIcon className="h-4 w-4" />} tint="bg-primary-soft text-primary">
+          Which questions name you
+        </SectionTitle>
+        {/* ⚠️ BOTH NUMBERS ARE COUNTED, NOT CLAIMED — one prompt per row we
+            are about to render, and the engines we actually ask. This
+            replaced a cyan Badge saying the same question count a second
+            time, one line above the sentence that says it in words. */}
+        <p className="text-slate mt-1 text-sm">
+          {formatNumber(groups.length)} {groups.length === 1 ? 'question' : 'questions'}, asked of{' '}
+          {ENGINES.length} AI tools. Best results first. Click a row to see the answer.
+        </p>
+
+        {/* ⚠️ THE KEY, NOT A PARAGRAPH ABOUT THE KEY. Four chips beside four
+            short glosses replaced 65 words of prose — a 22-word blurb here and
+            a 43-word note at the foot of the card. It is built from the same
+            constants the cells are, so it cannot drift from them. */}
+        <OutcomeLegend className="mt-3" />
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {FILTERS.map((f) => {
+            const { checks, questions } = countFor(f.id);
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                aria-pressed={filter === f.id}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                  filter === f.id
+                    ? 'border-primary bg-primary-soft text-primary'
+                    : 'border-line text-slate hover:text-navy'
+                }`}
+              >
+                {f.label} · {questions} {questions === 1 ? 'question' : 'questions'},{' '}
+                {checks} {checks === 1 ? 'answer' : 'answers'}
+              </button>
+            );
+          })}
+        </div>
+
+        {visible.length === 0 ? (
+          <p className="text-slate mt-4 text-sm">
+            {filter === 'cited'
+              ? 'No engine has cited you yet on the questions we watch. Publishing answers is what changes this — an engine can only cite text it can read on your own domain.'
+              : filter === 'mentioned'
+                ? 'Nothing here. Every mention we found was linked.'
+                : 'Nothing in this view.'}
+          </p>
+        ) : (
+          /*
+            ⚠️ TWO LAYOUTS, ONE DATA SET, AND THE SPLIT IS AT sm.
+
+            Four columns do not fit a phone. The grid is the right shape the
+            moment there is room for it — the comparison across engines is
+            the finding, and a fixed column per engine states it — and the
+            list is the right shape when there is not.
+
+            ⚠️ NEITHER BRANCH OWNS ANY LOGIC. Both render `visible`, both
+            call draftAction(), and both open to the same
+            <EngineDetailList/>. prompt-ranking.tsx states the rule for its
+            own pair of branches, and it holds harder here: a second copy of
+            the null-is-a-gap-not-a-no reading is what would let one of these
+            two claim a measurement nobody took.
+          */
+          <>
+            <div className="mt-2 hidden sm:block">
+              <PromptMatrix groups={visible} action={draftAction} />
+            </div>
+
+            <ul className="divide-line mt-2 divide-y sm:hidden">
+              {visible.map((group) => (
+                <QuestionRow key={group.question} group={group} action={draftAction(group)} />
+              ))}
+            </ul>
+          </>
+        )}
+
+        {visible.length > 0 && shown < filtered.length && (
+          <button
+            type="button"
+            onClick={() => setShown((n) => n + PAGE)}
+            className="text-primary hover:text-primary-hover mt-4 text-sm font-semibold"
+          >
+            Show {Math.min(PAGE, filtered.length - shown)} more of {filtered.length}
+          </button>
+        )}
+
+        {/* The 43-word "Named only means…" note stood here. Its first half is
+            now the legend's gloss and its second half is an action, so what is
+            left is the action alone. */}
+        {mentioned > 0 && (
+          <p className="text-slate mt-4 text-sm">
+            Got a “named only”? Your answer needs to be on a page AI can link to. Check{' '}
+            <Link
+              href="/dashboard/publish"
+              className="text-primary hover:text-primary-hover font-semibold"
+            >
+              your published pages
+            </Link>
+            .
+          </p>
+        )}
+      </Card>
+
+      {/* ⚠️ OUT OF THE GRID AND AFTER THE MATRIX. This was in the grid's left
+          column under the chart, which put a per-engine summary between the
+          trend and the evidence. Summary, then detail, then per-engine is the
+          order a reader actually wants; and out here it gets the full width
+          the rest of the page has. */}
+      {/* Per engine.
+
+          The tiles above average the three together, which hides the most
+          useful shape in the data: being cited on one engine and invisible
+          on another is a different problem from being invisible everywhere,
+          and it is fixable. Denominators are per engine and never assumed
+          equal — a run where one engine 429s leaves it genuinely behind. */}
+      {byEngine.some((e) => e.checked > 0) && (
+        <Card className="mt-6 p-5 sm:p-7">
+          <SectionTitle icon={<AeoIcon className="h-4 w-4" />} tint="bg-accent-soft text-teal-ink">
+            How each AI did
+          </SectionTitle>
+          <p className="text-slate mt-1 text-sm">
+            The same questions, one AI at a time.
+          </p>
+
+          <ul className="divide-line mt-3 divide-y">
+            {byEngine.map((e) => (
+              <li key={e.engine} className="py-3.5">
+                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                  {/* The mark, the name and the Gemini note are one line.
+
+                      `items-center` inside a row that aligns on the
+                      baseline: the logo has no baseline of its own, so it
+                      is centred against the name, and this box still hands
+                      the name's baseline up to the row so the percentage
+                      on the right stays level with it. */}
+                  <p className="text-navy flex items-center gap-2 text-sm font-semibold">
+                    <EngineMark engine={e.engine} className="h-4 w-4 shrink-0" />
+                    {e.engine}
+                    {/* ⚠️ Marked, never labelled with the country. Gemini
+                        rejects a location parameter and the coordinate
+                        route was tested and does not localise, so putting
+                        "United Kingdom" on this row would claim a
+                        targeting that did not happen. Only shown when a
+                        country is set — with none set, no engine is
+                        targeted and the note would single one out for
+                        nothing. */}
+                    {site.country && e.engine === 'Gemini' && (
+                      // The ml-2 this used to carry is now the parent's
+                      // gap-2 — the row is flex, so a margin would stack
+                      // on top of the gap and set this note further out
+                      // than the mark is from the name.
+                      <span className="text-slate text-xs font-normal">
+                        not location-targeted
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-slate text-xs">
+                    {e.checked === 0 ? (
+                      // Not a zero — a gap. Saying "0 citations" for an
+                      // engine we never heard from would be a measurement
+                      // we did not take.
+                      <span className="text-error-ink">no answers stored</span>
+                    ) : (
+                      <>
+                        <span className="text-success-ink font-semibold">
+                          {(((e.cited + e.mentioned) / e.checked) * 100).toFixed(0)}%
+                        </span>{' '}
+                        of {e.checked} name you · {e.cited} linked
+                        {e.mentioned > 0 && <> · {e.mentioned} named only</>}
+                      </>
+                    )}
+                  </p>
+                </div>
+                {e.checked > 0 && (
+                  <Meter
+                    className="mt-1.5"
+                    value={((e.cited + e.mentioned) / e.checked) * 100}
+                    tone={e.cited > 0 ? 'primary' : 'line'}
+                  />
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* The context, last: which of your pages are working, and who else the
+          engines draw on. Both are about the field rather than about you, so
+          they come after the evidence and the trend rather than competing with
+          them for the top of the page.
+
+          Outside the grid above, like the matrix — they were in its left
+          column, and nothing here needs to sit beside the rail. The rail holds
+          the budget and the add-a-question form, which belong next to the
+          chart. space-y-5 because they were a stack inside that column and
+          still are; losing it on the way out is what left them touching. */}
+      <div className="mt-5 space-y-5">
+        {/* Which of our own pages earned the citations.
+
+            The actionable half. "You were cited five times" is a score; "this
+            page was cited five times" is an instruction — it says which piece
+            of content is doing the work and therefore what to write more of.
+            Costs nothing to show: the full URLs were already stored on every
+            check. */}
+        {citedPages.length > 0 && (
+          <Card className="p-5 sm:p-7">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle
+                icon={<DocIcon className="h-4 w-4" />}
+                tint="bg-success/12 text-success-ink"
+              >
+                Your pages the AI links to
+              </SectionTitle>
+              <Badge tone="success">{citedPages.length}</Badge>
+            </div>
+            <p className="text-slate mt-1 text-sm">
+              The pages AI sent people to. Write more like these.
+            </p>
+
+            <ul className="divide-line mt-3 divide-y">
+              {citedPages.map((page) => (
+                <li
+                  key={page.url}
+                  className="flex flex-wrap items-baseline gap-x-4 gap-y-1 py-3.5"
+                >
+                  <a
+                    href={page.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary hover:text-primary-hover min-w-0 flex-1 truncate text-sm"
+                  >
+                    {prettyUrl(page.url)}
+                  </a>
+                  <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
+                    {page.citations}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {/* Share of voice.
+
+            ⚠️ COUNTS EVERY SOURCE IN EVERY ANSWER, not one per check. That is
+            the difference between ranking against the handful of rivals who
+            happened to take first place and ranking against the whole field
+            the engines actually drew from. */}
+        <Card className="p-5 sm:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle icon={<GlobeIcon className="h-4 w-4" />} tint="bg-cloud text-slate">
+              Who the AI reads instead
+            </SectionTitle>
+            <Badge tone="cyan">{formatNumber(competitors.length)} domains</Badge>
+          </div>
+          <p className="text-slate mt-1 text-sm">
+            Every website AI used to answer your questions. Most-used first. Yours is
+            highlighted.
+          </p>
+
+          <ul className="mt-5 space-y-4">
+            {shareRows.map((c) => (
+              <li key={c.domain}>
+                <div className="flex items-baseline justify-between gap-4">
+                  <p
+                    className={`min-w-0 truncate text-sm ${
+                      c.isYou ? 'text-navy font-semibold' : 'text-slate'
+                    }`}
+                  >
+                    {c.rank}. {c.domain}
+                    {c.isYou && ' (you)'}
+                  </p>
+                  <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
+                    {c.citations}
+                  </p>
+                </div>
+                <Meter
+                  className="mt-1.5"
+                  value={(c.citations / shareTop) * 100}
+                  tone={c.isYou ? 'primary' : 'line'}
+                />
+              </li>
+            ))}
+          </ul>
+
+          {competitors.length > shareRows.length && (
+            <p className="text-slate mt-4 text-xs">
+              and {formatNumber(competitors.length - shareRows.length)} more domains cited at
+              least once.
+            </p>
+          )}
+        </Card>
+      </div>
+
       <p className="text-slate mt-6 text-center text-xs">
-        Engines checked: {ENGINES.join(' · ')}
+        We asked: {ENGINES.join(' · ')}
       </p>
     </>
   );

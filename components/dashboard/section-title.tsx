@@ -20,13 +20,50 @@
 export function SectionTitle({
   children,
   as: Tag = 'h2',
+  icon,
+  tint = 'bg-cloud text-slate',
   className = '',
 }: {
   children: React.ReactNode;
   as?: 'h2' | 'h3';
+  /**
+   * A small mark in a tinted square, left of the title.
+   *
+   * ⚠️ DECORATION, AND IT MUST STAY DECORATION. The icon is aria-hidden and
+   * carries no meaning the title does not already say — it exists so a reader
+   * scanning a long page can find a card by its shape instead of reading five
+   * headings. Anything the icon alone would tell you belongs in the words.
+   *
+   * ⚠️ IDENTITY, NOT STATE. Same rule metric-tile.tsx states for its chip
+   * tint: this says WHICH card you are looking at, so it never changes with
+   * the data. A tint that moved with a value would be colour carrying meaning
+   * with no word beside it, which status-icon.tsx and score-dial.tsx both
+   * refuse.
+   *
+   * Optional, so the forty-odd existing call sites are untouched.
+   */
+  icon?: React.ReactNode;
+  /** Chip colours for the icon. Pair fills with their -ink text, never accent. */
+  tint?: string;
   className?: string;
 }) {
+  const heading = (
+    <Tag className={`text-[0.9375rem] font-bold tracking-normal ${icon ? '' : className}`}>
+      {children}
+    </Tag>
+  );
+
+  if (!icon) return heading;
+
   return (
-    <Tag className={`text-[0.9375rem] font-bold tracking-normal ${className}`}>{children}</Tag>
+    <div className={`flex items-center gap-2.5 ${className}`}>
+      <span
+        aria-hidden="true"
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}
+      >
+        {icon}
+      </span>
+      {heading}
+    </div>
   );
 }

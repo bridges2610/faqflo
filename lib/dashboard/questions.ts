@@ -1,4 +1,4 @@
-import type { CitationCheck, Engine } from './types';
+import { ENGINES, type CitationCheck, type Engine } from './types';
 
 /*
   One question, and every engine's answer to it.
@@ -69,6 +69,31 @@ export function groupByQuestion(latest: CitationCheck[]): QuestionGroup[] {
 }
 
 /**
+ * Every engine, in ENGINES order, with its check or `null`.
+ *
+ * ⚠️ ENGINES ORDER, NOT `checks` ORDER, AND THAT IS THE WHOLE POINT. A group
+ * holds however many rows a run produced, in whatever order they were stored.
+ * Rendering `group.checks` directly gives a matrix whose columns move from row
+ * to row — the one thing a grid must never do. Mapping over ENGINES fixes the
+ * column and lets the missing engine fall out as `null`.
+ *
+ * ⚠️ AND `null` IS A GAP, NOT A NO — the same rule cellFor states below. A
+ * group can be short of a check when an engine 429s mid-run, so callers must
+ * render that as "not checked" and never as "absent".
+ *
+ * Lived inline in tracking-workspace.tsx while the row of pills was its only
+ * consumer. The matrix and the expanded detail both need the identical mapping,
+ * and three copies of "find this engine, or null" is how a screen ends up
+ * disagreeing with itself about which engine a column belongs to.
+ */
+export function checksByEngine(group: QuestionGroup): { engine: Engine; check: CitationCheck | null }[] {
+  return ENGINES.map((engine) => ({
+    engine,
+    check: group.checks.find((c) => c.engine === engine) ?? null,
+  }));
+}
+
+/**
  * Did any engine name this business on this question?
  *
  * ⚠️ NAMED MEANS CITED **OR** MENTIONED. A mention is being named at all,
@@ -79,6 +104,30 @@ export function groupByQuestion(latest: CitationCheck[]): QuestionGroup[] {
  */
 export function namedIn(group: QuestionGroup): number {
   return group.checks.filter((c) => c.outcome === 'cited' || c.outcome === 'mentioned').length;
+}
+
+/** How many engines linked to you on this question. Citations only — see namedIn. */
+export function citedIn(group: QuestionGroup): number {
+  return group.checks.filter((c) => c.outcome === 'cited').length;
+}
+
+/**
+ * Best results first: most citations, then most mentions.
+ *
+ * ⚠️ IT COPIES. groupByQuestion's output is read for counts elsewhere on the
+ * same render, and sorting in place would reorder those callers' data
+ * underneath them.
+ *
+ * ⚠️ THE SECOND KEY IS namedIn, WHICH INCLUDES THE CITATIONS. That is what
+ * makes it a tiebreak rather than a second opinion: rows are already equal on
+ * citations by the time it is consulted, so what it actually ranks is the
+ * mentions among them.
+ *
+ * Array.prototype.sort is stable, so questions that tie on both keep the
+ * newest-first order groupByQuestion produced.
+ */
+export function sortByCitations(groups: QuestionGroup[]): QuestionGroup[] {
+  return [...groups].sort((a, b) => citedIn(b) - citedIn(a) || namedIn(b) - namedIn(a));
 }
 
 /**
