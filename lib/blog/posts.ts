@@ -10,6 +10,7 @@ import * as aeoGeoGuide from '@/content/posts/simple-aeo-and-geo-guide-for-busin
 import * as whyCareAboutAi from '@/content/posts/why-business-owners-should-care-about-ai.mdx';
 import * as vsPaidAds from '@/content/posts/why-ai-recommendations-are-better-than-paid-ads.mdx';
 import * as googleReviews from '@/content/posts/does-ai-use-my-google-reviews-how-reviews-affect-ai-recommendations.mdx';
+import * as llmsTxt from '@/content/posts/what-is-llms-txt-and-do-you-actually-need-one.mdx';
 
 /*
   The post registry.
@@ -63,6 +64,7 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  llmsTxt,
   googleReviews,
   vsPaidAds,
   whyCareAboutAi,

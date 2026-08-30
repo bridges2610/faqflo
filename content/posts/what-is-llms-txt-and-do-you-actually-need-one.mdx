@@ -1,0 +1,161 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: 'what-is-llms-txt-and-do-you-actually-need-one',
+  title: 'What Is llms.txt and Do You Actually Need One?',
+  date: '2026-08-30',
+  excerpt: 'A small file with a lot of hype around it. Here’s the honest answer.',
+  image: '/blog/what-is-llms-txt-and-do-you-actually-need-one.png',
+  // Describes the illustration rather than repeating the headline, which is
+  // already the page's h1 immediately below it.
+  imageAlt:
+    'A card headed “llms.txt” showing a short example file: “# Northline Roofing”, a line reading “Roofing and emergency repair, serving the Boise metro area”, then a “## Key pages” list of Services, Service area and FAQ. Along the bottom, an amber tag reading “Cheap to add” beside the note “Engine support not yet confirmed”.',
+};
+
+A small file with a lot of hype around it. Here’s the honest answer.
+
+<PostTldr>
+Write one if you like. Just don’t expect it to be the reason AI starts naming you.
+
+- It’s a plain text file at `yoursite.com/llms.txt` that points AI at your best pages. Fifteen
+  minutes to write, in a notepad app.
+- It’s a proposal, not a standard. No major answer engine has committed to reading it, so it is not
+  why you’re invisible.
+- What does matter: content readable without JavaScript, crawlers allowed in, and real answers on
+  your own domain. A file pointing at a page a crawler can’t read is a map to an empty room.
+
+</PostTldr>
+
+If you’ve been anywhere near a marketing newsletter lately, someone has told you your site needs an
+llms.txt file. Usually with some urgency. Sometimes with a link to buy a generator.
+
+So let’s do this plainly. What it is, what it does, and whether you should care — including the part
+most articles about it leave out.
+
+## What it is
+
+llms.txt is a plain text file you put at the root of your website, like `yoursite.com/llms.txt`.
+Inside, you write a short, human-readable map of your site: what your business is, and links to the
+pages that matter most, with a line describing each.
+
+That’s it. It’s a text file. You can write one in a notepad app.
+
+The idea is straightforward. AI assistants have a limited window of attention. Your website is full
+of navigation, cookie banners, footers, and menus that mean nothing to a machine. llms.txt is a way
+of saying: here’s the signal, skip the noise.
+
+If you’ve ever seen a robots.txt file, it’s a cousin of that. But robots.txt tells crawlers what
+they *can’t* touch. llms.txt suggests what they *should* pay attention to.
+
+A simple one looks roughly like this:
+
+```
+# Northline Roofing
+
+> Residential roofing and emergency repair serving the Boise metro area.
+
+## Key pages
+- [Services](https://example.com/services): Roof repair, replacement, and same-day tarping.
+- [Service area](https://example.com/areas): Towns and neighborhoods we cover.
+- [FAQ](https://example.com/faq): Pricing, timelines, insurance, and warranty questions.
+```
+
+Clean, short, obvious.
+
+## The honest verdict: it probably isn’t doing much yet
+
+Here’s the part the hype skips.
+
+llms.txt is a proposal, not a standard. It was suggested by a developer in 2024 and picked up
+quickly among people who build with AI. What it does not have is confirmed, widespread support from
+the big answer engines. Google has publicly been lukewarm at best. The major assistants have not
+committed to reading it. There’s no verified case of a small business getting cited because of an
+llms.txt file.
+
+So when someone tells you this file is why you’re invisible to AI, they’re overselling it.
+
+But — and this matters — it costs you about fifteen minutes and it can’t hurt. It’s a text file. It
+doesn’t slow your site down, it doesn’t break anything, and if support does firm up, you’re already
+done. That’s a reasonable bet at that price.
+
+Just don’t confuse it with the thing that actually matters.
+
+## What actually matters more
+
+If you only have an hour to spend on being found by AI, do these first, in this order.
+
+1. **Make sure your content is readable without JavaScript.** This is the big one and it sinks more
+   small businesses than anything else. Most
+   [FAQ plugins and accordion widgets](/blog/why-faq-plugins-arent-a-good-idea) build their answers
+   with JavaScript after the page loads. AI crawlers generally don’t run JavaScript — they grab the
+   raw HTML and move on. So your best content looks perfect to visitors and simply doesn’t exist to
+   the engines. An llms.txt pointing at a page the crawler can’t read is a map to an empty room.
+
+2. **Make sure crawlers are allowed in.** [Check your robots.txt](/blog/is-my-site-blocking-chatgpt).
+   A surprising number of sites block GPTBot, ClaudeBot, PerplexityBot, or Google-Extended without
+   the owner ever deciding to — it came with the theme, or a developer added it years ago as a
+   blanket rule.
+
+3. **Actually answer the questions.** Prices, service area, hours, timelines, what you don’t do. In
+   plain sentences, on your own domain. This is the raw material an AI builds a recommendation out
+   of. No file format substitutes for having something to say.
+
+4. **Then, sure, write an llms.txt.** Fifteen minutes. Cheap insurance.
+
+Notice that the first three are just good website hygiene. That’s the theme here. Traditional SEO
+built the foundation — a healthy, crawlable, well-organized site.
+[Answer Engine Optimization](/blog/what-is-aeo) is the next floor up, and it’s built out of the same
+materials. There isn’t a magic file that skips the construction.
+
+## How to write one, if you want to
+
+Keep it short and specific.
+
+- Start with your business name as a heading, then one line saying what you do and where.
+- List 5–10 links to your genuinely most important pages, each with a short plain-English
+  description.
+- Use your real service area and real specialties in the wording — not marketing language.
+- Save it as `llms.txt` and upload it to the root of your site, so it loads at
+  `yoursite.com/llms.txt`.
+- Check it loads in a browser. If you get a 404, it’s in the wrong folder.
+
+Don’t stuff it with keywords, don’t list every page you have, and don’t describe pages as more
+important than they are. The value of the file is that it’s honest and short.
+
+## Where FaqFlo comes in
+
+FaqFlo generates your llms.txt automatically — but it treats it as the last step, not the first,
+because that’s the order that actually gets results.
+
+Before that, it [checks whether AI crawlers can read your site at all](/free-report), whether
+they’re allowed in, and which questions people are asking about businesses like yours that you don’t
+currently answer. Then it gives you those answers as crawlable HTML for your own domain and tracks
+whether the engines start naming you.
+
+The file is easy. Having something worth pointing the file at is the work.
+
+<PostFaq
+  items={[
+    {
+      q: 'What is an llms.txt file?',
+      a: 'It’s a plain text file at the root of your website that gives AI systems a short, readable summary of your business and links to your most important pages. Think of it as a suggested table of contents written for machines rather than visitors.',
+    },
+    {
+      q: 'Do ChatGPT and Google actually read llms.txt?',
+      a: 'There’s no confirmed, broad support from the major answer engines today, and Google has been publicly unenthusiastic about it. It’s a community proposal that may or may not become standard, so treat it as a cheap bet rather than a requirement.',
+    },
+    {
+      q: 'Is llms.txt the same as robots.txt?',
+      a: 'No. robots.txt tells crawlers which parts of your site they’re not allowed to access, and it is widely respected. llms.txt is a newer, optional suggestion about which content is most useful, and support for it is far from universal.',
+    },
+    {
+      q: 'Will an llms.txt file get my business cited by AI?',
+      a: 'On its own, almost certainly not. Citations come from having clear, factual, crawlable content that answers real customer questions — the file just points at that content, so it’s worthless if the content isn’t there.',
+    },
+    {
+      q: 'Where do I put the llms.txt file?',
+      a: 'At the top level of your domain, so it opens at yoursite.com/llms.txt. Most website builders have a way to upload a file to the root or add a custom route; if it returns a “page not found,” it isn’t in the right place.',
+    },
+  ]}
+/>
