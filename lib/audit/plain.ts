@@ -30,13 +30,13 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
   /* ---------------------------------------------------------- technical --- */
   'raw-html': {
     pass: 'AI can read your pages. The words are in the page itself, not added afterwards by code it can’t run.',
-    warn: 'AI can read some of your page, but not much. Most of what visitors see never reaches it.',
-    fail: 'AI sees a blank page. Your site builds its content in the visitor’s browser, and AI doesn’t wait. To it, there is nothing here.',
+    warn: 'AI can read some of your page but not much of it, and most of what a visitor sees never reaches it.',
+    fail: 'AI sees a blank page, because your site builds its content in the visitor’s browser and assistants don’t wait around for that. As far as they can tell, there is nothing here at all.',
   },
   crawlers: {
     pass: 'The big AI assistants are allowed to read your site.',
-    warn: 'Your site’s settings turn some AI assistants away. They can never quote you, whatever you publish.',
-    fail: 'Your site turns the AI assistants away at the door. Nothing you write can be quoted until that changes. Fix this first.',
+    warn: 'Your site’s settings turn some of the AI assistants away, and the ones turned away can never quote you, whatever you publish.',
+    fail: 'Your site turns the AI assistants away at the door, so nothing you write can be quoted until that changes. It is the first thing on the list to fix.',
   },
   /* ⚠️ NO `warn` ON EITHER OF THE NEXT TWO, AND NONE IS NEEDED. Both checks
      are binary in lib/audit/checks/technical.ts — `allowed ? 'pass' : 'fail'`
@@ -46,7 +46,7 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
      ever grows a middle state, it needs a warn sentence here first. */
   googlebot: {
     pass: 'Google is allowed to read your site.',
-    fail: 'Your site is blocking Google. That loses you normal search results and the AI answers above them.',
+    fail: 'Your site is blocking Google, which costs you the ordinary search results as well as the AI answers that sit above them.',
   },
   https: {
     pass: 'Your site is secure, which every engine expects as a baseline.',
@@ -54,7 +54,7 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
   },
   noindex: {
     pass: 'Nothing on the page is asking search engines to ignore it.',
-    fail: 'This page tells search engines to leave it out. It is one setting, and nothing else counts while it is on.',
+    fail: 'This page is telling search engines to leave it out, and while that one setting is on, nothing else here counts.',
   },
   canonical: {
     pass: 'Your pages tell engines which address is the real one.',
@@ -299,7 +299,7 @@ const PLAIN_ACTIONS: Record<
 > = {
   'unblock-crawlers': {
     what: 'Let the AI assistants read your site',
-    why: 'Right now your site turns them away. Nothing else on this list matters until it stops.',
+    why: 'Right now your site turns them away at the door, and nothing else on this list counts until that stops.',
     label: 'Copy these lines',
     where:
       'These go in a file called robots.txt, at the top level of your site. Whoever looks after your website will know where that is.',
@@ -310,7 +310,7 @@ const PLAIN_ACTIONS: Record<
   },
   'publish-answers': {
     what: 'Answer the questions your customers actually ask',
-    why: 'A question with a short answer under it is what an assistant looks for. It can quote that whole.',
+    why: 'A question with a short answer underneath is the one shape an assistant can lift whole, so it is what they look for first.',
   },
   'paste-export': {
     what: 'Put your answers on your website',
@@ -318,7 +318,7 @@ const PLAIN_ACTIONS: Record<
   },
   'identity-schema': {
     what: 'Tell AI which business this is',
-    why: 'Without it an assistant can repeat your answer and never mention your name.',
+    why: 'Without it an assistant can repeat your answer word for word and never once mention your name.',
     label: 'Get the code to paste',
   },
   titles: {
@@ -334,14 +334,14 @@ const PLAIN_ACTIONS: Record<
   },
   'meta-descriptions': {
     what: 'Write the one-line summary that shows under your search result',
-    why: 'Without it, search engines write their own. They use whatever text comes first — usually your menu.',
+    why: 'Without one, search engines write their own summary from whatever text they hit first, which is usually your menu.',
     label: 'Copy this',
     where:
       'This goes near the top of each page, in the part visitors don’t see. Write a fresh sentence for each page.',
   },
   'llms-txt': {
     what: 'Add the small summary file AI assistants look for',
-    why: 'It takes one file, and FaqFlo writes it for you.',
+    why: 'It is a single file summarising your site for AI assistants, and FaqFlo writes it for you.',
     label: 'Get your file',
   },
   'identity-pages': {
@@ -350,7 +350,7 @@ const PLAIN_ACTIONS: Record<
   },
   sitemap: {
     what: 'Give search engines a list of your pages',
-    why: 'It’s how they find the pages nothing links to prominently.',
+    why: 'It is how they find the pages that nothing on your site links to prominently.',
     label: 'Copy this line',
     where: 'Add this to the end of your robots.txt file, at the top level of your site.',
   },
@@ -502,6 +502,24 @@ const WINS: { id: string; phrase: string; so: string }[] = [
 
   This is a floor on clarity, not a licence to lose accuracy. If a sentence can
   only be shortened by making it vaguer, leave it long and say why.
+
+  ⚠️ AND THE FIFTEEN-WORD RULE IS FOR THE FINDINGS ABOVE, NOT FOR PROSE.
+
+  The entries in PLAIN are a list: each one is read on its own, beside a status
+  mark, and one idea per sentence is genuinely clearer there. verdict() is a
+  paragraph somebody reads start to finish, and the same rule applied to it
+  produced a telegram — eight sentences of four to eleven words each, none
+  joined to the next:
+
+    "We read 100 pages of Letsroof's site the way AI does. You run a roofing
+     contractor. We also asked AI 81 questions. It named you in 15. It's in
+     good shape."
+
+  Every sentence there is short, the grade measured 3.2, and it reads like a
+  robot. So the target is the GRADE, and the grade has room: connect clauses
+  with "and", "so" and "but", vary the length, and let a sentence run to
+  twenty-odd words when that is how a person would say it. Measure the grade
+  afterwards rather than counting words as you go.
 */
 
 const NUMBER_WORDS = [
@@ -725,15 +743,15 @@ export function holdingBack(report: AuditReport): string {
   const weight =
     problems.length === 1
       ? fails.length
-        ? ' It’s worth doing before anything else on the site.'
-        : ' It’s not urgent, so there’s no rush.'
+        ? ' It is worth doing before anything else on the site.'
+        : ' It is not urgent, so there is no particular rush to get to it.'
       : fails.length
-        ? ' Some matter more than others, and you don’t have to do it all at once.'
+        ? ' Some matter more than others, and there is no need to do it all at once.'
         : ' None of it is urgent, so you can take these in your own time.';
 
   const pointer =
     problems.length > 1
-      ? ' The list is in order. Whatever costs you most sits at the top.'
+      ? ' The list below is in order, with whatever costs you most sitting at the top.'
       : '';
 
   return `${lead}${theme}${weight}${pointer}`;
@@ -774,6 +792,87 @@ export type VerdictContext = {
   checked?: number;
 };
 
+/**
+ * "Can AI read your site?", as a paragraph rather than a list.
+ *
+ * ⚠️ THIS EXISTS BECAUSE JOINING STANDALONE SENTENCES IS NOT PROSE. The caller
+ * used to do `blockers.map(plainFor).join(' ')`, which produced five unconnected
+ * declaratives and said "allowed to read your site" twice:
+ *
+ *   "The big AI assistants are allowed to read your site. Google is allowed to
+ *    read your site. AI can read your pages. The words are in the page itself…"
+ *
+ * Each of those is right on its own — that is what a PLAIN entry is for, beside
+ * a status mark in the technical view. Read one after another they are a list
+ * with the bullets taken out.
+ *
+ * ⚠️ AND IT LIVES HERE, NOT IN THE COMPONENT. audit-summary.tsx carries the rule
+ * that plain.ts writes these words, because a sentence composed in the JSX is a
+ * second voice describing the same measurement and free to drift from the one
+ * the technical view shows. Composing it here keeps one voice.
+ *
+ * The four checks are the same four verdict() cascades over, in the same
+ * severity order, grouped into the two questions a reader actually has: can
+ * they get in, and is there anything to read when they do.
+ */
+export function readability(report: AuditReport): string {
+  const all = report.pillars.flatMap((p) => p.findings);
+  const at = (id: string) => all.find((f) => f.id === id);
+  const ok = (id: string) => at(id)?.status === 'pass';
+  const present = (id: string) => at(id) !== undefined;
+
+  const blockers = ['crawlers', 'googlebot', 'raw-html', 'noindex']
+    .map(at)
+    .filter((f): f is Finding => Boolean(f));
+
+  /* Nothing to report on. Not a pass — we did not run these. */
+  if (blockers.length === 0) {
+    const n = report.crawled.length;
+    return `We read ${n} ${n === 1 ? 'page' : 'pages'} on your site.`;
+  }
+
+  const broken = blockers.filter((f) => f.status === 'fail' || f.status === 'warn');
+
+  /*
+    Something is in the way. The PLAIN entries for these already read as prose —
+    two or three sentences each — so they carry the detail, and all this adds is
+    the one-word answer to the question in the heading.
+  */
+  if (broken.length > 0) {
+    const lead = broken.some((f) => f.status === 'fail') ? 'Not properly, no.' : 'Mostly, but not cleanly.';
+    return `${lead} ${broken.map(plainFor).join(' ')}`;
+  }
+
+  /*
+    Everything passed, and this is the case the old join read worst on. Built as
+    two sentences on the two questions rather than one per check, so the answer
+    reads like an answer.
+  */
+  const getIn =
+    present('googlebot') && ok('googlebot')
+      ? 'The AI assistants can reach your pages, and so can Google.'
+      : 'The AI assistants can reach your pages.';
+
+  const toRead: string[] = [];
+  if (ok('raw-html')) {
+    toRead.push(
+      'your words sit in the page itself, rather than being drawn in afterwards by code they can’t run',
+    );
+  }
+  if (present('noindex') && ok('noindex')) {
+    toRead.push('nothing is quietly asking search engines to skip you');
+  }
+
+  const found =
+    toRead.length === 2
+      ? `When they do, ${toRead[0]}, and ${toRead[1]}.`
+      : toRead.length === 1
+        ? `When they do, ${toRead[0]}.`
+        : '';
+
+  return `Yes, and that isn’t something to take for granted. ${getIn}${found ? ` ${found}` : ''}`;
+}
+
 export function verdict(report: AuditReport, context: VerdictContext = {}): string {
   const all = report.pillars.flatMap((p) => p.findings);
   const at = (id: string) => all.find((f) => f.id === id);
@@ -781,54 +880,78 @@ export function verdict(report: AuditReport, context: VerdictContext = {}): stri
   const shaky = (id: string) => at(id)?.status === 'fail' || at(id)?.status === 'warn';
 
   const pages = report.crawled.length;
-  const whose = context.siteName ? `${context.siteName}’s site` : 'your site';
-  const asA = context.trade ? ` You run a ${context.trade.toLowerCase()}.` : '';
+  /* "Letsroof" when we know the name, "your site" when we don't. Used as the
+     subject of a sentence, so it never carries a possessive of its own. */
+  const site = context.siteName ?? 'your site';
+  /* ⚠️ ONLY WHEN WE DIDN'T GUESS IT — the caller passes `trade` for a
+     profileSource of 'schema' or 'manual' and withholds it for 'inferred'.
+     Woven into the opening clause now rather than standing as its own
+     sentence, but the condition is unchanged: never state a guess as a fact. */
+  const forA = context.trade ? `for a ${context.trade.toLowerCase()}, ` : '';
+  const read = `We read ${pages} ${pages === 1 ? 'page' : 'pages'} the way an AI assistant would`;
 
-  /* Two short sentences rather than one long one — the fifteen-word rule this
-     file sets for itself applies to its own opening line first. */
-  const asked =
-    context.checked && context.checked > 0
-      ? ` We also asked AI ${context.checked} questions. It named you in ${context.named ?? 0}.`
+  /*
+    The citation figures, said with what they mean.
+
+    ⚠️ NO CAUSAL CLAIM. A site can be named while its own pages are unreadable —
+    assistants cite directories and reviews too — and we have not measured where
+    a mention came from. So this states the count and its plain significance and
+    stops there.
+  */
+  const checked = context.checked ?? 0;
+  const named = context.named ?? 0;
+  const mentions =
+    checked > 0
+      ? named > 0
+        ? ` You came up in ${named} of the ${checked} questions we asked, so you’re already showing up.`
+        : ` None of the ${checked} questions we asked have brought you up yet.`
       : '';
 
-  const scanned = `We read ${pages} ${pages === 1 ? 'page' : 'pages'} of ${whose} the way AI does.${asA}${asked}`;
+  /*
+    ⚠️ THE FOUR CRISIS BRANCHES DELIBERATELY OMIT `mentions`.
+
+    Each one says in its own words that nothing else counts while the blocker is
+    switched on. Following that with a citation count argues with it inside one
+    paragraph. The figure is not lost: VisibilityLine reports it further down
+    this same page — see components/dashboard/audit-extras.tsx.
+  */
 
   if (failing('crawlers')) {
-    return `${scanned} Your site turns them away at the door. Its settings tell them not to read it. Until that changes, nothing you publish can be quoted, however good it is. It’s a two-minute fix, and it’s the only thing worth doing first.`;
+    return `Right now nothing you publish can be quoted, and it comes down to a single setting. ${site} is telling the AI assistants not to read it, so they turn around at the door. ${read}, and none of that work can reach them until this changes. It’s a two-minute fix, and it’s the only one worth doing first.`;
   }
 
-  /* ⚠️ GOOGLEBOT GETS ITS OWN SENTENCE, NOT THE CRAWLERS ONE. These shared a
+  /* ⚠️ GOOGLEBOT GETS ITS OWN BRANCH, NOT THE CRAWLERS ONE. These shared a
      branch, which read "your site turns them away at the door" for a site that
      lets every AI assistant in and blocks only Google — while part 1 of the
      report, directly below, correctly said the assistants were allowed. Same
      severity, different fact, so it needs its own words. */
   if (failing('googlebot')) {
-    return `${scanned} The assistants can read it, but Google can’t. Your settings turn Google away. That costs you normal search results and the AI answers above them. It’s a two-minute fix, and it’s the one to do first.`;
+    return `The AI assistants can read ${site}, but Google can’t. One setting turns Google away, and that costs you the ordinary search results as well as the AI answers sitting above them. ${read}, and everything else about them looks reachable. It’s a two-minute fix, and it’s the one to do first.`;
   }
 
   if (failing('raw-html')) {
-    return `${scanned} They saw an empty page. Your site builds its content in the visitor’s browser. AI does not wait for that. So as far as they can tell, there’s nothing on your site at all. That’s the one to fix before anything else.`;
+    return `As far as an AI assistant is concerned, ${site} is a blank page. Your site builds its content in the visitor’s browser, and assistants don’t wait around for that, so every one of the ${pages} ${pages === 1 ? 'page' : 'pages'} we read came back with nothing on it. Fix that and the rest of this report starts counting.`;
   }
 
   if (failing('noindex')) {
-    return `${scanned} One setting is quietly telling search engines to leave your site out altogether. Nothing else on this page matters much while that’s switched on.`;
+    return `One setting is quietly asking search engines to leave ${site} out altogether, and while it’s switched on very little else matters. ${read}, and this stands in front of all of them. Turn it off first, then work down the list below.`;
   }
 
   if (failing('qa-markup') && failing('question-headings')) {
-    return `${scanned} They can read it. But nothing on it is written as a question with an answer. So when a customer asks about what you do, there is nothing to match. It names somebody else. This is the gap that costs you most. It is the one we close.`;
+    return `AI can read ${site} perfectly well — it just can’t find an answer to quote. Nothing on the site is set out as a question with a reply underneath, and that’s the shape an assistant looks for first. So when a customer asks about what you do, there’s nothing to match, and it names someone else.${mentions} This is the gap that costs you most, and it’s the one we’re built to close.`;
   }
 
   if (failing('org-schema')) {
-    return `${scanned} They can read it, but nothing tells them which business these answers belong to. An assistant can repeat what you wrote and credit somebody else entirely. You do the work, and someone else gets the name check.`;
+    return `AI can read ${site}, but nothing on it says which business these answers belong to. So an assistant can repeat what you wrote and credit someone else — you do the work, and a competitor gets the name check.${mentions} It takes about fifteen minutes to fix, and it’s worth doing first.`;
   }
 
   if (shaky('qa-markup') || shaky('answer-first')) {
-    return `${scanned} The foundations are sound — they can reach your site and read it. What’s missing is shape. Your answers aren’t laid out as questions with a reply underneath. That’s the form assistants quote.`;
+    return `The foundations are solid — assistants can reach ${site} and read it fine. What’s missing is the shape. Your answers aren’t set out as a question with the reply right under it, and that’s the form an assistant quotes.${mentions} ${read}, and it’s the same story on most of them.`;
   }
 
   if (report.score >= 85) {
-    return `${scanned} It’s in good shape. Assistants can read it, tell whose it is, and find their way around. From here it is about depth. Answer more of their questions, and answer them better.`;
+    return `Good news — ${forA}${site} is in good shape. ${read}. It can get in, work out whose site it is, and find its way around.${mentions} From here it’s about depth: answer more of what your customers ask, and answer it better than anyone else nearby.`;
   }
 
-  return `${scanned} Nothing is badly broken, but several small things are each costing you a little. The list below is in the order worth doing them.`;
+  return `Nothing on ${site} is badly broken. There are just several small things, each costing you a little. ${read}, and the list below is in the order worth working through.${mentions} Start at the top — the first two or three make most of the difference.`;
 }

@@ -10,6 +10,7 @@ import {
   plainAction,
   plainFor,
   plainShort,
+  readability,
   strengths,
   verdict,
 } from '@/lib/audit/plain';
@@ -251,17 +252,12 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
     then told to ignore it — the order the cascade already uses. Sorting these
     any other way puts the mildest failure first.
   */
-  const all = report.pillars.flatMap((p) => p.findings);
-  const blockers = ['crawlers', 'googlebot', 'raw-html', 'noindex']
-    .map((id) => all.find((f) => f.id === id))
-    .filter((f): f is Finding => Boolean(f));
-  const broken = blockers.filter((f) => f.status === 'fail' || f.status === 'warn');
-  const readable =
-    broken.length > 0
-      ? broken.map(plainFor).join(' ')
-      : blockers.length > 0
-        ? blockers.map(plainFor).join(' ')
-        : `We read ${report.crawled.length} ${report.crawled.length === 1 ? 'page' : 'pages'} on your site.`;
+  /* ⚠️ COMPOSED IN plain.ts, NOT JOINED HERE. This was
+     `blockers.map(plainFor).join(' ')`, which put five standalone sentences end
+     to end and said "allowed to read your site" twice. readability() writes it
+     as a paragraph, and writing it there rather than here keeps one voice
+     describing one measurement — the rule stated above. */
+  const readable = readability(report);
   const checkedOn = new Date(report.checkedAt).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'long',
