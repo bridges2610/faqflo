@@ -21,7 +21,6 @@ import {
   checksByEngine,
   groupByQuestion,
   insteadFor,
-  sortByCitations,
   type QuestionGroup,
 } from '@/lib/dashboard/questions';
 import { CitationChart } from './citation-chart';
@@ -34,6 +33,7 @@ import {
   type OutcomeSplit,
 } from './engine-detail';
 import { PromptMatrix } from './prompt-matrix';
+import { QuestionControls } from './question-controls';
 import { EmptyState } from './empty-state';
 import { Meter } from './meter';
 import { RunProgress } from './run-progress';
@@ -134,12 +134,24 @@ function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.R
               </p>
             </div>
 
-            {action && <div className="shrink-0">{action}</div>}
           </div>
         </summary>
 
+        {/* ⚠️ THE ACTIONS ARE INSIDE THE DISCLOSURE, NOT BESIDE THE QUESTION.
+
+            They used to sit in a `shrink-0` slot on the summary row, which was
+            sized for one small "Draft an answer" button. The curate controls —
+            reorder, reword, stop watching — are a 318px cluster, and shrink-0
+            meant they could not give any of it back: at 360px the row ran 43px
+            past the viewport and the whole page scrolled sideways.
+
+            Putting them here also matches the matrix, which has always kept its
+            actions in the expanded row, and it un-squeezes the question itself:
+            the text had been sharing the line with a button that never yielded.
+        */}
         <div className="mt-3">
           <EngineDetailList group={group} />
+          {action ? <div className="mt-3">{action}</div> : null}
         </div>
       </details>
     </li>
@@ -641,7 +653,41 @@ export function TrackingWorkspace() {
     deliberately: a second copy here would be free to disagree with that one
     about how many questions a customer has.
   */
-  const groups = groupByQuestion(latest);
+  /*
+    ⚠️ THE LIST IS THE QUESTIONS, JOINED TO THE CHECKS — NOT THE OTHER WAY ROUND.
+
+    This was groupByQuestion(latest) alone, which builds rows out of the CHECKS.
+    Two things follow from that and both are wrong now that the owner curates
+    this list:
+
+      1. A question added a minute ago has no checks, so it did not appear at
+         all. You typed it, the list did not change, and the only hint was a
+         line of text elsewhere saying it would show up after the next run.
+      2. Nothing the owner does to the order could survive, because the rows
+         were derived from measurements rather than from their list.
+
+    So the rows come from `questions`, in the owner's `position` order, and each
+    one is joined to its checks by question text — the same string equality
+    0009 pins tracked_prompts to. A question with no checks yet renders as a
+    real row whose three cells read "not asked", which is exactly true.
+  */
+  const measured = new Map(groupByQuestion(latest).map((g) => [g.question, g]));
+
+  const groups: QuestionGroup[] = [...questions]
+    .sort((a, b) => a.position - b.position)
+    .map(
+      (q) =>
+        measured.get(q.question) ?? {
+          question: q.question,
+          checks: [],
+          /* ⚠️ addedAt, AND THE ROW MUST NOT PRINT IT AS A CHECK TIME. Nothing
+             has been checked, so "2 days ago" beside this row would date a
+             measurement that never happened. prompt-matrix.tsx suppresses the
+             timestamp when checks is empty. */
+          checkedAt: q.addedAt,
+          sources: 0,
+        },
+    );
 
   /*
     Chips carry BOTH units, because the row and the tile above count different
@@ -671,9 +717,17 @@ export function TrackingWorkspace() {
      results lead — most citations, then most mentions — so the top of the table
      is the proof the subscription bought. Pagination slices this, so "Show 12
      more" reveals progressively weaker rows rather than an arbitrary tail. */
-  const filtered = sortByCitations(
-    filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter)),
-  );
+  /*
+    ⚠️ THE OWNER'S ORDER WINS, SO sortByCitations IS GONE FROM HERE.
+
+    It sorted best-results-first, which was right while this list was derived
+    from measurements and nobody could arrange it. The owner can arrange it now,
+    and a reorder control whose result is immediately re-sorted away is a handle
+    attached to nothing — the exact failure this dashboard keeps writing down.
+    Filtering still narrows; it never reorders.
+  */
+  const filtered =
+    filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter));
   const visible = filtered.slice(0, shown);
 
   /*
@@ -688,7 +742,33 @@ export function TrackingWorkspace() {
     It is a function rather than JSX because both layouts below need their own
     instance of it per row, and the two must offer the identical button.
   */
-  const draftAction = (group: QuestionGroup) =>
+  /* The question row this group came from, for the controls. Matched by text,
+     the same join the rows themselves are built on. */
+  const ordered = [...questions].sort((a, b) => a.position - b.position);
+
+  const draftAction = (group: QuestionGroup) => {
+    const q = ordered.find((x) => x.question === group.question);
+    const index = q ? ordered.indexOf(q) : -1;
+
+    return (
+      <div className="space-y-3">
+        {q ? (
+          <QuestionControls
+            question={q}
+            /* Straight from the checks on the row rather than a second lookup —
+               the group IS the join, and asking twice is how the button and the
+               store end up disagreeing about whether an edit is allowed. */
+            hasResults={group.checks.length > 0}
+            isFirst={index === 0}
+            isLast={index === ordered.length - 1}
+          />
+        ) : null}
+        {draftButton(group)}
+      </div>
+    );
+  };
+
+  const draftButton = (group: QuestionGroup) =>
     group.checks.some((c) => c.outcome !== 'cited') ? (
       <DraftIntoGroup
         question={group.question}

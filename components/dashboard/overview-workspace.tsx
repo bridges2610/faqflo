@@ -1,27 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { ScoreDial } from '@/components/ui/score-dial';
 import { Sparkle } from '@/components/ui/doodle';
-import { scoreBand } from '@/lib/audit/score';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canOfferDoneForYou, canTrack } from '@/lib/dashboard/plans';
 import { timeAgo } from '@/lib/dashboard/format';
-import { auditHistory } from '@/lib/dashboard/store';
-import type { AuditRunRow } from '@/lib/supabase/types';
 import { buildWorklist, setupSteps, standing } from '@/lib/dashboard/worklist';
 import { DoneForYouCard } from './done-for-you-card';
-import { VisibilityPanel } from './visibility-panel';
-import { MetricTile } from './metric-tile';
+import { HomePreviews } from './home-previews';
 import { MicroLabel } from './micro-label';
 import { FaqIcon, GlobeIcon, SearchIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { SetupChecklist } from './setup-checklist';
-import { Sparkline } from './sparkline';
 import { StatRow } from './stat-row';
 import { TaskRow } from './task-row';
 
@@ -72,25 +65,19 @@ export function OverviewWorkspace() {
   const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
 
   /*
-    Past runs, for the trend.
+    ⚠️ THE PAST-RUNS FETCH HAS GONE WITH THE THINGS THAT READ IT.
 
-    Fetched here rather than in the provider because it is the one piece of
-    dashboard data that is not in the local snapshot, only this screen wants it,
-    and it must never block the worklist from rendering. A failed or empty read
-    simply means no sparkline — see auditHistory().
+    auditHistory() was called here for two consumers: a sparkline and a "since
+    last time" delta, both of which lived in the score strip this screen no
+    longer has. Keeping the request would have been a round trip per visit for
+    a value nothing rendered.
+
+    The rule it carried is worth remembering if a trend comes back: compare
+    SAME-DEPTH runs only. A quick run scores 3 findings across 2 pillars and a
+    full one ~40 across 6, so a line through both draws a cliff that never
+    happened to the customer's website. lib/dashboard/store.ts's auditHistory
+    still returns `depth` for exactly that reason.
   */
-  const [history, setHistory] = useState<AuditRunRow[]>([]);
-
-  useEffect(() => {
-    if (!site) return;
-    let cancelled = false;
-    void auditHistory(site.id).then((rows) => {
-      if (!cancelled) setHistory(rows);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [site]);
 
   const report = site?.lastAudit ?? null;
   const input = { report, site: site ?? null, user, groups, faqs, questions };
@@ -118,22 +105,7 @@ export function OverviewWorkspace() {
 
   const tasks = buildWorklist(input);
   const state = standing(input);
-  const band = report ? scoreBand(report.score) : null;
 
-  /*
-    ⚠️ SAME DEPTH ONLY, and this is where that rule is enforced for both the
-    delta and the sparkline.
-
-    A quick run scores 3 findings across 2 pillars; a full run scores ~40 across
-    6. Charting them on one line draws a cliff that never happened to the
-    customer's site. Sparkline itself can't see `depth`, so it has to be done
-    here — reversed at the end because the query returns newest first and a
-    trend line reads oldest to newest.
-  */
-  const comparable = report ? history.filter((r) => r.depth === report.depth) : [];
-  const trend = [...comparable].reverse().map((r) => r.score);
-  const previous = comparable.find((r) => r.checked_at !== report?.checkedAt);
-  const movement = report && previous ? report.score - previous.score : null;
 
   const pagesWithFaq = report?.pages?.filter((p) => p.hasFaqSchema).length ?? 0;
   const setupDone = steps.every((s) => s.done);
@@ -157,103 +129,18 @@ export function OverviewWorkspace() {
       />
 
       {/*
-        Whether AI names you, first — it is what the subscription is for, and
-        the audit exists in service of it.
+        ⚠️ FOUR WINDOWS, NOT A FIFTH DASHBOARD.
+
+        A visibility panel, a score strip and three metric tiles stood here —
+        a summary that counted things for itself and could therefore disagree
+        with the pages it summarised. HomePreviews reads exactly what the four
+        destinations read, and every card is a link: Home says where to go, it
+        is not somewhere to stay.
+
+        ⚠️ AND IT SITS BELOW THE WORKLIST NOW. Three rows of figures used to
+        come first, which put "how am I doing" above "what do I do about it"
+        on the one screen that exists to answer the second question.
       */}
-      <VisibilityPanel tracking={tracking} />
-
-      {/*
-        Then whether AI can read you.
-
-        ⚠️ A STRIP, NOT A CARD, AND THE DEMOTION IS THE POINT. This was the
-        opener until the visibility panel arrived above it. Two full-height
-        score cards stacked would be the "identical full-width rectangles"
-        this file's header comment says made the screen feel unfinished — so
-        this one gives up its vertical padding and puts everything on one line.
-
-        It keeps the GRADIENT dial while the panel above uses a banded one.
-        That is not an inconsistency: this figure is also printed and
-        screenshotted on its own from the audit page, where no band word would
-        travel with it. See the header of score-dial.tsx.
-      */}
-      {report && (
-        <Card className="mb-5 px-5 py-4">
-          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-center">
-            <ScoreDial score={report.score} size="sm" />
-
-            <div className="min-w-0 text-center sm:text-left">
-              <div className="flex flex-wrap items-baseline justify-center gap-x-3 gap-y-1 sm:justify-start">
-                <MicroLabel>Can AI read your site</MicroLabel>
-                <h3 className="text-navy text-[1.0625rem] font-bold tracking-normal">
-                  {band!.label}
-                </h3>
-                {movement !== null && movement !== 0 && (
-                  <span
-                    className={`text-xs font-semibold ${movement > 0 ? 'text-success-ink' : 'text-error-ink'}`}
-                  >
-                    {movement > 0 ? 'Up' : 'Down'} {Math.abs(movement)} pts
-                  </span>
-                )}
-                <span className="text-slate text-xs">{timeAgo(report.checkedAt)}</span>
-                {/* Renders nothing under three comparable runs — see
-                    sparkline.tsx. Inline here so its absence closes up rather
-                    than leaving a hole. */}
-                <Sparkline values={trend} label="Visibility score" />
-              </div>
-
-              <p className="text-slate mt-1 max-w-xl text-sm leading-relaxed">{band!.summary}</p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/*
-        One card, three cells, hairline dividers — not three floating cards.
-        Separate shadows across the top of a page read as separate things
-        competing; divided cells read as one row of figures, which is what they
-        are. (It was four until Visibility became the score card above.)
-      */}
-      <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-2 sm:divide-x lg:grid-cols-3">
-        <MetricTile
-          label="Pages live"
-          icon={<GlobeIcon className="h-3.5 w-3.5" />}
-          tint="bg-accent-soft text-teal-ink"
-          value={state.totalGroups === 0 ? '—' : `${state.liveGroups}/${state.totalGroups}`}
-          /* The only tile whose value is a ratio, so the only one with a bar.
-             Guarded on totalGroups because a brand-new account shows "—" and an
-             empty track under a dash would claim a zero out of nothing. */
-          progress={
-            state.totalGroups > 0
-              ? { value: state.liveGroups, total: state.totalGroups }
-              : null
-          }
-          footer={
-            state.staleGroups > 0
-              ? `${state.staleGroups} out of date`
-              : state.totalGroups === 0
-                ? 'nothing set up yet'
-                : 'up to date'
-          }
-          href="/dashboard/publish"
-        />
-        <MetricTile
-          label="Answers"
-          icon={<FaqIcon className="h-3.5 w-3.5" />}
-          tint="bg-success/12 text-success-ink"
-          value={state.published}
-          footer="published and quotable"
-          href="/dashboard/faqs"
-        />
-        {/* Neutral on purpose. Red would read as an alarm, and zero gaps is a
-            good outcome — a tile shouldn't change meaning with its value. */}
-        <MetricTile
-          label="Gaps"
-          icon={<SearchIcon className="h-3.5 w-3.5" />}
-          value={state.unanswered}
-          footer="questions with no answer"
-          href="/dashboard/questions"
-        />
-      </Card>
 
       {/* Main column and rail. The rail only exists once there is room beside
           the list; below lg everything stacks in source order, which puts the
@@ -424,6 +311,10 @@ export function OverviewWorkspace() {
             />
           )}
         </div>
+      </div>
+
+      <div className="mt-6">
+        <HomePreviews report={report} />
       </div>
 
       {sites.length > 1 && (

@@ -1075,6 +1075,58 @@ function pathTaken(data: DashboardData, siteId: string, path: string, exceptId?:
   );
 }
 
+/**
+ * Collapse a site's pages into one list of answers.
+ *
+ * Answers used to be one block per website page — a "Service page" group at
+ * /services, a "Pricing" group at /pricing — because the paste block goes onto
+ * that specific page and `publishedAt` tracked when each was pasted. The screen
+ * is one flat list now, and every export function in lib/dashboard/export.ts
+ * takes a single group, so a flat list needs a single group behind it.
+ *
+ * ⚠️ EVERY ENTRY SURVIVES; ONLY THE CONTAINER CHANGES. Answers are appended to
+ * the target in (group position, entry position) order, so what the customer
+ * reads top to bottom is what they read before, with the second page's answers
+ * following the first page's.
+ *
+ * ⚠️ THE MERGED GROUP IS 'never published', AND THAT IS NOT DATA LOSS — IT IS
+ * THE TRUTH. The combined block has never been pasted anywhere. Carrying the
+ * target's publishedAt across would let publishState() report 'current' for a
+ * block that exists nowhere but here, and the customer's live pages would
+ * quietly hold a partial copy while the dashboard said everything was fine.
+ * Nulling both fields makes the next nudge say "paste this", which is exactly
+ * what needs to happen.
+ *
+ * ⚠️ IDEMPOTENT, AND A NO-OP BELOW TWO GROUPS. Safe to call on every visit.
+ */
+export async function mergeGroupsForSite(siteId: string): Promise<DashboardData> {
+  const data = requireData('mergeGroupsForSite');
+  const groups = groupsForSite(data, siteId);
+  if (groups.length < 2) return data;
+
+  const [target, ...rest] = groups;
+  const restIds = new Set(rest.map((g) => g.id));
+
+  // Ordered the way the customer already reads them: page order, then the
+  // order within each page.
+  const ordered = groups.flatMap((g) => faqsForGroup(data, g.id));
+
+  let rank = 0;
+  const faqs = data.faqs.map((f) => {
+    const index = ordered.findIndex((o) => o.id === f.id);
+    if (index === -1) return f;
+    return { ...f, groupId: target.id, position: rank++ };
+  });
+
+  return write({
+    ...data,
+    groups: data.groups
+      .filter((g) => !restIds.has(g.id))
+      .map((g) => (g.id === target.id ? { ...g, publishedAt: null, publishedHash: null } : g)),
+    faqs,
+  });
+}
+
 export async function createGroup(siteId: string, input: NewGroup): Promise<DashboardData> {
   const data = requireData('createGroup');
   if (pathTaken(data, siteId, input.path)) throw new DuplicatePath(normalizePath(input.path));
@@ -1147,6 +1199,150 @@ export async function deleteGroup(id: string): Promise<DashboardData> {
     );
 
   return write({ ...data, groups, faqs: data.faqs.filter((f) => f.groupId !== id) });
+}
+
+/*
+  The competitors a customer watches.
+
+  ⚠️ ADD, EDIT, DELETE AND REORDER ARE ALL LEGITIMATE HERE, AND THEY ARE NOT ON
+  THE MEASURED LIST. This is a list the owner keeps: which businesses do I
+  consider rivals. `tracking.competitors` is the other thing — every domain the
+  engines actually cited, counted — and it has no CRUD because editing it would
+  be editing a measurement. The two live on one page and must not learn each
+  other's habits.
+*/
+
+/** What the customer types. The domain is normalised before it is stored. */
+export type NewCompetitor = { name: string; domain: string };
+
+export type AddCompetitorResult =
+  | { ok: true; data: DashboardData }
+  | { ok: false; reason: 'bad-domain' | 'duplicate' | 'own-domain' | 'cap' };
+
+/**
+ * How many rivals one site may watch.
+ *
+ * ⚠️ A LIST, NOT A DATABASE. Ten is enough to hold the businesses a local owner
+ * actually competes with, and past that the page stops being a watch list and
+ * becomes the measured table with extra steps — which already exists directly
+ * below it and is better at the job.
+ */
+export const COMPETITOR_CAP = 10;
+
+export async function addCompetitor(
+  siteId: string,
+  input: NewCompetitor,
+): Promise<AddCompetitorResult> {
+  const data = requireData('addCompetitor');
+
+  /* ⚠️ NORMALISED ON THE WAY IN, ONCE. The Competitors page joins this row to
+     the measured list by `domain`, and the measured side is built from
+     sourceHost() output — bare host, no scheme, no www. A stored
+     "https://Summit.com/" would never match and the row would read as a
+     permanent zero, which is indistinguishable from a real finding. */
+  const domain = normalizeDomain(input.domain);
+  if (!domain) return { ok: false, reason: 'bad-domain' };
+
+  const site = data.sites.find((s) => s.id === siteId);
+  /* Watching yourself would put a row in the list whose "mentions" figure is
+     your own citations — a number that already has a home on this page and
+     means something else there. */
+  if (site && normalizeDomain(site.domain) === domain) return { ok: false, reason: 'own-domain' };
+
+  const mine = data.competitors.filter((c) => c.siteId === siteId);
+  if (mine.some((c) => c.domain === domain)) return { ok: false, reason: 'duplicate' };
+  if (mine.length >= COMPETITOR_CAP) return { ok: false, reason: 'cap' };
+
+  const created: Competitor = {
+    id: newId('cmp'),
+    siteId,
+    // Falls back to the domain so a row is never nameless. Someone who pastes a
+    // URL and tabs away still gets a readable list.
+    name: input.name.trim() || domain,
+    domain,
+    position: mine.length,
+    createdAt: now(),
+  };
+
+  return { ok: true, data: await write({ ...data, competitors: [...data.competitors, created] }) };
+}
+
+export async function updateCompetitor(
+  id: string,
+  patch: Partial<NewCompetitor>,
+): Promise<DashboardData> {
+  const data = requireData('updateCompetitor');
+  const target = data.competitors.find((c) => c.id === id);
+  if (!target) return data;
+
+  // Same normalisation as the add path, for the same reason. An edit that
+  // introduced a scheme would silently unmatch a row that was matching.
+  const domain = patch.domain === undefined ? target.domain : normalizeDomain(patch.domain);
+  if (!domain) return data;
+
+  // A rename onto a domain already watched would break the unique constraint
+  // in 0015; refusing here keeps the failure in front of the customer rather
+  // than in a save error.
+  if (
+    domain !== target.domain &&
+    data.competitors.some((c) => c.siteId === target.siteId && c.domain === domain)
+  ) {
+    return data;
+  }
+
+  return write({
+    ...data,
+    competitors: data.competitors.map((c) =>
+      c.id === id
+        ? { ...c, name: patch.name?.trim() || c.name, domain }
+        : c,
+    ),
+  });
+}
+
+export async function deleteCompetitor(id: string): Promise<DashboardData> {
+  const data = requireData('deleteCompetitor');
+  const target = data.competitors.find((c) => c.id === id);
+  if (!target) return data;
+
+  /* ⚠️ CLOSE THE GAP THE DELETE LEAVES. Positions are compared by value when a
+     row moves, so a list holding 0,1,3 has a neighbour that moveCompetitor can
+     never find — the row at 3 would become undraggable. Renumbering the
+     survivors is what keeps every position adjacent to the next. */
+  const remaining = data.competitors
+    .filter((c) => c.id !== id)
+    .sort((a, b) => a.position - b.position);
+
+  let rank = 0;
+  const renumbered = remaining.map((c) =>
+    c.siteId === target.siteId ? { ...c, position: rank++ } : c,
+  );
+
+  return write({ ...data, competitors: renumbered });
+}
+
+export async function moveCompetitor(
+  id: string,
+  direction: 'up' | 'down',
+): Promise<DashboardData> {
+  const data = requireData('moveCompetitor');
+  const target = data.competitors.find((c) => c.id === id);
+  if (!target) return data;
+
+  const neighbourPosition = target.position + (direction === 'up' ? -1 : 1);
+  const neighbour = data.competitors.find(
+    (c) => c.siteId === target.siteId && c.position === neighbourPosition,
+  );
+  if (!neighbour) return data;
+
+  return write({
+    ...data,
+    competitors: data.competitors.map((c) => {
+      if (c.id === target.id) return { ...c, position: neighbourPosition };
+      if (c.id === neighbour.id) return { ...c, position: target.position };
+      return c;
+    }),
+  });
 }
 
 export async function moveGroup(id: string, direction: 'up' | 'down'): Promise<DashboardData> {
@@ -1847,6 +2043,104 @@ export type ManualQuestionResult =
  * a longer local list would simply be truncated there and the questions past it
  * would sit on screen looking watched while nothing ever asked them.
  */
+/**
+ * Has this question ever been asked?
+ *
+ * ⚠️ THE GATE ON EDITING, AND IT BELONGS HERE RATHER THAN IN THE BUTTON.
+ * questions.question is byte-identical to tracked_prompts.question and the two
+ * are joined by plain string equality — 0009 says so and forbids even trimming
+ * on the way in. So changing the text does not rename a question; it orphans
+ * every result collected under the old wording and leaves the new one looking
+ * as though it was never asked. A hidden pencil is a suggestion. This is the
+ * rule.
+ */
+export function questionHasResults(data: DashboardData, question: DiscoveredQuestion): boolean {
+  const tracking = data.tracking.find((t) => t.siteId === question.siteId);
+  return (tracking?.latest ?? []).some((c) => c.question === question.question);
+}
+
+export type EditQuestionResult =
+  | { ok: true; data: DashboardData }
+  | { ok: false; reason: 'empty' | 'too-long' | 'duplicate' | 'has-results' };
+
+/** Reword a question that has not been asked yet. */
+export async function updateQuestion(id: string, text: string): Promise<EditQuestionResult> {
+  const data = requireData('updateQuestion');
+  const target = data.questions.find((q) => q.id === id);
+  if (!target) return { ok: false, reason: 'empty' };
+
+  if (questionHasResults(data, target)) return { ok: false, reason: 'has-results' };
+
+  // Same normalisation addManualQuestion applies, so an edit and an add cannot
+  // disagree about what counts as the same question.
+  const next = text.trim().replace(/\s+/g, ' ');
+  if (!next) return { ok: false, reason: 'empty' };
+  if (next.length > MANUAL_QUESTION_MAX_CHARS) return { ok: false, reason: 'too-long' };
+
+  const key = questionKey(next);
+  if (
+    data.questions.some((q) => q.siteId === target.siteId && q.id !== id && questionKey(q.question) === key)
+  ) {
+    return { ok: false, reason: 'duplicate' };
+  }
+
+  return {
+    ok: true,
+    data: await write({
+      ...data,
+      questions: data.questions.map((q) => (q.id === id ? { ...q, question: next } : q)),
+    }),
+  };
+}
+
+/**
+ * Stop watching a question.
+ *
+ * ⚠️ THE RESULTS ALREADY COLLECTED ARE NOT DELETED WITH IT. citation_checks is
+ * evidence and the browser holds SELECT on it and nothing else — see 0009. The
+ * rows simply stop being joined to anything on screen. That is the honest
+ * outcome: we did ask, and we did see what we saw.
+ */
+export async function deleteQuestion(id: string): Promise<DashboardData> {
+  const data = requireData('deleteQuestion');
+  const target = data.questions.find((q) => q.id === id);
+  if (!target) return data;
+
+  /* Close the gap, for the reason deleteCompetitor gives: positions are matched
+     by value when a row moves, so a hole makes the row past it undraggable. */
+  const remaining = data.questions
+    .filter((q) => q.id !== id)
+    .sort((a, b) => a.position - b.position);
+
+  let rank = 0;
+  const renumbered = remaining.map((q) =>
+    q.siteId === target.siteId ? { ...q, position: rank++ } : q,
+  );
+
+  return write({ ...data, questions: renumbered });
+}
+
+export async function moveQuestion(id: string, direction: 'up' | 'down'): Promise<DashboardData> {
+  const data = requireData('moveQuestion');
+  const target = data.questions.find((q) => q.id === id);
+  if (!target) return data;
+
+  const neighbourPosition = target.position + (direction === 'up' ? -1 : 1);
+  const neighbour = data.questions.find(
+    (q) => q.siteId === target.siteId && q.position === neighbourPosition,
+  );
+  if (!neighbour) return data;
+
+  return write({
+    ...data,
+    questions: data.questions.map((q) => {
+      if (q.id === target.id) return { ...q, position: neighbourPosition };
+      if (q.id === neighbour.id) return { ...q, position: target.position };
+      return q;
+    }),
+  });
+}
+
 export async function addManualQuestion(
   siteId: string,
   question: string,

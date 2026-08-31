@@ -201,12 +201,24 @@ function MatrixRow({
               <span className="text-navy block text-[0.8125rem] leading-snug">
                 {group.question}
               </span>
+              {/* ⚠️ NO TIMESTAMP ON A ROW THAT HAS NEVER BEEN ASKED. Rows are
+                  built from the question list now, so one can exist with no
+                  checks at all — and `checkedAt` on those is the date it was
+                  ADDED. Printing "2 days ago" beside three "not asked" cells
+                  would date a measurement that never happened. */}
               <span className="text-slate mt-0.5 block text-[0.6875rem]">
-                {timeAgo(group.checkedAt)}
-                {instead && (
+                {group.checks.length === 0 ? (
+                  'Not asked yet — runs with your next check'
+                ) : (
                   <>
-                    {' '}
-                    · AI sent people to <span className="text-navy font-medium">{instead}</span>
+                    {timeAgo(group.checkedAt)}
+                    {instead ? (
+                      <>
+                        {' '}
+                        · AI sent people to{' '}
+                        <span className="text-navy font-medium">{instead}</span>
+                      </>
+                    ) : null}
                   </>
                 )}
               </span>

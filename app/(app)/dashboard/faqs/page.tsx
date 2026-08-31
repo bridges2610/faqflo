@@ -1,13 +1,13 @@
 import type { Metadata } from 'next';
 import { requirePro } from '@/lib/auth/pro-only';
-import { FaqsWorkspace } from '@/components/dashboard/faqs-workspace';
+import { AnswersWorkspace } from '@/components/dashboard/answers-workspace';
 
-export const metadata: Metadata = { title: 'FAQs' };
+export const metadata: Metadata = { title: 'Answers' };
 
-export default async function FaqsPage() {
+export default async function AnswersPage() {
   /* Pro only — a free account is redirected to its report.
-   See the reasoning in lib/auth/pro-only.ts. */
+     See the reasoning in lib/auth/pro-only.ts. */
   await requirePro();
 
-  return <FaqsWorkspace />;
+  return <AnswersWorkspace />;
 }

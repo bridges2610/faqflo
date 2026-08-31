@@ -22,6 +22,7 @@ import {
 import { trackingPeriod, trackingPlanFor } from './plans';
 import * as store from './store';
 import type {
+  Competitor,
   ContentPlan,
   DashboardData,
   DiscoveredQuestion,
@@ -90,6 +91,8 @@ type Ctx = {
   /** Answers in one group, ordered by position. */
   faqsIn: (groupId: string) => FaqEntry[];
   questions: DiscoveredQuestion[];
+  /** The rivals this site watches, in the owner's order. */
+  competitors: Competitor[];
   tracking: SiteTracking | null;
   /**
    * Re-read tracking from Postgres — call after a run stores new checks.
@@ -127,6 +130,15 @@ type Ctx = {
   editGroup: (id: string, patch: Partial<store.NewGroup>) => Promise<void>;
   removeGroup: (id: string) => Promise<void>;
   moveGroup: (id: string, direction: 'up' | 'down') => Promise<void>;
+  /** Collapse a site's pages into one list. Idempotent; a no-op below two. */
+  mergeGroups: (siteId: string) => Promise<void>;
+
+  /* The watch list. Nothing here touches the MEASURED competitor list behind
+     `tracking` — that one is evidence and has no mutations at all. */
+  addCompetitor: (siteId: string, input: store.NewCompetitor) => Promise<store.AddCompetitorResult>;
+  editCompetitor: (id: string, patch: Partial<store.NewCompetitor>) => Promise<void>;
+  removeCompetitor: (id: string) => Promise<void>;
+  moveCompetitor: (id: string, direction: 'up' | 'down') => Promise<void>;
   markPublished: (groupId: string) => Promise<void>;
   saveAudit: (siteId: string, report: SiteAudit) => Promise<void>;
   saveContentPlan: (plan: ContentPlan) => Promise<void>;
@@ -149,6 +161,14 @@ type Ctx = {
   ) => Promise<void>;
   /** A question the customer typed. Resolves to why it was refused, if it was. */
   addManualQuestion: (siteId: string, question: string) => Promise<store.ManualQuestionResult>;
+
+  /* ⚠️ editQuestion CAN REFUSE, and 'has-results' is the refusal that matters:
+     the text is joined to its measurements by string equality, so rewording a
+     question that has been asked orphans everything collected under the old
+     wording. store.questionHasResults is the gate. */
+  editQuestion: (id: string, text: string) => Promise<store.EditQuestionResult>;
+  removeQuestion: (id: string) => Promise<void>;
+  moveQuestion: (id: string, direction: 'up' | 'down') => Promise<void>;
   /** Re-mark questions the site now publishes an answer to. */
   recheckCoverage: (siteId: string) => Promise<void>;
 
@@ -296,6 +316,18 @@ export function DashboardProvider({
 
   const questions = useMemo(
     () => (data && site ? store.questionsForSite(data, site.id) : []),
+    [data, site],
+  );
+
+  /* Sorted here rather than trusted from the store, so a row whose position was
+     just swapped renders in its new place without waiting for a reload. */
+  const competitors = useMemo(
+    () =>
+      data && site
+        ? data.competitors
+            .filter((c) => c.siteId === site.id)
+            .sort((a, b) => a.position - b.position)
+        : [],
     [data, site],
   );
 
@@ -608,6 +640,7 @@ export function DashboardProvider({
     faqs,
     faqsIn,
     questions,
+    competitors,
     tracking,
     refreshTracking,
     trackingRun,
@@ -633,6 +666,24 @@ export function DashboardProvider({
     editGroup: (id, patch) => apply(() => store.updateGroup(id, patch)),
     removeGroup: (id) => apply(() => store.deleteGroup(id)),
     moveGroup: (id, direction) => apply(() => store.moveGroup(id, direction)),
+    mergeGroups: (siteId) => apply(() => store.mergeGroupsForSite(siteId)),
+
+    /*
+      ⚠️ THIS ONE DOES NOT GO THROUGH apply() ON THE WAY IN, AND THE REASON IS
+      THE REFUSAL. A duplicate, a bad domain, your own domain and a full list
+      are four different things the customer can fix, and apply() only speaks
+      DashboardData — routing a refusal through it would mean inventing a
+      snapshot to hand back, which is a state write for a thing that changed no
+      state. So the store is called directly and apply() runs only on success.
+    */
+    addCompetitor: async (siteId, input) => {
+      const result = await store.addCompetitor(siteId, input);
+      if (result.ok) await apply(async () => result.data);
+      return result;
+    },
+    editCompetitor: (id, patch) => apply(() => store.updateCompetitor(id, patch)),
+    removeCompetitor: (id) => apply(() => store.deleteCompetitor(id)),
+    moveCompetitor: (id, direction) => apply(() => store.moveCompetitor(id, direction)),
     markPublished: (id) => apply(() => store.markGroupPublished(id)),
     saveAudit: (siteId, report) => apply(() => store.saveAudit(siteId, report)),
     saveContentPlan: (plan) => apply(() => store.saveContentPlan(plan)),
@@ -643,6 +694,17 @@ export function DashboardProvider({
     moveFaq: (id, direction) => apply(() => store.moveFaq(id, direction)),
     moveFaqToGroup: (id, groupId) => apply(() => store.moveFaqToGroup(id, groupId)),
     coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
+
+    /* Direct, then apply() on success — same shape as addCompetitor, and for
+       the same reason: apply() only speaks DashboardData, so a refusal has
+       nothing to hand it. */
+    editQuestion: async (id, text) => {
+      const result = await store.updateQuestion(id, text);
+      if (result.ok) await apply(async () => result.data);
+      return result;
+    },
+    removeQuestion: (id) => apply(() => store.deleteQuestion(id)),
+    moveQuestion: (id, direction) => apply(() => store.moveQuestion(id, direction)),
     addQuestions: (siteId, qs, mode) => apply(() => store.addQuestions(siteId, qs, mode)),
     /*
       Returns the refusal instead of swallowing it.
