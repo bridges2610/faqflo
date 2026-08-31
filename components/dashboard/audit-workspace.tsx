@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { ScoreDial } from '@/components/ui/score-dial';
-import { STATUS_CHIP, STATUS_WORD, StatusIcon } from '@/components/ui/status-icon';
 import { useDashboard } from '@/lib/dashboard/provider';
 // pageBudgetFor is no longer imported here: the budget is the server's
 // decision now, and a client-side copy of it would only ever be a guess about
@@ -16,12 +15,17 @@ import { opportunities, visibilityFindings } from '@/lib/dashboard/audit-context
 import { timeAgo } from '@/lib/dashboard/format';
 import { taskFromAction } from '@/lib/dashboard/worklist';
 import { buildActionPlan } from '@/lib/audit/actions';
-import { buildPillars, overallScore, pillarBand, scoreBand } from '@/lib/audit/score';
-import { PILLARS, type AuditReport, type Finding } from '@/lib/audit/types';
+import { buildPillars, overallScore, scoreBand } from '@/lib/audit/score';
+import {
+  PILLARS,
+  type AuditReport,
+  type Finding,
+  type PillarResult,
+} from '@/lib/audit/types';
 import { EmptyState } from './empty-state';
 import { PageHeader } from './page-header';
-import { ChevronIcon } from './nav-icons';
 import { AuditSummary } from './audit-summary';
+import { AreaScores, CheckGroup, ChecksHeading, StatusTally } from './audit-checks';
 import { TaskRow } from './task-row';
 import { AUDIT_TABS, WorkspaceTabs } from './workspace-tabs';
 import { UpgradeCard } from './upgrade-card';
@@ -42,101 +46,48 @@ import { SectionTitle } from './section-title';
    the free report needed a third copy. The `warn` chip changed colour in the
    move — amber rather than the brand cyan it shared with the Pro lock. */
 
-function PillarCard({ pillar }: { pillar: ReturnType<typeof buildPillars>[number] }) {
-  const [open, setOpen] = useState(false);
-  const band = pillarBand(pillar.score);
-  const bodyId = `pillar-${pillar.id}`;
-  const blurb = PILLARS.find((p) => p.id === pillar.id)?.blurb ?? '';
-
-  const barColour =
-    band === 'good' ? 'bg-success' : band === 'mixed' ? 'bg-accent' : band === 'poor' ? 'bg-error' : 'bg-line';
-
-  return (
-    <Card className="p-5">
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          aria-controls={bodyId}
-          className="group/toggle -m-1 flex min-w-0 flex-1 items-start gap-2.5 rounded-lg p-1 text-left"
-        >
-          <ChevronIcon
-            className={`text-slate group-hover/toggle:text-navy mt-1 h-4 w-4 shrink-0 transition-transform duration-200 ${
-              open ? 'rotate-90' : ''
-            }`}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="text-navy text-[0.9375rem] font-semibold">{pillar.label}</span>
-              <span className="text-slate text-xs">
-                {pillar.score === null
-                  ? 'not measured'
-                  : `${pillar.score}/100 · ${pillar.scoredCount} checks`}
-              </span>
-            </span>
-            <span className="text-slate mt-0.5 block text-xs">{blurb}</span>
-            {/* Not <Meter> — this sits inside the disclosure <button>, and a
-                div is not valid phrasing content there. Same height, same
-                track colour, same aria-hidden as Meter; see meter.tsx. */}
-            <span
-              className="bg-cloud mt-2 block h-1.5 w-full overflow-hidden rounded-full"
-              aria-hidden="true"
-            >
-              <span
-                className={`block h-full rounded-full ${barColour}`}
-                style={{ width: `${pillar.score ?? 0}%` }}
-              />
-            </span>
-          </span>
-        </button>
-      </div>
-
-      {open && (
-        <ul id={bodyId} className="divide-line mt-4 divide-y border-t border-line pt-1">
-          {pillar.findings.map((f) => (
-            <FindingRow key={f.id} finding={f} />
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-}
-
-function FindingRow({ finding }: { finding: Finding }) {
-  return (
-    <li className="flex gap-3 py-3">
-      <span
-        className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-          STATUS_CHIP[finding.status]
-        }`}
-      >
-        <StatusIcon status={finding.status} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-navy text-sm font-semibold">
-          {finding.label}
-          <span className="sr-only"> — {STATUS_WORD[finding.status]}</span>
-        </p>
-        <p className="text-slate mt-0.5 text-sm leading-relaxed">{finding.detail}</p>
-        {finding.evidence && finding.evidence.length > 0 && (
-          <ul className="text-slate mt-1.5 space-y-0.5">
-            {/* Index keys: this is a static display list with no reordering and
-                no identity of its own, and evidence lines are not guaranteed
-                unique — the same heading really can appear on several pages. */}
-            {finding.evidence.map((e, i) => (
-              <li key={`${i}-${e}`} className="font-mono text-[0.6875rem] break-all">
-                {e}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </li>
-  );
-}
+/*
+  PillarCard and FindingRow used to live here. They were the technical view:
+  six collapsed cards of `label` + `detail`, in the order the checks ran. Both
+  are gone — see the header of audit-checks.tsx for what replaced them and why.
+  The pillar scores they carried survive as AreaScores.
+*/
 
 export type AuditView = 'plain' | 'technical';
+
+/**
+ * Every finding, most urgent first, then by area.
+ *
+ * ⚠️ THIS PARTITIONS — IT DOES NOT FILTER. Every finding lands in exactly one
+ * of the four groups, and the four together are the whole report. That is the
+ * page's contract: it is the complete checklist somebody forwards to an
+ * agency, so a check quietly missing from it is worse than one that reads
+ * awkwardly.
+ *
+ * ⚠️ isHiddenInSummary() MUST NOT BE APPLIED HERE. It exists so the PLAIN
+ * summary can leave out checks not worth a business owner's attention. Using it
+ * on this page would drop checks from the document being handed over.
+ */
+function groupFindings(pillars: PillarResult[]) {
+  const all = pillars.flatMap((p) => p.findings);
+  /* Stable inside a group, so related work travels together once the reader
+     has stopped caring about severity. PILLARS is in weight order. */
+  const areaRank = new Map(PILLARS.map((p, i) => [p.id, i]));
+  const byArea = (a: Finding, b: Finding) =>
+    (areaRank.get(a.pillar) ?? 99) - (areaRank.get(b.pillar) ?? 99);
+  const of = (...statuses: Finding['status'][]) =>
+    all.filter((f) => statuses.includes(f.status)).sort(byArea);
+
+  return {
+    all,
+    fail: of('fail'),
+    warn: of('warn'),
+    pass: of('pass'),
+    // Locked and n/a together: both mean "no reading", and the group's own
+    // words say which is which rather than leaving a bare mark to imply it.
+    unchecked: of('locked', 'na'),
+  };
+}
 
 export function AuditWorkspace({
   justUpgraded = false,
@@ -314,6 +265,9 @@ export function AuditWorkspace({
   const stored = site.lastAudit;
   const shown = fresh ?? (stored ? { ...stored, opportunities: opportunities(data, site) } : null);
   const band = shown ? scoreBand(shown.score) : null;
+  /* Computed once for both the tally in the header and the four groups below,
+     so the number beside the score and the number in a heading cannot drift. */
+  const checks = groupFindings(shown?.pillars ?? []);
 
   return (
     <>
@@ -411,8 +365,16 @@ export function AuditWorkspace({
                     {shown.crawled.length === 1 ? 'page' : 'pages'} · {timeAgo(shown.checkedAt)}.
                     Anything we couldn&rsquo;t measure is marked and left out of the score.
                   </p>
+                  {/* The tally sits with the score because it is the same
+                      reading twice: one number, then what it is made of. It
+                      also keys the marks used all the way down the page. */}
+                  <div className="flex justify-center sm:justify-start">
+                    <StatusTally findings={checks.all} />
+                  </div>
                 </div>
               </div>
+
+              <AreaScores pillars={shown.pillars} />
             </Card>
 
             {shown.actions.length > 0 && (
@@ -467,11 +429,36 @@ export function AuditWorkspace({
               </Card>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              {shown.pillars.map((p) => (
-                <PillarCard key={p.id} pillar={p} />
-              ))}
-            </div>
+            <ChecksHeading total={checks.all.length} />
+
+            <CheckGroup
+              title="Needs fixing"
+              blurb="These are costing you now. Each one stops an AI assistant doing something it would otherwise do."
+              findings={checks.fail}
+              defaultOpen
+            />
+            <CheckGroup
+              title="Worth a look"
+              blurb="Not broken, but not doing you any favours either. Worth handing over once the list above is clear."
+              findings={checks.warn}
+              defaultOpen
+            />
+            <CheckGroup
+              title="Working fine"
+              blurb="Nothing to do here. Listed so you can see what was checked, and so nobody pays to fix something that already works."
+              findings={checks.pass}
+              defaultOpen={false}
+            />
+            {/* ⚠️ LOCKED IS NOT DISABLED, AND n/a IS NOT A FAILURE. The blurb
+                says which is which: one needs something we don't have, the
+                other doesn't apply to this site. A check listed with a blank
+                mark and no reason reads as a broken feature. */}
+            <CheckGroup
+              title="Not checked"
+              blurb="Either they don’t apply to your site, or they need something we don’t have yet. None of them count for or against your score."
+              findings={checks.unchecked}
+              defaultOpen={false}
+            />
 
             {/* The scan's own working. A budget spent on 100 of 340 pages is
                 only trustworthy if the report says which 100 and why it

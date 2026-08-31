@@ -213,7 +213,11 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
   },
   sources: {
     pass: 'You link out to other sources, which reads as researched rather than promotional.',
-    warn: 'You don’t link out to anything. Citing a supplier, a standard or a local authority is a cheap way to look credible.',
+    warn: 'You link out to very little. Citing a supplier, a standard or a local authority is a cheap way to look credible.',
+    /* The check has three arms — three or more outbound links passes, one or
+       two warns, none fails — and only the first two had a sentence, so the
+       most isolated case fell through to the technical detail. */
+    fail: 'You don’t link to anything outside your own site. That reads as promotional, and assistants trust sources that back themselves up.',
   },
   'llms-txt': {
     pass: 'You publish a summary file aimed at AI assistants.',
@@ -628,7 +632,16 @@ export function strengths(report: AuditReport): string {
   "Citation & source readiness" — are written for the technical view, and are
   exactly the register this page exists to avoid.
 */
-const PILLAR_PLAIN: Record<PillarId, string> = {
+/**
+ * What each area of the audit is really about, in ordinary words.
+ *
+ * ⚠️ EXPORTED FOR THE TECHNICAL VIEW, WHICH TAGS EVERY CHECK WITH ITS AREA.
+ * That view groups by urgency rather than by pillar, so the area has to travel
+ * on the row itself. These names are written to complete "it comes down to…",
+ * which is how holdingBack() uses them — read them that way before editing, and
+ * do not write a second set somewhere else.
+ */
+export const PILLAR_PLAIN: Record<PillarId, string> = {
   technical: 'letting the AI read your pages at all',
   structure: 'how your answers are laid out',
   seo: 'the basics search engines look for',
