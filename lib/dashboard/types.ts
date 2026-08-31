@@ -192,6 +192,16 @@ export type DiscoveredQuestion = {
    * is the truth rather than a guess.
    */
   source?: 'discovered' | 'manual';
+  /**
+   * Ordering on the AI Mentions page.
+   *
+   * ⚠️ A VALUE, BECAUSE THE ORDER USED TO BE AN ACCIDENT. The list was read
+   * `.order('added_at')` — the order the model happened to return them in. The
+   * owner drags them now, so it has to be stored. Same swap-two-positions idiom
+   * as FaqEntry.position; 0015 added the column and backfilled it from
+   * added_at so nobody's existing list reshuffled.
+   */
+  position: number;
   addedAt: string;
 };
 
@@ -278,6 +288,35 @@ export type CitationDay = {
    *  re-deriving them from `byEngine` (which counts citations only). */
   cited: number;
   mentioned: number;
+};
+
+/**
+ * A rival the customer NAMED.
+ *
+ * ⚠️ NOT CompetitorShare, WHICH IS BELOW AND IS THE OPPOSITE KIND OF THING.
+ * That one is derived — every domain the engines actually cited, counted from
+ * the checks, with no rows of its own precisely because nobody chose its
+ * contents. This one is a short list the owner keeps: these are the businesses
+ * I compete with, tell me how often AI names them.
+ *
+ * ⚠️ NO CITATION COUNT ON IT. How often a domain was cited is known only to the
+ * measurements; storing a copy here would let the two drift. The page joins
+ * them by `domain` at read time, which is why that field is a bare host —
+ * matching Site.domain and the keys CompetitorShare uses.
+ *
+ * ⚠️ AND A WATCHED RIVAL WITH NO CITATIONS READS AS ZERO, NEVER AS BLANK. The
+ * absence is the finding the owner asked us to watch for.
+ */
+export type Competitor = {
+  id: string;
+  siteId: string;
+  /** What the owner calls them: "Summit Roofing". */
+  name: string;
+  /** Bare host, no scheme and no trailing slash. */
+  domain: string;
+  /** Ordering on the Competitors page. */
+  position: number;
+  createdAt: string;
 };
 
 export type CompetitorShare = {
@@ -433,4 +472,6 @@ export type DashboardData = {
   questions: DiscoveredQuestion[];
   tracking: SiteTracking[];
   contentPlans: ContentPlan[];
+  /** The rivals the customer named. Not the ones we measured — see Competitor. */
+  competitors: Competitor[];
 };

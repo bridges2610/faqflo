@@ -15,6 +15,7 @@
 import {
   ENGINES,
   type CitationCheck,
+  type Competitor,
   type CitationDay,
   type CitedPage,
   type CompetitorShare,
@@ -654,6 +655,11 @@ export type SeedLocalData = {
   questions: DiscoveredQuestion[];
   tracking: SiteTracking[];
   contentPlans: ContentPlan[];
+  /* Empty on purpose. The seed's `tracking[].competitors` is the MEASURED
+     list — who the engines cited — and this is the watch list, which nobody
+     has named yet on a fresh fixture. Seeding it would blur exactly the
+     distinction the Competitors page exists to draw. */
+  competitors: Competitor[];
   audits: Record<string, AuditReport>;
 };
 
@@ -706,6 +712,9 @@ export function buildSeed(siteId: string): SeedLocalData {
     why: q.why,
     intent: q.intent,
     covered: q.covered,
+    // The array order is the list order, so index is the position. daysAgo
+    // below runs the same way round, which is what the 0015 backfill assumed.
+    position: i,
     addedAt: daysAgo(10 - i),
   }));
 
@@ -788,6 +797,7 @@ export function buildSeed(siteId: string): SeedLocalData {
     questions,
     tracking,
     contentPlans: [seedContentPlan(site.id)],
+    competitors: [],
     // The seeded audit, hung off the real site id — audits are keyed by site
     // in local storage now rather than living on the site object.
     audits: { [site.id]: seedAudit() },

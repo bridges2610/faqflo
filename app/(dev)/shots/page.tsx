@@ -141,6 +141,7 @@ export default function Shots() {
       questions: seed.questions,
       tracking: seed.tracking,
       contentPlans: seed.contentPlans,
+      competitors: seed.competitors,
     };
 
     setState({ data: full, tracking: seed.tracking[0] ?? null });

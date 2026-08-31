@@ -4,12 +4,17 @@
  * Hand-written rather than generated, because a generation step is a build
  * dependency this project doesn't otherwise have.
  *
- * ⚠️ THE SCHEMA HAS NOW REACHED THE LINE THIS COMMENT DRAWS. Citation tracking
- * (0006) took it to seven tables, and "a handful" was the stated threshold for
- * switching to `supabase gen types typescript` and deleting this file. The next
- * table is a good moment to do it — hand-maintained row types drift, and this
- * file already has: ProfileRow is missing `welcomed_at`, which 0004 added.
- * Do not maintain both.
+ * ⚠️ THE SCHEMA PASSED THE LINE THIS COMMENT DRAWS, AND THEN PASSED IT AGAIN.
+ * Citation tracking (0006) took it to seven tables, and "a handful" was the
+ * stated threshold for switching to `supabase gen types typescript` and
+ * deleting this file. 0015 added an eighth (competitors) — hand-written below,
+ * because generating types needs the Supabase CLI and project credentials in
+ * the build, which is a dependency this repo still does not have and is not a
+ * decision to make in passing.
+ *
+ * The drift that comment predicted did happen: ProfileRow was missing
+ * `welcomed_at` from 0004 for four migrations. It is added now. That is the
+ * second piece of evidence for switching; a third should settle it.
  *
  * snake_case here mirrors the database exactly. The app's camelCase types in
  * lib/dashboard/types.ts are a separate thing, and the mapping between them is
@@ -34,6 +39,15 @@ export type ProfileRow = {
   plan: PlanId;
   /** Anchors the monthly check budget. Null on free. See 0012. */
   plan_since: string | null;
+  /**
+   * When the welcome email went out, and the lock that stops it going twice.
+   *
+   * ⚠️ ADDED IN 0004 AND MISSING HERE UNTIL NOW — the drift this file's own
+   * header warned about, closed. Written only by the service role, through the
+   * guarded update in 0004: `set welcomed_at = now() where id = $1 and
+   * welcomed_at is null`.
+   */
+  welcomed_at: string | null;
   created_at: string;
 };
 
@@ -151,6 +165,27 @@ export type FaqRow = {
  * ⚠️ `question` must match tracked_prompts.question byte for byte; the two are
  * joined by string equality. Same warning as on that column in 0006.
  */
+/**
+ * A rival the customer NAMED, as opposed to one we measured.
+ *
+ * ⚠️ NO CITATION COUNT HERE, DELIBERATELY. How often a domain was cited is
+ * known only to citation_checks, and storing a copy would let this table drift
+ * from the thing that counts. The page joins the two by `domain` at read time —
+ * which is why that column is a bare host with no scheme and no trailing
+ * slash, matching sites.domain and the measured list's own keys.
+ */
+export type CompetitorRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  name: string;
+  /** Bare host. "summit.com", never "https://summit.com/". */
+  domain: string;
+  /** Ordering on the Competitors page. See faqs.position. */
+  position: number;
+  created_at: string;
+};
+
 export type QuestionRow = {
   id: string;
   site_id: string;
@@ -160,6 +195,8 @@ export type QuestionRow = {
   intent: string | null;
   covered: boolean;
   source: 'discovered' | 'manual';
+  /** Ordering on the AI Mentions page. Added in 0015; see faqs.position. */
+  position: number;
   added_at: string;
 };
 

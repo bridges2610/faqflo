@@ -102,6 +102,10 @@ function fromClaims(claims: Record<string, unknown>): ProfileRow {
     email: typeof claims.email === 'string' ? claims.email : '',
     plan: 'free',
     plan_since: null,
+    /* Null, not a date: this account has no profile row, so no welcome email
+       has been sent for it. Claiming otherwise here would let the guarded
+       update in 0004 think the job was done. */
+    welcomed_at: null,
     created_at: new Date().toISOString(),
   };
 }

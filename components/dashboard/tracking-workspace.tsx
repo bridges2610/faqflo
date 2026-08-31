@@ -340,7 +340,7 @@ export function TrackingWorkspace() {
   if (!site) {
     return (
       <>
-        <PageHeader title="Results" description="Whether AI is actually citing you." />
+        <PageHeader title="AI Mentions" description="Whether AI is actually naming you." />
         <EmptyState
           title="Add a site first"
           body="Citations are tracked per site, against that site's domain."
@@ -410,7 +410,7 @@ export function TrackingWorkspace() {
   if (daily.length === 0) {
     return (
       <>
-        <PageHeader title="Results" description={`What the engines say about ${site.name}.`} />
+        <PageHeader title="AI Mentions" description={`What the engines say about ${site.name}.`} />
         {questions.length === 0 ? (
           <EmptyState
             title="Find some questions first"
@@ -705,7 +705,7 @@ export function TrackingWorkspace() {
     <>
       <PageHeader
         className="mb-3"
-        title="Results"
+        title="AI Mentions"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
         /* This route is Pro-only, so canRunNow is always true here now — see
            the note where it is derived. The branch stays because the question
@@ -1376,56 +1376,14 @@ export function TrackingWorkspace() {
           </Card>
         )}
 
-        {/* Share of voice.
+        {/* ⚠️ "Who the AI reads instead" MOVED TO /dashboard/competitors, WHOLE.
 
-            ⚠️ COUNTS EVERY SOURCE IN EVERY ANSWER, not one per check. That is
-            the difference between ranking against the handful of rivals who
-            happened to take first place and ranking against the whole field
-            the engines actually drew from. */}
-        <Card className="p-5 sm:p-7">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <SectionTitle icon={<GlobeIcon className="h-4 w-4" />} tint="bg-cloud text-slate">
-              Who the AI reads instead
-            </SectionTitle>
-            <Badge tone="cyan">{formatNumber(competitors.length)} domains</Badge>
-          </div>
-          <p className="text-slate mt-1 text-sm">
-            Every website AI used to answer your questions. Most-used first. Yours is
-            highlighted.
-          </p>
-
-          <ul className="mt-5 space-y-4">
-            {shareRows.map((c) => (
-              <li key={c.domain}>
-                <div className="flex items-baseline justify-between gap-4">
-                  <p
-                    className={`min-w-0 truncate text-sm ${
-                      c.isYou ? 'text-navy font-semibold' : 'text-slate'
-                    }`}
-                  >
-                    {c.rank}. {c.domain}
-                    {c.isYou && ' (you)'}
-                  </p>
-                  <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
-                    {c.citations}
-                  </p>
-                </div>
-                <Meter
-                  className="mt-1.5"
-                  value={(c.citations / shareTop) * 100}
-                  tone={c.isYou ? 'primary' : 'line'}
-                />
-              </li>
-            ))}
-          </ul>
-
-          {competitors.length > shareRows.length && (
-            <p className="text-slate mt-4 text-xs">
-              and {formatNumber(competitors.length - shareRows.length)} more domains cited at
-              least once.
-            </p>
-          )}
-        </Card>
+            It was the last card on this page, under the evidence and the
+            per-engine summary, which made the answer to "then who IS it
+            naming?" something you had to scroll past three other things to
+            reach. It is its own nav destination now, and the measured list
+            went across unchanged — same ranking, same counts, same rule that
+            your own row survives the cut whatever its rank. */}
       </div>
 
       <p className="text-slate mt-6 text-center text-xs">

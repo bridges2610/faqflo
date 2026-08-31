@@ -30,12 +30,20 @@ type NavItem = {
   roofing company. Eight destinations is also eight places to check, most of
   which are empty most of the time.
 
-  What merged, and why the pairs are pairs rather than one screen each:
+  What merged, and why:
 
-    Answers       = /faqs + /publish     writing them, then getting them onto
-                                         the page. Same object, two verbs.
-    Opportunities = /questions + /content what you haven't answered, and what
-                                         you haven't written. Both are gaps.
+    Answers  = /faqs + /publish + /questions + /content
+               One page. The questions nobody has answered sit at the top as
+               suggestions, the answers you have written sit below them, and
+               the paste block is a panel off the bottom bar. Writing an answer
+               and putting it on your website is one job, and the gap you are
+               filling belongs on the same screen as the filling.
+
+  ⚠️ TWO ITEMS ARE NAMED FOR WHAT THEY ANSWER, NOT FOR THE DATA BEHIND THEM.
+  "Results" and "Your site" are our words for our pipeline. "AI Mentions" is
+  the thing a business owner came to find out — does AI say my name — and
+  "Audit" is what they would call a report on their website. Competitors is new
+  and is the question they ask second: who is it naming instead.
 
   ⚠️ NO ROUTE MOVED, AND ONE GAINED A CHILD. Audit actions deep-link to
   /dashboard/faqs/<groupId> — a real route now; it used to be an anchor
@@ -51,10 +59,10 @@ type NavItem = {
 */
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Home', Icon: HomeIcon },
-  { href: '/dashboard/audit', label: 'Your site', Icon: AeoIcon },
+  { href: '/dashboard/audit', label: 'Audit', Icon: AeoIcon },
   { href: '/dashboard/faqs', label: 'Answers', Icon: FaqIcon },
-  { href: '/dashboard/questions', label: 'Opportunities', Icon: SearchIcon },
-  { href: '/dashboard/tracking', label: 'Results', Icon: ChartIcon },
+  { href: '/dashboard/competitors', label: 'Competitors', Icon: SearchIcon },
+  { href: '/dashboard/tracking', label: 'AI Mentions', Icon: ChartIcon },
 ];
 
 /*
@@ -66,8 +74,11 @@ const NAV: NavItem[] = [
   section while the sidebar highlighted nothing.
 */
 const OWNS: Record<string, string[]> = {
-  '/dashboard/faqs': ['/dashboard/publish'],
-  '/dashboard/questions': ['/dashboard/content'],
+  /* Answers absorbed three routes, not one. Publish is its copy panel now, and
+     Opportunities — the questions nobody has answered yet — became the list of
+     suggestions at the top of it. All three URLs still resolve; see the note on
+     NAV above. */
+  '/dashboard/faqs': ['/dashboard/publish', '/dashboard/questions', '/dashboard/content'],
 };
 
 /** Home owns the exact path; the rest own their subtree, plus anything above. */
@@ -151,7 +162,7 @@ const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: H
 const PRO_VALUE: Record<string, string> = {
   '/dashboard/audit': 'Every page, not just one',
   '/dashboard/faqs': 'Written and ready to paste',
-  '/dashboard/questions': 'Questions you’re missing',
+  '/dashboard/competitors': 'Who AI names instead',
   '/dashboard/tracking': 'Re-checked every week',
 };
 

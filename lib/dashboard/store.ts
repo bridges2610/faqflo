@@ -27,6 +27,7 @@ import { createClient as supabaseBrowser } from '@/lib/supabase/client';
 import type {
   AuditRunRow,
   CitationCheckRow,
+  CompetitorRow,
   FaqGroupRow,
   FaqRow,
   QuestionRow,
@@ -49,6 +50,7 @@ import type {
   CitationCheck,
   CitationDay,
   CitedPage,
+  Competitor,
   CompetitorShare,
   EngineBreakdown,
   ContentPlan,
@@ -124,6 +126,7 @@ const EMPTY_LOCAL: LocalData = {
   questions: [],
   tracking: [],
   contentPlans: [],
+  competitors: [],
   audits: {},
 };
 
@@ -185,9 +188,14 @@ function normaliseLocal(data: LocalData): LocalData {
   return {
     groups: data.groups ?? [],
     faqs: data.faqs ?? [],
-    questions: data.questions ?? [],
+    /* ⚠️ BACKFILL position BY INDEX, NEVER TO A CONSTANT. Rows cached before
+       0015 have no position, and defaulting them all to 0 would leave the order
+       to however the array happened to be stored — a silent reshuffle of a list
+       the customer has already read. The array order IS the old order. */
+    questions: (data.questions ?? []).map((q, i) => ({ ...q, position: q.position ?? i })),
     tracking: (data.tracking ?? []).map(normaliseTracking),
     contentPlans: data.contentPlans ?? [],
+    competitors: data.competitors ?? [],
     audits,
   };
 }
@@ -330,7 +338,38 @@ function questionToRow(q: DiscoveredQuestion, userId: string) {
     intent: q.intent ?? null,
     covered: q.covered,
     source: q.source ?? 'discovered',
+    position: q.position,
     added_at: q.addedAt,
+  };
+}
+
+/*
+  The competitors a customer named.
+
+  ⚠️ NOTHING MAPS A CITATION COUNT, BECAUSE THE ROW DOES NOT HOLD ONE. How
+  often AI cited a domain lives in the checks; the Competitors page joins the
+  two by `domain` when it renders. See the note on Competitor in types.ts.
+*/
+function competitorToRow(c: Competitor, userId: string) {
+  return {
+    id: c.id,
+    site_id: c.siteId,
+    user_id: userId,
+    name: c.name,
+    domain: c.domain,
+    position: c.position,
+    created_at: c.createdAt,
+  };
+}
+
+function rowToCompetitor(r: CompetitorRow): Competitor {
+  return {
+    id: r.id,
+    siteId: r.site_id,
+    name: r.name,
+    domain: r.domain,
+    position: r.position ?? 0,
+    createdAt: r.created_at,
   };
 }
 
@@ -343,6 +382,7 @@ function rowToQuestion(r: QuestionRow): DiscoveredQuestion {
     intent: r.intent ?? undefined,
     covered: r.covered,
     source: r.source,
+    position: r.position ?? 0,
     addedAt: r.added_at,
   };
 }
@@ -395,6 +435,7 @@ async function write(data: DashboardData): Promise<DashboardData> {
     questions: data.questions,
     tracking: data.tracking,
     contentPlans: data.contentPlans,
+    competitors: data.competitors,
     // Held so assemble() can keep joining reports onto sites; never persisted
     // from here. See the note above.
     audits: previous.audits,
@@ -403,6 +444,7 @@ async function write(data: DashboardData): Promise<DashboardData> {
   const groups = diff(previous.groups, next.groups);
   const faqs = diff(previous.faqs, next.faqs);
   const questions = diff(previous.questions, next.questions);
+  const competitors = diff(previous.competitors, next.competitors);
 
   const fail = (what: string, error: { message: string } | null) => {
     if (error) throw new Error(`Could not save your ${what}: ${error.message}`);
@@ -449,6 +491,22 @@ async function write(data: DashboardData): Promise<DashboardData> {
   if (questions.removed.length) {
     fail('questions', (await supabase.from('questions').delete().in('id', questions.removed)).error);
   }
+  if (competitors.changed.length) {
+    fail(
+      'competitors',
+      (
+        await supabase
+          .from('competitors')
+          .upsert(competitors.changed.map((c) => competitorToRow(c, userId)))
+      ).error,
+    );
+  }
+  if (competitors.removed.length) {
+    fail(
+      'competitors',
+      (await supabase.from('competitors').delete().in('id', competitors.removed)).error,
+    );
+  }
 
   // One row per site, so a plan is an upsert on site_id rather than a diff.
   for (const plan of next.contentPlans) {
@@ -485,6 +543,7 @@ function assemble(user: User, sites: Site[], local: LocalData): DashboardData {
     groups: local.groups,
     faqs: local.faqs,
     questions: local.questions,
+    competitors: local.competitors,
     tracking: local.tracking,
     contentPlans: local.contentPlans,
   };
@@ -543,15 +602,24 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
   const supabase = supabaseBrowser();
   const siteIds = sites.map((s) => s.id);
 
-  const [groupRows, faqRows, questionRows, planRows] = await Promise.all([
+  const [groupRows, faqRows, questionRows, planRows, competitorRows] = await Promise.all([
     supabase.from('faq_groups').select('*').eq('user_id', userId).order('position'),
     supabase.from('faqs').select('*').eq('user_id', userId).order('position'),
-    supabase.from('questions').select('*').eq('user_id', userId).order('added_at'),
+    /* ⚠️ BY position NOW, NOT added_at. 0015 added the column and backfilled it
+       from added_at, so this returns exactly the order it used to on the day it
+       shipped — and the order the owner drags it into after that. */
+    supabase.from('questions').select('*').eq('user_id', userId).order('position'),
     supabase.from('content_plans').select('*').eq('user_id', userId),
+    supabase.from('competitors').select('*').eq('user_id', userId).order('position'),
   ]);
 
   const firstError =
-    groupRows.error ?? faqRows.error ?? questionRows.error ?? planRows.error ?? null;
+    groupRows.error ??
+    faqRows.error ??
+    questionRows.error ??
+    planRows.error ??
+    competitorRows.error ??
+    null;
   if (firstError) {
     /*
       ⚠️ THROW RATHER THAN FALL BACK TO EMPTY. An empty dashboard is
@@ -591,6 +659,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
     groups: (groupRows.data ?? []).map(rowToGroup),
     faqs: (faqRows.data ?? []).map(rowToFaq),
     questions: (questionRows.data ?? []).map(rowToQuestion),
+    competitors: (competitorRows.data ?? []).map(rowToCompetitor),
     tracking: [],
     contentPlans: (planRows.data ?? []).map((r) => r.plan as ContentPlan),
     audits,
@@ -1739,6 +1808,9 @@ export async function addQuestions(
       intent: q.intent,
       covered: false,
       source: 'discovered',
+      // Appended after everything already on the list, so a re-run adds to the
+      // bottom rather than shuffling what the owner has already ordered.
+      position: kept.length + created.length,
       addedAt: now(),
     });
   }
@@ -1813,6 +1885,8 @@ export async function addManualQuestion(
     // putting words in their mouth.
     covered: false,
     source: 'manual',
+    // Appended, like a discovered one. The owner can drag it wherever after.
+    position: mine.length,
     addedAt: now(),
   };
 
