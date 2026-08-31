@@ -21,7 +21,7 @@ const TECHNICAL = '/dashboard/audit?view=technical';
 import type { ActionItem, AuditReport, Finding } from '@/lib/audit/types';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
 import { useDashboard } from '@/lib/dashboard/provider';
-import type { Site } from '@/lib/dashboard/types';
+import { sameReport, type Site } from '@/lib/dashboard/types';
 import { IndustryPlan, IndustryPlanPrompt, VisibilityLine } from './audit-extras';
 
 /*
@@ -203,7 +203,7 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
     box comes back empty. Migration 0016 carries the long form.
   */
   const ticked = new Set(
-    actionTicks.filter((t) => t.reportCheckedAt === report.checkedAt).map((t) => t.actionId),
+    actionTicks.filter((t) => sameReport(t.reportCheckedAt, report.checkedAt)).map((t) => t.actionId),
   );
   const done = report.actions.filter((a) => ticked.has(a.id)).length;
 

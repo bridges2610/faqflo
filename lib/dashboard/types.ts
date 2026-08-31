@@ -336,6 +336,28 @@ export type ActionTick = {
   createdAt: string;
 };
 
+/**
+ * Is this tick stamped with the report on screen?
+ *
+ * ⚠️ COMPARE THE INSTANT, NEVER THE STRING. The two stamps reach us in
+ * different spellings of the same moment: `report.checkedAt` is a JSONB string
+ * written by `new Date().toISOString()`, so it ends in `Z`, while a tick's
+ * `report_checked_at` is a timestamptz column, which Postgres renders as
+ * `+00:00`. `===` on those is false for the same millisecond.
+ *
+ * That is not a cosmetic bug. The tick held in memory keeps the `Z` form, so
+ * the box ticks and stays ticked — until the page reloads and the value comes
+ * back from Postgres, at which point every tick silently fails this gate and
+ * the customer's progress looks discarded.
+ */
+export function sameReport(tickStamp: string, reportCheckedAt: string): boolean {
+  const a = Date.parse(tickStamp);
+  const b = Date.parse(reportCheckedAt);
+  // An unparseable stamp is not a match. Falling back to === would resurrect
+  // exactly the bug this exists to close.
+  return Number.isFinite(a) && Number.isFinite(b) && a === b;
+}
+
 export type CompetitorShare = {
   domain: string;
   /**

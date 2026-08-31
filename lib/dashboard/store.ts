@@ -47,6 +47,7 @@ import {
 } from './plans';
 import { buildSeed, emptyTracking, newId } from './seed';
 import { ENGINES } from './types';
+import { sameReport } from './types';
 import type {
   CitationCheck,
   CitationDay,
@@ -382,7 +383,12 @@ function rowToTick(r: ActionTickRow): ActionTick {
     id: r.id,
     siteId: r.site_id,
     actionId: r.action_id,
-    reportCheckedAt: r.report_checked_at,
+    /* ⚠️ NORMALISED HERE SO ONE SPELLING EXISTS IN MEMORY. Postgres renders
+       timestamptz as `+00:00`; the report's own stamp is a JSONB string ending
+       in `Z`. Everything downstream compares with sameReport(), which parses
+       both, but a single canonical form keeps a stored tick and a freshly made
+       one identical — including to the diff() that decides what to upsert. */
+    reportCheckedAt: new Date(r.report_checked_at).toISOString(),
     createdAt: r.created_at,
   };
 }
@@ -1387,7 +1393,7 @@ export async function toggleActionTick(
 
   /* Ticked against THIS report — untick. Ticked against an older one, which the
      UI is already ignoring, counts as unticked, so this re-stamps it instead. */
-  if (existing && existing.reportCheckedAt === reportCheckedAt) {
+  if (existing && sameReport(existing.reportCheckedAt, reportCheckedAt)) {
     return write({ ...data, actionTicks: data.actionTicks.filter((t) => t.id !== existing.id) });
   }
 
