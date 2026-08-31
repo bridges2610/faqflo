@@ -186,6 +186,16 @@ export type CompetitorRow = {
   created_at: string;
 };
 
+/** A ticked-off audit action. See migration 0016 and ActionTick. */
+export type ActionTickRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  action_id: string;
+  report_checked_at: string;
+  created_at: string;
+};
+
 export type QuestionRow = {
   id: string;
   site_id: string;

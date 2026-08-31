@@ -22,6 +22,7 @@ import {
 import { trackingPeriod, trackingPlanFor } from './plans';
 import * as store from './store';
 import type {
+  ActionTick,
   Competitor,
   ContentPlan,
   DashboardData,
@@ -93,6 +94,8 @@ type Ctx = {
   questions: DiscoveredQuestion[];
   /** The rivals this site watches, in the owner's order. */
   competitors: Competitor[];
+  /** Fixes ticked against the CURRENT report only — see toggleAction. */
+  actionTicks: ActionTick[];
   tracking: SiteTracking | null;
   /**
    * Re-read tracking from Postgres — call after a run stores new checks.
@@ -139,6 +142,11 @@ type Ctx = {
   editCompetitor: (id: string, patch: Partial<store.NewCompetitor>) => Promise<void>;
   removeCompetitor: (id: string) => Promise<void>;
   moveCompetitor: (id: string, direction: 'up' | 'down') => Promise<void>;
+
+  /* ⚠️ TAKES THE REPORT'S TIMESTAMP, DELIBERATELY. A tick belongs to the audit
+     that raised it; passing the stamp is what lets a newer scan clear the
+     slate. See migration 0016. */
+  toggleAction: (siteId: string, actionId: string, reportCheckedAt: string) => Promise<void>;
   markPublished: (groupId: string) => Promise<void>;
   saveAudit: (siteId: string, report: SiteAudit) => Promise<void>;
   saveContentPlan: (plan: ContentPlan) => Promise<void>;
@@ -321,6 +329,11 @@ export function DashboardProvider({
 
   /* Sorted here rather than trusted from the store, so a row whose position was
      just swapped renders in its new place without waiting for a reload. */
+  const actionTicks = useMemo(
+    () => (data && site ? data.actionTicks.filter((t) => t.siteId === site.id) : []),
+    [data, site],
+  );
+
   const competitors = useMemo(
     () =>
       data && site
@@ -641,6 +654,7 @@ export function DashboardProvider({
     faqsIn,
     questions,
     competitors,
+    actionTicks,
     tracking,
     refreshTracking,
     trackingRun,
@@ -684,6 +698,8 @@ export function DashboardProvider({
     editCompetitor: (id, patch) => apply(() => store.updateCompetitor(id, patch)),
     removeCompetitor: (id) => apply(() => store.deleteCompetitor(id)),
     moveCompetitor: (id, direction) => apply(() => store.moveCompetitor(id, direction)),
+    toggleAction: (siteId, actionId, at) =>
+      apply(() => store.toggleActionTick(siteId, actionId, at)),
     markPublished: (id) => apply(() => store.markGroupPublished(id)),
     saveAudit: (siteId, report) => apply(() => store.saveAudit(siteId, report)),
     saveContentPlan: (plan) => apply(() => store.saveContentPlan(plan)),

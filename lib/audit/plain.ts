@@ -30,17 +30,23 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
   /* ---------------------------------------------------------- technical --- */
   'raw-html': {
     pass: 'AI can read your pages. The words are in the page itself, not added afterwards by code it can’t run.',
-    warn: 'AI can read some of your page, but not much of it. A lot of what visitors see never reaches the systems writing AI answers.',
-    fail: 'AI sees a blank page. Your site builds its content in the visitor’s browser, and the systems behind AI answers don’t wait for that — so as far as they’re concerned, there’s nothing here.',
+    warn: 'AI can read some of your page, but not much. Most of what visitors see never reaches it.',
+    fail: 'AI sees a blank page. Your site builds its content in the visitor’s browser, and AI doesn’t wait. To it, there is nothing here.',
   },
   crawlers: {
     pass: 'The big AI assistants are allowed to read your site.',
-    warn: 'Some AI assistants are being turned away by your site’s settings, so they can never quote you no matter what you publish.',
-    fail: 'Your site is turning the AI assistants away at the door. Nothing you write can be quoted by them until that changes — this is the first thing to fix.',
+    warn: 'Your site’s settings turn some AI assistants away. They can never quote you, whatever you publish.',
+    fail: 'Your site turns the AI assistants away at the door. Nothing you write can be quoted until that changes. Fix this first.',
   },
+  /* ⚠️ NO `warn` ON EITHER OF THE NEXT TWO, AND NONE IS NEEDED. Both checks
+     are binary in lib/audit/checks/technical.ts — `allowed ? 'pass' : 'fail'`
+     and `noindex ? 'fail' : 'pass'`. plainFor() falls back to the technical
+     `detail` for a status with no entry, which would put developer wording on
+     the plain report; that cannot happen while these stay binary. If either
+     ever grows a middle state, it needs a warn sentence here first. */
   googlebot: {
     pass: 'Google is allowed to read your site.',
-    fail: 'Your site is blocking Google. That takes out ordinary search results and the AI answers on top of them at the same time.',
+    fail: 'Your site is blocking Google. That loses you normal search results and the AI answers above them.',
   },
   https: {
     pass: 'Your site is secure, which every engine expects as a baseline.',
@@ -48,7 +54,7 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
   },
   noindex: {
     pass: 'Nothing on the page is asking search engines to ignore it.',
-    fail: 'This page is telling search engines to leave it out entirely. It’s a single setting, and while it’s there nothing else you do to the page matters.',
+    fail: 'This page tells search engines to leave it out. It is one setting, and nothing else counts while it is on.',
   },
   canonical: {
     pass: 'Your pages tell engines which address is the real one.',
@@ -153,7 +159,7 @@ const PLAIN: Record<string, Partial<Record<CheckStatus, PlainEntry>>> = {
   'meta-description': {
     pass: 'Your pages have their own summary for search results.',
     warn: (f) => `${count(f)} of your pages have no summary, so engines write their own from whatever text they hit first — usually your menu.`,
-    fail: 'None of your pages have a summary for search results, so engines invent one from whatever text they find first.',
+    fail: 'None of your pages have a summary for search results. Engines invent one from whatever text comes first.',
   },
   'meta-length': {
     pass: 'Your page summaries are a sensible length.',
@@ -300,7 +306,7 @@ const PLAIN_ACTIONS: Record<
   },
   'publish-answers': {
     what: 'Answer the questions your customers actually ask',
-    why: 'A question with a short answer under it is the shape an assistant looks for, and the shape it can quote whole.',
+    why: 'A question with a short answer under it is what an assistant looks for. It can quote that whole.',
   },
   'paste-export': {
     what: 'Put your answers on your website',
@@ -324,7 +330,7 @@ const PLAIN_ACTIONS: Record<
   },
   'meta-descriptions': {
     what: 'Write the one-line summary that shows under your search result',
-    why: 'Without it, search engines write their own from whatever text they find first — usually your menu.',
+    why: 'Without it, search engines write their own. They use whatever text comes first — usually your menu.',
     label: 'Copy this',
     where:
       'This goes near the top of each page, in the part visitors don’t see. Write a fresh sentence for each page.',
@@ -421,12 +427,12 @@ const WINS: { id: string; phrase: string; so: string }[] = [
   {
     id: 'crawlers',
     phrase: 'The AI assistants are allowed in',
-    so: 'so they can come and read your pages whenever they like',
+    so: 'so they can read your pages any time',
   },
   {
     id: 'raw-html',
     phrase: 'Your words sit right there in the page',
-    so: 'which means they can actually read them',
+    so: 'so they can read them',
   },
   {
     id: 'qa-markup',
@@ -436,22 +442,22 @@ const WINS: { id: string; phrase: string; so: string }[] = [
   {
     id: 'question-headings',
     phrase: 'You ask questions the way your customers ask them',
-    so: 'so the wording lines up with what people really type',
+    so: 'the wording people really type',
   },
   {
     id: 'org-schema',
-    phrase: 'Your business is named properly in the code',
+    phrase: 'Your business is named in the code',
     so: 'so an assistant knows who to credit',
   },
   {
     id: 'answer-first',
     phrase: 'Your answers come straight after the question',
-    so: 'which is exactly the shape an assistant likes to quote',
+    so: 'the shape an assistant quotes',
   },
   {
     id: 'specificity',
     phrase: 'Your answers use real numbers instead of vague claims',
-    so: 'and that is what makes them worth repeating',
+    so: 'which makes them worth repeating',
   },
   {
     id: 'title',
@@ -460,13 +466,13 @@ const WINS: { id: string; phrase: string; so: string }[] = [
   },
   {
     id: 'identity-pages',
-    phrase: 'You have the about and contact pages people look for',
-    so: 'which is how anyone checks you are a real business',
+    phrase: 'You have an about and a contact page',
+    so: 'how people check you are real',
   },
   {
     id: 'contactable',
     phrase: 'People can find how to reach you',
-    so: 'which sounds obvious until you see how many sites hide it',
+    so: 'which many sites still hide',
   },
   {
     id: 'sitemap',
@@ -544,6 +550,31 @@ const HARD_PART = 3;
  * is most of the reading level: joined, the same three phrases made a 19-word
  * sentence; split, they are three sentences of six.
  */
+/**
+ * A finding in a few words, for a bulleted list.
+ *
+ * ⚠️ NOT `finding.label`, AND THAT IS THE WHOLE POINT. Eleven of the forty-four
+ * labels the check modules emit are written for someone who builds websites —
+ * "Canonical URL declared", "One H1 per page", "Served over HTTPS", "Page is
+ * indexable". They are correct and they belong in the technical view. On a page
+ * whose entire purpose is that a roofer follows it, they are the wrong words.
+ *
+ * ⚠️ AND NO NEW LOOKUP TABLE. This reads the two that already exist: the WINS
+ * phrase where a finding has one, because those were written to be short and
+ * plain, and otherwise the first sentence of plainFor(), which is the
+ * plain-English rendering every other surface already shows. A third map beside
+ * PLAIN and WINS would be a third thing to drift out of step, and this file
+ * carries that warning about itself.
+ */
+export function plainShort(finding: Finding): string {
+  const win = WINS.find((w) => w.id === finding.id);
+  if (win && finding.status === 'pass') return win.phrase;
+
+  const full = plainFor(finding);
+  const first = full.split(/(?<=[.?!])\s/)[0] ?? full;
+  return first.replace(/[.]$/, '');
+}
+
 export function strengths(report: AuditReport): string {
   const shown = report.pillars.flatMap((p) => p.findings).filter((f) => !isHiddenInSummary(f));
   const passing = shown.filter((f) => f.status === 'pass');
@@ -689,7 +720,7 @@ export function holdingBack(report: AuditReport): string {
 
   const pointer =
     problems.length > 1
-      ? ' We’ve put the list in order, so whatever costs you the most sits right at the top.'
+      ? ' The list is in order. Whatever costs you most sits at the top.'
       : '';
 
   return `${lead}${theme}${weight}${pointer}`;
@@ -708,21 +739,62 @@ export function holdingBack(report: AuditReport): string {
  * sentence, dashes and semicolons broken into full stops — and NO CLAIM
  * CHANGED. Shorten further only the same way.
  */
-export function verdict(report: AuditReport): string {
+/**
+ * What to open the report with, about THIS business.
+ *
+ * ⚠️ THE TRADE IS ONLY PASSED WHEN WE DID NOT GUESS IT. Site.profileSource
+ * distinguishes 'schema' and 'manual' — read off their site, or typed by them —
+ * from 'inferred', which is a model filling in a blank. Printing "as a roofing
+ * contractor" over an inference states our guess as their fact, in the first
+ * line of the document they trust most. The caller decides; this only formats
+ * what it is handed.
+ *
+ * ⚠️ AND `named`/`checked` ARE OMITTED, NOT ZEROED, WHEN NOTHING HAS RUN. An
+ * account with no checks has no result. "AI named you in 0 answers" is a
+ * measurement nobody took.
+ */
+export type VerdictContext = {
+  siteName?: string;
+  /** Only when profileSource is 'schema' or 'manual'. */
+  trade?: string;
+  named?: number;
+  checked?: number;
+};
+
+export function verdict(report: AuditReport, context: VerdictContext = {}): string {
   const all = report.pillars.flatMap((p) => p.findings);
   const at = (id: string) => all.find((f) => f.id === id);
   const failing = (id: string) => at(id)?.status === 'fail';
   const shaky = (id: string) => at(id)?.status === 'fail' || at(id)?.status === 'warn';
 
   const pages = report.crawled.length;
-  const scanned = `We looked at ${pages} ${pages === 1 ? 'page' : 'pages'} of your site the way an AI assistant would.`;
+  const whose = context.siteName ? `${context.siteName}’s site` : 'your site';
+  const asA = context.trade ? ` You run a ${context.trade.toLowerCase()}.` : '';
 
-  if (failing('crawlers') || failing('googlebot')) {
-    return `${scanned} Your site turns them away at the door — its settings tell them not to read it. Until that changes, nothing you publish can be quoted, however good it is. It’s a two-minute fix, and it’s the only thing worth doing first.`;
+  /* Two short sentences rather than one long one — the fifteen-word rule this
+     file sets for itself applies to its own opening line first. */
+  const asked =
+    context.checked && context.checked > 0
+      ? ` We also asked AI ${context.checked} questions. It named you in ${context.named ?? 0}.`
+      : '';
+
+  const scanned = `We read ${pages} ${pages === 1 ? 'page' : 'pages'} of ${whose} the way AI does.${asA}${asked}`;
+
+  if (failing('crawlers')) {
+    return `${scanned} Your site turns them away at the door. Its settings tell them not to read it. Until that changes, nothing you publish can be quoted, however good it is. It’s a two-minute fix, and it’s the only thing worth doing first.`;
+  }
+
+  /* ⚠️ GOOGLEBOT GETS ITS OWN SENTENCE, NOT THE CRAWLERS ONE. These shared a
+     branch, which read "your site turns them away at the door" for a site that
+     lets every AI assistant in and blocks only Google — while part 1 of the
+     report, directly below, correctly said the assistants were allowed. Same
+     severity, different fact, so it needs its own words. */
+  if (failing('googlebot')) {
+    return `${scanned} The assistants can read it, but Google can’t. Your settings turn Google away. That costs you normal search results and the AI answers above them. It’s a two-minute fix, and it’s the one to do first.`;
   }
 
   if (failing('raw-html')) {
-    return `${scanned} They saw an empty page. Your site builds its content in the visitor’s browser, and the systems behind AI answers don’t wait for that. So as far as they can tell, there’s nothing on your site at all. That’s the one to fix before anything else.`;
+    return `${scanned} They saw an empty page. Your site builds its content in the visitor’s browser. AI does not wait for that. So as far as they can tell, there’s nothing on your site at all. That’s the one to fix before anything else.`;
   }
 
   if (failing('noindex')) {
@@ -730,7 +802,7 @@ export function verdict(report: AuditReport): string {
   }
 
   if (failing('qa-markup') && failing('question-headings')) {
-    return `${scanned} They can read it — but nothing on it is written as a question with an answer underneath. So when a customer asks an assistant about what you do, there’s nothing on your site to match against, and it answers with somebody else instead. This is the gap that costs you the most, and it’s the one we’re built to close.`;
+    return `${scanned} They can read it. But nothing on it is written as a question with an answer. So when a customer asks about what you do, there is nothing to match. It names somebody else. This is the gap that costs you most. It is the one we close.`;
   }
 
   if (failing('org-schema')) {
@@ -738,11 +810,11 @@ export function verdict(report: AuditReport): string {
   }
 
   if (shaky('qa-markup') || shaky('answer-first')) {
-    return `${scanned} The foundations are sound — they can reach your site and read it. What’s missing is shape. Your answers aren’t laid out as questions with a direct reply underneath, and that’s the form assistants actually quote.`;
+    return `${scanned} The foundations are sound — they can reach your site and read it. What’s missing is shape. Your answers aren’t laid out as questions with a reply underneath. That’s the form assistants quote.`;
   }
 
   if (report.score >= 85) {
-    return `${scanned} It’s in good shape. Assistants can read it, tell whose it is, and find their way around. From here it’s about depth — answering more of the questions your customers ask, and answering them better than anyone else does.`;
+    return `${scanned} It’s in good shape. Assistants can read it, tell whose it is, and find their way around. From here it is about depth. Answer more of their questions, and answer them better.`;
   }
 
   return `${scanned} Nothing is badly broken, but several small things are each costing you a little. The list below is in the order worth doing them.`;

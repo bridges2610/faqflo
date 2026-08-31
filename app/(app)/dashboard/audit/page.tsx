@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { requirePro } from '@/lib/auth/pro-only';
 import { AuditWorkspace } from '@/components/dashboard/audit-workspace';
 
-export const metadata: Metadata = { title: 'Your site' };
+export const metadata: Metadata = { title: 'Audit' };
 
 /*
   Two search params, both read on the server and handed down as props rather

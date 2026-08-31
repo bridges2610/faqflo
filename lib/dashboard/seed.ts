@@ -15,6 +15,7 @@
 import {
   ENGINES,
   type CitationCheck,
+  type ActionTick,
   type Competitor,
   type CitationDay,
   type CitedPage,
@@ -520,37 +521,37 @@ function seedContentPlan(siteId: string): ContentPlan {
       {
         role: 'services',
         label: 'Services',
-        why: 'The page that says what you actually do. Assistants quote it when someone asks who handles a job.',
+        why: 'The page that says what you do. Assistants quote it.',
         slugs: ['services', 'what-we-do'],
       },
       {
         role: 'pricing',
         label: 'Pricing',
-        why: 'Cost is the first question a roofing customer asks, and the one assistants most often answer with a competitor.',
+        why: 'Cost is the first thing customers ask. Assistants answer with someone else.',
         slugs: ['pricing', 'cost', 'price'],
       },
       {
         role: 'about',
         label: 'About',
-        why: 'Establishes who the business is, which is what an engine needs before it will name you.',
+        why: 'Says who the business is. An engine needs that to name you.',
         slugs: ['about', 'our-story', 'who-we-are'],
       },
       {
         role: 'service-area',
         label: 'Service area',
-        why: 'Roofing is bought locally. Without a page naming the towns you cover, "near me" questions cannot match you.',
+        why: 'Roofing is bought locally. Name the towns you cover.',
         slugs: ['service-area', 'areas-we-serve', 'locations'],
       },
       {
         role: 'storm-damage',
         label: 'Storm & hail damage',
-        why: 'Storm work is urgent and searched separately from routine repair — it rarely finds a general services page.',
+        why: 'Storm work is urgent, and people search for it on its own.',
         slugs: ['storm', 'hail', 'emergency'],
       },
       {
         role: 'financing',
         label: 'Financing',
-        why: 'A roof is a five-figure purchase. People search for how to pay for it before they search for who fits it.',
+        why: 'A roof costs five figures. People search how to pay first.',
         slugs: ['financing', 'finance', 'payment-plans'],
       },
       {
@@ -566,7 +567,7 @@ function seedContentPlan(siteId: string): ContentPlan {
         angle: 'Real local ranges by roof size and material, not a national average.',
         primaryKeyword: 'new roof cost franklin tn',
         aeoQuestion: 'How much does a new roof cost in Franklin, Tennessee?',
-        why: 'One of the questions you don’t answer, and the one assistants currently answer with somebody else’s numbers.',
+        why: 'A question you don’t answer. Assistants use someone else’s page.',
       },
       {
         title: 'Does Tennessee homeowners insurance cover hail damage to a roof?',
@@ -660,6 +661,8 @@ export type SeedLocalData = {
      has named yet on a fresh fixture. Seeding it would blur exactly the
      distinction the Competitors page exists to draw. */
   competitors: Competitor[];
+  /** Empty on a fixture: nobody has ticked anything off a seeded audit. */
+  actionTicks: ActionTick[];
   audits: Record<string, AuditReport>;
 };
 
@@ -798,6 +801,7 @@ export function buildSeed(siteId: string): SeedLocalData {
     tracking,
     contentPlans: [seedContentPlan(site.id)],
     competitors: [],
+    actionTicks: [],
     // The seeded audit, hung off the real site id — audits are keyed by site
     // in local storage now rather than living on the site object.
     audits: { [site.id]: seedAudit() },

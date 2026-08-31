@@ -319,6 +319,23 @@ export type Competitor = {
   createdAt: string;
 };
 
+/**
+ * A fix the customer says they have done.
+ *
+ * ⚠️ A CLAIM, NOT A MEASUREMENT, AND THE TWO MUST NOT BLUR. The audit decides
+ * whether a fix landed; this records that somebody ticked a box. `reportCheckedAt`
+ * scopes the tick to the audit that raised it, so a newer scan clears the slate
+ * rather than letting the report show "done" for something still failing.
+ */
+export type ActionTick = {
+  id: string;
+  siteId: string;
+  /** The RECIPES constant from lib/audit/actions.ts — stable across runs. */
+  actionId: string;
+  reportCheckedAt: string;
+  createdAt: string;
+};
+
 export type CompetitorShare = {
   domain: string;
   /**
@@ -474,4 +491,6 @@ export type DashboardData = {
   contentPlans: ContentPlan[];
   /** The rivals the customer named. Not the ones we measured — see Competitor. */
   competitors: Competitor[];
+  /** Fixes ticked off the audit plan. See ActionTick. */
+  actionTicks: ActionTick[];
 };

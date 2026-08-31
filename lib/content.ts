@@ -144,7 +144,7 @@ ${
 - Between 6 and 9 entries, ordered by how much each one matters to this business.
 - "role" is a stable lowercase key, like "services" or "storm-damage".
 - "label" is what the customer would call it, like "Storm & hail damage".
-- "why" is one sentence on why THIS industry needs it, written to the business owner. Say what it costs them not to have it.
+- "why" is one sentence of AT MOST 15 WORDS on why THIS industry needs it, written to the business owner. Say what it costs them not to have it. Fifteen words is a hard limit: this text is rendered in a report written for a reader at a sixth-grade level, and a longer sentence pushes the whole page above it.
 - "slugs" are lowercase fragments that would appear in the URL path or page title of such a page — 2 to 4 of them, no slashes. These are how we detect the page, so give real-world variants: for an about page, ["about", "our-story", "who-we-are"].
 - Go beyond the generic set. Name the pages that matter in this particular trade.
 
@@ -153,7 +153,7 @@ ${
 - "angle" is one sentence on what makes it different from the obvious version of the piece.
 - "primaryKeyword" is what someone types into a search box.
 - "aeoQuestion" is what someone asks an assistant out loud — a full question, phrased as a person speaks.
-- "why" is one sentence to the owner on why this one earns its place.
+- "why" is one sentence of AT MOST 15 WORDS to the owner on why this one earns its place. Fifteen is a hard limit, for the reading level of the report it lands in.
 
 Rules for the topics:
 - Ground them in the service area. A topic that would suit an identical business two states away is a wasted topic.

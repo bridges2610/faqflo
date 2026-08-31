@@ -1,27 +1,28 @@
 'use client';
 
-import { useId, useState } from 'react';
-import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Check } from '@/components/ui/check';
 import { ScoreDial } from '@/components/ui/score-dial';
-import { useCopy } from '@/lib/dashboard/use-copy';
 import {
   holdingBack,
   isHiddenInSummary,
   plainAction,
   plainFor,
+  plainShort,
   strengths,
   verdict,
 } from '@/lib/audit/plain';
 import { scoreBand } from '@/lib/audit/score';
+
+/* The href AUDIT_TABS uses, not a second copy of the string — workspace-tabs.tsx
+   owns what the technical view is called and where it lives. */
+const TECHNICAL = '/dashboard/audit?view=technical';
 import type { ActionItem, AuditReport, Finding } from '@/lib/audit/types';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
+import { useDashboard } from '@/lib/dashboard/provider';
 import type { Site } from '@/lib/dashboard/types';
-import { ChevronIcon, CopyIcon, TickIcon } from './nav-icons';
-import { MicroLabel } from './micro-label';
-import { SectionTitle } from './section-title';
+import { IndustryPlan, IndustryPlanPrompt, VisibilityLine } from './audit-extras';
 
 /*
   The audit for someone who doesn't want an audit.
@@ -36,144 +37,6 @@ import { SectionTitle } from './section-title';
 */
 
 /**
- * A list the reader opens if they want it.
- *
- * The paragraph above each of these is the summary; this is the evidence. Both
- * lists used to be open on arrival, which meant the page led with thirty items
- * and the two paragraphs explaining them scrolled away.
- *
- * ⚠️ THE CONTENT STAYS IN THE DOM WHEN CLOSED. PillarCard unmounts its body;
- * this one must not. This page is a printable deliverable
- * and window.print() cannot reveal something React never rendered — a customer
- * printing a collapsed report would get two empty sections. `hidden print:block`
- * hides it on screen and brings it back for print, which is the masthead's trick
- * above in reverse.
- */
-function Collapsible({
-  label,
-  children,
-}: {
-  /** Says what opening it gets you — "Show all 14" beats a bare chevron. */
-  label: string;
-  children: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-controls={id}
-        className="text-primary hover:text-primary-hover mt-4 inline-flex items-center gap-1.5 text-sm font-semibold transition-colors duration-150 print:hidden"
-      >
-        <ChevronIcon
-          className={`h-4 w-4 transition-transform duration-200 ${open ? 'rotate-90' : ''}`}
-        />
-        {open ? 'Hide the list' : label}
-      </button>
-
-      <div id={id} className={open ? 'mt-4' : 'hidden print:mt-4 print:block'}>
-        {children}
-      </div>
-    </>
-  );
-}
-
-/** One thing that's wrong, and what it costs. Worst first. */
-function ProblemRow({ finding }: { finding: Finding }) {
-  return (
-    <li className="flex gap-3 py-3.5">
-      {/*
-        ⚠️ THE WORD IS THE SIGNAL. THE COLOUR IS THE SECOND COPY OF IT.
-
-        This used to be a red-or-cyan dot with the only distinguishing text in
-        an `sr-only` span marked `print:not-sr-only`. So a screen-reader user
-        and a printed page both got "Fix"/"Check", and a sighted colourblind
-        reader looking at the screen got nothing — red and cyan at 2px are the
-        same dot. Colour was carrying the whole meaning, which is exactly what
-        score-dial.tsx refuses to do and what every status colour in this
-        dashboard is required not to do.
-      */}
-      <span
-        className={`mt-0.5 shrink-0 rounded-pill px-2 py-0.5 text-[0.6875rem] font-semibold tracking-wide uppercase ${
-          finding.status === 'fail'
-            ? 'bg-error/12 text-error-ink'
-            : 'bg-accent-soft text-teal-ink'
-        }`}
-      >
-        {finding.status === 'fail' ? 'Fix' : 'Check'}
-      </span>
-      <p className="text-slate text-[0.9375rem] leading-relaxed">{plainFor(finding)}</p>
-    </li>
-  );
-}
-
-/**
- * One job from the plan, without the scoring language.
- *
- * ⚠️ NOT the shared TaskRow, and it must not become it. TaskRow shows
- * "+N points" and an effort band — the vocabulary of the technical report. This
- * view exists precisely to say the same job without any of that, via
- * plainAction(). The two look similar enough that merging them will look like a
- * tidy-up; it would put the jargon straight back into the plain view.
- */
-function ActionRow({ item, index }: { item: ActionItem; index: number }) {
-  const { copied, copy } = useCopy();
-  // The recipe's own wording is written for the technical report; this page
-  // needs the same job described without the vocabulary.
-  const { what, why, label } = plainAction(item);
-
-  return (
-    <li className="break-inside-avoid py-4">
-      <div className="flex gap-4">
-        <span className="bg-primary-soft text-primary font-display print-step mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-extrabold">
-          {index + 1}
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h3 className="text-navy text-[1.0625rem] leading-snug font-semibold">{what}</h3>
-            <span className="text-slate text-xs">about {item.effort}</span>
-          </div>
-          <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">{why}</p>
-
-          {item.action.kind === 'link' && (
-            <ButtonLink href={item.action.href} size="sm" variant="ghost" className="mt-3 print:hidden">
-              {label}
-            </ButtonLink>
-          )}
-
-          {item.action.kind === 'copy' && (
-            <div className="mt-3">
-              <p className="text-slate text-sm">{item.action.where}</p>
-              {/* The one place jargon is allowed to survive: text the customer
-                  has to paste somewhere, which has to be exact. */}
-              <pre className="border-line bg-cloud mt-2 overflow-auto rounded-lg border p-3 print:bg-white">
-                <code className="text-navy font-mono text-[0.6875rem] leading-relaxed whitespace-pre">
-                  {item.action.snippet}
-                </code>
-              </pre>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="mt-2 print:hidden"
-                onClick={() => copy(item.action.kind === 'copy' ? item.action.snippet : '')}
-              >
-                {copied ? <TickIcon className="h-4 w-4" /> : <CopyIcon className="h-4 w-4" />}
-                {copied ? 'Copied' : 'Copy this'}
-              </Button>
-            </div>
-          )}
-        </div>
-      </div>
-    </li>
-  );
-}
-
-/**
  * The plain reading of one audit.
  *
  * ⚠️ Takes the report as a PROP rather than reading site.lastAudit from
@@ -184,6 +47,143 @@ function ActionRow({ item, index }: { item: ActionItem; index: number }) {
  * would be a switch that changes the score. One object, passed down, cannot
  * disagree with itself.
  */
+/** The three things worth naming, in a part. Short lines, no jargon. */
+function Named({ items, tone }: { items: Finding[]; tone: 'good' | 'bad' }) {
+  if (items.length === 0) return null;
+
+  return (
+    <ul className="mt-3 space-y-1.5">
+      {items.slice(0, 3).map((f) => (
+        <li key={f.id} className="flex gap-2.5">
+          <span
+            aria-hidden="true"
+            className={`mt-[0.45rem] h-1.5 w-1.5 shrink-0 rounded-full ${
+              tone === 'good' ? 'bg-success' : 'bg-warn'
+            }`}
+          />
+          {/* ⚠️ plainShort, NEVER finding.label — eleven of the forty-four
+              labels are written for a developer. See the note on plainShort. */}
+          <span className="text-slate text-[0.9375rem] leading-snug">{plainShort(f)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One numbered part of the report.
+ *
+ * ⚠️ A DIRECT CHILD OF .print-sections, WHICH IS LOAD-BEARING. globals.css
+ * gives every direct child a top rule and 6mm of air in print — that is the
+ * ruled-section look the printed report has. Wrapping these in anything would
+ * collapse all five into one section on paper.
+ *
+ * ⚠️ THE NUMBER IS DECORATION; THE HEADING IS THE MEANING. It is aria-hidden,
+ * because "1" read aloud before every heading is noise, and the headings
+ * already read in order.
+ */
+function Part({
+  n,
+  title,
+  note,
+  action,
+  children,
+}: {
+  n: number;
+  title: React.ReactNode;
+  note?: string;
+  action?: { href: string; label: string };
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border-line border-b py-7 last:border-b-0">
+      <div className="flex gap-5 sm:gap-7">
+        <span
+          aria-hidden="true"
+          className="text-slate/30 font-display w-5 shrink-0 text-xl leading-none font-extrabold tabular-nums sm:w-7 sm:text-2xl"
+        >
+          {n}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+            <h2 className="text-navy text-base font-bold tracking-normal sm:text-[1.0625rem]">
+              {title}
+            </h2>
+            {note ? <p className="text-slate shrink-0 text-sm">{note}</p> : null}
+          </div>
+
+          <div className="mt-3">{children}</div>
+
+          {action ? (
+            <Link
+              href={action.href}
+              className="text-primary hover:text-primary-hover mt-4 inline-block text-[0.9375rem] font-semibold print:hidden"
+            >
+              {action.label} →
+            </Link>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One fix, with a box the customer can tick.
+ *
+ * ⚠️ THE TICK IS A CLAIM, NOT A MEASUREMENT. It records that the customer says
+ * they have done this. The audit is what knows whether it is true, and the next
+ * scan settles it — see the note on report_checked_at in migration 0016. So
+ * nothing derived from a tick may ever be presented as a finding.
+ */
+function ActionStep({
+  item,
+  checked,
+  onToggle,
+}: {
+  item: ActionItem;
+  checked: boolean;
+  onToggle: () => void;
+}) {
+  const plain = plainAction(item);
+
+  return (
+    <li className="flex gap-3">
+      {/* A real checkbox: it is focusable, it announces its own state, and the
+          label is tied to it without any aria of ours. */}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onToggle}
+        id={`act-${item.id}`}
+        className="accent-primary mt-1 h-4 w-4 shrink-0 cursor-pointer print:hidden"
+      />
+      <div className="min-w-0 flex-1">
+        <label
+          htmlFor={`act-${item.id}`}
+          className={`block cursor-pointer text-[0.9375rem] leading-snug font-semibold ${
+            checked ? 'text-slate/60 line-through' : 'text-navy'
+          }`}
+        >
+          {plain.what}
+        </label>
+        <p className="text-slate mt-1 text-[0.9375rem] leading-relaxed">{plain.why}</p>
+        {item.action.kind === 'link' ? (
+          /* ⚠️ plain.label, NOT item.action.label. plainAction() exists to
+             replace button labels that name a file or a format — its own
+             comment gives "Get the schema block" as the example — and reading
+             the raw label straight off the action walks around it. That is
+             exactly how "Get the schema block" reached a page whose whole job
+             is to use no jargon. */
+          <ButtonLink href={item.action.href} size="sm" variant="ghost" className="mt-2 print:hidden">
+            {plain.label}
+          </ButtonLink>
+        ) : null}
+      </div>
+    </li>
+  );
+}
+
 export function AuditSummary({ report, site }: { report: AuditReport; site: Site }) {
   const findings = report.pillars.flatMap((p) => p.findings).filter((f) => !isHiddenInSummary(f));
   const working = findings.filter((f) => f.status === 'pass');
@@ -192,7 +192,76 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
     .filter((f) => f.status === 'fail' || f.status === 'warn')
     .sort((a, b) => (a.status === b.status ? b.weight - a.weight : a.status === 'fail' ? -1 : 1));
 
+  const { actionTicks, toggleAction, tracking } = useDashboard();
+
+  /*
+    ⚠️ ONLY TICKS STAMPED WITH THIS REPORT COUNT.
+
+    A tick says "I did this". The audit says whether it landed. If a fix was
+    ticked against last week's scan and this week's scan still raises it, the
+    honest reading is that it is not done — so the stamp has to match or the
+    box comes back empty. Migration 0016 carries the long form.
+  */
+  const ticked = new Set(
+    actionTicks.filter((t) => t.reportCheckedAt === report.checkedAt).map((t) => t.actionId),
+  );
+  const done = report.actions.filter((a) => ticked.has(a.id)).length;
+
+  /*
+    ⚠️ THE TRADE ONLY TRAVELS WHEN WE DIDN'T GUESS IT.
+
+    profileSource 'schema' means we read it off their own markup; 'manual' means
+    they typed it. 'inferred' means a model filled the blank in — and content
+    -workspace.tsx already treats that as the case that earns a "check this"
+    badge. Opening their report with "You run a roofing contractor" over a guess
+    would state our inference as their fact, in the first line of the document
+    they trust most.
+  */
+  const trade =
+    site.profileSource === 'schema' || site.profileSource === 'manual'
+      ? (site.industry ?? undefined)
+      : undefined;
+
+  /* Omitted, not zeroed: an account with no checks has no result, and "named
+     you in 0" is a measurement nobody took. */
+  const checks = tracking?.latest ?? [];
+  const namedCount = checks.filter(
+    (c) => c.outcome === 'cited' || c.outcome === 'mentioned',
+  ).length;
+
   const band = scoreBand(report.score);
+
+  /*
+    Part 1, from the two findings that decide it.
+
+    ⚠️ plainFor() WRITES THIS, NOT THIS FILE. plain.ts already has a
+    pass/warn/fail sentence for each of these. Composing a new sentence here
+    would be a second voice describing the same measurement, free to drift from
+    the one the technical view shows.
+
+    ⚠️ THE SAME FOUR verdict() BRANCHES ON, AND THAT IS NOT A COINCIDENCE.
+    This read only `raw-html` and `crawlers`, while the summary directly above
+    it cascades over `crawlers`, `googlebot`, `raw-html` and `noindex`. So a
+    site failing noindex got a verdict reading "one setting is quietly telling
+    search engines to leave your site out altogether" with this part underneath
+    replying "AI can read your pages" — the report disagreeing with itself in
+    the two places a reader compares first. Same list, same order, one answer.
+
+    ⚠️ SEVERITY ORDER, NOT ALPHABETICAL. Can't get in, then nothing to read,
+    then told to ignore it — the order the cascade already uses. Sorting these
+    any other way puts the mildest failure first.
+  */
+  const all = report.pillars.flatMap((p) => p.findings);
+  const blockers = ['crawlers', 'googlebot', 'raw-html', 'noindex']
+    .map((id) => all.find((f) => f.id === id))
+    .filter((f): f is Finding => Boolean(f));
+  const broken = blockers.filter((f) => f.status === 'fail' || f.status === 'warn');
+  const readable =
+    broken.length > 0
+      ? broken.map(plainFor).join(' ')
+      : blockers.length > 0
+        ? blockers.map(plainFor).join(' ')
+        : `We read ${report.crawled.length} ${report.crawled.length === 1 ? 'page' : 'pages'} on your site.`;
   const checkedOn = new Date(report.checkedAt).toLocaleDateString(undefined, {
     day: 'numeric',
     month: 'long',
@@ -200,7 +269,7 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
   });
 
   return (
-    <div className="print-report print-sections space-y-5">
+    <div className="print-report print-sections">
       {/*
         Masthead, print only.
 
@@ -224,95 +293,122 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
         </p>
       </div>
 
-      <div className="flex justify-end print:hidden">
-        <Button size="sm" variant="ghost" onClick={() => window.print()}>
+      {/*
+        The score, and the one sentence about it.
+
+        ⚠️ THE DOWNLOAD BUTTON LIVES IN HERE NOW, AND THAT FIXES AN OFF-BY-ONE.
+        It used to be its own direct child sitting between the masthead and this
+        block, which made THIS the third child while globals.css styles
+        `.print-sections > div:nth-child(2)` as the leading block. :nth-child
+        counts hidden elements, so the rule was landing on a print:hidden button
+        row and the verdict never got the treatment written for it.
+      */}
+      <div className="border-line flex flex-col items-center gap-5 border-b pb-8 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
+        <ScoreDial score={report.score} />
+        <div className="min-w-0 flex-1">
+          <p className="text-navy text-[1.125rem] leading-snug font-bold sm:text-[1.25rem]">
+            {band.label}
+          </p>
+          <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">{verdict(report, {
+              siteName: site.name,
+              trade,
+              named: checks.length > 0 ? namedCount : undefined,
+              checked: checks.length > 0 ? checks.length : undefined,
+            })}</p>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="shrink-0 print:hidden"
+          onClick={() => window.print()}
+        >
           Download PDF
         </Button>
       </div>
 
-      {/* The verdict — the one thing to read ------------------------------- */}
-      <Card className="p-5 sm:p-7">
-        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-          <ScoreDial score={report.score} />
-          <div className="min-w-0">
-            <Badge tone={report.score >= 85 ? 'success' : report.score >= 60 ? 'cyan' : 'neutral'}>
-              {band.label}
-            </Badge>
-            <p className="text-navy mt-3 text-[1.0625rem] leading-relaxed">{verdict(report)}</p>
-          </div>
-        </div>
-      </Card>
-
-      {/* What's working ---------------------------------------------------- */}
-      {/* Deliberately first. A report that only lists faults reads as an
-          attack, and it hides that most of the score was already earned. */}
-      {working.length > 0 && (
-        <Card className="p-5 sm:p-7">
-          <div className="flex flex-wrap items-center gap-3">
-            <SectionTitle>What&rsquo;s already working</SectionTitle>
-            <Badge tone="success">{working.length}</Badge>
-          </div>
-          {/* The summary instead of the list, with the list one click away.
-              Twenty ticks in a row is something people scroll past. */}
-          <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{strengths(report)}</p>
-          <Collapsible label={`Show all ${working.length}`}>
-            <ul className="print-columns space-y-2.5">
-              {working.map((f) => (
-                <li key={f.id} className="flex gap-2.5">
-                  <Check className="text-success-ink mt-[0.4rem] shrink-0" />
-                  <p className="text-slate text-[0.9375rem] leading-relaxed">{plainFor(f)}</p>
-                </li>
-              ))}
-            </ul>
-          </Collapsible>
-        </Card>
-      )}
-
-      {/* What's holding you back ------------------------------------------- */}
-      {problems.length > 0 && (
-        <Card className="p-5 sm:p-7">
-          <div className="flex flex-wrap items-center gap-3">
-            <SectionTitle>What&rsquo;s holding you back</SectionTitle>
-            <Badge tone="neutral">{problems.length}</Badge>
-          </div>
-          <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">
-            {holdingBack(report)}
+      <Part n={1} title="Can AI read your site?">
+        <p className="text-slate text-[0.9375rem] leading-relaxed">{readable}</p>
+        {/* ⚠️ `discovered` IS EVERY IN-SCOPE URL FOUND, READ OR NOT, and it is
+            bigger than crawled on a big site — see the note on it in
+            lib/audit/types.ts. Saying so is the honest version of a page count;
+            printing only "we read 4 pages" hides that there were 40. */}
+        {report.discovered > report.crawled.length ? (
+          <p className="text-slate mt-2 text-[0.9375rem] leading-relaxed">
+            We read {report.crawled.length} of the {report.discovered} pages we found.
           </p>
-          <Collapsible label={`Show all ${problems.length}`}>
-            <ul className="divide-line divide-y">
-              {problems.map((f) => (
-                <ProblemRow key={f.id} finding={f} />
-              ))}
-            </ul>
-          </Collapsible>
-        </Card>
-      )}
+        ) : null}
+      </Part>
 
-      {/* Do these next ------------------------------------------------------ */}
-      {report.actions.length > 0 && (
-        <Card className="border-primary p-5 sm:p-7">
-          <MicroLabel tone="primary">
-            Do these {report.actions.length} things
-          </MicroLabel>
-          <SectionTitle className="mt-3">Where to start</SectionTitle>
-          <p className="text-slate mt-1 text-sm">
-            In order. The first one is worth more than the rest put together.
+      <Part
+        n={2}
+        title="Is AI naming you?"
+        action={{ href: '/dashboard/tracking', label: 'See the answers' }}
+      >
+        <VisibilityLine />
+      </Part>
+
+      <Part
+        n={3}
+        title="What&rsquo;s already good"
+        action={working.length > 3 ? { href: TECHNICAL, label: 'See all the details' } : undefined}
+      >
+        {working.length > 0 ? (
+          <p className="text-slate text-[0.9375rem] leading-relaxed">{strengths(report)}</p>
+        ) : (
+          <p className="text-slate text-[0.9375rem] leading-relaxed">
+            Nothing is passing yet. That is what part 5 is for.
           </p>
-          <ul className="divide-line mt-3 divide-y">
-            {report.actions.map((item, i) => (
-              <ActionRow key={item.id} item={item} index={i} />
+        )}
+        <Named items={working} tone="good" />
+      </Part>
+
+      <Part
+        n={4}
+        title="What&rsquo;s costing you"
+        action={problems.length > 0 ? { href: TECHNICAL, label: 'See all the details' } : undefined}
+      >
+        {problems.length > 0 ? (
+          <p className="text-slate text-[0.9375rem] leading-relaxed">{holdingBack(report)}</p>
+        ) : (
+          <p className="text-slate text-[0.9375rem] leading-relaxed">
+            Nothing. Every check passed.
+          </p>
+        )}
+        <Named items={problems} tone="bad" />
+        {/* ⚠️ THE FULL LIST IS NOT HERE ANY MORE, AND IT IS NOT GONE. Two
+            Collapsibles held every passing and failing finding — up to 56 of
+            them on a full run — inside a report meant to be read start to
+            finish. The Technical detail view renders all of them, which is
+            where somebody who wants a list will look. */}
+      </Part>
+
+      {report.actions.length > 0 ? (
+        <Part n={5} title="Do this next" note={`${done} of ${report.actions.length} done`}>
+          <ul className="space-y-4">
+            {report.actions.map((item) => (
+              <ActionStep
+                key={item.id}
+                item={item}
+                checked={ticked.has(item.id)}
+                onToggle={() => toggleAction(site.id, item.id, report.checkedAt)}
+              />
             ))}
           </ul>
-        </Card>
-      )}
+        </Part>
+      ) : null}
 
-      {/* The "see the technical detail" link that used to close this is gone —
-          the toggle above the page is that now, and two controls doing one job
-          is one more than anybody needs. */}
-      <p className="text-slate text-center text-xs print:mt-8">
-        Prepared by FaqFlo from a scan of {report.crawled.length}{' '}
-        {report.crawled.length === 1 ? 'page' : 'pages'} on {checkedOn}.
-      </p>
+      <IndustryPlan pages={report.pages ?? []} />
+      <IndustryPlanPrompt />
+
+      <div>
+        <p className="text-slate text-center text-[0.9375rem] leading-relaxed">
+          That&rsquo;s everything. Come back after you&rsquo;ve made a change.
+        </p>
+        <p className="text-slate/70 mt-2 text-center text-xs">
+          Checked {report.crawled.length}{' '}
+          {report.crawled.length === 1 ? 'page' : 'pages'} on {checkedOn}.
+        </p>
+      </div>
     </div>
   );
 }

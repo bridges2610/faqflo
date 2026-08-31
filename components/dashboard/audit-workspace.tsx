@@ -323,8 +323,8 @@ export function AuditWorkspace({
           carries its own print masthead. */}
       <div className="print:hidden">
         <PageHeader
-          title="Your site"
-          description={`What an AI crawler sees when it reads ${site.domain} — and what to do about it.`}
+          title="Audit"
+          description={`What AI sees when it reads ${site.domain}, and what to do about it.`}
           action={
             <Button size="sm" onClick={run} disabled={busy}>
               {busy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}

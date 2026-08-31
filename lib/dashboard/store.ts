@@ -25,6 +25,7 @@ import { isAuditReport } from '@/lib/audit/types';
 import { questionKey } from '@/lib/questions';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
 import type {
+  ActionTickRow,
   AuditRunRow,
   CitationCheckRow,
   CompetitorRow,
@@ -49,6 +50,7 @@ import { ENGINES } from './types';
 import type {
   CitationCheck,
   CitationDay,
+  ActionTick,
   CitedPage,
   Competitor,
   CompetitorShare,
@@ -127,6 +129,7 @@ const EMPTY_LOCAL: LocalData = {
   tracking: [],
   contentPlans: [],
   competitors: [],
+  actionTicks: [],
   audits: {},
 };
 
@@ -196,6 +199,7 @@ function normaliseLocal(data: LocalData): LocalData {
     tracking: (data.tracking ?? []).map(normaliseTracking),
     contentPlans: data.contentPlans ?? [],
     competitors: data.competitors ?? [],
+    actionTicks: data.actionTicks ?? [],
     audits,
   };
 }
@@ -362,6 +366,27 @@ function competitorToRow(c: Competitor, userId: string) {
   };
 }
 
+function tickToRow(t: ActionTick, userId: string) {
+  return {
+    id: t.id,
+    site_id: t.siteId,
+    user_id: userId,
+    action_id: t.actionId,
+    report_checked_at: t.reportCheckedAt,
+    created_at: t.createdAt,
+  };
+}
+
+function rowToTick(r: ActionTickRow): ActionTick {
+  return {
+    id: r.id,
+    siteId: r.site_id,
+    actionId: r.action_id,
+    reportCheckedAt: r.report_checked_at,
+    createdAt: r.created_at,
+  };
+}
+
 function rowToCompetitor(r: CompetitorRow): Competitor {
   return {
     id: r.id,
@@ -436,6 +461,7 @@ async function write(data: DashboardData): Promise<DashboardData> {
     tracking: data.tracking,
     contentPlans: data.contentPlans,
     competitors: data.competitors,
+    actionTicks: data.actionTicks,
     // Held so assemble() can keep joining reports onto sites; never persisted
     // from here. See the note above.
     audits: previous.audits,
@@ -445,6 +471,7 @@ async function write(data: DashboardData): Promise<DashboardData> {
   const faqs = diff(previous.faqs, next.faqs);
   const questions = diff(previous.questions, next.questions);
   const competitors = diff(previous.competitors, next.competitors);
+  const actionTicks = diff(previous.actionTicks, next.actionTicks);
 
   const fail = (what: string, error: { message: string } | null) => {
     if (error) throw new Error(`Could not save your ${what}: ${error.message}`);
@@ -507,6 +534,22 @@ async function write(data: DashboardData): Promise<DashboardData> {
       (await supabase.from('competitors').delete().in('id', competitors.removed)).error,
     );
   }
+  if (actionTicks.changed.length) {
+    fail(
+      'progress',
+      (
+        await supabase
+          .from('audit_action_ticks')
+          .upsert(actionTicks.changed.map((t) => tickToRow(t, userId)))
+      ).error,
+    );
+  }
+  if (actionTicks.removed.length) {
+    fail(
+      'progress',
+      (await supabase.from('audit_action_ticks').delete().in('id', actionTicks.removed)).error,
+    );
+  }
 
   // One row per site, so a plan is an upsert on site_id rather than a diff.
   for (const plan of next.contentPlans) {
@@ -544,6 +587,7 @@ function assemble(user: User, sites: Site[], local: LocalData): DashboardData {
     faqs: local.faqs,
     questions: local.questions,
     competitors: local.competitors,
+    actionTicks: local.actionTicks,
     tracking: local.tracking,
     contentPlans: local.contentPlans,
   };
@@ -602,7 +646,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
   const supabase = supabaseBrowser();
   const siteIds = sites.map((s) => s.id);
 
-  const [groupRows, faqRows, questionRows, planRows, competitorRows] = await Promise.all([
+  const [groupRows, faqRows, questionRows, planRows, competitorRows, tickRows] = await Promise.all([
     supabase.from('faq_groups').select('*').eq('user_id', userId).order('position'),
     supabase.from('faqs').select('*').eq('user_id', userId).order('position'),
     /* ⚠️ BY position NOW, NOT added_at. 0015 added the column and backfilled it
@@ -611,6 +655,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
     supabase.from('questions').select('*').eq('user_id', userId).order('position'),
     supabase.from('content_plans').select('*').eq('user_id', userId),
     supabase.from('competitors').select('*').eq('user_id', userId).order('position'),
+    supabase.from('audit_action_ticks').select('*').eq('user_id', userId),
   ]);
 
   const firstError =
@@ -619,6 +664,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
     questionRows.error ??
     planRows.error ??
     competitorRows.error ??
+    tickRows.error ??
     null;
   if (firstError) {
     /*
@@ -660,6 +706,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
     faqs: (faqRows.data ?? []).map(rowToFaq),
     questions: (questionRows.data ?? []).map(rowToQuestion),
     competitors: (competitorRows.data ?? []).map(rowToCompetitor),
+    actionTicks: (tickRows.data ?? []).map(rowToTick),
     tracking: [],
     contentPlans: (planRows.data ?? []).map((r) => r.plan as ContentPlan),
     audits,
@@ -1319,6 +1366,43 @@ export async function deleteCompetitor(id: string): Promise<DashboardData> {
   );
 
   return write({ ...data, competitors: renumbered });
+}
+
+/**
+ * Tick a fix, or untick it.
+ *
+ * ⚠️ THE TICK CARRIES THE REPORT IT BELONGS TO. Re-ticking after a new scan
+ * overwrites reportCheckedAt, and the UI only honours a tick whose stamp
+ * matches the report on screen — so a fix ticked against last week's audit does
+ * not silently mark this week's finding as done. Migration 0016 carries the
+ * long form of why.
+ */
+export async function toggleActionTick(
+  siteId: string,
+  actionId: string,
+  reportCheckedAt: string,
+): Promise<DashboardData> {
+  const data = requireData('toggleActionTick');
+  const existing = data.actionTicks.find((t) => t.siteId === siteId && t.actionId === actionId);
+
+  /* Ticked against THIS report — untick. Ticked against an older one, which the
+     UI is already ignoring, counts as unticked, so this re-stamps it instead. */
+  if (existing && existing.reportCheckedAt === reportCheckedAt) {
+    return write({ ...data, actionTicks: data.actionTicks.filter((t) => t.id !== existing.id) });
+  }
+
+  const next: ActionTick = {
+    id: existing?.id ?? newId('tick'),
+    siteId,
+    actionId,
+    reportCheckedAt,
+    createdAt: existing?.createdAt ?? now(),
+  };
+
+  return write({
+    ...data,
+    actionTicks: [...data.actionTicks.filter((t) => t.id !== next.id), next],
+  });
 }
 
 export async function moveCompetitor(

@@ -1,17 +1,30 @@
-import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
+import { requirePro } from '@/lib/auth/pro-only';
+import { ContentWorkspace } from '@/components/dashboard/content-workspace';
 
 /*
-  Absorbed by Answers.
+  Off the sidebar, reached from Audit.
 
-  ⚠️ THE ROUTE STAYS, AND THAT IS THE WHOLE JOB OF THIS FILE. A dozen places
-  still link here — lib/dashboard/worklist.ts builds action items pointing at
-  these paths, audit-context.ts recommends them, help-workspace.tsx documents
-  them, and the audit deep-links into them. Deleting the route would turn every
-  one of those into a 404; redirecting keeps them all landing somewhere true.
+  ⚠️ THIS WAS BRIEFLY A REDIRECT TO ANSWERS, AND THAT WAS A MISTAKE. The nav cut
+  folded Opportunities into Answers, and this route went with it — but the
+  content plan is not a list of unanswered questions, it is advice about the
+  customer's WEBSITE for their trade: the pages a roofer needs, the articles
+  worth writing. It belongs beside the audit that motivates it.
 
-  See the note on NAV in components/dashboard/app-shell.tsx: labels changed when
-  the sidebar was rewritten, URLs did not.
+  The redirect also made the plan ungeneratable: ContentWorkspace holds the only
+  button that calls /api/dashboard/content, so with nothing rendering it, no new
+  plan could ever exist. Audit shows a plan when there is one and links here
+  when there is not.
+
+  Same shape as /dashboard/sites: a real page you reach by link rather than a
+  sixth destination to check.
 */
-export default function ContentPage() {
-  redirect('/dashboard/faqs');
+export const metadata: Metadata = { title: 'Pages & topics' };
+
+export default async function ContentPage() {
+  /* Pro only — a free account is redirected to its report.
+     See the reasoning in lib/auth/pro-only.ts. */
+  await requirePro();
+
+  return <ContentWorkspace />;
 }
