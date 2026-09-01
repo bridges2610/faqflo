@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -177,7 +178,31 @@ export function CompetitorsWorkspace() {
 
   return (
     <>
-      <PageHeader className="mb-4" title="Competitors" description={sourceLine} />
+      <PageHeader className="mb-2" title="Competitors" description={sourceLine} />
+
+      {/* ⚠️ ATTRIBUTION, NOT NAVIGATION, WHICH IS WHY IT SITS UNDER THE
+          DESCRIPTION RATHER THAN IN PageHeader's action SLOT. That slot is
+          right-aligned on wide screens, which would put "where did this come
+          from" a column away from the sentence it answers.
+
+          ⚠️ AND THE CLAIM IS TRUE. Everything on this page is derived from the
+          same SiteTracking object the AI Mentions page renders — buildTracking
+          in lib/dashboard/store.ts builds both from citation_checks in one
+          pass. The one difference worth knowing is the slice: these counts read
+          EVERY check in the window, while the grid on AI Mentions reads
+          `latest`, deduped to the most recent result per question and engine.
+          Same source, so the two can never contradict each other; different
+          spans, so a domain's count here can exceed what one run shows. */}
+      <p className="text-slate mb-5 text-sm">
+        Counted from your{' '}
+        <Link
+          href="/dashboard/tracking"
+          className="text-primary hover:text-primary-hover font-semibold"
+        >
+          AI Mentions checks
+        </Link>
+        , where you can see each answer in full.
+      </p>
 
       {/* ⚠️ THE SUMMARY GOES ABOVE THE WATCH LIST, WHICH REVERSES THE NOTE AT
           THE TOP OF THIS FILE. That note put the list you can act on first, and
