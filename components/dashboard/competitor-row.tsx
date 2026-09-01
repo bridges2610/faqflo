@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
-import type { Competitor } from '@/lib/dashboard/types';
+import type { Competitor, CompetitorShare } from '@/lib/dashboard/types';
+import { TrendMark } from './source-row';
 import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './nav-icons';
 
 /**
@@ -22,11 +23,20 @@ import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './nav-icons';
 export function CompetitorRow({
   competitor,
   mentions,
+  trend,
   isFirst,
   isLast,
 }: {
   competitor: Competitor;
   mentions: number;
+  /**
+   * How their citations moved between the last two runs.
+   *
+   * ⚠️ MEASURED LIKE `mentions`, AND NULL FOR THE SAME KINDS OF REASON. A rival
+   * with no citations has nothing to trend, and so does an account with only
+   * one run — both render as words rather than as a flat arrow.
+   */
+  trend: CompetitorShare['trend'];
   isFirst: boolean;
   isLast: boolean;
 }) {
@@ -114,6 +124,7 @@ export function CompetitorRow({
               </div>
 
               <div className="flex shrink-0 items-center gap-3">
+                <TrendMark trend={trend} />
                 {/* ⚠️ A REAL SPACE, NOT JUST ml-1. The margin spaces it on
                     screen and leaves the text content joined — "4mentions" is
                     what a screen reader says and what lands when the row is

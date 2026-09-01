@@ -34,6 +34,7 @@ import {
 import { buildActionPlan } from '@/lib/audit/actions';
 import { buildPillars, overallScore } from '@/lib/audit/score';
 import type { AuditReport, Finding } from '@/lib/audit/types';
+import { sourceKind } from './platforms';
 import { contentHash } from './export';
 import { TRACKING_PLANS } from './plans';
 
@@ -731,8 +732,31 @@ export function buildSeed(siteId: string): SeedLocalData {
     }
   }
 
+  const citedTotal = [...citedCounts.values()].reduce((n, c) => n + c, 0);
+
+  /*
+    ⚠️ THE NEW FIELDS ARE DERIVED OR EMPTY, NEVER INVENTED. `kind` and `share`
+    are real functions of what the fixture holds, so they are computed. The
+    other three are not knowable here and are left at their honest empty value:
+    seedChecks() invents outcomes, not answers, so there are no `sources` to say
+    which engine cited whom or which questions they turned up on, and there is
+    one run so there is nothing to trend against.
+
+    `trend: null` is the important one. It is exactly the state a real
+    single-run account is in, which makes the fixture the thing that exercises
+    the "no trend yet" wording rather than a case nobody sees until production.
+  */
   const competitors: CompetitorShare[] = [...citedCounts.entries()]
-    .map(([domain, citations]) => ({ domain, citations, isYou: domain === site.domain }))
+    .map(([domain, citations]) => ({
+      domain,
+      citations,
+      isYou: domain === site.domain,
+      kind: domain === site.domain ? ('business' as const) : sourceKind(domain),
+      share: citedTotal > 0 ? (citations / citedTotal) * 100 : 0,
+      engines: [],
+      topQuestions: [],
+      trend: null,
+    }))
     .sort((a, b) => b.citations - a.citations);
 
   /*

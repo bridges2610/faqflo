@@ -12,6 +12,7 @@
  */
 
 import type { AuditReport } from '@/lib/audit/types';
+import type { SourceKind } from './platforms';
 import type { Language, Tone } from '@/lib/faq';
 
 /**
@@ -371,6 +372,47 @@ export type CompetitorShare = {
    */
   citations: number;
   isYou: boolean;
+
+  /**
+   * A business like theirs, or a platform they can't compete with.
+   *
+   * ⚠️ FROM AN EXPLICIT LIST, AND UNKNOWN MEANS 'business'. See
+   * lib/dashboard/platforms.ts for why there is no cleverness here: a directory
+   * shown among rivals is untidy, a rival hidden among directories defeats the
+   * page. Nothing is dropped on the strength of this — it groups, it does not
+   * filter.
+   */
+  kind: SourceKind;
+
+  /**
+   * This domain's share of every source cited, 0–100.
+   *
+   * The denominator is `sourceAppearances.total`, so the page can print the
+   * ratio without a second definition of what a citation is.
+   */
+  share: number;
+
+  /** Which engines cited it, in ENGINES order. */
+  engines: Engine[];
+
+  /**
+   * The questions it was cited on, most-cited first.
+   *
+   * ⚠️ "CITED ON", NOT "BEAT YOU ON". An answer can cite this domain and name
+   * the customer in the same breath, so any surface calling this "what they
+   * beat you on" would be claiming something nobody measured.
+   */
+  topQuestions: string[];
+
+  /**
+   * Movement between the two most recent check dates.
+   *
+   * ⚠️ `null` MEANS THERE WAS NOTHING TO COMPARE, AND IT IS NOT 'steady'. An
+   * account with one run has no trend, and drawing a flat arrow for it would
+   * report an absence of data as a measurement of no change — the same rule
+   * PillarResult.score follows for a pillar nobody could score.
+   */
+  trend: 'up' | 'down' | 'steady' | 'new' | null;
 };
 
 /**

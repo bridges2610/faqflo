@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { formatShortDate } from '@/lib/dashboard/format';
 import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, LockIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
@@ -347,56 +348,20 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/**
- * When the next automatic check lands, on every page rather than only Results.
- *
- * ⚠️ THIS REPLACED A COUNTDOWN, AND IT IS A DIFFERENT KIND OF MESSAGE. The old
- * WindowNotice counted down the last seven days of a Get Cited window and then
- * explained why things had stopped — a deadline that is only visible on the
- * screen it will break is a deadline you meet by accident. A subscription has no
- * such deadline. What is worth surfacing instead is the opposite fact: something
- * is going to happen for you, without you doing anything.
- *
- * Quiet by design — it is reassurance, not a warning, so it gets the neutral
- * treatment the ended-window notice used rather than the accent one.
- */
-function NextCheckNotice() {
-  const { site, user } = useDashboard();
+/*
+  NextCheckNotice used to live here: a bordered card above every Pro page saying
+  when the next automatic check lands.
 
-  // Free's checks are pressed by hand on its own report, never scheduled — so
-  // there is no next one to promise here. See TRACKING_PLANS.free.schedule.
-  if (!site || !isPro(user)) return null;
+  ⚠️ IT WAS MOSTLY A DUPLICATE OF THE SIDEBAR. PlanFooter below already told
+  every Pro account "Checked automatically every week", which was the card's
+  whole second sentence — so it spent about 84px of the content column, on every
+  screen, to add one fact: the date. That fact moved into PlanFooter's own line,
+  and the box went.
 
-  const due = nextCheckDate(site);
-  if (!due) return null;
-
-  /*
-    Due already, or overdue: the sweep runs nightly, so "today" is honest and a
-    date in the past is not. Saying a check was due yesterday invites the
-    question of where it is, and the answer — "tonight" — is the useful half.
-  */
-  const today = due.getTime() <= Date.now();
-
-  return (
-    <div className="border-line bg-cloud mb-3 rounded-xl border p-3.5">
-      <p className="text-navy text-sm font-semibold">
-        {today
-          ? `Next check for ${site.name} runs tonight`
-          : `Next check for ${site.name}: ${due.toLocaleDateString(undefined, {
-              weekday: 'long',
-              day: 'numeric',
-              month: 'short',
-            })}`}
-      </p>
-      <p className="text-slate mt-1 text-sm leading-relaxed">
-        We ask the AI engines about you every week and record what they say.{' '}
-        <Link href="/dashboard/tracking" className="text-primary hover:text-primary-hover font-semibold">
-          See your results →
-        </Link>
-      </p>
-    </div>
-  );
-}
+  Its "See your results →" link was dropped rather than moved. A CTA inside the
+  plan block would rebuild the clutter this removed, and AI Mentions is a nav
+  item a few pixels above it in the same column.
+*/
 
 /**
  * What plan this account is on, pinned to the bottom of the sidebar.
@@ -407,8 +372,28 @@ function NextCheckNotice() {
  * count would always read "1 of 1" or "0 of 1" and teach nothing.
  */
 function PlanFooter() {
-  const { user, tracking } = useDashboard();
+  const { user, tracking, site } = useDashboard();
   const pro = isPro(user);
+
+  /*
+    When the next automatic check lands — the one fact the banner above the page
+    used to carry, now folded into the line that already promised weekly checks.
+
+    ⚠️ THE FALLBACK IS THE ORIGINAL SENTENCE, NOT A BLANK. A Pro site with no
+    nextCheckAt yet still gets told checks run weekly; dropping the reassurance
+    for accounts without a date would be a worse regression than the space this
+    reclaimed.
+
+    Due already, or overdue: the sweep runs nightly, so "tonight" is honest and
+    a date in the past is not. Saying a check was due yesterday invites the
+    question of where it is, and the answer is tonight.
+  */
+  const due = pro ? nextCheckDate(site) : null;
+  const proLine = !due
+    ? 'Checked automatically every week'
+    : due.getTime() <= Date.now()
+      ? 'Checked every week — next one tonight'
+      : `Checked every week — next one ${formatShortDate(due)}`;
 
   /*
     ⚠️ "ALREADY TAKEN" IS A CLAIM ABOUT THE PAST AND HAS TO BE CHECKED.
@@ -447,7 +432,7 @@ function PlanFooter() {
       <p className="text-navy mt-1 text-sm font-semibold">{pro ? 'Pro' : 'Free'}</p>
       <p className="text-slate mt-1 text-xs leading-relaxed">
         {pro
-          ? 'Checked automatically every week'
+          ? proLine
           : left > 0
             ? `${left} of ${TRACKING_PLANS.free.runsPerPeriod} checks left`
             : 'You’ve used all three checks'}
@@ -638,13 +623,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <ShellSkeleton />
             ) : (
               <>
-                {/* ⚠️ The three notices are about what the app is doing right
-                    now — a run in flight, a scan queued, the next check due.
-                    None of that is true of a sheet of paper, and they sit above
-                    the report so they would print as a preamble to it. */}
+                {/* ⚠️ Both notices are about what the app is doing right now —
+                    a scan queued, a run in flight. Neither is true of a sheet of
+                    paper, and they sit above the report so they would print as a
+                    preamble to it. */}
                 <div className="print:hidden">
-                  <NextCheckNotice />
-                {/* Same slot, same argument as the countdown above: a run that
+                {/* A run that
                     only reports on the page that started it is one you assume
                     died when you clicked away.
 

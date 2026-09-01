@@ -93,6 +93,18 @@ export type FetchResult =
     }
   | { ok: false; failure: FetchFailure };
 
+/** What safeFetchBytes hands back. Same shape, raw body. */
+export type BinaryResult =
+  | {
+      ok: true;
+      status: number;
+      finalUrl: string;
+      body: Uint8Array;
+      ms: number;
+      contentType: string | null;
+    }
+  | { ok: false; failure: FetchFailure };
+
 export function classify(status: number): FetchFailure {
   if (status === 404 || status === 410) return { kind: 'notfound', status };
   if (status >= 500) return { kind: 'server', status };
@@ -112,10 +124,10 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
  * generator to MAX_CONTENT_CHARS, the audit to whatever its parser keeps. The
  * cap is here to bound memory, not to judge the page.
  */
-async function readCapped(res: Response): Promise<string> {
+async function readCappedBytes(res: Response): Promise<Uint8Array> {
   const body = res.body;
   // No stream to read (HEAD, 204, or a runtime that didn't give us one).
-  if (!body) return (await res.text()).slice(0, MAX_BYTES);
+  if (!body) return new Uint8Array(await res.arrayBuffer()).subarray(0, MAX_BYTES);
 
   const reader = body.getReader();
   const chunks: Uint8Array[] = [];
@@ -144,9 +156,14 @@ async function readCapped(res: Response): Promise<string> {
     at += chunk.byteLength;
   }
 
+  return joined.subarray(0, MAX_BYTES);
+}
+
+/** The same read, decoded as text. */
+async function readCapped(res: Response): Promise<string> {
   // fatal: false so a multi-byte character cut in half by the cap degrades to
   // a replacement character instead of throwing away the whole page.
-  return new TextDecoder('utf-8', { fatal: false }).decode(joined.subarray(0, MAX_BYTES));
+  return new TextDecoder('utf-8', { fatal: false }).decode(await readCappedBytes(res));
 }
 
 /**
@@ -158,6 +175,38 @@ async function readCapped(res: Response): Promise<string> {
  *                   UA in fetcher.ts about masquerading costing us pages.
  */
 export async function safeFetch(url: string, userAgent: string): Promise<FetchResult> {
+  return walk(url, userAgent, readCapped);
+}
+
+/**
+ * The same fetch, handing back raw bytes instead of decoded text.
+ *
+ * ⚠️ IT SHARES THE GUARD LOOP RATHER THAN COPYING IT, which is the only reason
+ * it is safe to exist. Every rule in the header of this file — the per-hop
+ * re-check, the hop ceiling, the timeout, the byte cap — applies to it because
+ * it is literally the same code path; a second loop written next door would
+ * drift from those and the drift would be invisible until something used it to
+ * reach 169.254.169.254.
+ *
+ * Added for the favicon proxy, which serves images from our own domain so a
+ * customer's competitor list never reaches a third party. Text callers should
+ * keep using safeFetch.
+ */
+export async function safeFetchBytes(
+  url: string,
+  userAgent: string,
+): Promise<BinaryResult> {
+  return walk(url, userAgent, readCappedBytes);
+}
+
+async function walk<T>(
+  url: string,
+  userAgent: string,
+  read: (res: Response) => Promise<T>,
+): Promise<
+  { ok: true; status: number; finalUrl: string; body: T; ms: number; contentType: string | null }
+  | { ok: false; failure: FetchFailure }
+> {
   const started = Date.now();
 
   let target: string = url;
@@ -210,7 +259,7 @@ export async function safeFetch(url: string, userAgent: string): Promise<FetchRe
       ok: true,
       status: res.status,
       finalUrl: guard.url.toString(),
-      body: await readCapped(res),
+      body: await read(res),
       ms: Date.now() - started,
       contentType: res.headers.get('content-type'),
     };

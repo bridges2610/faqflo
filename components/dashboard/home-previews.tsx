@@ -88,7 +88,15 @@ export function HomePreviews({ report }: { report: AuditReport | null }) {
 
   const competitors = tracking?.competitors ?? [];
   const you = competitors.find((c) => c.isYou);
-  const top = competitors.find((c) => !c.isYou);
+  /* ⚠️ THE TOP BUSINESS, NOT THE TOP SOURCE. This read the first row that
+     wasn't the customer, which on a local-services account is reddit.com or
+     yelp.com — so Home introduced a forum as their competitor. The Competitors
+     page groups these; this card only has room for one name, so it takes the
+     first real business and falls back to the raw leader when every source is
+     a platform, rather than showing nothing. */
+  const top =
+    competitors.find((c) => !c.isYou && c.kind === 'business') ??
+    competitors.find((c) => !c.isYou);
   const scale = Math.max(you?.citations ?? 0, top?.citations ?? 0, 1);
 
   return (

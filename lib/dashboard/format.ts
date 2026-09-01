@@ -72,6 +72,30 @@ export function formatPlainDate(iso: string | null): string {
   return Number.isNaN(date.getTime()) ? 'unknown' : PLAIN_DATE.format(date);
 }
 
+/**
+ * A short weekday-and-date — "Thu 4 Sep".
+ *
+ * ⚠️ PINNED FOR THE SAME REASON PLAIN_DATE IS, and it arrived carrying the bug.
+ * This came out of a `toLocaleDateString(undefined, …)` in app-shell.tsx, which
+ * left both the locale and the zone to the runtime — so the server and the
+ * browser could render different days for one timestamp, and a US and a UK
+ * reader could see the day and month swapped. It is a promise about when work
+ * happens, which is the worst kind of date to render two ways.
+ *
+ * No year: this is only ever used for a date inside the coming week, where the
+ * year is noise in a 256px column.
+ */
+const SHORT_DATE = new Intl.DateTimeFormat('en-GB', {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  timeZone: 'UTC',
+});
+
+export function formatShortDate(date: Date | null): string {
+  return date && !Number.isNaN(date.getTime()) ? SHORT_DATE.format(date) : 'unknown';
+}
+
 /** Thousands separators, so 12480 doesn't read as 1248 at a glance. */
 export function formatNumber(n: number): string {
   return n.toLocaleString();

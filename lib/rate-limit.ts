@@ -81,6 +81,17 @@ export const QUESTIONS_RATE_LIMIT = 10;
 export const FETCH_URL_RATE_LIMIT = 60;
 
 /**
+ * Favicons fetched for the Competitors page.
+ *
+ * High, because one page view legitimately asks for up to six at once and a
+ * customer flicking between screens will do that repeatedly. The real defence
+ * is not this number: the route only serves signed-in callers, only ever
+ * fetches an image, and caches what it gets, so a determined caller is mostly
+ * hitting our own cache rather than anybody else's server.
+ */
+export const FAVICON_RATE_LIMIT = 120;
+
+/**
  * Ceiling for reading a page when nobody is signed in.
  *
  * ⚠️ THE ROUTE USED TO REFUSE ANONYMOUS CALLERS OUTRIGHT, WHICH IS WHY THERE

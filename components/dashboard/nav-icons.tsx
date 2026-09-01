@@ -147,6 +147,47 @@ export function ArrowDownIcon({ className = '' }: IconProps) {
   );
 }
 
+/*
+  Trend marks, and they are DIAGONAL for a reason that is not decoration.
+
+  ⚠️ ArrowUpIcon AND ArrowDownIcon ARE THE REORDER CONTROLS IN THE SAME ROW.
+  competitor-row.tsx puts them at the left of every watched rival to move it up
+  and down the list, so pointing the identical glyph at "cited more often" a few
+  pixels to the right would be one shape meaning two things on one screen. A
+  diagonal reads as a trend rather than as a control, which is the distinction
+  being drawn.
+
+  ⚠️ A SHAFT AND A CORNER HEAD, NOT A ZIGZAG. The first version of these drew a
+  four-point polyline with a bracket stuck on the end — a chart line, which at
+  12px collapsed into a smudge that read as broken. One straight diagonal with a
+  right-angled head is the shape that survives being small, which is the only
+  size these are ever drawn at.
+*/
+export function TrendUpIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <path d="M5.5 14.5 14.5 5.5M8.5 5.5h6v6" />
+    </svg>
+  );
+}
+
+export function TrendDownIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <path d="M5.5 5.5 14.5 14.5M8.5 14.5h6v-6" />
+    </svg>
+  );
+}
+
+/** Steady: level and pointing on, not a dash — it is a reading, not a gap. */
+export function TrendFlatIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <path d="M4.5 10h11M12 6.5 15.5 10 12 13.5" />
+    </svg>
+  );
+}
+
 export function CopyIcon({ className = '' }: IconProps) {
   return (
     <svg {...BASE} className={className}>

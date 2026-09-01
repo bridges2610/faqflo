@@ -9,9 +9,10 @@ import { formatNumber } from '@/lib/dashboard/format';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { COMPETITOR_CAP } from '@/lib/dashboard/store';
 import { CompetitorRow } from './competitor-row';
+import { CompetitorSummary } from './competitor-summary';
 import { EmptyState } from './empty-state';
-import { Meter } from './meter';
-import { GlobeIcon, SearchIcon } from './nav-icons';
+import { GlobeIcon, ChevronIcon, SearchIcon } from './nav-icons';
+import { SourceRow } from './source-row';
 import { PageHeader } from './page-header';
 import { SectionTitle } from './section-title';
 
@@ -54,6 +55,7 @@ export function CompetitorsWorkspace() {
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showPlatforms, setShowPlatforms] = useState(false);
 
   if (!site) {
     return (
@@ -86,6 +88,41 @@ export function CompetitorsWorkspace() {
      that value. See the note on Competitor in types.ts for why it is a bare
      host on both sides. */
   const mentionsByDomain = new Map(measured.map((c) => [c.domain, c.citations]));
+  /* ⚠️ THE SAME JOIN, THE SAME KEY. The trend is already computed for every
+     domain the engines cited — see buildTracking — so a watched rival gets its
+     movement for free. A rival AI has never cited has no measured row at all,
+     which is `undefined` here and renders as "no trend yet" rather than as a
+     flat line: nothing to compare is not the same as no change. */
+  const trendByDomain = new Map(measured.map((c) => [c.domain, c.trend]));
+
+  /*
+    Where this page's numbers come from, said on the page itself.
+
+    ⚠️ EVERY PART OF THIS SENTENCE IS READ, NOT ASSERTED. The engines are the
+    ones with `checked > 0` — naming all three when Gemini never answered would
+    be a claim about work we did not do — and the question count is the distinct
+    questions actually put to them, not the prompts on the watch list, which can
+    differ. "Every week" is safe here and only here: this route is Pro-only
+    (requirePro in its page.tsx), and free checks are pressed by hand.
+
+    ⚠️ IT DEGRADES TO A PROMISE, NOT A ZERO. Before the first run there are no
+    engines and no questions, so the sentence describes what will happen rather
+    than reporting that nothing did.
+  */
+  const enginesUsed = (tracking?.byEngine ?? []).filter((e) => e.checked > 0).map((e) => e.engine);
+  const askedCount = new Set((tracking?.latest ?? []).map((c) => c.question)).size;
+
+  const engineList =
+    enginesUsed.length > 1
+      ? `${enginesUsed.slice(0, -1).join(', ')} and ${enginesUsed[enginesUsed.length - 1]}`
+      : (enginesUsed[0] ?? 'the AI tools');
+
+  const sourceLine =
+    enginesUsed.length > 0 && askedCount > 0
+      ? `Every website ${engineList} pointed to when we asked them ${askedCount} ${
+          askedCount === 1 ? 'question' : 'questions'
+        } about ${site.name}. We ask again every week.`
+      : `Once your first check runs, this shows every website the AI tools pointed to when answering questions about ${site.name}.`;
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
@@ -100,6 +137,28 @@ export function CompetitorsWorkspace() {
     setError(ADD_ERROR[result.reason] ?? 'That didn’t work.');
   }
 
+  const ranked = measured.map((c, i) => ({ ...c, rank: i + 1 }));
+
+  /*
+    ⚠️ THE OWNER'S OWN LIST OVERRIDES OURS. A domain they typed into the watch
+    list above is a rival because they said so, and that is a stronger signal
+    than a hardcoded list in lib/dashboard/platforms.ts. Without this, watching
+    a marketplace you genuinely compete with would file it under directories and
+    hide the very row you asked us to keep an eye on.
+  */
+  const watchedDomains = new Set(watched.map((c) => c.domain));
+  const isBusiness = (c: (typeof ranked)[number]) =>
+    c.kind === 'business' || watchedDomains.has(c.domain);
+
+  /*
+    Two groups, and NOTHING IS DISCARDED — the platform rows keep their counts
+    and their ranks, they are just not what the reader came for. Deleting them
+    would break the totals printed above and would hide a real finding: an
+    account losing to directories rather than to rivals needs to know that.
+  */
+  const businesses = ranked.filter(isBusiness);
+  const platforms = ranked.filter((c) => !isBusiness(c));
+
   /*
     Rank before slicing, and keep the customer's own row whatever its rank.
 
@@ -107,24 +166,29 @@ export function CompetitorsWorkspace() {
     a missing one — the reader would see ten rivals and no sign of themselves,
     which looks like a bug rather than the finding it is.
   */
-  const ranked = measured.map((c, i) => ({ ...c, rank: i + 1 }));
-  const shareRows = ranked.slice(0, SHARE_ROWS);
+  const shareRows = businesses.slice(0, SHARE_ROWS);
   const you = ranked.find((c) => c.isYou);
   if (you && !shareRows.some((c) => c.isYou)) shareRows.push(you);
 
   // Bars are relative to the top row, not to the total: the question is who is
   // ahead of you, and against a 900-source total every bar would be a sliver.
   const shareTop = Math.max(...shareRows.map((c) => c.citations), 1);
+  const platformTop = Math.max(...platforms.map((c) => c.citations), 1);
 
   return (
     <>
-      <PageHeader
-        className="mb-4"
-        title="Competitors"
-        description={`The websites AI used to answer questions about ${site.name}.`}
-      />
+      <PageHeader className="mb-4" title="Competitors" description={sourceLine} />
 
-      {/* The list you keep, first. It is the one you can act on. */}
+      {/* ⚠️ THE SUMMARY GOES ABOVE THE WATCH LIST, WHICH REVERSES THE NOTE AT
+          THE TOP OF THIS FILE. That note put the list you can act on first, and
+          it was right while the page was two lists. A summary is a different
+          kind of thing: it answers "how am I doing", which is the question that
+          comes before "what do I do about it". It removes itself entirely when
+          there is nothing measured, so the watch list is still the first thing
+          a new account sees. */}
+      <CompetitorSummary sources={measured} appearances={appearances} />
+
+      {/* The list you keep. It is the one you can act on. */}
       <Card className="p-5 sm:p-7">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={<SearchIcon className="h-4 w-4" />} tint="bg-primary-soft text-primary">
@@ -148,6 +212,7 @@ export function CompetitorsWorkspace() {
                    measured zero, and that zero is the answer the owner asked
                    for by adding them. */
                 mentions={mentionsByDomain.get(c.domain) ?? 0}
+                trend={trendByDomain.get(c.domain) ?? null}
                 isFirst={i === 0}
                 isLast={i === watched.length - 1}
               />
@@ -210,36 +275,72 @@ export function CompetitorsWorkspace() {
           {formatNumber(appearances.total)} were yours.
         </p>
 
-        <ul className="mt-5 space-y-4">
-          {shareRows.map((c) => (
-            <li key={c.domain}>
-              <div className="flex items-baseline justify-between gap-4">
-                <p
-                  className={`min-w-0 truncate text-sm ${
-                    c.isYou ? 'text-navy font-semibold' : 'text-slate'
-                  }`}
-                >
-                  {c.rank}. {c.domain}
-                  {c.isYou && ' (you)'}
-                </p>
-                <p className="text-navy shrink-0 text-sm font-semibold tabular-nums">
-                  {c.citations}
-                </p>
-              </div>
-              <Meter
-                className="mt-1.5"
-                value={(c.citations / shareTop) * 100}
-                tone={c.isYou ? 'primary' : 'line'}
-              />
-            </li>
-          ))}
-        </ul>
-
-        {measured.length > shareRows.length ? (
-          <p className="text-slate mt-4 text-xs">
-            and {formatNumber(measured.length - shareRows.length)} more websites AI used at least
-            once.
+        {businesses.length > 0 ? (
+          <>
+            <p className="text-navy mt-5 text-sm font-semibold">Businesses like yours</p>
+            <ul className="mt-3 space-y-4">
+              {shareRows.map((c) => (
+                <SourceRow
+                  key={c.domain}
+                  source={c}
+                  rank={c.rank}
+                  topCitations={shareTop}
+                  watched={watchedDomains.has(c.domain)}
+                />
+              ))}
+            </ul>
+            {businesses.length > shareRows.length ? (
+              <p className="text-slate mt-4 text-xs">
+                and {formatNumber(businesses.length - shareRows.length)} more businesses AI used at
+                least once.
+              </p>
+            ) : null}
+          </>
+        ) : (
+          /* ⚠️ A FINDING, NOT AN EMPTY STATE. Every source being a directory is
+             the answer to the question this page asks, and saying "no results"
+             would throw it away. */
+          <p className="text-slate mt-5 text-sm leading-relaxed">
+            Every website AI used was a directory or a big platform rather than a business like
+            yours. That is worth knowing on its own — it means the opening is still there.
           </p>
+        )}
+
+        {platforms.length > 0 ? (
+          <div className="border-line mt-6 border-t pt-4">
+            <button
+              type="button"
+              onClick={() => setShowPlatforms((v) => !v)}
+              aria-expanded={showPlatforms}
+              aria-controls="platform-sources"
+              className="text-slate hover:text-navy inline-flex items-center gap-1.5 text-sm font-medium transition-colors duration-150"
+            >
+              <ChevronIcon
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${
+                  showPlatforms ? 'rotate-90' : ''
+                }`}
+              />
+              Big sites and directories ({platforms.length})
+            </button>
+            <p className="text-slate mt-1 text-xs leading-relaxed">
+              Review sites, forums and marketplaces. You can’t out-rank them, but being listed on
+              them is often how AI finds you.
+            </p>
+
+            {showPlatforms && (
+              <ul id="platform-sources" className="mt-4 space-y-4">
+                {platforms.slice(0, SHARE_ROWS).map((c) => (
+                  <SourceRow key={c.domain} source={c} rank={c.rank} topCitations={platformTop} />
+                ))}
+              </ul>
+            )}
+
+            {showPlatforms && platforms.length > SHARE_ROWS ? (
+              <p className="text-slate mt-4 text-xs">
+                and {formatNumber(platforms.length - SHARE_ROWS)} more.
+              </p>
+            ) : null}
+          </div>
         ) : null}
       </Card>
       ) : null}

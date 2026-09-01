@@ -35,6 +35,7 @@ import type {
   SiteRow,
 } from '@/lib/supabase/types';
 import { normalizeDomain, sourceHost } from './domain';
+import { sourceKind } from './platforms';
 import { contentHash, normalizePath } from './export';
 import type { TrackingPeriod } from './plans';
 import {
@@ -1892,10 +1893,36 @@ export async function trackingFromDb(
   let sourceTotal = 0;
   let sourceOurs = 0;
 
+  /*
+    ⚠️ FOUR MORE FACTS OUT OF THE SAME PASS, NOT A SECOND ONE.
+
+    Which engines cited a domain, what questions it was cited on, and how it
+    moved between the last two runs are all already sitting on these rows —
+    `engine`, `question` and `checked_at` — and none of them needed a new
+    column, a new request or a model. A second loop would be a second definition
+    of what counts as a citation, which is how two screens end up disagreeing.
+
+    Per-date tallies are keyed the way the daily rollup above keys its days, so
+    "a run" means the same thing in both places.
+  */
+  const enginesBy = new Map<string, Set<Engine>>();
+  const questionsBy = new Map<string, Map<string, number>>();
+  const byDateHost = new Map<string, Map<string, number>>();
+  const countedRows = new Set<string>();
+
   for (const row of rows) {
     // Defensive: `sources` is jsonb, so a malformed row is a possibility the
     // type system cannot rule out.
     const sources = Array.isArray(row.sources) ? (row.sources as unknown[]) : [];
+    const date = row.checked_at.slice(0, 10); // ISO is already YYYY-MM-DD
+
+    /* One date bucket per row, whether or not its sources parse — a run that
+       cited nothing is still a run that happened. */
+    let dayHosts = byDateHost.get(date);
+    if (!dayHosts) {
+      dayHosts = new Map<string, number>();
+      byDateHost.set(date, dayHosts);
+    }
 
     for (const value of sources) {
       if (typeof value !== 'string') continue;
@@ -1904,6 +1931,27 @@ export async function trackingFromDb(
 
       sourceTotal += 1;
       tally.set(host, (tally.get(host) ?? 0) + 1);
+      dayHosts.set(host, (dayHosts.get(host) ?? 0) + 1);
+
+      if (ENGINES.includes(row.engine as Engine)) {
+        const set = enginesBy.get(host) ?? new Set<Engine>();
+        set.add(row.engine as Engine);
+        enginesBy.set(host, set);
+      }
+
+      /* ⚠️ COUNTED ONCE PER ROW, NOT ONCE PER SOURCE. An answer citing a domain
+         three times is still one answer to that question, and counting URLs
+         would rank a page that links itself a lot above a domain cited across
+         ten different questions. The seen-set is keyed on host and row rather
+         than stashing a sentinel in the question map, so no real question can
+         ever collide with the bookkeeping. */
+      const pair = `${host}\u0000${row.id}`;
+      if (!countedRows.has(pair)) {
+        countedRows.add(pair);
+        const qs = questionsBy.get(host) ?? new Map<string, number>();
+        qs.set(row.question, (qs.get(row.question) ?? 0) + 1);
+        questionsBy.set(host, qs);
+      }
 
       // Ours, and which page of ours — the actionable half of a citation.
       // Subdomains count as ours, matching isOurs() in lib/tracking/classify.ts.
@@ -1914,8 +1962,44 @@ export async function trackingFromDb(
     }
   }
 
+  /*
+    Movement between the two most recent dates that ran.
+
+    ⚠️ NULL WHEN THERE IS ONLY ONE RUN, AND NULL IS NOT 'steady'. A single-run
+    account has nothing to compare, and a flat arrow there would report the
+    absence of a measurement as a measurement of no change — the rule
+    PillarResult.score already follows for a pillar nobody could score.
+  */
+  const dates = [...byDateHost.keys()].sort();
+  const newest = dates.length >= 2 ? byDateHost.get(dates[dates.length - 1]) : undefined;
+  const prior = dates.length >= 2 ? byDateHost.get(dates[dates.length - 2]) : undefined;
+
+  const trendFor = (host: string): CompetitorShare['trend'] => {
+    if (!newest || !prior) return null;
+    const now = newest.get(host) ?? 0;
+    const was = prior.get(host) ?? 0;
+    if (was === 0 && now > 0) return 'new';
+    if (now > was) return 'up';
+    if (now < was) return 'down';
+    return 'steady';
+  };
+
   const competitors: CompetitorShare[] = [...tally.entries()]
-    .map(([domain, citations]) => ({ domain, citations, isYou: domain === ours }))
+    .map(([domain, citations]) => ({
+      domain,
+      citations,
+      isYou: domain === ours,
+      /* ⚠️ THE CUSTOMER IS NEVER A PLATFORM, whatever the list says. A site
+         hosted on a domain that happens to be listed is still theirs. */
+      kind: domain === ours ? ('business' as const) : sourceKind(domain),
+      share: sourceTotal > 0 ? (citations / sourceTotal) * 100 : 0,
+      engines: ENGINES.filter((e) => enginesBy.get(domain)?.has(e)),
+      topQuestions: [...(questionsBy.get(domain) ?? new Map<string, number>())]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 3)
+        .map(([q]) => q),
+      trend: trendFor(domain),
+    }))
     .sort((a, b) => b.citations - a.citations || a.domain.localeCompare(b.domain));
 
   const citedPages: CitedPage[] = [...citedUrls.entries()]
