@@ -153,8 +153,17 @@ export function Hero() {
                 h-13 matches the lg Button's height (see SIZES in
                 components/ui/button.tsx) so the two line up. py-3 alone left
                 the field a few pixels shorter than the button next to it.
+
+                ⚠️ sm:flex-1, NOT flex-1 — AND h-13 IS WHY. `flex-1` is
+                `flex: 1 1 0%`, and below sm this form is flex-col, so that
+                basis of 0 governs the HEIGHT and overrides h-13. The form has
+                no height of its own, so there is no free space for flex-grow
+                to claim and the field collapsed to its content: 21px, one line
+                of text, beside a 52px button. Scoping the modifier to sm keeps
+                the grow where the main axis is horizontal and it means
+                something, and leaves h-13 in charge when the two are stacked.
               */
-              className="border-line focus:border-primary text-navy shadow-soft h-13 min-w-0 flex-1 rounded-input border bg-white px-4 text-[0.9375rem] outline-none transition-colors duration-150"
+              className="border-line focus:border-primary text-navy shadow-soft h-13 min-w-0 rounded-input border bg-white px-4 text-[0.9375rem] outline-none transition-colors duration-150 sm:flex-1"
             />
             {/* ⚠️ NOT "Check my site" — that label belongs to the free tool.
 
