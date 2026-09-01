@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { FreeHome } from '@/components/dashboard/free-home';
 import { OverviewWorkspace } from '@/components/dashboard/overview-workspace';
+import { POSTS } from '@/lib/blog/posts';
 import { currentUser } from '@/lib/auth/dal';
 import { isPro } from '@/lib/auth/entitlements';
 
@@ -31,5 +32,14 @@ export const metadata: Metadata = { title: 'Dashboard' };
 export default async function DashboardPage() {
   const user = await currentUser();
 
-  return isPro(user) ? <OverviewWorkspace /> : <FreeHome />;
+  /*
+    ⚠️ THE POSTS ARE READ HERE, NOT IN THE WORKSPACE. lib/blog/posts.ts imports
+    every .mdx module to reach its `meta`, so a client component importing it
+    would pull the whole blog into the dashboard bundle. This is a server
+    component, POSTS is already sorted newest first, and only plain objects
+    cross the boundary.
+  */
+  const posts = POSTS.slice(0, 3).map((post) => post.meta);
+
+  return isPro(user) ? <OverviewWorkspace posts={posts} /> : <FreeHome />;
 }

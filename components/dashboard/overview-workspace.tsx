@@ -2,21 +2,18 @@
 
 import Link from 'next/link';
 import { ButtonLink } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Sparkle } from '@/components/ui/doodle';
-import { isNamedAfterDomain } from '@/lib/dashboard/domain';
+import type { PostMeta } from '@/lib/blog/posts';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canOfferDoneForYou, canTrack } from '@/lib/dashboard/plans';
-import { timeAgo } from '@/lib/dashboard/format';
-import { buildWorklist, setupSteps, standing } from '@/lib/dashboard/worklist';
+import { canOfferDoneForYou, trackingPlanFor } from '@/lib/dashboard/plans';
+import { buildWorklist, setupSteps } from '@/lib/dashboard/worklist';
 import { DoneForYouCard } from './done-for-you-card';
-import { HomePreviews } from './home-previews';
-import { MicroLabel } from './micro-label';
-import { FaqIcon, GlobeIcon, SearchIcon } from './nav-icons';
+import { CitationChart } from './citation-chart';
+import { HomeReading } from './home-reading';
+import { HomeRivals } from './home-rivals';
+import { HomeSnapshot } from './home-snapshot';
+import { HomeWorklist } from './home-worklist';
 import { PageHeader } from './page-header';
 import { SetupChecklist } from './setup-checklist';
-import { StatRow } from './stat-row';
-import { TaskRow } from './task-row';
 
 /*
   The landing screen.
@@ -42,11 +39,24 @@ import { TaskRow } from './task-row';
  * during SSR and there is no server output to disagree with. Moving it
  * somewhere that renders on the server would break that.
  */
-function greeting(): string {
+/**
+ * The time of day, with a mark to match it.
+ *
+ * ⚠️ new Date() IS SAFE HERE AND WOULD NOT BE HIGHER UP. A clock read during
+ * render is the classic hydration mismatch — the server is on UTC and the
+ * reader is not. It cannot bite here because this branch never renders on the
+ * server: `data` is null until the provider resolves, and the !site || !data
+ * branch above returns the welcome screen instead. Move this above that guard
+ * and it becomes a real bug.
+ */
+function greeting(): { text: string; emoji: string } {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+  /* ⚠️ 😎, NOT A SUN WEARING SUNGLASSES — there is no such emoji in Unicode.
+     The nearest two are this one, which has the sunglasses, and 🌞 (sun with
+     face), which has the sun. Swapping between them is a one-character change. */
+  if (hour < 12) return { text: 'Good morning', emoji: '😎' };
+  if (hour < 18) return { text: 'Good afternoon', emoji: '👋' };
+  return { text: 'Good evening', emoji: '🌙' };
 }
 
 /*
@@ -61,7 +71,7 @@ function greeting(): string {
   rule it was obeying (colour never alone) is satisfied more plainly without it.
 */
 
-export function OverviewWorkspace() {
+export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
   const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
 
   /*
@@ -83,6 +93,7 @@ export function OverviewWorkspace() {
   const input = { report, site: site ?? null, user, groups, faqs, questions };
   const steps = setupSteps({ ...input, siteCount: sites.length });
   const firstName = data?.user.name.split(' ')[0] ?? '';
+  const hello = greeting();
 
   /*
     A brand-new account gets no metric row.
@@ -104,23 +115,38 @@ export function OverviewWorkspace() {
   }
 
   const tasks = buildWorklist(input);
-  const state = standing(input);
 
 
-  const pagesWithFaq = report?.pages?.filter((p) => p.hasFaqSchema).length ?? 0;
   const setupDone = steps.every((s) => s.done);
+
+  /* Both copied from the AI Mentions page rather than derived a second way —
+     the chart is the same chart and must describe the same window. */
+  const daily = tracking?.daily ?? [];
+  const oneShot = trackingPlanFor(user).schedule === 'once';
 
   return (
     <>
       <PageHeader
-        title={`${greeting()}, ${firstName}`}
-        /* Most people type their domain into the name field, so printing both
-           gave "letsroof.com · letsroof.com". */
-        description={
-          isNamedAfterDomain(site.name, site.domain)
-            ? site.domain
-            : `${site.name} · ${site.domain}`
+        /*
+          ⚠️ THE SECOND LINE SAYS WHAT THE PRODUCT IS FOR. It read
+          "Letsroof · letsroof.com" — a name and a domain, on the screen a
+          customer lands on. It said nothing about why they are here, which is
+          the one thing a home screen owes somebody who has just arrived.
+
+          ⚠️ THE THREE ENGINES BY NAME, AND ONLY THOSE THREE. They are what
+          ENGINES lists and what this product actually queries. The house rule
+          against naming Google AI Overviews on a product surface still holds.
+        */
+        title={
+          <>
+            {hello.text}, {firstName}{' '}
+            {/* ⚠️ aria-hidden, AND THE SENTENCE IS WHOLE WITHOUT IT. A screen
+                reader announcing "sun" after somebody's name is noise, not
+                warmth — the greeting already says the time of day in words. */}
+            <span aria-hidden="true">{hello.emoji}</span>
+          </>
         }
+        description={`This is how ${site.domain} looks to ChatGPT, Perplexity and Gemini — and what to change so they name you when someone asks.`}
         action={
           <ButtonLink href="/dashboard/audit" variant="ghost" size="sm">
             {report ? 'Run a fresh check' : 'Check my site'}
@@ -129,193 +155,114 @@ export function OverviewWorkspace() {
       />
 
       {/*
-        ⚠️ FOUR WINDOWS, NOT A FIFTH DASHBOARD.
-
-        A visibility panel, a score strip and three metric tiles stood here —
-        a summary that counted things for itself and could therefore disagree
-        with the pages it summarised. HomePreviews reads exactly what the four
-        destinations read, and every card is a link: Home says where to go, it
-        is not somewhere to stay.
-
-        ⚠️ AND IT SITS BELOW THE WORKLIST NOW. Three rows of figures used to
-        come first, which put "how am I doing" above "what do I do about it"
-        on the one screen that exists to answer the second question.
+        ⚠️ THE SETUP CHECKLIST OUTRANKS EVERYTHING, AND ONLY WHILE UNFINISHED.
+        A score dial above these four steps would put a measurement of an empty
+        account above the thing that fills it.
       */}
-
-      {/* Main column and rail. The rail only exists once there is room beside
-          the list; below lg everything stacks in source order, which puts the
-          work above the context. */}
-      <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
-        <div className="space-y-5">
-          {/* In the MAIN column, not the rail, and only while it is unfinished.
-              For a new account this is the primary content — a rail would push
-              it below the worklist on a phone, which is exactly the person who
-              needs it first. */}
-          {!setupDone && <SetupChecklist steps={steps} />}
-
-          {tasks.length > 0 ? (
-            <Card className="p-5 sm:p-7">
-              <div className="flex flex-wrap items-baseline justify-between gap-3">
-                <h2 className="text-[0.9375rem] font-bold tracking-normal">Do these next</h2>
-                <p className="text-slate text-xs">Highest payoff for the least work, in order.</p>
-              </div>
-              <ul className="divide-line mt-2 divide-y">
-                {tasks.map((task, i) => (
-                  <TaskRow key={task.id} task={task} index={i} />
-                ))}
-              </ul>
-            </Card>
-          ) : (
-            report && (
-              <Card className="p-5 sm:p-7">
-                {/* The one doodle in the dashboard, and it is here because this
-                    is the one screen state that marks something achieved rather
-                    than something to do. Everywhere else a hand-drawn mark
-                    would be decoration on a working tool — nav-icons.tsx says
-                    as much about why the loose marks are wrong for navigation.
-                    Fill-only cyan, as globals.css requires: it sits beside the
-                    words, never carrying them. */}
-                <h2 className="flex items-center gap-2 text-[0.9375rem] font-bold tracking-normal">
-                  <Sparkle className="text-accent h-4 w-4 shrink-0" />
-                  Nothing needs you right now
-                </h2>
-                <p className="text-slate mt-1.5 text-[0.9375rem] leading-relaxed">
-                  Your answers are live and current, and the last check found nothing worth
-                  fixing. Come back after your next round of changes to the site.
-                </p>
-              </Card>
-            )
-          )}
+      {/* ⚠️ THE COMPACT ONE HERE, THE FULL CARD ONLY WITH NO SITE. This account
+          already has figures below; a four-step card ahead of them delays the
+          thing they opened the page for. The branch above — no site at all —
+          keeps the full version, where the steps are the whole page. */}
+      {!setupDone && (
+        <div className="mb-5">
+          <SetupChecklist steps={steps} compact />
         </div>
+      )}
 
-        <div className="mt-5 space-y-5 lg:mt-0">
-          {report && (
-            <Card className="p-5">
-              <MicroLabel>About this site</MicroLabel>
+      {/*
+        ⚠️ THE SNAPSHOT ROW IS THE POINT OF THE PAGE, AND IT IS FIRST.
 
-              {/* ⚠️ THE RATIOS GET BARS; THE FACTS DO NOT.
+        Home led with a score card beside the worklist. Honest, and it did not
+        look like a dashboard: the score sat alone on the left while AI
+        mentions, share of voice and answer counts were buried in preview cards
+        below the fold — and the worklist was three times the height of the
+        thing next to it, so the left column was mostly white space.
 
-                  These rows used to be one undifferentiated list of
-                  right-aligned text, which made "1 of 4" and "Roofing
-                  contractor" look like the same kind of statement. The
-                  proportions now read as proportions; industry and service area
-                  are facts with no denominator, and a bar under either would be
-                  decoration pretending to be data.
+        The order now answers the two questions in the order they get asked:
+        where do I stand (the row), is it moving (the chart), what do I do (the
+        list). Each block spans the full width of whatever it needs, so nothing
+        tall is ever parked beside something short.
+      */}
+      <HomeSnapshot report={report} />
 
-                  ⚠️ "AI citations" USED TO BE HERE AND DELIBERATELY IS NOT.
-                  It lives in the visibility panel at the top of the page now.
-                  Two reasons beyond tidiness: a citation count is not a fact
-                  about the crawl, and this whole card is gated on `report` —
-                  so an account that had been checked but never audited saw
-                  nothing at all from Results on this screen. */}
-              <div className="divide-line mt-2 divide-y">
-                <StatRow
-                  label="Pages read"
-                  value={report.crawled.length}
-                  total={Math.max(report.discovered, report.crawled.length)}
-                />
-                <StatRow
-                  label="With FAQ markup"
-                  value={pagesWithFaq}
-                  total={report.pages ? report.pages.length : null}
-                  note="—"
-                />
-              </div>
+      {/*
+        ⚠️ items-stretch, NOT items-start, AND THAT IS THE FIX BEAU ASKED FOR.
+        The old page put a 500px card beside a 1,200px one and the difference
+        read as a hole. These two are much closer — a chart against a short
+        list — but they are still not equal, and a ragged bottom edge is what
+        looks unfinished. Stretched, the row reads as one band; the list simply
+        breathes more. The tall thing (the worklist) now spans the full width
+        below, so nothing is ever parked beside it.
 
-              {/* "Not set", not "unknown": on a site that has never run a full
-                  audit we did not look and fail — there was nothing to look at.
-                  "Unknown" implied a dead end, which is what this row used to
-                  be. */}
-              <dl className="divide-line border-line mt-1 divide-y border-t text-sm">
-                <Row term="Industry" value={site.industry ?? 'Not set'} />
-                <Row term="Service area" value={site.location ?? 'Not set'} />
-              </dl>
-
-              {/* ⚠️ Where these two values came from changes how much to trust
-                  them, so the UI says which it is — `schema` is the business's
-                  own markup, `inferred` is a model's reading of the homepage.
-
-                  Every state except `manual` links out, including the null one.
-                  That was the bug: the link used to appear only for `inferred`,
-                  so a site that had never had a content plan built showed
-                  "unknown" with nowhere to go — and the editor it pointed at
-                  was itself unreachable until a plan existed.
-
-                  It now points at Sites, which holds the only editor. Keeping
-                  one editor is what keeps the `manual` promise — once a
-                  customer corrects us, no later run overwrites it — in one
-                  place rather than several. */}
-              {site.profileSource !== 'manual' && (
-                <p className="text-slate mt-3 text-xs leading-relaxed">
-                  {site.profileSource === 'inferred'
-                    ? 'Industry and area were worked out from your homepage. '
-                    : site.profileSource === 'schema'
-                      ? "Read from your site's own markup. "
-                      : 'Not set yet — adding them makes your content plan and questions specific to your trade. '}
-                  <Link
-                    href="/dashboard/sites"
-                    className="text-primary hover:text-primary-hover font-semibold"
-                  >
-                    {site.profileSource === null ? 'Add them →' : 'Edit →'}
-                  </Link>
-                </p>
-              )}
-            </Card>
-          )}
-
-          <Card tone="cloud" className="p-5">
-            <MicroLabel>Learn</MicroLabel>
-            <ul className="mt-3 space-y-3.5">
-              <LearnLink
-                href="/blog/what-is-aeo"
-                title="What AEO is, in plain English"
-                body="Why being the answer replaced being ranked."
-              />
-              <LearnLink
-                href="/seo-guide"
-                title="SEO in the age of AI answers"
-                body="The fundamentals that still matter, and why."
-              />
-            </ul>
-            <p className="text-slate border-line mt-4 border-t pt-3 text-xs leading-relaxed">
-              Citation tracking — putting your questions to the engines and recording who they
-              name — runs once on Free, and every week on Pro without you having to do anything.
-              You can see the results on the Results page.
-            </p>
-          </Card>
-
-          {/*
-            Below Learn, at the bottom of the rail.
-
-            Last on purpose: the rail is supporting context, and this is the
-            only thing in it asking for money. Above the Learn card it would be
-            the second thing on the screen after the worklist, which is a
-            harder sell than the page has earned by then.
-
-            `tone="white"` because Learn directly above is cloud — two cloud
-            cards in a row merge into one block. `compact` because the rail is
-            20rem and the card's default padding is a viewport breakpoint that
-            would resolve to p-7 in here. Copy is shorter than the default for
-            the same reason: this column is a third the width of the Publish
-            page the default wording was written for.
-
-            Pro only. `user` is null for the provider's first frame and
-            isPro(null) is false, so the card stays out rather than appearing
-            and then vanishing once the plan loads.
-          */}
-          {canOfferDoneForYou(user) && (
-            <DoneForYouCard
-              tone="white"
-              compact
-              body="I’ll set the whole thing up by hand and get it live on your site."
-            />
-          )}
+        ⚠️ AND NO CHART WITHOUT DATA. CitationChart will draw empty axes given
+        an empty array — Math.max(1, ...[]) is 1 and its last point is
+        optionally chained — so the guard lives here rather than in a component
+        that is right to assume it was given something to plot.
+      */}
+      {daily.length > 0 && (
+        <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-stretch">
+          {/* The span string is copied from the AI Mentions page rather than
+              written again — its own docstring records how this line has been
+              wrong before, describing five checkpoints spread over three months
+              as "the last 5 days". */}
+          <CitationChart
+            daily={daily}
+            span={oneShot ? 'from your one check' : 'over the last 30 days'}
+          />
+          <HomeRivals />
         </div>
+      )}
+
+      {/* Full width, because it is the tallest thing on the page and nothing
+          should have to sit beside it. */}
+      <div className="mt-5">
+        <HomeWorklist report={report} tasks={tasks} />
       </div>
 
-      <div className="mt-6">
-        <HomePreviews report={report} />
-      </div>
+      {/*
+        ⚠️ THIS LINE IS THE SURVIVING HALF OF THE "About this site" CARD.
+
+        That card went — pages read, industry and service area all read better
+        on the redesigned Audit, in context. But it also carried the ONLY prompt
+        anywhere in the dashboard to set industry and service area, and both
+        fields are sent to the model by Content and by question discovery.
+
+        `manual` gets nothing: once a customer has corrected us, asking again is
+        noise.
+      */}
+      {site.profileSource !== 'manual' && (
+        <p className="text-slate mt-4 text-sm leading-relaxed">
+          {site.profileSource === 'inferred'
+            ? `We worked out that you're a ${(site.industry ?? 'business').toLowerCase()} from your homepage. `
+            : site.profileSource === 'schema'
+              ? `Your trade and service area were read from your site's own markup. `
+              : 'Your trade and service area aren’t set. Adding them makes your questions and content plan specific to what you do. '}
+          <Link
+            href="/dashboard/sites"
+            className="text-primary hover:text-primary-hover font-semibold"
+          >
+            {site.profileSource === null ? 'Add them →' : 'Change it →'}
+          </Link>
+        </p>
+      )}
+
+      {/* ⚠️ "Learn" USED TO SIT HERE with two hand-picked links. It has become
+          HomeReading — the three most recent posts, which keep themselves
+          current — and that component carries /seo-guide in its footer because
+          the card it replaced was the only route to it in the product. */}
+      <HomeReading posts={posts} />
+
+      {/* Last, and that is where the upsell belongs: it is the only thing on
+          this page asking for money, and the page has to earn it first. */}
+      {canOfferDoneForYou(user) && (
+        <div className="mt-6">
+          <DoneForYouCard
+            tone="cloud"
+            compact
+            body="I’ll set the whole thing up by hand and get it live on your site."
+          />
+        </div>
+      )}
 
       {sites.length > 1 && (
         <p className="text-slate mt-6 text-center text-xs">
@@ -323,29 +270,5 @@ export function OverviewWorkspace() {
         </p>
       )}
     </>
-  );
-}
-
-/** One term and its value in the site brief. */
-function Row({ term, value }: { term: string; value: string | number }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-2">
-      <dt className="text-slate">{term}</dt>
-      <dd className="text-navy min-w-0 truncate text-right font-semibold tabular-nums">{value}</dd>
-    </div>
-  );
-}
-
-/** A way into the guides — the only thing in the dashboard that links to them. */
-function LearnLink({ href, title, body }: { href: string; title: string; body: string }) {
-  return (
-    <li>
-      <Link href={href} className="group block">
-        <p className="text-navy group-hover:text-primary text-sm font-semibold transition-colors duration-150">
-          {title} →
-        </p>
-        <p className="text-slate mt-0.5 text-xs leading-relaxed">{body}</p>
-      </Link>
-    </li>
   );
 }

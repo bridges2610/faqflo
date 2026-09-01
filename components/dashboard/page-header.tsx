@@ -13,7 +13,14 @@ export function PageHeader({
   centered = false,
   className = 'mb-8',
 }: {
-  title: string;
+  /**
+   * ⚠️ ReactNode, NOT string, SO A DECORATIVE MARK CAN BE HIDDEN. Home's
+   * greeting carries an emoji, and an emoji in a heading is announced by name
+   * ("Good morning, Beau, sun") unless it is wrapped in aria-hidden — which a
+   * plain string cannot do. Every existing caller passes a string, and string
+   * is a ReactNode, so nothing else changes.
+   */
+  title: React.ReactNode;
   description?: string;
   /** Primary action for the page, right-aligned on wide screens. */
   action?: ReactNode;

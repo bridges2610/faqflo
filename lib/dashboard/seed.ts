@@ -241,7 +241,15 @@ function seedDaily(offsets: number[]): CitationDay[] {
   const out: CitationDay[] = [];
   const days = offsets.length;
 
-  for (const [index, offset] of [...offsets].reverse().entries()) {
+  /* ⚠️ OLDEST FIRST, TO MATCH REAL DATA. buildTracking sorts its days
+     ascending by date, and CitationChart plots array order — so a fixture in
+     the other order draws time running backwards. `.reverse()` did exactly
+     that for [32, 25, 2]: it produced 30/8, 7/8, 31/7 along the x-axis, and
+     because `progress` ramps with the index, the newest day also got the
+     LOWEST value. The demo chart therefore showed citations falling when it
+     was written to show them rising, in the marketing screenshots as well as
+     the dashboard. Sorting by offset descending puts the oldest day first. */
+  for (const [index, offset] of [...offsets].sort((a, b) => b - a).entries()) {
     const i = offset;
     const progress = (days - (days - 1 - index)) / days;
     const byEngine = {} as Record<Engine, number>;

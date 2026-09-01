@@ -24,12 +24,44 @@ import type { SetupStep } from '@/lib/dashboard/worklist';
 
   Only the current step gets a button. A checklist with four buttons is four
   decisions, and the whole point of a checklist is that there is one.
+
+  ⚠️ TWO SIZES, AND THE SMALL ONE IS NOT A LESSER VERSION. `compact` is a single
+  row — progress, count, next step — for the customer who has a site and is
+  partway through. There it sits above a dashboard full of real figures, and a
+  four-step card ahead of them delays the thing they came for.
+
+  The FULL card is still right for the other call site: an account with no site
+  yet has no figures to delay, and the four steps ARE the page. Same steps, same
+  data, same self-retiring behaviour; only the room it takes changes.
 */
-export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
+export function SetupChecklist({ steps, compact = false }: { steps: SetupStep[]; compact?: boolean }) {
   const done = steps.filter((s) => s.done).length;
   if (done === steps.length) return null;
 
   const currentIndex = steps.findIndex((s) => !s.done);
+  const current = steps[currentIndex];
+
+  if (compact) {
+    return (
+      <Card className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3.5">
+        {/* The bar first, then the count that carries its meaning — the same
+            split the full card uses, just on one line. */}
+        <span className="min-w-24 flex-1">
+          <Meter value={(done / steps.length) * 100} />
+        </span>
+        <span className="text-slate text-xs whitespace-nowrap">
+          {done} of {steps.length} set up
+        </span>
+        {current && (
+          <ButtonLink href={current.href} size="sm" variant="ghost" className="shrink-0">
+            {/* ⚠️ THE STEP IS NAMED, NOT "CONTINUE". One click, and the reader
+                should know where it goes before they take it. */}
+            Next: {current.label}
+          </ButtonLink>
+        )}
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-5 sm:p-7">
@@ -50,7 +82,7 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
 
       <ol className="mt-5 space-y-4">
         {steps.map((step, i) => {
-          const current = i === currentIndex;
+          const isCurrent = i === currentIndex;
 
           return (
             <li key={step.id} className="flex gap-3.5">
@@ -58,7 +90,7 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
                 className={`font-display mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                   step.done
                     ? 'bg-success/12 text-success-ink'
-                    : current
+                    : isCurrent
                       ? 'bg-primary-soft text-primary'
                       : 'bg-cloud text-slate border-line border'
                 }`}
@@ -78,7 +110,7 @@ export function SetupChecklist({ steps }: { steps: SetupStep[] }) {
                 {/* The reason only appears on the step they're on. On a done
                     step it is noise, and on a later one it is a decision they
                     do not have to make yet. */}
-                {current && (
+                {isCurrent && (
                   <>
                     <p className="text-slate mt-1 text-sm leading-relaxed">{step.why}</p>
                     <ButtonLink href={step.href} size="sm" className="mt-3">

@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { NEW_TAB, NewTabNote } from './new-tab';
 import { AUTHOR, AUTHOR_AVATAR } from '@/lib/blog/posts';
 import { SectionTitle } from './section-title';
 
@@ -102,8 +103,16 @@ export function DoneForYouCard({
               than a stock illustration — and it is what makes alt="" correct. */}
           <p className="text-navy mt-2 text-sm font-semibold">&mdash; {AUTHOR}</p>
 
-          <ButtonLink href="/done-for-you" size="sm" variant="ghost" className="mt-4" arrow>
+          <ButtonLink
+            href="/done-for-you"
+            {...NEW_TAB}
+            size="sm"
+            variant="ghost"
+            className="mt-4"
+            arrow
+          >
             See what I do
+            <NewTabNote />
           </ButtonLink>
         </div>
       </div>

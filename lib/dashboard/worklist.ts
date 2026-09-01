@@ -98,6 +98,19 @@ export function taskFromAction(item: ActionItem): Task {
  * Order within this function doesn't matter — everything is ranked afterwards —
  * but the conditions do. Each one is a state the crawl cannot observe.
  */
+/**
+ * A group's name with the word "page" after it, unless it is already there.
+ *
+ * ⚠️ THE NAME IS FREE TEXT THE CUSTOMER TYPED, and most people call a group
+ * after the page it goes on — the seed's own groups are "Service page" and
+ * "Pricing page". Appending unconditionally produced "Re-paste your Service
+ * page page" at the very top of Home, which is the first line of the first
+ * task on the first screen.
+ */
+function pageName(name: string): string {
+  return /\bpages?$/i.test(name.trim()) ? name.trim() : `${name.trim()} page`;
+}
+
 function productTasks(input: WorklistInput): Task[] {
   const { groups, faqs, questions, site, user } = input;
   const tasks: Task[] = [];
@@ -125,7 +138,7 @@ function productTasks(input: WorklistInput): Task[] {
   if (stale.length > 0) {
     tasks.push({
       id: 'republish-stale',
-      what: `Re-paste ${stale.length === 1 ? `your ${stale[0].group.name} page` : `${stale.length} pages`}`,
+      what: `Re-paste ${stale.length === 1 ? `your ${pageName(stale[0].group.name)}` : `${stale.length} pages`}`,
       why: 'Those answers changed here after they were pasted. Until the new version is on the page, the engines are still reading the old one.',
       impact: null,
       effort: '15 minutes',
