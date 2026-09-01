@@ -111,9 +111,18 @@ function niceMax(value: number): number {
   return Math.ceil(value / (magnitude / 2)) * (magnitude / 2);
 }
 
+/**
+ * An axis tick: month first.
+ *
+ * ⚠️ US ORDER, AND IT IS BUILT FROM THE KEY RATHER THAN FORMATTED. `key` is
+ * already YYYY-MM-DD, so slicing it needs no Date and therefore cannot drift a
+ * day across timezones — the hazard the pinned formatters in
+ * lib/dashboard/format.ts exist to close. This read `${d}/${m}` and rendered
+ * 15/8, which an American reader takes for the 8th of a fifteenth month.
+ */
 function shortDate(key: string): string {
   const [, m, d] = key.split('-');
-  return `${Number(d)}/${Number(m)}`;
+  return `${Number(m)}/${Number(d)}`;
 }
 
 export function CitationChart({

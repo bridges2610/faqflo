@@ -21,12 +21,24 @@ export function timeAgo(iso: string | null): string {
   const days = Math.round(hours / 24);
   if (days < 7) return `${days} day${days === 1 ? '' : 's'} ago`;
 
-  return new Date(iso).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return AGO_DATE.format(new Date(iso));
 }
+
+/**
+ * What timeAgo falls back to once "N days ago" stops being useful.
+ *
+ * ⚠️ PINNED LIKE ITS NEIGHBOURS, AND IT WAS NOT. This branch called
+ * `toLocaleDateString(undefined, …)` — no locale, no zone — so it obeyed
+ * neither half of the rule stated beside PLAIN_DATE below: the server renders
+ * on UTC and the reader's browser does not, and "Aug 15" or "15 Aug" depended
+ * on which side of the Atlantic was looking.
+ */
+const AGO_DATE = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
 
 /**
  * "in 3 days" — the forward-looking counterpart to timeAgo().
@@ -50,7 +62,12 @@ export function timeUntil(iso: string | null): string {
 }
 
 /**
- * An absolute date — "12 October 2026".
+ * An absolute date — "October 12, 2026".
+ *
+ * ⚠️ en-US, AND THAT IS THE WHOLE PRODUCT'S CONVENTION. Every date the
+ * dashboard renders is month-first; the chart axis, the plan block and
+ * timeAgo's fallback all agree with this one. Only lib/blog/posts.ts keeps its
+ * own formatter, and it is already en-US too.
  *
  * ⚠️ LOCALE AND TIMEZONE ARE BOTH PINNED, for the reason lib/blog/posts.ts
  * spells out at length: a date rendered in the browser's zone can land on the
@@ -58,7 +75,7 @@ export function timeUntil(iso: string | null): string {
  * either side of the Atlantic. Both make a scheduled date look wrong to
  * somebody, and this one is a promise about when work happens.
  */
-const PLAIN_DATE = new Intl.DateTimeFormat('en-GB', {
+const PLAIN_DATE = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
   month: 'long',
   year: 'numeric',
@@ -73,7 +90,7 @@ export function formatPlainDate(iso: string | null): string {
 }
 
 /**
- * A short weekday-and-date — "Thu 4 Sep".
+ * A short weekday-and-date — "Fri, Sep 4".
  *
  * ⚠️ PINNED FOR THE SAME REASON PLAIN_DATE IS, and it arrived carrying the bug.
  * This came out of a `toLocaleDateString(undefined, …)` in app-shell.tsx, which
@@ -85,7 +102,7 @@ export function formatPlainDate(iso: string | null): string {
  * No year: this is only ever used for a date inside the coming week, where the
  * year is noise in a 256px column.
  */
-const SHORT_DATE = new Intl.DateTimeFormat('en-GB', {
+const SHORT_DATE = new Intl.DateTimeFormat('en-US', {
   weekday: 'short',
   day: 'numeric',
   month: 'short',

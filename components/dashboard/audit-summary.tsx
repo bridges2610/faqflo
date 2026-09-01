@@ -21,6 +21,7 @@ import { scoreBand } from '@/lib/audit/score';
 const TECHNICAL = '/dashboard/audit?view=technical';
 import type { ActionItem, AuditReport, Finding } from '@/lib/audit/types';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
+import { formatPlainDate } from '@/lib/dashboard/format';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { sameReport, type Site } from '@/lib/dashboard/types';
 import { IndustryPlan, IndustryPlanPrompt, VisibilityLine } from './audit-extras';
@@ -258,11 +259,13 @@ export function AuditSummary({ report, site }: { report: AuditReport; site: Site
      as a paragraph, and writing it there rather than here keeps one voice
      describing one measurement — the rule stated above. */
   const readable = readability(report);
-  const checkedOn = new Date(report.checkedAt).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  /* ⚠️ formatPlainDate, NOT toLocaleDateString(undefined, …). This is the date
+     printed on the sheet of paper a customer keeps, and it used to render in
+     whatever locale and zone the browser happened to have. A second formatter
+     was written for it and then deleted: in en-US it produced a string
+     identical to this one, and two functions with one output is how they drift
+     apart later. See the note beside PLAIN_DATE in lib/dashboard/format.ts. */
+  const checkedOn = formatPlainDate(report.checkedAt);
 
   return (
     <div className="print-report print-sections">
