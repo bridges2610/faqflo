@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ButtonLink } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import type { PostMeta } from '@/lib/blog/posts';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canOfferDoneForYou, trackingPlanFor } from '@/lib/dashboard/plans';
@@ -72,7 +72,8 @@ function greeting(): { text: string; emoji: string } {
 */
 
 export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
-  const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
+  const { site, sites, groups, faqs, questions, tracking, data, user, runAudit, auditBusy, auditError } =
+    useDashboard();
 
   /*
     ⚠️ THE PAST-RUNS FETCH HAS GONE WITH THE THINGS THAT READ IT.
@@ -148,11 +149,33 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
         }
         description={`This is how ${site.domain} looks to ChatGPT, Perplexity and Gemini — and what to change so they name you when someone asks.`}
         action={
-          <ButtonLink href="/dashboard/audit" variant="ghost" size="sm">
-            {report ? 'Run a fresh check' : 'Check my site'}
-          </ButtonLink>
+          /* ⚠️ IT RUNS THE CHECK; IT DOES NOT GO AND FIND IT. This was a link to
+             /dashboard/audit, which meant the button labelled "Run a fresh
+             check" ran nothing — it navigated, and left the customer to press a
+             second button when they arrived.
+
+             `disabled` is driven by the provider's flag rather than a local one,
+             so this button and the Audit page's cannot both start a crawl. See
+             the note on runAudit in lib/dashboard/provider.tsx. */
+          <Button variant="ghost" size="sm" onClick={runAudit} disabled={auditBusy}>
+            {auditBusy ? 'Checking…' : report ? 'Run a fresh check' : 'Check my site'}
+          </Button>
         }
       />
+
+      {/* The progress line that used to sit here is a toast now — see
+          components/dashboard/audit-notice.tsx. Under the greeting it was a
+          second slate paragraph directly below the first, and it scrolled away
+          on a page long enough that a minute-long check outlives the view. */}
+
+      {/* ⚠️ SHOWN WHERE THE BUTTON IS. Four full checks a day is a real ceiling
+          (AUDIT_FULL_RATE_LIMIT), and a refusal that appeared only on another
+          page would make this button look like it did nothing. */}
+      {auditError && (
+        <p role="alert" className="text-error-ink mb-5 text-sm">
+          {auditError}
+        </p>
+      )}
 
       {/*
         ⚠️ THE SETUP CHECKLIST OUTRANKS EVERYTHING, AND ONLY WHILE UNFINISHED.

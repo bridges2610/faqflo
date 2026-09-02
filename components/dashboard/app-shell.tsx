@@ -11,6 +11,7 @@ import { formatShortDate } from '@/lib/dashboard/format';
 import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, LockIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
+import { AuditNotice } from './audit-notice';
 import { RunNotice } from './run-notice';
 import { ScanNotice } from './scan-notice';
 import { SiteSwitcher } from './site-switcher';
@@ -644,6 +645,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
       </div>
+
+      {/* ⚠️ OUTSIDE <main>, AND THAT IS WHAT MAKES IT A TOAST. Inside, the
+          content column's padding and stacking context would box it in; out
+          here it is positioned against the viewport. Rendered by the shell
+          rather than by a page, so it follows across navigations. */}
+      <AuditNotice />
     </div>
   );
 }

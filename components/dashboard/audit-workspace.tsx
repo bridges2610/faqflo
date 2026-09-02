@@ -11,14 +11,12 @@ import { useDashboard } from '@/lib/dashboard/provider';
 // decision now, and a client-side copy of it would only ever be a guess about
 // what the server was going to do.
 import { PAGE_BUDGET, canRunFullAudit } from '@/lib/dashboard/plans';
-import { opportunities, visibilityFindings } from '@/lib/dashboard/audit-context';
+import { opportunities } from '@/lib/dashboard/audit-context';
 import { timeAgo } from '@/lib/dashboard/format';
 import { taskFromAction } from '@/lib/dashboard/worklist';
-import { buildActionPlan } from '@/lib/audit/actions';
-import { buildPillars, overallScore, scoreBand } from '@/lib/audit/score';
+import { scoreBand } from '@/lib/audit/score';
 import {
   PILLARS,
-  type AuditReport,
   type Finding,
   type PillarResult,
 } from '@/lib/audit/types';
@@ -104,11 +102,10 @@ export function AuditWorkspace({
    */
   view?: AuditView;
 }) {
-  const { site, user, data, tracking, groups, saveAudit, renameSite } = useDashboard();
-  /** null means "nothing run this session" — the stored report is the fallback. */
-  const [fresh, setFresh] = useState<AuditReport | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /* ⚠️ `fresh` IS GONE TOO. It held the just-run report for display, but
+     runAudit() saves through the store — so site.lastAudit already carries it,
+     and a local copy was a second source for one thing. */
+  const { site, user, data, runAudit, auditBusy, auditError } = useDashboard();
 
   /*
     Landing here straight from Stripe.
@@ -157,104 +154,16 @@ export function AuditWorkspace({
 
   const full = canRunFullAudit(user);
 
-  async function run() {
-    if (!site) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/audit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        /*
-          `maxPages` is gone. The server derives the page budget from the site
-          row, because a client that states its own allowance isn't stating
-          anything the server should believe — and a hundred pages is a hundred
-          requests to somebody else's host.
-        */
-        body: JSON.stringify({
-          url: site.domain,
-          depth: full ? 'full' : 'quick',
-          siteId: site.id,
-        }),
-      });
-      const crawl = (await res.json()) as AuditReport | { error: string };
-      if (!res.ok || 'error' in crawl) {
-        setError('error' in crawl ? crawl.error : 'That audit failed.');
-        return;
-      }
-      const merged = merge(crawl);
-      setFresh(merged);
-      await saveAudit(site.id, merged);
+  /*
+    run() and merge() used to live here.
 
-      /*
-        Keep what the crawl learned about the business.
-
-        businessProfile() reads industry and service area off the site's own
-        LocalBusiness markup on every full crawl, and until now the result was
-        thrown away unless the customer went to Content and generated a plan —
-        so a site that plainly declares `RoofingContractor` still read
-        "Industry: unknown" on the dashboard. Both the content plan and question
-        discovery send these fields to the model, so an empty pair costs
-        specificity in two places.
-
-        `schema` flat, not Content's conditional: this came from markup by
-        definition. A site whose markup names a trade but no `areaServed`
-        leaves location null for the customer to fill in, which is honest —
-        Content's `inferred` is for the different case where a model completed
-        a partial profile.
-
-        ⚠️ Never over a manual one. A customer correcting us is the strongest
-        signal we have, and a re-run quietly reverting it would be the feature
-        arguing with its user. Same guard as content-workspace.tsx.
-      */
-      const profile = crawl.profile;
-      if (site.profileSource !== 'manual' && profile?.industry) {
-        await renameSite(site.id, {
-          industry: profile.industry,
-          location: profile.location,
-          profileSource: 'schema',
-        });
-      }
-    } catch {
-      setError('Could not run the audit. Check your connection and try again.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  /**
-   * Fold in the half of the audit that isn't a crawl.
-   *
-   * Visibility and opportunities come from this account's own data and are
-   * merged here rather than sent to the endpoint — it's unauthenticated, and a
-   * body-supplied citation is exactly the number this product can't fake. The
-   * score is recomputed locally with the same pure functions the server used.
-   */
-  function merge(crawl: AuditReport): AuditReport {
-    if (!site || !data) return crawl;
-
-    const crawlFindings = crawl.pillars.flatMap((p) => p.findings).filter((f) => f.pillar !== 'visibility');
-    const findings = [...crawlFindings, ...visibilityFindings(site, user, tracking)];
-    const pillars = buildPillars(findings);
-
-    const firstGroup = groups[0];
-    return {
-      ...crawl,
-      pillars,
-      score: overallScore(pillars),
-      scoredCount: pillars.reduce((n, p) => n + p.scoredCount, 0),
-      actions: buildActionPlan(findings, {
-        domain: crawl.domain,
-        // A real route now. This was `#${id}`, and nothing on the Answers
-        // screen ever rendered that anchor — the link landed at the top of a
-        // list and left the customer to find the page themselves.
-        faqsHref: firstGroup ? `/dashboard/faqs/${firstGroup.id}` : '/dashboard/faqs',
-        publishHref: '/dashboard/publish',
-        questionsHref: '/dashboard/questions',
-      }),
-      opportunities: opportunities(data, site),
-    };
-  }
+    ⚠️ THEY MOVED UP, NOT AWAY. The check can be started from Home now, and two
+    local `busy` flags would let a customer start one here and a second one
+    there — two of only four full audits a day. The flag lives on the provider
+    so both buttons see the same run; the merge is a pure function in
+    lib/dashboard/run-audit.ts so the provider did not have to grow a second
+    copy of the scoring rules.
+  */
 
   /*
     Opportunities are recomputed from the current state rather than read back
@@ -263,7 +172,7 @@ export function AuditWorkspace({
     something they already fixed.
   */
   const stored = site.lastAudit;
-  const shown = fresh ?? (stored ? { ...stored, opportunities: opportunities(data, site) } : null);
+  const shown = stored ? { ...stored, opportunities: opportunities(data, site) } : null;
   const band = shown ? scoreBand(shown.score) : null;
   /* Computed once for both the tally in the header and the four groups below,
      so the number beside the score and the number in a heading cannot drift. */
@@ -280,8 +189,8 @@ export function AuditWorkspace({
           title="Audit"
           description={`What AI sees when it reads ${site.domain}, and what to do about it.`}
           action={
-            <Button size="sm" onClick={run} disabled={busy}>
-              {busy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}
+            <Button size="sm" onClick={runAudit} disabled={auditBusy}>
+              {auditBusy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}
             </Button>
           }
         />
@@ -308,16 +217,16 @@ export function AuditWorkspace({
                   may land a second or two after this renders. Telling somebody
                   who has just paid that a feature is locked is worse than asking
                   them to refresh. */}
-              {busy
+              {auditBusy
                 ? `Running your first full audit now. It reads up to ${PAGE_BUDGET.pro} pages, so give it a moment.`
                 : `Run the full check below and it will read every page on ${site.name}, not just the home page. If anything still looks locked, give it a moment and refresh — your payment is still going through.`}
             </p>
           </div>
         )}
 
-        {error && (
+        {auditError && (
           <p role="alert" className="text-error-ink text-sm">
-            {error}
+            {auditError}
           </p>
         )}
 
@@ -330,8 +239,8 @@ export function AuditWorkspace({
                 : 'The free checks look at whether your content is readable and whether the AI crawlers are allowed in.'
             }
             action={
-              <Button onClick={run} disabled={busy}>
-                {busy ? 'Scanning…' : 'Run the audit'}
+              <Button onClick={runAudit} disabled={auditBusy}>
+                {auditBusy ? 'Scanning…' : 'Run the audit'}
               </Button>
             }
           />

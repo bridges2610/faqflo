@@ -43,6 +43,13 @@ export type RunOptions = {
   /** Page budget for a full run. Ignored by `quick`, which reads one page. */
   budget?: CrawlBudget;
   /**
+   * Told which part of the run is starting, as it starts.
+   *
+   * Optional, and every caller that does not pass it behaves exactly as before.
+   * The route uses it to stream progress to a browser; nothing else needs it.
+   */
+  onPhase?: (phase: AuditPhase) => void;
+  /**
    * Filled in by the caller from the account's own data — tracking for the AI
    * visibility pillar, and the loop's state for opportunities. The engine never
    * fabricates either: given nothing, the pillar stays locked.
@@ -62,6 +69,21 @@ const LOCKED_VISIBILITY: Finding = {
   weight: 0,
 };
 
+/**
+ * Which part of the run is happening now.
+ *
+ * ⚠️ THESE ARE REAL BOUNDARIES IN runAudit BELOW, NOT A TIMELINE. Each one is
+ * emitted immediately before the work it names begins, so a caller showing them
+ * is reporting where the function actually is rather than guessing from a
+ * clock.
+ *
+ * ⚠️ AND `reading` OWNS ALMOST ALL THE WALL CLOCK. It is network I/O across up
+ * to a hundred pages; the other two are local computation and take a moment.
+ * Anything rendering these should expect the first to hold for most of the run
+ * — that is the truth about where the time goes, not a stall.
+ */
+export type AuditPhase = 'reading' | 'checking' | 'scoring';
+
 export type AuditResult =
   | { ok: true; report: AuditReport }
   | { ok: false; failure: FetchFailure };
@@ -75,6 +97,10 @@ export type AuditResult =
  * the audience is.
  */
 export async function runAudit(entryUrl: string, options: RunOptions): Promise<AuditResult> {
+  // Optional by design: every existing caller passes nothing and behaves as before.
+  const phase = options.onPhase ?? (() => {});
+
+  phase('reading');
   const fetched =
     options.depth === 'quick'
       ? await fetchQuick(entryUrl)
@@ -82,9 +108,11 @@ export async function runAudit(entryUrl: string, options: RunOptions): Promise<A
   if (!fetched.ok) return fetched;
   const set = fetched.set;
 
+  phase('checking');
   const findings =
     options.depth === 'quick' ? quickFindings(set) : fullFindings(set, options.visibility);
 
+  phase('scoring');
   const pillars = buildPillars(findings);
   const domain = hostOf(set.entry.finalUrl);
 

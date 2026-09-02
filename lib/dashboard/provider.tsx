@@ -19,7 +19,10 @@ import {
   useRef,
   useState,
 } from 'react';
-import { trackingPeriod, trackingPlanFor } from './plans';
+import type { AuditPhase } from '@/lib/audit/run';
+import type { AuditReport } from '@/lib/audit/types';
+import { canRunFullAudit, trackingPeriod, trackingPlanFor } from './plans';
+import { mergeAudit } from './run-audit';
 import * as store from './store';
 import type {
   ActionTick,
@@ -79,6 +82,23 @@ type Ctx = {
   loadError: string | null;
   /** Re-run the load after a failure. */
   retryLoad: () => void;
+
+  /**
+   * Start a fresh audit of the selected site.
+   *
+   * ⚠️ IT LIVES HERE SO THERE CAN ONLY EVER BE ONE. Two screens start a check
+   * now — Home's header and the Audit page — and with a `busy` flag in each,
+   * a customer could start one, walk to the other page, find an enabled button
+   * and start a second crawl. That is two of only four full audits a day
+   * (AUDIT_FULL_RATE_LIMIT) and a second hundred requests to their own host.
+   * One flag above both pages is what makes the button honest on each.
+   */
+  runAudit: () => Promise<void>;
+  auditBusy: boolean;
+  /** Which part of the run is happening, or null when nothing is running. */
+  auditPhase: AuditPhase | null;
+  /** Why the last run failed, in the customer's words. Null once one starts. */
+  auditError: string | null;
   data: DashboardData | null;
   user: User | null;
   /** Currently selected site, or null while loading / if none exist. */
@@ -258,6 +278,9 @@ export function DashboardProvider({
     A dropped connection became a dashboard that never loaded.
   */
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [auditBusy, setAuditBusy] = useState(false);
+  const [auditPhase, setAuditPhase] = useState<AuditPhase | null>(null);
+  const [auditError, setAuditError] = useState<string | null>(null);
   // Bumped by retryLoad() to re-run the effect below. A counter rather than a
   // boolean so a second failure can still be retried a third time.
   const [loadNonce, setLoadNonce] = useState(0);
@@ -638,12 +661,161 @@ export function DashboardProvider({
     [data, site],
   );
 
+  /*
+    The audit, moved here whole from audit-workspace.tsx.
+
+    Every line of it was already written and reviewed there; what changed is
+    where the `busy` flag lives. See the note on runAudit in Ctx above for why
+    that had to move, and lib/dashboard/run-audit.ts for the merge it calls.
+  */
+  const runAudit = useCallback(async () => {
+    if (!site || !data || auditBusy) return;
+
+    setAuditBusy(true);
+    setAuditError(null);
+    try {
+      const res = await fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        /*
+          No `maxPages`. The server derives the page budget from the site row,
+          because a client that states its own allowance isn't stating anything
+          the server should believe — and a hundred pages is a hundred requests
+          to somebody else's host.
+        */
+        body: JSON.stringify({
+          url: site.domain,
+          depth: canRunFullAudit(data.user) ? 'full' : 'quick',
+          siteId: site.id,
+          // Opt in to progress. Every other caller of this route sends no such
+          // flag and still gets one JSON object back — see the note in the
+          // route about why this had to be additive.
+          stream: true,
+        }),
+      });
+
+      /*
+        ⚠️ A REFUSAL IS STILL PLAIN JSON, even in streaming mode. The rate
+        limit, the ownership check and the entitlement check all decide before
+        any crawling starts, so there is no stream for them to live in.
+      */
+      if (!res.ok || !res.body) {
+        const refused = (await res.json().catch(() => null)) as { error?: string } | null;
+        setAuditError(refused?.error ?? 'That audit failed.');
+        return;
+      }
+
+      /*
+        Newline-delimited JSON: phase markers as the run reaches them, then
+        exactly one report or one error.
+
+        ⚠️ BUFFERED ON \n, NOT PER CHUNK. A read can split a line anywhere, so
+        parsing whatever arrived would throw on a half-written object every few
+        hundred pages. The tail is kept and prepended to the next read.
+      */
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let tail = '';
+      let crawl: AuditReport | null = null;
+      let streamError: string | null = null;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        tail += decoder.decode(value, { stream: true });
+        const lines = tail.split('\n');
+        tail = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let msg: { type?: string; phase?: AuditPhase; report?: AuditReport; error?: string };
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (msg.type === 'phase' && msg.phase) setAuditPhase(msg.phase);
+          if (msg.type === 'report' && msg.report) crawl = msg.report;
+          if (msg.type === 'error') streamError = msg.error ?? 'That audit failed.';
+        }
+      }
+
+      if (streamError || !crawl) {
+        setAuditError(streamError ?? 'That audit failed.');
+        return;
+      }
+
+      const merged = mergeAudit(crawl, {
+        site,
+        data,
+        user: data.user,
+        tracking: tracking ?? null,
+        groups,
+      });
+
+      /*
+        ⚠️ A FAILED SAVE IS NOT A FAILED AUDIT, AND IT USED TO SAY IT WAS.
+
+        By this line the crawl has already succeeded AND been recorded — the
+        route writes audit_runs in an after() block, which is precisely what
+        makes a report survive the customer navigating away mid-crawl. All that
+        can still go wrong is refreshing THIS page's copy. Reporting "could not
+        run the audit" for that would send someone to re-run a sixty-second
+        crawl, and spend another of their four daily checks, to fix a problem a
+        reload already fixes.
+      */
+      try {
+        await apply(() => store.saveAudit(site.id, merged));
+      } catch {
+        setAuditError('The check finished, but this page could not refresh. Reload to see it.');
+        return;
+      }
+
+      /*
+        Keep what the crawl learned about the business.
+
+        businessProfile() reads industry and service area off the site's own
+        LocalBusiness markup on every full crawl, and the result used to be
+        thrown away unless the customer went to Content and generated a plan —
+        so a site that plainly declares `RoofingContractor` still read
+        "Industry: unknown". Both the content plan and question discovery send
+        these fields to the model, so an empty pair costs specificity twice.
+
+        ⚠️ NEVER OVER A MANUAL ONE. A customer correcting us is the strongest
+        signal we have, and a re-run quietly reverting it would be the feature
+        arguing with its user. Same guard as content-workspace.tsx.
+      */
+      const profile = crawl.profile;
+      if (site.profileSource !== 'manual' && profile?.industry) {
+        // Best-effort for the same reason as the save above: the next crawl
+        // will offer it again, and it is not worth failing a good run over.
+        await apply(() =>
+          store.updateSite(site.id, {
+            industry: profile.industry,
+            location: profile.location,
+            profileSource: 'schema',
+          }),
+        ).catch(() => {});
+      }
+    } catch {
+      setAuditError('Could not run the audit. Check your connection and try again.');
+    } finally {
+      setAuditBusy(false);
+      setAuditPhase(null);
+    }
+  }, [site, data, tracking, groups, auditBusy, apply]);
+
   const value: Ctx = {
     // Not loading if we have stopped and failed — otherwise the shell would
     // show a spinner and an error message at the same time.
     loading: data === null && loadError === null,
     loadError,
     retryLoad: () => setLoadNonce((n) => n + 1),
+    runAudit,
+    auditBusy,
+    auditPhase,
+    auditError,
     data,
     user: data?.user ?? null,
     site,
