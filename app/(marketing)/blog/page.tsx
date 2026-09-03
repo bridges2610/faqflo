@@ -14,8 +14,24 @@ export const metadata: Metadata = {
 export default function Blog() {
   return (
     <div className="px-5 pt-14 pb-24 sm:px-8 sm:pt-20">
-      <div className="mx-auto max-w-184">
-        <Badge tone="cyan">Blog</Badge>
+      {/* The grid's width. max-w-184 was the reading measure of a one-column
+          archive; three tiles need the marketing container the rest of the site
+          uses. */}
+      <div className="mx-auto max-w-6xl">
+        {/*
+          ⚠️ THE MASTHEAD KEEPS THE OLD 736px BOX, AND HAS NO mx-auto.
+
+          Two separate reasons, and both bite if this simply inherits max-w-6xl.
+          The h1 below is measured: its comment records that 2.5rem fits on one
+          line INSIDE max-w-184, and the chip shape and tilt are built on that.
+          And the intro paragraph set across 1152px is a poor measure to read.
+
+          No mx-auto because a centred 736px block inside a 1152px column would
+          sit inset from the first tile — the eye lands on two different left
+          edges. Left-aligned, the headline and the grid start at the same x.
+        */}
+        <div className="max-w-184">
+          <Badge tone="cyan">Blog</Badge>
         {/*
           ⚠️ THE FREE REPORT'S CHIP, IN THE REPORT'S OWN MASTHEAD COLOUR. The
           shape is free-home.tsx's <Section> h2 — the wordmark's 10px radius,
@@ -64,21 +80,22 @@ export default function Blog() {
             Insights to Get You Listed in AI
           </h1>
         </div>
-        <p className="text-slate mt-5 text-lg leading-relaxed">
-          What changed in search, what the answer engines actually read, and how small businesses
-          can end up in the answer.
-        </p>
+          <p className="text-slate mt-5 text-lg leading-relaxed">
+            What changed in search, what the answer engines actually read, and how small businesses
+            can end up in the answer.
+          </p>
+        </div>
 
         {POSTS.length > 0 ? (
-          /* One column, per the brief. The hairline between entries does the
-             separating so each post needs no card of its own. */
-          <div className="divide-line mt-14 divide-y">
+          /* Tiles. The card carries its own edge now, so there is no hairline
+             between entries to do the separating — the gap does it. */
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {POSTS.map((post, i) => (
-              <div key={post.meta.slug} className="py-10 first:pt-0 last:pb-0">
-                {/* Only the first image is eager — it is the one above the fold,
-                    and marking them all priority would defeat the point. */}
-                <PostCard meta={post.meta} priority={i === 0} />
-              </div>
+              /* ⚠️ THE FIRST ROW IS EAGER, NOT THE FIRST POST. Three tiles sit
+                 above the fold on a desktop now rather than one. Still a fixed
+                 few: marking them all priority is the thing that would defeat
+                 the point. */
+              <PostCard key={post.meta.slug} meta={post.meta} priority={i < 3} />
             ))}
           </div>
         ) : (

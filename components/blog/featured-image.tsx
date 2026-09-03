@@ -17,15 +17,31 @@ export function FeaturedImage({
   meta,
   priority = false,
   sizes,
+  className = 'rounded-xl',
 }: {
   meta: PostMeta;
   /** Set on the post page's own lead image — it is the LCP element there. */
   priority?: boolean;
   sizes: string;
+  /**
+   * Corner treatment, and only that.
+   *
+   * ⚠️ IT EXISTS SO A CARD CAN CLIP THIS INSTEAD. The archive's tiles round and
+   * clip their own outer edge, and an image that also rounds itself leaves a
+   * notch where the two radii disagree — so those pass `rounded-none` and let
+   * the card do it. The default keeps every other caller exactly as it was.
+   */
+  className?: string;
 }) {
   if (!meta.image) {
     return (
-      <div className="bg-brand-gradient-bright grain relative flex aspect-video items-end overflow-hidden rounded-xl">
+      /* ⚠️ THE FALLBACK TAKES className TOO. It is easy to change only the
+         branch below, because every post has an image today and this one never
+         renders — it would first appear the day somebody publishes without one,
+         which is the whole case this branch exists for. */
+      <div
+        className={`bg-brand-gradient-bright grain relative flex aspect-video items-end overflow-hidden ${className}`}
+      >
         {/* Navy on cyan, never white — the gradient is far too light to carry
             white type at 4.5:1. */}
         <p className="font-display text-navy relative p-6 text-lg leading-snug font-extrabold text-balance sm:p-8 sm:text-2xl">
@@ -36,7 +52,7 @@ export function FeaturedImage({
   }
 
   return (
-    <div className="bg-cloud relative aspect-video overflow-hidden rounded-xl">
+    <div className={`bg-cloud relative aspect-video overflow-hidden ${className}`}>
       <Image
         src={meta.image}
         alt={meta.imageAlt}
