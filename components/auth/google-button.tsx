@@ -57,7 +57,14 @@ export function GoogleButton({
 
   return (
     <>
-      <Button variant="ghost" size="md" className="w-full" onClick={signIn} disabled={busy}>
+      <Button
+      variant="ghost"
+      size="md"
+      shape="pill"
+      className="w-full"
+      onClick={signIn}
+      disabled={busy}
+    >
         <GoogleMark className="h-4 w-4" />
         {busy ? 'Taking you to Google…' : label}
       </Button>

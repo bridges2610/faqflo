@@ -33,6 +33,7 @@ import { EFFORT_COST } from '@/lib/audit/actions';
 import type { ActionItem, AuditReport } from '@/lib/audit/types';
 import { publishState } from './export';
 import { isPro, PRO_PRICE } from './plans';
+import { isOpenQuestion } from './questions';
 import type { DiscoveredQuestion, FaqEntry, FaqGroup, Site, User } from './types';
 
 export type Task = {
@@ -117,7 +118,7 @@ function productTasks(input: WorklistInput): Task[] {
 
   const published = faqs.filter((f) => f.status === 'published');
   const emptyDrafts = faqs.filter((f) => f.status === 'draft' && !f.answer.trim());
-  const uncovered = questions.filter((q) => !q.covered);
+  const uncovered = questions.filter(isOpenQuestion);
 
   const states = groups.map((g) => ({
     group: g,
@@ -176,7 +177,7 @@ function productTasks(input: WorklistInput): Task[] {
       why: 'These questions were drafted but never answered. A blank draft does nothing — it cannot be published or quoted.',
       impact: null,
       effort: '15 minutes',
-      action: { kind: 'link', label: 'Write them', href: '/dashboard/faqs' },
+      action: { kind: 'link', label: 'Write them', href: '/dashboard/faqs?tab=answers' },
     });
   }
 
@@ -198,7 +199,7 @@ function productTasks(input: WorklistInput): Task[] {
       why: 'Answers belong to a page, so the export knows where to point and the schema names the right URL.',
       impact: null,
       effort: '2 minutes',
-      action: { kind: 'link', label: 'Add a group', href: '/dashboard/faqs' },
+      action: { kind: 'link', label: 'Add a group', href: '/dashboard/faqs?tab=answers' },
     });
   }
 
@@ -369,7 +370,7 @@ export function standing(input: WorklistInput): {
     liveGroups: states.filter((s) => s === 'current').length,
     totalGroups: groups.length,
     published: faqs.filter((f) => f.status === 'published').length,
-    unanswered: questions.filter((q) => !q.covered).length,
+    unanswered: questions.filter(isOpenQuestion).length,
     staleGroups: states.filter((s) => s === 'stale').length,
   };
 }

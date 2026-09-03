@@ -20,6 +20,7 @@
 
 import type { Finding, Opportunity } from '@/lib/audit/types';
 import { publishState } from './export';
+import { isOpenQuestion } from './questions';
 
 import type { DashboardData, FaqGroup, Site, SiteTracking, User } from './types';
 
@@ -126,7 +127,7 @@ export function opportunities(data: DashboardData, site: Site): Opportunity[] {
   const questions = data.questions.filter((q) => q.siteId === site.id);
   const tracking = data.tracking.find((t) => t.siteId === site.id);
 
-  const uncovered = questions.filter((q) => !q.covered);
+  const uncovered = questions.filter(isOpenQuestion);
   if (uncovered.length) {
     out.push({
       id: 'uncovered-questions',
@@ -145,7 +146,7 @@ export function opportunities(data: DashboardData, site: Site): Opportunity[] {
       id: 'empty-drafts',
       title: `${emptyDrafts.length} drafted ${emptyDrafts.length === 1 ? 'question has' : 'questions have'} no answer written`,
       detail: 'These came from real questions and are waiting on you for the answer.',
-      href: '/dashboard/faqs',
+      href: '/dashboard/faqs?tab=answers',
     });
   }
 
@@ -157,7 +158,7 @@ export function opportunities(data: DashboardData, site: Site): Opportunity[] {
       id: 'unpublished',
       title: `${unpublished.length} finished ${unpublished.length === 1 ? 'answer is' : 'answers are'} still in drafts`,
       detail: 'Drafts are invisible to both visitors and engines until they are published.',
-      href: '/dashboard/faqs',
+      href: '/dashboard/faqs?tab=answers',
     });
   }
 

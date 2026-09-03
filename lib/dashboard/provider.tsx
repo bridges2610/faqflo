@@ -26,6 +26,7 @@ import { mergeAudit } from './run-audit';
 import * as store from './store';
 import type {
   ActionTick,
+  Article,
   Competitor,
   ContentPlan,
   DashboardData,
@@ -143,6 +144,8 @@ type Ctx = {
   runTracking: (only?: string[]) => Promise<void>;
   /** The generated content plan for the active site; null until one is made. */
   contentPlan: ContentPlan | null;
+  /** This site's articles, newest first. See Article in types.ts. */
+  articles: Article[];
 
   addSite: (input: store.NewSite) => Promise<void>;
   renameSite: (id: string, patch: store.SitePatch) => Promise<void>;
@@ -170,6 +173,18 @@ type Ctx = {
   markPublished: (groupId: string) => Promise<void>;
   saveAudit: (siteId: string, report: SiteAudit) => Promise<void>;
   saveContentPlan: (plan: ContentPlan) => Promise<void>;
+  /** Resolves with the new article's id, so the caller can navigate to it. */
+  addArticle: (siteId: string, input: store.NewArticle) => Promise<string | undefined>;
+  editArticle: (
+    id: string,
+    patch: {
+      title: string;
+      intro: string;
+      sections: { heading: string; body: string }[];
+      faqs: { q: string; a: string }[];
+    },
+  ) => Promise<void>;
+  removeArticle: (id: string) => Promise<void>;
 
   addFaqs: (groupId: string, entries: store.NewFaq[]) => Promise<void>;
   editFaq: (
@@ -180,6 +195,14 @@ type Ctx = {
   moveFaq: (id: string, direction: 'up' | 'down') => Promise<void>;
   moveFaqToGroup: (id: string, groupId: string) => Promise<void>;
   coverQuestion: (id: string) => Promise<void>;
+  /**
+   * Wave a question away, or bring it back.
+   *
+   * Not `removeQuestion`: the row is kept so a re-run of discovery cannot
+   * simply propose it again, and so the owner has an undo. See
+   * setQuestionDismissed() in store.ts.
+   */
+  dismissQuestion: (id: string, dismissed: boolean) => Promise<void>;
   /** Store a discovered set for a site, replacing the previous one. */
   /** `append` tops the list up to the prompt cap; `replace` (default) swaps it. */
   addQuestions: (
@@ -661,6 +684,11 @@ export function DashboardProvider({
     [data, site],
   );
 
+  const articles = useMemo(
+    () => (data && site ? store.articlesForSite(data, site.id) : []),
+    [data, site],
+  );
+
   /*
     The audit, moved here whole from audit-workspace.tsx.
 
@@ -832,6 +860,7 @@ export function DashboardProvider({
     trackingRun,
     runTracking,
     contentPlan,
+    articles,
 
     addSite: (input) => apply(() => store.createSite(input)),
     renameSite: (id, patch) => apply(() => store.updateSite(id, patch)),
@@ -875,6 +904,21 @@ export function DashboardProvider({
     markPublished: (id) => apply(() => store.markGroupPublished(id)),
     saveAudit: (siteId, report) => apply(() => store.saveAudit(siteId, report)),
     saveContentPlan: (plan) => apply(() => store.saveContentPlan(plan)),
+    /* Identified by diffing rather than by trusting position — same shape as
+       addGroup above, and for the same reason: the store is free to sort or
+       reorder without silently breaking the caller. */
+    addArticle: async (siteId, input) => {
+      const existing = new Set((data?.articles ?? []).map((a) => a.id));
+      let created: string | undefined;
+      await apply(async () => {
+        const next = await store.createArticle(siteId, input);
+        created = next.articles.find((a) => !existing.has(a.id))?.id;
+        return next;
+      });
+      return created;
+    },
+    editArticle: (id, patch) => apply(() => store.updateArticle(id, patch)),
+    removeArticle: (id) => apply(() => store.deleteArticle(id)),
 
     addFaqs: (id, entries) => apply(() => store.createFaqs(id, entries)),
     editFaq: (id, patch) => apply(() => store.updateFaq(id, patch)),
@@ -882,6 +926,7 @@ export function DashboardProvider({
     moveFaq: (id, direction) => apply(() => store.moveFaq(id, direction)),
     moveFaqToGroup: (id, groupId) => apply(() => store.moveFaqToGroup(id, groupId)),
     coverQuestion: (id) => apply(() => store.markQuestionCovered(id)),
+    dismissQuestion: (id, dismissed) => apply(() => store.setQuestionDismissed(id, dismissed)),
 
     /* Direct, then apply() on success — same shape as addCompetitor, and for
        the same reason: apply() only speaks DashboardData, so a refusal has

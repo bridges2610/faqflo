@@ -47,7 +47,7 @@ import { EmbedStepList } from './embed-steps';
 */
 const PLATFORM_KEY = 'faqflo.publish.platform';
 
-export function EmbedInstructions() {
+export function EmbedInstructions({ compact = false }: { compact?: boolean }) {
   /*
     Read during the first render, deliberately, and safe for two reasons.
 
@@ -109,7 +109,9 @@ export function EmbedInstructions() {
       <div
         role="group"
         aria-label="Your website platform"
-        className="bg-cloud border-line mt-4 flex flex-wrap items-center gap-1 rounded-2xl border p-1"
+        className={`bg-cloud border-line flex flex-wrap items-center gap-1 rounded-2xl border p-1 ${
+          compact ? 'mt-3' : 'mt-4'
+        }`}
       >
         {EMBED_GUIDES.map((guide) => (
           <button
@@ -135,8 +137,18 @@ export function EmbedInstructions() {
         which platform they are in; announcing four steps on every press would
         talk over a person still choosing.
       */}
-      <div id={panelId} role="region" aria-labelledby={headingId} className="mt-5">
-        <EmbedStepList guide={embedGuide(platform)} headingAs="h3" headingId={headingId} />
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={headingId}
+        className={compact ? 'mt-4' : 'mt-5'}
+      >
+        <EmbedStepList
+          guide={embedGuide(platform)}
+          headingAs="h3"
+          headingId={headingId}
+          compact={compact}
+        />
       </div>
     </>
   );

@@ -135,7 +135,8 @@ export type FaqGroupRow = {
   user_id: string;
   name: string;
   /** Leading slash, no origin. The site row owns the domain. */
-  path: string;
+  /** Null until the owner says which page this set goes on. See FaqGroup.path. */
+  path: string | null;
   position: number;
   published_at: string | null;
   published_hash: string | null;
@@ -153,6 +154,8 @@ export type FaqRow = {
   status: 'published' | 'draft';
   position: number;
   source: 'generated' | 'manual' | 'discovered';
+  /** What the generated set was about. Added in 0018; null before that. */
+  topic: string | null;
   tone: string | null;
   language: string | null;
   created_at: string;
@@ -204,6 +207,14 @@ export type QuestionRow = {
   why: string | null;
   intent: string | null;
   covered: boolean;
+  /**
+   * The owner said they are never answering this one. Added in 0017.
+   *
+   * Nullable in the type because every row written before that migration has
+   * the column's default rather than a value the app set — see the note on
+   * DiscoveredQuestion.dismissed.
+   */
+  dismissed: boolean | null;
   source: 'discovered' | 'manual';
   /** Ordering on the AI Mentions page. Added in 0015; see faqs.position. */
   position: number;
@@ -262,3 +273,28 @@ export type CitationCheckRow = {
  * sites.next_check_at, moved forward a week by claim_due_checks(). See 0012 for
  * why the objections 0011 raised against a column no longer hold.
  */
+
+/**
+ * A generated article. Added in 0017.
+ *
+ * `sections` is jsonb read whole and never queried into — the same test
+ * audit_runs.report and content_plans.plan are stored under. Typed as unknown
+ * here because the database does not enforce its shape; rowToArticle() in
+ * lib/dashboard/store.ts is where it is checked.
+ */
+export type ArticleRow = {
+  id: string;
+  site_id: string;
+  user_id: string;
+  title: string;
+  intro: string;
+  sections: { heading: string; body: string }[] | null;
+  /** Q&As belonging to this article. Added in 0018; see ArticleFaq. */
+  faqs: { q: string; a: string }[] | null;
+  /** What the owner typed as a brief, or null when they just pressed the button. */
+  brief: string | null;
+  /** Measured by countWords() at generation time. Never the model's own count. */
+  word_count: number;
+  created_at: string;
+  updated_at: string;
+};

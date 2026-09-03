@@ -17,7 +17,7 @@
  * belongs. The single exception is llms.txt, which is site-wide — see below.
  */
 
-import type { FaqEntry, FaqGroup, Site } from './types';
+import type { Article, FaqEntry, FaqGroup, Site } from './types';
 
 /** Escape for HTML text content and attribute values. */
 function escapeHtml(value: string): string {
@@ -35,9 +35,15 @@ function publishable(faqs: FaqEntry[]): FaqEntry[] {
     .sort((a, b) => a.position - b.position);
 }
 
-/** Absolute URL of the page a group is pasted on. */
-export function groupUrl(site: Site, group: FaqGroup): string {
-  return `https://${site.domain}${group.path}`;
+/**
+ * Absolute URL of the page a group is pasted on, or null when it has none yet.
+ *
+ * ⚠️ NULL IS A REAL ANSWER, NOT A MISSING ONE. A set exists from the moment its
+ * answers are written; where it goes is decided later. Every caller has to
+ * handle that rather than interpolating `null` into a URL string.
+ */
+export function groupUrl(site: Site, group: FaqGroup): string | null {
+  return group.path ? `https://${site.domain}${group.path}` : null;
 }
 
 /**
@@ -109,10 +115,18 @@ export function buildSchemaJson(site: Site, group: FaqGroup, faqs: FaqEntry[]): 
   ];
 
   if (entries.length > 0) {
+    const url = groupUrl(site, group);
+
     graph.push({
       '@type': 'QAPage',
-      '@id': `${groupUrl(site, group)}#faq`,
-      url: groupUrl(site, group),
+      /*
+        ⚠️ NO @id AND NO url UNTIL THE SET HAS A PAGE. Spreading them in only
+        when `url` is known is what keeps this honest: the alternative is
+        `"@id": "https://letsroof.comnull#faq"`, which is not a weaker claim but
+        a wrong one. Same rule buildArticleSchemaJson() follows — an article has
+        no stored path and therefore names no page.
+      */
+      ...(url ? { '@id': `${url}#faq`, url } : {}),
       name: group.name,
       publisher: { '@id': organizationId },
       mainEntity: entries.map((f) => ({
@@ -190,7 +204,8 @@ export function buildLlmsTxt(
     const entries = publishable(faqsFor(group.id));
     if (entries.length === 0) continue;
 
-    lines.push(`## ${group.name}`, '', `Published at ${groupUrl(site, group)}`, '');
+    const url = groupUrl(site, group);
+    lines.push(`## ${group.name}`, '', ...(url ? [`Published at ${url}`, ''] : []));
     for (const faq of entries) {
       lines.push(`- **${faq.question}** ${faq.answer}`);
     }
@@ -242,6 +257,218 @@ export function buildPlainText(group: FaqGroup, faqs: FaqEntry[]): string {
   }
 
   return lines.join('\n').trimEnd() + '\n';
+}
+
+/* ------------------------------------------------------------ articles --- */
+
+/*
+  An article is a different kind of paste from a Q&A block, and the differences
+  are worth stating once here rather than being rediscovered:
+
+  - It is ONE page's whole body, not a section bolted onto an existing page. So
+    it leads with an <h1>, which the FAQ block deliberately never does — that
+    block is a guest on somebody else's page and an <h1> would fight the page's
+    own.
+  - It has no group, so there is no stored path and no published hash. Nothing
+    tracks whether an article's live copy has drifted, because there is no
+    address to compare against. That is a real gap, not an oversight to paper
+    over with a guess at where they pasted it.
+
+  Everything else follows the rules at the top of this file: no JavaScript, real
+  heading and paragraph elements, and nothing pointing at faqflo.com.
+*/
+
+/** Blank-line-separated prose to <p> elements. */
+function paragraphs(body: string, className: string): string {
+  return body
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `  <p class="${className}">${escapeHtml(p)}</p>`)
+    .join('\n');
+}
+
+/**
+ * The article as HTML.
+ *
+ * ⚠️ EVERY FIELD GOES THROUGH escapeHtml() AND NOTHING IS INTERPRETED. The
+ * headings are real <h2> elements because the schema in lib/article.ts has a
+ * heading field — not because anything here looked for a "##". A model that
+ * emitted markdown despite being told not to produces visible "##" characters,
+ * which is ugly and obvious; a builder that tried to parse it would instead be
+ * a markdown-to-HTML converter running on untrusted text.
+ */
+export function buildArticleHtml(article: Article): string {
+  const title = article.title.trim();
+  if (!title) return '';
+
+  const intro = paragraphs(article.intro, 'faqflo-article-intro');
+
+  const sections = article.sections
+    .filter((s) => s.heading.trim() && s.body.trim())
+    .map(
+      (s) => `  <h2 class="faqflo-article-heading">${escapeHtml(s.heading.trim())}</h2>
+${paragraphs(s.body, 'faqflo-article-text')}`,
+    )
+    .join('\n\n');
+
+  /*
+    ⚠️ THE Q&As GO INSIDE THE <article>, AT THE FOOT, AND publishable() DOES NOT
+    APPLY TO THEM. Group answers are filtered to status: 'published' before
+    export; an ArticleFaq has no status at all — it is part of a draft the owner
+    is editing, and everything in it goes when they copy it. Reaching for the
+    group's rule here by reflex would silently emit nothing.
+
+    <h3> under the section <h2>s, not <h2> itself: these sit below the article's
+    own headings and a flat outline would put a Q&A block on the same level as a
+    section of the piece.
+  */
+  const faqs = article.faqs
+    .filter((f) => f.q.trim() && f.a.trim())
+    .map(
+      (f) => `    <div class="faqflo-article-faq">
+      <h3 class="faqflo-question">${escapeHtml(f.q.trim())}</h3>
+      <p class="faqflo-answer">${escapeHtml(f.a.trim())}</p>
+    </div>`,
+    )
+    .join('\n\n');
+
+  const faqBlock = faqs
+    ? `  <section class="faqflo-article-faqs">
+    <h2 class="faqflo-article-heading">Frequently asked questions</h2>
+
+${faqs}
+  </section>`
+    : '';
+
+  return `<article class="faqflo-article">
+  <h1 class="faqflo-article-title">${escapeHtml(title)}</h1>
+
+${[intro, sections, faqBlock].filter(Boolean).join('\n\n')}
+</article>`;
+}
+
+/**
+ * JSON-LD for the article.
+ *
+ * ⚠️ THE PUBLISHER @id IS THE ONE buildSchemaJson() ALREADY MINTS. A page can
+ * carry both an article and a Q&A block, and two Organization nodes with
+ * different ids on one page declare two businesses. Referencing the same
+ * `https://{domain}/#organization` means whichever block is pasted first
+ * defines the business and the other points at it.
+ *
+ * No `url` and no `@id` on the Article node: those would have to name the page
+ * it was pasted on, and unlike a group, an article has no stored path. A URL we
+ * guessed would be a claim about the customer's site that we have no basis for.
+ *
+ * No `image`, no `author`. Both are commonly stuffed in for rich results that
+ * this does not chase — see the note on buildSchemaJson — and inventing an
+ * author for a piece the owner publishes under their own name is exactly the
+ * kind of made-up field the rest of this codebase refuses.
+ */
+export function buildArticleSchemaJson(site: Site, article: Article): string {
+  const organizationId = `https://${site.domain}/#organization`;
+
+  const body = [article.intro, ...article.sections.map((s) => s.body)]
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .join('\n\n');
+
+  const graph: Record<string, unknown>[] = [
+    {
+      '@type': 'Organization',
+      '@id': organizationId,
+      name: site.name,
+      url: `https://${site.domain}/`,
+    },
+    {
+      '@type': 'Article',
+      headline: article.title,
+      publisher: { '@id': organizationId },
+      datePublished: article.createdAt,
+      dateModified: article.updatedAt,
+      articleBody: body,
+      wordCount: article.wordCount,
+    },
+  ];
+
+  /*
+    ⚠️ QAPage WITH SEVERAL QUESTIONS, MATCHING buildSchemaJson() ABOVE — AND
+    THAT SHAPE IS UNCONVENTIONAL. schema.org means QAPage for a page with ONE
+    question and FAQPage for many. The Q&A export chose QAPage deliberately and
+    says why: it is there so an assistant can tell which string is a question,
+    not to chase the rich results Google retired.
+
+    This matches it rather than being right on its own, so the product speaks
+    one dialect and the decision lives in one place. Worth revisiting — for both
+    builders in the same change, never for one.
+
+    No `@id` and no `url`: unlike a group, an article has no stored path, so
+    naming the page it sits on would be a claim about the customer's site we
+    have no basis for.
+  */
+  const questions = article.faqs.filter((f) => f.q.trim() && f.a.trim());
+  if (questions.length > 0) {
+    graph.push({
+      '@type': 'QAPage',
+      name: article.title,
+      publisher: { '@id': organizationId },
+      mainEntity: questions.map((f) => ({
+        '@type': 'Question',
+        name: f.q.trim(),
+        acceptedAnswer: { '@type': 'Answer', text: f.a.trim() },
+      })),
+    });
+  }
+
+  return JSON.stringify({ '@context': 'https://schema.org', '@graph': graph }, null, 2);
+}
+
+/**
+ * Both halves as one paste — the same bargain buildPasteBlock() strikes.
+ *
+ * The `<` escape is not optional: an article body containing the literal text
+ * `</script>` would otherwise close this element early, truncating the JSON and
+ * spilling the rest onto the customer's page as visible text.
+ */
+export function buildArticleBlock(site: Site, article: Article): string {
+  const html = buildArticleHtml(article);
+  if (!html) return '';
+
+  const json = buildArticleSchemaJson(site, article).replace(/</g, '\\u003c');
+  return `${html}\n\n<script type="application/ld+json">\n${json}\n</script>`;
+}
+
+/**
+ * The article as plain text, for pasting into an editor that wants words.
+ *
+ * Headings are left as bare lines with a blank line either side rather than
+ * decorated with "##" or underlines: this is going into a WordPress or
+ * Squarespace editor where the owner will style them, and markdown characters
+ * they then have to delete are worse than none.
+ */
+export function buildArticlePlain(article: Article): string {
+  const parts = [article.title.trim(), '', article.intro.trim()];
+
+  for (const section of article.sections) {
+    const heading = section.heading.trim();
+    const body = section.body.trim();
+    if (!heading || !body) continue;
+    parts.push('', heading, '', body);
+  }
+
+  /* Same Q: / A: shape buildPlainText() uses for a group, so somebody who has
+     copied both recognises the second one. No [draft] marker: an ArticleFaq has
+     no status to mark. */
+  const questions = article.faqs.filter((f) => f.q.trim() && f.a.trim());
+  if (questions.length > 0) {
+    parts.push('', 'Frequently asked questions', '');
+    for (const f of questions) {
+      parts.push(`Q: ${f.q.trim()}`, `A: ${f.a.trim()}`, '');
+    }
+  }
+
+  return parts.join('\n').trimEnd() + '\n';
 }
 
 /**
@@ -633,9 +860,17 @@ export function embedGuide(id: EmbedPlatformId): EmbedGuide {
 }
 
 /** Normalise whatever the customer typed into a leading-slash path. */
-export function normalizePath(input: string): string {
+export function normalizePath(input: string | null): string | null {
+  /*
+    ⚠️ EMPTY NOW MEANS "NOT PLACED", NOT "THE HOME PAGE". This returned '/' for
+    a blank input, which was right when every group had to have a path — and is
+    wrong now that a set exists before anyone has chosen one. Coercing blank to
+    the root would silently claim every unplaced set lives on the customer's
+    home page.
+  */
+  if (input === null) return null;
   const trimmed = input.trim();
-  if (!trimmed) return '/';
+  if (!trimmed) return null;
 
   // Accept a pasted full URL and keep only the path — a group belongs to its
   // site, so an origin typed here can only ever disagree with the site's domain.

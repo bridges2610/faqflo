@@ -21,6 +21,20 @@ import { usePathname } from 'next/navigation';
   The pill treatment is the one already used by the answer filters and
   GeneratorPanel's source toggle; this is that pattern lifted out rather than a
   third version of it.
+
+  ⚠️ THE ACTIVE TAB IS FILLED, NOT WHITE, AND THE COLOUR IS NOT FREE TO CHANGE.
+  It was a white pill on the grey field, which read as an unlit switch — you had
+  to compare three labels' weight to work out where you were. `bg-primary` with
+  `text-white` is 5.17:1 and one of only TWO sanctioned white-on-fill pairs in
+  this product (the other is `bg-navy`, 17.04:1). Any other fill here needs
+  measuring against white text before it ships; `accent` in particular is 1.9:1
+  on white and is fill-only for exactly this reason.
+
+  ⚠️ THE SEGMENTED SHAPE SURVIVED THE BUTTON RESHAPING ON PURPOSE. Buttons in
+  the dashboard are 14px now (see the note on SHAPES in components/ui/button.tsx)
+  and the pill is meant to be rare. A segmented control is where it still earns
+  its keep: the field and the lit segment share one silhouette, which is what
+  makes it read as one control with a position rather than three buttons.
 */
 export type WorkspaceTab = { href: string; label: string };
 
@@ -55,7 +69,7 @@ export function WorkspaceTabs({
                 aria-current={active ? 'page' : undefined}
                 className={`block rounded-full px-4 py-1.5 text-sm transition-all duration-200 ${
                   active
-                    ? 'text-navy shadow-soft bg-white font-semibold'
+                    ? 'bg-primary shadow-soft font-semibold text-white'
                     : 'text-slate hover:text-navy'
                 }`}
               >
@@ -69,11 +83,18 @@ export function WorkspaceTabs({
   );
 }
 
-/** The two pairs, declared once so both members of a pair agree on the set. */
-export const ANSWER_TABS: WorkspaceTab[] = [
-  { href: '/dashboard/faqs', label: 'Write' },
-  { href: '/dashboard/publish', label: 'Publish' },
-];
+/*
+  ⚠️ ANSWER_TABS AND ITS TWO HELPERS LIVE IN lib/dashboard/answers-tabs.ts, NOT
+  HERE, AND MOVING THEM BACK BREAKS THE ANSWERS PAGE.
+
+  This module carries 'use client', and that directive applies to the MODULE,
+  not to the component in it — so every export from it is a client reference.
+  app/(app)/dashboard/faqs/page.tsx reads `?tab=` during a server render and
+  calls answersTabFrom() on it, which failed with "attempted to call
+  answersTabFrom() from the server but answersTabFrom is on the client".
+
+  The other two sets below stay put because only client components read them.
+*/
 
 export const OPPORTUNITY_TABS: WorkspaceTab[] = [
   { href: '/dashboard/questions', label: 'Questions' },

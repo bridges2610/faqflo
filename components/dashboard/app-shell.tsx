@@ -62,7 +62,12 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Home', Icon: HomeIcon },
   { href: '/dashboard/audit', label: 'Audit', Icon: AeoIcon },
-  { href: '/dashboard/faqs', label: 'Answers', Icon: FaqIcon },
+  /* ⚠️ "Content", NOT "Answers", AND THE PATH DELIBERATELY DID NOT MOVE.
+     The screen makes articles, FAQs and the paste code; "Answers" named a
+     third of it. Renaming the label rather than the route is what keeps every
+     link in worklist.ts, audit-context.ts and the two redirect stubs true —
+     see the note on NAV below about labels changing and URLs not. */
+  { href: '/dashboard/faqs', label: 'Content', Icon: FaqIcon },
   { href: '/dashboard/competitors', label: 'Competitors', Icon: SearchIcon },
   { href: '/dashboard/tracking', label: 'AI Mentions', Icon: ChartIcon },
 ];
@@ -163,7 +168,12 @@ const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: H
 */
 const PRO_VALUE: Record<string, string> = {
   '/dashboard/audit': 'Every page, not just one',
-  '/dashboard/faqs': 'Written and ready to paste',
+  /* Re-counted against the 30-character budget above, not just retyped: this is
+     25. The old string, "Written and ready to paste", described the export;
+     this screen now writes the content too. "Articles and answers written" said
+     that in 28 characters but read three grades harder — three long words in a
+     row with no verb to break them up. */
+  '/dashboard/faqs': 'We write it, you paste it',
   '/dashboard/competitors': 'Who AI names instead',
   '/dashboard/tracking': 'Re-checked every week',
 };

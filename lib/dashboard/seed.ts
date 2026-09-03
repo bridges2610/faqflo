@@ -12,8 +12,10 @@
  * gone, because the plan is a column the browser cannot write.
  */
 
+import { countWords } from '@/lib/article';
 import {
   ENGINES,
+  type Article,
   type CitationCheck,
   type ActionTick,
   type Competitor,
@@ -77,21 +79,43 @@ function dateKey(n: number): string {
 }
 
 /*
-  Two groups, because one group wouldn't show why groups exist.
+  Three sets, because one wouldn't show why sets exist.
 
   The service page is left deliberately stale (its stored hash won't match its
   answers) and the pricing page is current, so both states of the publish nudge
   are visible side by side the first time the dashboard is opened.
+
+  ⚠️ THE THIRD HAS NO PATH ON PURPOSE. That is what a freshly generated set
+  looks like before anybody has said where it goes, and it is the state the
+  export has to handle without inventing a URL — see FaqGroup.path.
 */
 type SeedGroup = {
   name: string;
-  path: string;
+  path: string | null;
   /** 'stale' stores a hash that can't match; 'current' stores the real one. */
   state: 'stale' | 'current';
   faqs: { q: string; a: string; status: 'published' | 'draft' }[];
 };
 
 const SEED_GROUPS: SeedGroup[] = [
+  {
+    // Freshly generated and not yet placed: no path, nothing pasted.
+    name: 'Warranty and guarantees',
+    path: null,
+    state: 'current',
+    faqs: [
+      {
+        q: 'What does the workmanship warranty cover?',
+        a: 'It covers the work itself — flashing, fixings and the way the materials were fitted. If something we installed lets water in, we come back and put it right at no charge.',
+        status: 'draft',
+      },
+      {
+        q: 'Is the warranty transferable if I sell the house?',
+        a: 'Yes. Tell us who the new owner is and we move it across, which is worth doing before the sale rather than after.',
+        status: 'draft',
+      },
+    ],
+  },
   {
     name: 'Service page',
     path: '/services',
@@ -672,8 +696,70 @@ export type SeedLocalData = {
   competitors: Competitor[];
   /** Empty on a fixture: nobody has ticked anything off a seeded audit. */
   actionTicks: ActionTick[];
+  articles: Article[];
   audits: Record<string, AuditReport>;
 };
+
+/*
+  One finished article, so the Articles tab has something in it.
+
+  ⚠️ WRITTEN TO THE SAME RULES THE REAL PROMPT ENFORCES, because this fixture is
+  what the marketing screenshots photograph. No invented prices, no statistics,
+  no awards — the constraint lib/article.ts puts on the model applies just as
+  hard to a hand-written stand-in that ends up on the home page.
+
+  One, not three. A seeded list long enough to scroll would push the rest of the
+  tab out of a 1200x860 capture, and the point of the fixture is to show what
+  the screen looks like with work in it, not to fill it.
+*/
+function seedArticle(siteId: string): Article {
+  const sections = [
+    {
+      heading: 'What actually drives the price',
+      body: 'Size is the obvious one, but it is rarely the thing that moves a quote the most. The pitch of the roof, how many layers have to come off, and whether the deck underneath has softened all change the labour before a single shingle is bought.\n\nMaterial is the other half. Asphalt is the common choice and the cheapest to install. Metal and slate cost more up front and last longer, which only pays off if you plan to stay.',
+    },
+    {
+      heading: 'Why two quotes can differ so much',
+      body: 'A low quote is not always a better deal. It usually means fewer layers stripped, thinner underlayment, or a warranty that covers the materials but not the work.\n\nAsk each contractor to write down what they are removing, what they are putting back, and who covers what if something leaks in year three. Once those are on paper the quotes are comparable.',
+    },
+    {
+      heading: 'When you can wait and when you cannot',
+      body: 'Curling edges and a few missing shingles after a storm can usually wait for a dry week. A stain spreading across a ceiling cannot — water has already found a path and it will keep taking it.\n\nIf you can see daylight from inside the attic, that is the same answer. Get it looked at now and cover it in the meantime.',
+    },
+    {
+      heading: 'What to have ready before you call',
+      body: 'The age of the roof, if you know it. Photographs of anything you can see from the ground. Whether you have had work done before, and by whom.\n\nNone of it is required, but it turns a vague site visit into a real quote, and it means fewer trips before anyone can give you a number.',
+    },
+  ];
+
+  return {
+    id: 'art_seed_roof_cost',
+    siteId,
+    title: 'What Changes the Cost of a New Roof',
+    intro:
+      'Most people asking what a roof costs are really asking why the quotes they were given are so far apart. The honest answer is that a roof is priced on what has to be done to it, not on its size alone.\n\nHere is what moves the number, and what to have ready before you ask anyone for a quote.',
+    sections,
+    /* One Q&A on the fixture so the article page's FAQ block and the schema it
+       emits are visible in a screenshot without pressing anything. Written to
+       the same no-invented-facts rule as the article above it. */
+    faqs: [
+      {
+        q: 'Do you give a written quote before any work starts?',
+        a: 'Yes. We put the scope, the materials and the warranty in writing before anything is booked, so you can compare it against anyone else you have asked.',
+      },
+    ],
+    brief: null,
+    // ⚠️ Measured, not typed. Same rule the route follows — see Article.wordCount.
+    wordCount: countWords({
+      title: 'What Changes the Cost of a New Roof',
+      intro:
+        'Most people asking what a roof costs are really asking why the quotes they were given are so far apart. The honest answer is that a roof is priced on what has to be done to it, not on its size alone.\n\nHere is what moves the number, and what to have ready before you ask anyone for a quote.',
+      sections,
+    }),
+    createdAt: daysAgo(6),
+    updatedAt: daysAgo(6),
+  };
+}
 
 export function buildSeed(siteId: string): SeedLocalData {
   // Stands in for the real row's domain in the seeded competitor table. The
@@ -691,7 +777,10 @@ export function buildSeed(siteId: string): SeedLocalData {
       path: seed.path,
       position: gi,
       createdAt: daysAgo(30 - gi),
-      publishedAt: daysAgo(24 - gi * 6),
+      /* ⚠️ A SET WITH NO PAGE HAS NEVER BEEN PASTED. Claiming otherwise would
+         put the fixture in a state the product cannot reach: publishState()
+         would report 'current' for answers that are nowhere. */
+      publishedAt: seed.path ? daysAgo(24 - gi * 6) : null,
       publishedHash: null, // set below, once its answers exist
     };
 
@@ -703,6 +792,10 @@ export function buildSeed(siteId: string): SeedLocalData {
       status: f.status,
       position: i,
       source: 'generated',
+      /* The set's name, on every answer in it — which is what the generator
+         does. The list groups by the set itself; this is the record of which
+         batch the answer came from. */
+      topic: seed.name,
       tone: 'Professional',
       language: 'English',
       createdAt: daysAgo(30 - i),
@@ -711,7 +804,11 @@ export function buildSeed(siteId: string): SeedLocalData {
 
     // 'stale' stores a hash that cannot match anything, so the group opens in
     // the out-of-date state; 'current' stores the real hash of what it holds.
-    group.publishedHash = seed.state === 'stale' ? 'staleseed' : contentHash(entries);
+    group.publishedHash = !seed.path
+      ? null
+      : seed.state === 'stale'
+        ? 'staleseed'
+        : contentHash(entries);
 
     groups.push(group);
     faqs.push(...entries);
@@ -834,6 +931,7 @@ export function buildSeed(siteId: string): SeedLocalData {
     contentPlans: [seedContentPlan(site.id)],
     competitors: [],
     actionTicks: [],
+    articles: [seedArticle(site.id)],
     // The seeded audit, hung off the real site id — audits are keyed by site
     // in local storage now rather than living on the site object.
     audits: { [site.id]: seedAudit() },

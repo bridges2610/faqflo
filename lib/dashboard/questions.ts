@@ -1,4 +1,22 @@
-import { ENGINES, type CitationCheck, type Engine } from './types';
+import { ENGINES, type CitationCheck, type DiscoveredQuestion, type Engine } from './types';
+
+/**
+ * A question that is still work: nobody has answered it and nobody has waved
+ * it away.
+ *
+ * ⚠️ ONE PREDICATE, BECAUSE FIVE SCREENS COUNT THIS AND THEY MUST AGREE. Home's
+ * tile, the worklist, the audit's action list and the Answers page all render
+ * "N questions you don't answer", and before Ignore existed each did its own
+ * `!q.covered`. A dismissed question is not work, so every one of those counts
+ * had to learn the second half of the rule at the same moment — the failure
+ * otherwise is silent and looks like the Ignore button doing nothing.
+ *
+ * `dismissed` is optional on the type (rows predate the column), and absent
+ * means not dismissed.
+ */
+export function isOpenQuestion(q: DiscoveredQuestion): boolean {
+  return !q.covered && !q.dismissed;
+}
 
 /*
   One question, and every engine's answer to it.

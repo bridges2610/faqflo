@@ -23,7 +23,8 @@ import { EmptyState } from './empty-state';
 import { CopyIcon, TickIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { UpgradeCard } from './upgrade-card';
-import { ANSWER_TABS, WorkspaceTabs } from './workspace-tabs';
+import { ANSWER_TABS } from '@/lib/dashboard/answers-tabs';
+import { WorkspaceTabs } from './workspace-tabs';
 import { SectionTitle } from './section-title';
 
 /*
@@ -216,7 +217,7 @@ export function PublishWorkspace() {
           title="Publish"
           description={`The crawlable HTML for ${site.domain}, ready to paste.`}
         />
-        <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
+        <WorkspaceTabs tabs={ANSWER_TABS} label="Content sections" />
         <UpgradeCard
           title="Ready-to-paste code for your website"
           body="Clean HTML with your answers in it, the behind-the-scenes code that tells AI who you are, and an llms.txt file — built per page and pasted onto your own site, so the mention goes to you. Your answers are always yours: copy them out as plain text from the Answers page any time."
@@ -242,14 +243,14 @@ export function PublishWorkspace() {
         }
       />
 
-      <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
+      <WorkspaceTabs tabs={ANSWER_TABS} label="Content sections" />
 
       <div className="space-y-5">
         {groups.length === 0 ? (
           <EmptyState
             title="No groups yet"
             body="A group is one page's worth of answers. Add one on the Answers page and its code appears here."
-            action={<ButtonLink href="/dashboard/faqs">Go to Answers</ButtonLink>}
+            action={<ButtonLink href="/dashboard/faqs?tab=answers">Go to Answers</ButtonLink>}
           />
         ) : (
           groups.map((group) => <GroupSection key={group.id} site={site} group={group} />)

@@ -110,8 +110,16 @@ export type FaqGroup = {
    * A path rather than a full URL on purpose: the site already owns the domain,
    * and storing an absolute URL here would let the two disagree. The export
    * would then emit schema pointing at a domain the customer doesn't own.
+   *
+   * ⚠️ NULL UNTIL THE OWNER SAYS, AND THAT IS WHY IT IS NULLABLE. A set is
+   * created the moment its answers are written, long before anyone has decided
+   * which page it goes on. Minting a plausible slug would make the schema
+   * assert that page exists on their site — the exact inversion of what this
+   * field is for. Null means "not placed yet": the block still copies, and
+   * buildSchemaJson() omits @id and url rather than guessing, the same rule
+   * buildArticleSchemaJson() follows for an article.
    */
-  path: string;
+  path: string | null;
   /** Ordering on the Answers page. */
   position: number;
   createdAt: string;
@@ -149,6 +157,18 @@ export type FaqEntry = {
       relying on array index, which wouldn't survive a real query's ORDER BY. */
   position: number;
   source: 'generated' | 'manual' | 'discovered';
+  /**
+   * What the set this came from is about — "Roof replacement costs".
+   *
+   * ⚠️ A LABEL FOR ONE GENERATION RUN, NOT A CATEGORY SOMEBODY PICKS. The model
+   * names each batch and every answer in that batch carries the same string,
+   * which is what lets the Answers list show one row per topic.
+   *
+   * Optional because every row written before the column existed has none, and
+   * because a hand-written answer never had a batch. The list buckets those two
+   * cases separately — see the note in answers-workspace.tsx.
+   */
+  topic?: string;
   tone: Tone;
   language: Language;
   createdAt: string;
@@ -180,6 +200,24 @@ export type DiscoveredQuestion = {
   intent?: string;
   /** Whether an existing published answer already covers it. */
   covered: boolean;
+  /**
+   * The owner said they are never answering this one.
+   *
+   * ⚠️ NOT A KIND OF `covered`, AND MERGING THE TWO WOULD LIE TWICE. `covered`
+   * means the site answers it — it feeds the "x of y answered" count and the
+   * coverage recheck. Dismissed means the opposite: nobody is going to answer
+   * it, and it should stop being suggested. Folding it into `covered` would
+   * inflate the answered figure and let recheckCoverage() un-dismiss it.
+   *
+   * ⚠️ IT MUST SURVIVE A DISCOVER RE-RUN. addQuestions() in 'replace' mode
+   * keeps only covered and manual rows; a dismissed one dropped there comes
+   * straight back on the next run, and the Ignore button looks broken. The
+   * keep-predicate there names this field for that reason.
+   *
+   * Optional because rows written before this column existed have no value, and
+   * absent means "not dismissed" — which is true of every one of them.
+   */
+  dismissed?: boolean;
   /**
    * Who put this question on the list.
    *
@@ -541,7 +579,89 @@ export type ContentPlan = {
   location: string | null;
   mustHave: MustHavePage[];
   topics: ArticleTopic[];
+  /**
+   * Titles of suggestions the owner has waved away.
+   *
+   * ⚠️ A LIST OF TITLES, NOT A FLAG ON THE TOPIC, AND NO MIGRATION EITHER WAY.
+   * The whole plan is one jsonb column (content_plans.plan), so this rides
+   * along inside it — but a flag on ArticleTopic would also have to survive the
+   * model's schema, which returns topics with no such field. Keeping the
+   * decision beside the topics rather than inside them means the generated
+   * shape stays exactly what the model produces.
+   *
+   * ⚠️ AND IT IS DELIBERATELY CLEARED BY A REGENERATE. Refreshing replaces the
+   * suggestions wholesale; carrying old titles forward would silently hide
+   * brand-new topics that happened to be named the same thing.
+   *
+   * Optional because every plan stored before this has none.
+   */
+  hiddenTopics?: string[];
   generatedAt: string;
+};
+
+/**
+ * One `<h2>` and the prose under it.
+ *
+ * ⚠️ STRUCTURE, NOT MARKDOWN, AND THAT IS THE WHOLE REASON THIS TYPE EXISTS.
+ * The ask was "use proper headings like H2". A markdown blob would put that
+ * promise in the model's hands and then need a parser to make HTML out of it —
+ * a parser handling untrusted model output, which is the thing
+ * lib/dashboard/answer-markdown.ts exists to keep small and auditable. A schema
+ * with a heading field cannot come back without headings, and the HTML builder
+ * becomes a mapping through escapeHtml() with nothing to interpret.
+ *
+ * `body` may hold blank-line-separated paragraphs; the builder splits on them.
+ */
+export type ArticleSection = { heading: string; body: string };
+
+/**
+ * A question and answer that belongs to ONE article.
+ *
+ * ⚠️ NOT A FaqEntry, AND THE DIFFERENCE IS OWNERSHIP RATHER THAN SHAPE. A
+ * FaqEntry belongs to a group — a page of the customer's site — has a publish
+ * status, a position among its siblings, and reaches the site through that
+ * group's paste block. These belong to the article: they are written from its
+ * text, they sit at the foot of it, they go out inside its paste block, and
+ * they are deleted with it. Storing them as FaqEntry rows would have put them
+ * in the Answers list, which is the thing this change exists to stop.
+ *
+ * No status field on purpose: an article is a draft the owner is editing, and
+ * everything in it goes when they copy it. See the note on publishable() in
+ * export.ts.
+ */
+export type ArticleFaq = { q: string; a: string };
+
+/**
+ * A generated article, kept.
+ *
+ * ⚠️ NOT AN ArticleTopic. That one is a SUGGESTION — a title and an angle the
+ * content plan proposes. This is the finished piece. They sit in the same file
+ * and the names are one letter apart, so: topics are what to write, Articles
+ * are what was written.
+ *
+ * Stored rather than handed over and forgotten, for the same reason ContentPlan
+ * is: it costs a real model call. It is also what the monthly allowance is
+ * counted from — a cap on something nobody keeps is a cap nobody can see.
+ */
+export type Article = {
+  id: string;
+  siteId: string;
+  title: string;
+  /** The opening, before the first heading. */
+  intro: string;
+  sections: ArticleSection[];
+  /** Questions and answers written from this article. See ArticleFaq. */
+  faqs: ArticleFaq[];
+  /** What the owner typed as a brief, kept so a rewrite can reuse it. */
+  brief: string | null;
+  /**
+   * ⚠️ MEASURED AFTER THE FACT, NEVER TAKEN FROM THE MODEL'S WORD. A language
+   * model asked how many words it wrote will give a number, and it will be
+   * wrong. countWords() in lib/article.ts is the only thing that sets this.
+   */
+  wordCount: number;
+  createdAt: string;
+  updatedAt: string;
 };
 
 /** Everything the app keeps for one account. One row per key, in DB terms. */
@@ -557,4 +677,6 @@ export type DashboardData = {
   competitors: Competitor[];
   /** Fixes ticked off the audit plan. See ActionTick. */
   actionTicks: ActionTick[];
+  /** Articles written for this account. See Article. */
+  articles: Article[];
 };

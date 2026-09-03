@@ -3,9 +3,49 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 
 type Variant = 'primary' | 'ghost' | 'dark' | 'light';
 type Size = 'sm' | 'md' | 'lg';
+type Shape = 'soft' | 'pill';
 
 const BASE =
-  'inline-flex items-center justify-center gap-2 rounded-pill font-medium whitespace-nowrap transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+
+/*
+  ⚠️ `soft` IS THE DEFAULT AND `pill` IS THE OPT-IN, WHICH IS THE OPPOSITE OF
+  HOW THIS COMPONENT STARTED. Read this before flipping it back.
+
+  Every button in the product was a 999px pill, and the dashboard had become a
+  screenful of them. The instruction was to use the shape sparingly, so it is
+  now the exception a caller asks for rather than the rule everyone inherits —
+  which is a statement in the type, not just a habit.
+
+  The default is `soft` rather than `pill` for a second, duller reason:
+  components/dashboard holds 98 Button and ButtonLink call sites and marketing
+  holds nine. Defaulting to pill would have meant editing 98 files to change 98
+  buttons. Defaulting to soft means nine callers say `shape="pill"`.
+
+  ⚠️ EVERYTHING A VISITOR SEES KEEPS ITS PILLS ON PURPOSE. The public pages
+  were not part of this change and nobody has reviewed a squared-off home page.
+  That means components/marketing (hero, final-cta, site-nav, mobile-nav,
+  pricing-teaser, visibility-audit x2, done-for-you-form), the blog index, the
+  homepage's own FAQ generator in components/generator, AND the five forms in
+  components/auth — the sign-in screens are reached from the marketing nav and
+  are styled to match it, so they belong on that side of the line.
+
+  ⚠️ THE SIGNED-IN SURFACES TAKE THE DEFAULT, INCLUDING THE ONES THAT DO NOT
+  LOOK LIKE THE DASHBOARD. app/(app)/error.tsx and the checkout return page are
+  behind the login and square off with everything else.
+
+  Adding a button to a public page? It needs `shape="pill"`, and nothing
+  enforces that but this note — grep for `<Button` outside components/dashboard
+  and check the list above before assuming a directory is covered.
+
+  Badges are untouched: components/ui/badge.tsx stays rounded-pill because a
+  badge reads as a tag rather than a control. Segmented toggles keep their pill
+  field too — that is the one place the shape still earns its keep.
+*/
+const SHAPES: Record<Shape, string> = {
+  soft: 'rounded-input',
+  pill: 'rounded-pill',
+};
 
 const VARIANTS: Record<Variant, string> = {
   // Solid blue rather than the gradient: white text needs 4.5:1, and the
@@ -29,6 +69,7 @@ const SIZES: Record<Size, string> = {
 type CommonProps = {
   variant?: Variant;
   size?: Size;
+  shape?: Shape;
   /** Trailing arrow that nudges right on hover. */
   arrow?: boolean;
   className?: string;
@@ -54,6 +95,7 @@ function Inner({ children, arrow }: { children: ReactNode; arrow?: boolean }) {
 export function Button({
   variant = 'primary',
   size = 'md',
+  shape = 'soft',
   arrow,
   className = '',
   children,
@@ -61,7 +103,7 @@ export function Button({
 }: CommonProps & ComponentPropsWithoutRef<'button'>) {
   return (
     <button
-      className={`group ${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`group ${BASE} ${SHAPES[shape]} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
     >
       <Inner arrow={arrow}>{children}</Inner>
@@ -73,6 +115,7 @@ export function ButtonLink({
   href,
   variant = 'primary',
   size = 'md',
+  shape = 'soft',
   arrow,
   className = '',
   children,
@@ -81,7 +124,7 @@ export function ButtonLink({
   return (
     <Link
       href={href}
-      className={`group ${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
+      className={`group ${BASE} ${SHAPES[shape]} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
     >
       <Inner arrow={arrow}>{children}</Inner>

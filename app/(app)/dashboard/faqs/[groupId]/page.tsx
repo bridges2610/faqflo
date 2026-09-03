@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { requirePro } from '@/lib/auth/pro-only';
 import { GroupWorkspace } from '@/components/dashboard/group-workspace';
 
-export const metadata: Metadata = { title: 'Answers' };
+export const metadata: Metadata = { title: 'Content' };
 
 /*
   One page of the customer's site.

@@ -176,10 +176,10 @@ const NAV_MAP = [
     body: 'Questions people put to assistants about a business like yours, plus the pages your industry is expected to have.',
   },
   {
-    nav: 'Answers',
+    nav: 'Content',
     href: '/dashboard/faqs',
     loop: 'Generate + Publish',
-    body: 'Writing the answers, and the copy-paste export that puts them on your site. Two tabs, one job.',
+    body: 'Where all your content gets made. Pick a topic and we write the article or the answers, then hand you the code to paste on your site.',
   },
   {
     nav: 'Results',

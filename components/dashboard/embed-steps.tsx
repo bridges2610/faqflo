@@ -44,25 +44,41 @@ export function EmbedStepList({
   guide,
   headingAs = 'h3',
   headingId,
+  compact = false,
 }: {
   guide: EmbedGuide;
   headingAs?: 'h3' | 'h4';
   /** Set when a caller labels a region with this heading. */
   headingId?: string;
+  /**
+   * One size down, for a footnote under a copy button.
+   *
+   * ⚠️ A SIZE, NOT A SHORTER GUIDE. Every step, the warning and the gotcha are
+   * still here — the compact form is for a place where the instructions sit
+   * beneath the thing they explain rather than being the subject of the page.
+   * Dropping content at a smaller size would leave somebody stuck with no way
+   * to tell they were reading an abridged version.
+   */
+  compact?: boolean;
 }) {
   const Heading = headingAs;
+
+  const body = compact ? 'text-xs' : 'text-sm';
 
   return (
     <div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <Heading id={headingId} className="text-navy text-[0.9375rem] font-semibold">
+        <Heading
+          id={headingId}
+          className={`text-navy font-semibold ${compact ? 'text-sm' : 'text-[0.9375rem]'}`}
+        >
           {guide.platform}
         </Heading>
         {guide.warning && <Badge tone="neutral">Read this one</Badge>}
       </div>
 
       <p
-        className={`mt-1 text-sm leading-relaxed ${guide.warning ? 'text-error-ink' : 'text-slate'}`}
+        className={`mt-1 leading-relaxed ${body} ${guide.warning ? 'text-error-ink' : 'text-slate'}`}
       >
         {guide.summary}
       </p>
@@ -75,12 +91,14 @@ export function EmbedStepList({
         hearing the number twice. Tailwind's marker styling cannot reach this
         treatment, and swapping the <ol> for a <div> would throw the count away.
       */}
-      <ol className="mt-3 list-none space-y-2.5">
+      <ol className={`list-none ${compact ? 'mt-2 space-y-2' : 'mt-3 space-y-2.5'}`}>
         {guide.steps.map((step, i) => (
-          <li key={i} className="text-slate flex gap-3 text-sm leading-relaxed">
+          <li key={i} className={`text-slate flex gap-3 leading-relaxed ${body}`}>
             <span
               aria-hidden="true"
-              className="bg-cloud text-navy mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[0.6875rem] font-semibold"
+              className={`bg-cloud text-navy mt-0.5 flex shrink-0 items-center justify-center rounded-full font-mono font-semibold ${
+                compact ? 'h-4 w-4 text-[0.625rem]' : 'h-5 w-5 text-[0.6875rem]'
+              }`}
             >
               {i + 1}
             </span>
@@ -97,7 +115,7 @@ export function EmbedStepList({
               to do, it is what to look at when the four above appear to have
               worked and the page still says nothing. */}
           <MicroLabel>If it looks wrong</MicroLabel>
-          <p className="text-slate mt-1 text-sm leading-relaxed">
+          <p className={`text-slate mt-1 leading-relaxed ${body}`}>
             <StepText parts={guide.gotcha} />
           </p>
         </div>

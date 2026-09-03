@@ -139,6 +139,7 @@ export function MobileNav({ links }: { links: NavLink[] }) {
           <ButtonLink
             href="/free-report"
             size="sm"
+            shape="pill"
             arrow
             onClick={() => setOpen(false)}
             className="w-full"

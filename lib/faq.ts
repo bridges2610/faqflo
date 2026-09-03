@@ -72,24 +72,71 @@ const TONE_GUIDE: Record<Tone, string> = {
     'Use confident, expert language backed by specifics. Be definitive and data-driven. Establish credibility.',
 };
 
+/**
+ * The dashboard's shape: the same answers, plus a name for the set.
+ *
+ * ⚠️ A SIBLING OF FAQ_SCHEMA, NOT A REPLACEMENT, AND THE PUBLIC ROUTE IS WHY.
+ * /api/generate serves /free-report to people with no account, and its response
+ * shape is a contract the marketing page sells. Adding a required field to the
+ * schema they share would change what a stranger gets in order to tidy a
+ * dashboard list. This one is used only by /api/dashboard/generate.
+ */
+export const FAQ_SET_SCHEMA = {
+  type: 'object',
+  properties: {
+    topic: { type: 'string' },
+    faqs: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          q: { type: 'string' },
+          a: { type: 'string' },
+        },
+        required: ['q', 'a'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['topic', 'faqs'],
+  additionalProperties: false,
+} as const;
+
 export function buildPrompt(opts: {
   content: string;
   count: number;
   tone: Tone;
   language: Language;
+  /**
+   * Ask for a name for the set as well.
+   *
+   * ⚠️ OPT-IN, SO THE PUBLIC ROUTE'S PROMPT IS BYTE-IDENTICAL TO WHAT IT WAS.
+   * Only the dashboard needs a label, because only the dashboard keeps the set
+   * and has to list it.
+   */
+  withTopic?: boolean;
 }): string {
-  const { content, count, tone, language } = opts;
+  const { content, count, tone, language, withTopic } = opts;
 
   return `You are an FAQ expert. Based on the following content, generate exactly ${count} frequently asked questions with clear, concise answers. These FAQs should reflect what real users would ask about this topic.
 
 Tone: ${tone} — ${TONE_GUIDE[tone]}
 
-Return a JSON object with a "faqs" array. Format:
-{"faqs": [
+Return a JSON object with a "faqs" array${withTopic ? ' and a "topic" string' : ''}. Format:
+{${withTopic ? '"topic": "What the set is about",\n ' : ''}"faqs": [
   {"q": "Question here?", "a": "Answer here (2-4 sentences)."},
   ...
 ]}
-
+${
+  withTopic
+    ? `
+The topic:
+- Two to five words naming what this set of answers is about, as a heading — "Roof replacement costs", "Insurance claims".
+- Not a sentence, not a question, and no trailing punctuation.
+- It labels a row in a list, so it has to make sense with no other context.
+`
+    : ''
+}
 Rules:
 - Questions must be natural and conversational, as a real person would type them
 - Answers must be accurate based ONLY on the provided content

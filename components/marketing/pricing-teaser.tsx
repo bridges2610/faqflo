@@ -260,6 +260,7 @@ export function PricingTeaser() {
               <ButtonLink
                 href={plan.href}
                 variant={plan.featured ? 'primary' : 'ghost'}
+                shape="pill"
                 className="mt-5 w-full"
               >
                 {plan.cta}

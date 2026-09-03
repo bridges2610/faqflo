@@ -5,7 +5,7 @@ import {
   clampCount,
   coerceLanguage,
   coerceTone,
-  FAQ_SCHEMA,
+  FAQ_SET_SCHEMA,
   MAX_FAQ_COUNT,
   MAX_FAQ_COUNT_PRO,
   type Faq,
@@ -120,7 +120,10 @@ export async function POST(request: Request) {
     const message = await client.messages.create({
       model: MODEL,
       max_tokens: 8192,
-      output_config: { format: { type: 'json_schema', schema: FAQ_SCHEMA } },
+      /* ⚠️ FAQ_SET_SCHEMA, NOT FAQ_SCHEMA — the dashboard's shape, which adds a
+         name for the set so the Answers list can group by it. The public route
+         next door keeps the original; see the note on both in lib/faq.ts. */
+      output_config: { format: { type: 'json_schema', schema: FAQ_SET_SCHEMA } },
       messages: [
         {
           role: 'user',
@@ -129,6 +132,7 @@ export async function POST(request: Request) {
             count: clampCount(count, perCall),
             tone: coerceTone(tone),
             language: coerceLanguage(language),
+            withTopic: true,
           }),
         },
       ],
@@ -150,12 +154,18 @@ export async function POST(request: Request) {
     const text = message.content.find((block) => block.type === 'text')?.text;
     if (!text) return fail('No FAQs came back. Please try again.', 500);
 
-    const faqs = (JSON.parse(text) as { faqs: Faq[] }).faqs;
+    const parsed = JSON.parse(text) as { topic?: string; faqs: Faq[] };
+    const faqs = parsed.faqs;
     if (!Array.isArray(faqs) || faqs.length === 0) {
       return fail('No FAQs came back. Please try again.', 500);
     }
 
-    return NextResponse.json({ faqs });
+    /* Trimmed and length-capped: this becomes a row label, and a model that
+       ignores "two to five words" should not be able to push a paragraph into
+       the list. An empty string is left for the caller to bucket. */
+    const topic = typeof parsed.topic === 'string' ? parsed.topic.trim().slice(0, 80) : '';
+
+    return NextResponse.json({ topic, faqs });
   } catch (err) {
     // Same taxonomy as /api/generate — APIConnectionError extends APIError in
     // the TS SDK, so it has to be tested first.

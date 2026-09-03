@@ -89,7 +89,7 @@ export default function Blog() {
               The first post is on its way. In the meantime, the guide covers the basics of getting
               read by AI.
             </p>
-            <ButtonLink href="/seo-guide" size="md" arrow className="mt-6">
+            <ButtonLink href="/seo-guide" size="md" shape="pill" arrow className="mt-6">
               Read the guide
             </ButtonLink>
           </div>

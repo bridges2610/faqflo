@@ -14,7 +14,8 @@ import { GroupForm } from './group-form';
 import { PageHeader } from './page-header';
 import { ArrowDownIcon, ArrowUpIcon, ChevronIcon, PlusIcon, TrashIcon } from './nav-icons';
 import { SectionTitle } from './section-title';
-import { ANSWER_TABS, WorkspaceTabs } from './workspace-tabs';
+import { ANSWER_TABS } from '@/lib/dashboard/answers-tabs';
+import { WorkspaceTabs } from './workspace-tabs';
 
 /*
   Answers: the index of pages.
@@ -102,7 +103,7 @@ export function FaqsWorkspace() {
         }
       />
 
-      <WorkspaceTabs tabs={ANSWER_TABS} label="Answers sections" />
+      <WorkspaceTabs tabs={ANSWER_TABS} label="Content sections" />
 
       <div className="space-y-5">
         {adding && (
@@ -207,8 +208,7 @@ export function FaqsWorkspace() {
                             </span>
                             <span className="text-slate mt-1 block text-sm">
                               <code className="font-mono text-xs">
-                                {site.domain}
-                                {group.path}
+                                {group.path ? `${site.domain}${group.path}` : 'No page yet'}
                               </code>
                             </span>
                             <span className="text-slate mt-1 block text-xs">

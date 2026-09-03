@@ -65,7 +65,13 @@ export function PublishPanel({
             ) : null}
           </p>
 
-          <div className="flex shrink-0 items-center gap-2">
+          {/* ⚠️ WRAPS RATHER THAN shrink-0, AND THE NARROWEST PHONE IS WHY.
+              Both buttons are whitespace-nowrap and together measure 328px; a
+              320px viewport leaves 272px inside this bar, so `shrink-0` pushed
+              "Copy for my website" — the one action on this page that changes
+              what AI can read — off the right edge and scrolled the whole
+              document sideways. Wrapping puts it on its own line instead. */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
               {open ? 'Hide' : 'How to add it'}
             </Button>

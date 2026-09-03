@@ -3,6 +3,7 @@
 import { Card } from '@/components/ui/card';
 import { scoreBand } from '@/lib/audit/score';
 import type { AuditReport } from '@/lib/audit/types';
+import { isOpenQuestion } from '@/lib/dashboard/questions';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { MetricTile } from './metric-tile';
 import { AeoIcon, ChartIcon, FaqIcon, SearchIcon } from './nav-icons';
@@ -44,7 +45,7 @@ export function HomeSnapshot({ report }: { report: AuditReport | null }) {
   const appearances = tracking?.sourceAppearances ?? { ours: 0, total: 0 };
 
   const live = faqs.filter((f) => f.status === 'published').length;
-  const unanswered = questions.filter((q) => !q.covered).length;
+  const unanswered = questions.filter(isOpenQuestion).length;
 
   const band = report ? scoreBand(report.score) : null;
 
@@ -118,7 +119,7 @@ export function HomeSnapshot({ report }: { report: AuditReport | null }) {
             ? `${unanswered} question${unanswered === 1 ? '' : 's'} still unanswered`
             : 'Every question answered'
         }
-        href="/dashboard/faqs"
+        href="/dashboard/faqs?tab=answers"
         icon={<FaqIcon className="h-3.5 w-3.5" />}
         tint="bg-success/12 text-success-ink"
       />

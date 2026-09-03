@@ -22,10 +22,12 @@
  */
 
 import { isAuditReport } from '@/lib/audit/types';
+import { countWords } from '@/lib/article';
 import { questionKey } from '@/lib/questions';
 import { createClient as supabaseBrowser } from '@/lib/supabase/client';
 import type {
   ActionTickRow,
+  ArticleRow,
   AuditRunRow,
   CitationCheckRow,
   CompetitorRow,
@@ -50,6 +52,7 @@ import { buildSeed, emptyTracking, newId } from './seed';
 import { ENGINES } from './types';
 import { sameReport } from './types';
 import type {
+  Article,
   CitationCheck,
   CitationDay,
   ActionTick,
@@ -128,6 +131,7 @@ const EMPTY_LOCAL: LocalData = {
   groups: [],
   faqs: [],
   questions: [],
+  articles: [],
   tracking: [],
   contentPlans: [],
   competitors: [],
@@ -202,6 +206,9 @@ function normaliseLocal(data: LocalData): LocalData {
     contentPlans: data.contentPlans ?? [],
     competitors: data.competitors ?? [],
     actionTicks: data.actionTicks ?? [],
+    // Absent in every snapshot written before 0017, which is all of them — the
+    // reason this whole function exists.
+    articles: data.articles ?? [],
     audits,
   };
 }
@@ -309,6 +316,7 @@ function faqToRow(f: FaqEntry, userId: string) {
     status: f.status,
     position: f.position,
     source: f.source,
+    topic: f.topic ?? null,
     tone: f.tone,
     language: f.language,
     created_at: f.createdAt,
@@ -325,8 +333,54 @@ function rowToFaq(r: FaqRow): FaqEntry {
     status: r.status,
     position: r.position,
     source: r.source,
+    topic: r.topic ?? undefined,
     tone: (r.tone ?? 'Professional') as FaqEntry['tone'],
     language: (r.language ?? 'English') as FaqEntry['language'],
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/*
+  Articles.
+
+  ⚠️ THE BODY IS ONE jsonb COLUMN, NOT A sections TABLE. Nothing queries inside
+  an article — it is read whole to render one card and build one paste block —
+  which is the same test audit_runs.report and content_plans.plan are stored
+  under. A child table would buy ordering guarantees for rows that are only ever
+  read as a unit, and cost a join on every dashboard load.
+*/
+function articleToRow(a: Article, userId: string) {
+  return {
+    id: a.id,
+    site_id: a.siteId,
+    user_id: userId,
+    title: a.title,
+    intro: a.intro,
+    sections: a.sections,
+    faqs: a.faqs,
+    brief: a.brief,
+    word_count: a.wordCount,
+    created_at: a.createdAt,
+    updated_at: a.updatedAt,
+  };
+}
+
+function rowToArticle(r: ArticleRow): Article {
+  return {
+    id: r.id,
+    siteId: r.site_id,
+    title: r.title,
+    intro: r.intro,
+    // Defended rather than trusted: this is the one column whose shape the
+    // database does not enforce, and a malformed blob would otherwise throw
+    // inside .map() during render rather than here during load.
+    sections: Array.isArray(r.sections) ? r.sections : [],
+    // Same defence as `sections`: the database does not enforce this shape, so
+    // a malformed blob is caught here rather than thrown inside .map() on render.
+    faqs: Array.isArray(r.faqs) ? r.faqs : [],
+    brief: r.brief,
+    wordCount: r.word_count,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -343,6 +397,9 @@ function questionToRow(q: DiscoveredQuestion, userId: string) {
     why: q.why ?? null,
     intent: q.intent ?? null,
     covered: q.covered,
+    // Absent means "not dismissed" — see the field's note in types.ts. Written
+    // as a real boolean rather than left undefined so the column is never null.
+    dismissed: q.dismissed ?? false,
     source: q.source ?? 'discovered',
     position: q.position,
     added_at: q.addedAt,
@@ -413,6 +470,7 @@ function rowToQuestion(r: QuestionRow): DiscoveredQuestion {
     why: r.why ?? undefined,
     intent: r.intent ?? undefined,
     covered: r.covered,
+    dismissed: r.dismissed ?? false,
     source: r.source,
     position: r.position ?? 0,
     addedAt: r.added_at,
@@ -465,6 +523,7 @@ async function write(data: DashboardData): Promise<DashboardData> {
     groups: data.groups,
     faqs: data.faqs,
     questions: data.questions,
+    articles: data.articles,
     tracking: data.tracking,
     contentPlans: data.contentPlans,
     competitors: data.competitors,
@@ -479,6 +538,7 @@ async function write(data: DashboardData): Promise<DashboardData> {
   const questions = diff(previous.questions, next.questions);
   const competitors = diff(previous.competitors, next.competitors);
   const actionTicks = diff(previous.actionTicks, next.actionTicks);
+  const articles = diff(previous.articles, next.articles);
 
   const fail = (what: string, error: { message: string } | null) => {
     if (error) throw new Error(`Could not save your ${what}: ${error.message}`);
@@ -558,6 +618,17 @@ async function write(data: DashboardData): Promise<DashboardData> {
     );
   }
 
+  if (articles.changed.length) {
+    fail(
+      'articles',
+      (await supabase.from('articles').upsert(articles.changed.map((a) => articleToRow(a, userId))))
+        .error,
+    );
+  }
+  if (articles.removed.length) {
+    fail('articles', (await supabase.from('articles').delete().in('id', articles.removed)).error);
+  }
+
   // One row per site, so a plan is an upsert on site_id rather than a diff.
   for (const plan of next.contentPlans) {
     const before = previous.contentPlans.find((p) => p.siteId === plan.siteId);
@@ -597,6 +668,7 @@ function assemble(user: User, sites: Site[], local: LocalData): DashboardData {
     actionTicks: local.actionTicks,
     tracking: local.tracking,
     contentPlans: local.contentPlans,
+    articles: local.articles,
   };
 }
 
@@ -653,17 +725,26 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
   const supabase = supabaseBrowser();
   const siteIds = sites.map((s) => s.id);
 
-  const [groupRows, faqRows, questionRows, planRows, competitorRows, tickRows] = await Promise.all([
-    supabase.from('faq_groups').select('*').eq('user_id', userId).order('position'),
-    supabase.from('faqs').select('*').eq('user_id', userId).order('position'),
-    /* ⚠️ BY position NOW, NOT added_at. 0015 added the column and backfilled it
-       from added_at, so this returns exactly the order it used to on the day it
-       shipped — and the order the owner drags it into after that. */
-    supabase.from('questions').select('*').eq('user_id', userId).order('position'),
-    supabase.from('content_plans').select('*').eq('user_id', userId),
-    supabase.from('competitors').select('*').eq('user_id', userId).order('position'),
-    supabase.from('audit_action_ticks').select('*').eq('user_id', userId),
-  ]);
+  const [groupRows, faqRows, questionRows, planRows, competitorRows, tickRows, articleRows] =
+    await Promise.all([
+      supabase.from('faq_groups').select('*').eq('user_id', userId).order('position'),
+      supabase.from('faqs').select('*').eq('user_id', userId).order('position'),
+      /* ⚠️ BY position NOW, NOT added_at. 0015 added the column and backfilled it
+         from added_at, so this returns exactly the order it used to on the day it
+         shipped — and the order the owner drags it into after that. */
+      supabase.from('questions').select('*').eq('user_id', userId).order('position'),
+      supabase.from('content_plans').select('*').eq('user_id', userId),
+      supabase.from('competitors').select('*').eq('user_id', userId).order('position'),
+      supabase.from('audit_action_ticks').select('*').eq('user_id', userId),
+      /* Newest first: the Articles tab reads most-recent-first, and unlike
+         questions and answers there is nothing to drag, so the order is a fact
+         about when they were written rather than a stored preference. */
+      supabase
+        .from('articles')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+    ]);
 
   const firstError =
     groupRows.error ??
@@ -672,6 +753,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
     planRows.error ??
     competitorRows.error ??
     tickRows.error ??
+    articleRows.error ??
     null;
   if (firstError) {
     /*
@@ -716,6 +798,7 @@ async function readFromDb(userId: string, sites: Site[]): Promise<LocalData> {
     actionTicks: (tickRows.data ?? []).map(rowToTick),
     tracking: [],
     contentPlans: (planRows.data ?? []).map((r) => r.plan as ContentPlan),
+    articles: (articleRows.data ?? []).map(rowToArticle),
     audits,
   };
 }
@@ -1105,7 +1188,7 @@ export { normalizeDomain };
 
 /* --------------------------------------------------------------- groups --- */
 
-export type NewGroup = { name: string; path: string };
+export type NewGroup = { name: string; path: string | null };
 
 /**
  * Refused because another page on this site already publishes to that path.
@@ -1123,10 +1206,22 @@ export class DuplicatePath extends Error {
   }
 }
 
-function pathTaken(data: DashboardData, siteId: string, path: string, exceptId?: string): boolean {
-  return data.groups.some(
-    (g) => g.siteId === siteId && g.id !== exceptId && g.path === normalizePath(path),
-  );
+/*
+  ⚠️ TWO UNPLACED SETS DO NOT CLASH, AND THE DATABASE AGREES. A null path means
+  "no page chosen yet", and any number of sets can be in that state at once —
+  Postgres does not treat two NULLs as equal, so the (site_id, path) unique
+  index allows them too. Only a real path can be taken.
+*/
+function pathTaken(
+  data: DashboardData,
+  siteId: string,
+  path: string | null,
+  exceptId?: string,
+): boolean {
+  const wanted = normalizePath(path);
+  if (wanted === null) return false;
+
+  return data.groups.some((g) => g.siteId === siteId && g.id !== exceptId && g.path === wanted);
 }
 
 /**
@@ -1183,7 +1278,7 @@ export async function mergeGroupsForSite(siteId: string): Promise<DashboardData>
 
 export async function createGroup(siteId: string, input: NewGroup): Promise<DashboardData> {
   const data = requireData('createGroup');
-  if (pathTaken(data, siteId, input.path)) throw new DuplicatePath(normalizePath(input.path));
+  if (pathTaken(data, siteId, input.path)) throw new DuplicatePath(normalizePath(input.path) ?? '');
 
   const group: FaqGroup = {
     id: newId('grp'),
@@ -1205,7 +1300,7 @@ export async function updateGroup(id: string, patch: Partial<NewGroup>): Promise
 
   const nextPath = patch.path !== undefined ? normalizePath(patch.path) : target.path;
   if (nextPath !== target.path && pathTaken(data, target.siteId, nextPath, id)) {
-    throw new DuplicatePath(nextPath);
+    throw new DuplicatePath(nextPath ?? '');
   }
 
   /*
@@ -1479,6 +1574,8 @@ export async function markGroupPublished(id: string): Promise<DashboardData> {
 /* ----------------------------------------------------------------- faqs --- */
 
 export type NewFaq = {
+  /** What the generated set was about. Absent for hand-written answers. */
+  topic?: string;
   question: string;
   answer: string;
   status?: FaqEntry['status'];
@@ -1539,6 +1636,9 @@ export async function createFaqs(groupId: string, entries: NewFaq[]): Promise<Da
     status: e.status ?? 'draft',
     position: start + i,
     source: e.source ?? 'manual',
+    // Empty string treated as absent: a model that returned "" would otherwise
+    // create a topic row with a blank name.
+    topic: e.topic?.trim() || undefined,
     tone: e.tone ?? 'Professional',
     language: e.language ?? 'English',
     createdAt: stamp,
@@ -2144,10 +2244,21 @@ export async function addQuestions(
   const data = requireData('addQuestions');
 
   const mine = data.questions.filter((q) => q.siteId === siteId);
-  // Append keeps the whole list; replace keeps the work already done and
-  // anything the customer wrote themselves. See the note above.
+  /*
+    Append keeps the whole list; replace keeps the work already done, anything
+    the customer wrote themselves, and anything they have waved away.
+
+    ⚠️ `dismissed` IS IN THIS PREDICATE FOR THE SAME REASON `manual` IS. Both
+    are decisions a person made, and a re-run producing a better-worded version
+    of a model's suggestion has no business overruling either. Drop it here and
+    Ignore works until the next Discover, at which point the question returns
+    and the button looks broken — the exact failure the note on
+    DiscoveredQuestion.dismissed describes.
+  */
   const kept =
-    mode === 'append' ? mine : mine.filter((q) => q.covered || q.source === 'manual');
+    mode === 'append'
+      ? mine
+      : mine.filter((q) => q.covered || q.dismissed || q.source === 'manual');
 
   // Normalised, not raw: the model rarely returns a question in exactly the
   // words it used last time, and two spellings of one question would be two
@@ -2368,6 +2479,29 @@ export async function addManualQuestion(
  * normalised question text — the customer rarely publishes the question in
  * exactly the words the model proposed.
  */
+/**
+ * Wave a question away, or bring it back.
+ *
+ * ⚠️ A FLAG, NOT A DELETE, AND THAT IS THE WHOLE DIFFERENCE FROM
+ * deleteQuestion(). Deleting frees the row — and the next Discover re-run,
+ * which is free to re-propose anything not on the list, would simply suggest it
+ * again. Only a kept row can say "we already asked, they said no."
+ *
+ * It is also what makes the Ignored list restorable. A customer who ignores the
+ * wrong one has an undo; a deleted row has nothing to undo to.
+ */
+export async function setQuestionDismissed(
+  id: string,
+  dismissed: boolean,
+): Promise<DashboardData> {
+  const data = requireData('setQuestionDismissed');
+
+  return write({
+    ...data,
+    questions: data.questions.map((q) => (q.id === id ? { ...q, dismissed } : q)),
+  });
+}
+
 export async function recheckCoverage(siteId: string): Promise<DashboardData> {
   const data = requireData('recheckCoverage');
   const published = new Set(
@@ -2384,6 +2518,110 @@ export async function recheckCoverage(siteId: string): Promise<DashboardData> {
         : q,
     ),
   });
+}
+
+/* -------------------------------------------------------------- articles --- */
+
+export type NewArticle = {
+  title: string;
+  intro: string;
+  sections: { heading: string; body: string }[];
+  brief: string | null;
+  wordCount: number;
+};
+
+/**
+ * Keep a generated article.
+ *
+ * ⚠️ NO CAP CHECKED HERE, AND THAT IS DELIBERATE — UNLIKE createFaqs(). The
+ * monthly article allowance is spent by GENERATING, not by keeping: the model
+ * call is the thing that costs money, and it has already happened by the time
+ * this runs. Refusing the save at this point would bill for an article and then
+ * throw it away.
+ *
+ * The count is therefore enforced server-side in app/api/dashboard/article, on
+ * rows this function writes, which is also the only place it can be enforced —
+ * a browser deciding how much of its own allowance is left is a browser
+ * deciding its own entitlements. See the header of that route.
+ */
+export async function createArticle(siteId: string, input: NewArticle): Promise<DashboardData> {
+  const data = requireData('createArticle');
+  const stamp = now();
+
+  const article: Article = {
+    id: newId('art'),
+    siteId,
+    title: input.title.trim(),
+    intro: input.intro.trim(),
+    sections: input.sections,
+    // Written from the finished article afterwards, on its own page — never at
+    // generation time. See AddFaqs in article-workspace.tsx.
+    faqs: [],
+    brief: input.brief?.trim() || null,
+    wordCount: input.wordCount,
+    createdAt: stamp,
+    updatedAt: stamp,
+  };
+
+  // Newest first, matching the order readFromDb asks Postgres for — so a
+  // freshly written article sits where a reload would put it.
+  return write({ ...data, articles: [article, ...data.articles] });
+}
+
+/**
+ * Save an edited article.
+ *
+ * ⚠️ `wordCount` IS NOT IN THE PATCH, AND MUST NOT BE. The field's note in
+ * types.ts says it is measured and never taken from anyone's word — that was
+ * written about the model, and it applies just as hard to a person. The caller
+ * recomputes it with countWords() from the text it is saving; accepting a
+ * number here would let an edited article keep the draft's count and quietly
+ * become wrong.
+ *
+ * ⚠️ NO CAP CHECK, for the same reason createArticle() has none: the monthly
+ * allowance is spent by GENERATING. Editing something already paid for costs
+ * nothing and must never be refused.
+ */
+export async function updateArticle(
+  id: string,
+  patch: {
+    title: string;
+    intro: string;
+    sections: { heading: string; body: string }[];
+    faqs: { q: string; a: string }[];
+  },
+): Promise<DashboardData> {
+  const data = requireData('updateArticle');
+
+  return write({
+    ...data,
+    articles: data.articles.map((a) =>
+      a.id === id
+        ? {
+            ...a,
+            title: patch.title.trim(),
+            intro: patch.intro.trim(),
+            /* Blank rows dropped on the way in: an empty heading would emit an
+               empty <h2> into the paste block, and an empty body a stray <p>. */
+            sections: patch.sections.filter((sec) => sec.heading.trim() && sec.body.trim()),
+            // Blank rows dropped for the same reason as sections: an empty
+            // question would emit an empty <h3> and a schema entry with no name.
+            faqs: patch.faqs.filter((f) => f.q.trim() && f.a.trim()),
+            wordCount: countWords({
+              title: patch.title,
+              intro: patch.intro,
+              sections: patch.sections,
+            }),
+            updatedAt: now(),
+          }
+        : a,
+    ),
+  });
+}
+
+export async function deleteArticle(id: string): Promise<DashboardData> {
+  const data = requireData('deleteArticle');
+  return write({ ...data, articles: data.articles.filter((a) => a.id !== id) });
 }
 
 /* ------------------------------------------------------------- selectors --- */
@@ -2418,6 +2656,19 @@ export function questionsForSite(data: DashboardData, siteId: string): Discovere
       if (a.covered !== b.covered) return a.covered ? 1 : -1;
       return b.addedAt.localeCompare(a.addedAt);
     });
+}
+
+/**
+ * One site's articles, newest first.
+ *
+ * Sorted here rather than relying on the read order: createArticle() prepends
+ * to the in-memory snapshot, and a snapshot that has been mutated a few times
+ * without a reload should still come back in the order a reload would give.
+ */
+export function articlesForSite(data: DashboardData, siteId: string): Article[] {
+  return data.articles
+    .filter((a) => a.siteId === siteId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function trackingForSite(data: DashboardData, siteId: string) {

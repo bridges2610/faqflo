@@ -69,6 +69,67 @@ export const GUARANTEE_DAYS = 30;
 export const FREE_FAQ_CAP = 10;
 
 /**
+ * Articles a Pro account may generate per month.
+ *
+ * ⚠️ A GENERATION CAP, NOT A STORAGE CAP — THE OPPOSITE OF FREE_FAQ_CAP ABOVE,
+ * WHICH IS WHY THEY READ SO SIMILARLY AND BEHAVE SO DIFFERENTLY. Deleting an
+ * article does not give the month back: the model call is what cost money, and
+ * it already happened. Someone who writes ten and deletes nine has none left.
+ *
+ * Ten because a thousand words on a real subject is the most expensive thing in
+ * this product per press of a button — every other generator returns a page of
+ * short answers — and ten a month is more than a small business publishes.
+ *
+ * Free is zero, and there is no FREE constant to pair with this one, because
+ * the whole dashboard generator is already Pro-only. See canGenerate() below;
+ * articles sit behind that same predicate rather than a second, drifting copy.
+ */
+export const ARTICLE_CAP = 10;
+
+/**
+ * Articles used and left in the current window, or null when the account has no
+ * allowance at all.
+ *
+ * ⚠️ THE WINDOW IS trackingPeriod()'S, NOT A NEW ONE. That function already
+ * walks whole months from the Stripe billing anniversary in UTC, and carries
+ * the warning about why a budget anchored to `now` can never be enforced. A
+ * second month-boundary implementation here would be a second answer to "when
+ * does this reset", and the two would eventually disagree in front of a
+ * customer who is being refused.
+ *
+ * ⚠️ THIS IS FOR RENDERING ONLY. The count the customer is actually held to is
+ * taken server-side in app/api/dashboard/article, from rows they cannot forge.
+ * This one is computed from the browser's own snapshot so the screen can say
+ * what is left without a round trip — the same division of labour this file
+ * draws with lib/auth/entitlements.ts at the top.
+ */
+export function articleAllowance(
+  user: User | null,
+  articles: { createdAt: string }[],
+  /** Injected only by tests; production always means "now" — as trackingPeriod. */
+  now?: Date,
+): { used: number; left: number; cap: number; resetsAt: Date | null } | null {
+  if (!canGenerate(user)) return null;
+
+  const period = trackingPeriod({
+    plan: planOf(user),
+    planSince: user?.planSince ?? null,
+    accountCreatedAt: user?.createdAt ?? null,
+    now,
+  });
+
+  const start = period?.start ?? new Date(0);
+  const used = articles.filter((a) => new Date(a.createdAt) >= start).length;
+
+  return {
+    used,
+    left: Math.max(0, ARTICLE_CAP - used),
+    cap: ARTICLE_CAP,
+    resetsAt: period?.end ?? null,
+  };
+}
+
+/**
  * Sites per account. Both plans.
  *
  * ⚠️ THE SAME ON BOTH ON PURPOSE, WHICH IS NOT WHAT THE OLD MODEL DID. Get

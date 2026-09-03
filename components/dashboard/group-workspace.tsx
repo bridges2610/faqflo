@@ -18,7 +18,8 @@ import { GroupForm } from './group-form';
 import { ManualForm } from './manual-form';
 import { PageHeader } from './page-header';
 import { PlusIcon } from './nav-icons';
-import { ANSWER_TABS, WorkspaceTabs } from './workspace-tabs';
+import { ANSWER_TABS } from '@/lib/dashboard/answers-tabs';
+import { WorkspaceTabs } from './workspace-tabs';
 
 /*
   One page of the customer's site: its answers, and the tools that make them.
@@ -76,12 +77,16 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
   if (!site || !group) {
     return (
       <>
-        <PageHeader title="Answers" description="Everything your customers ask, by page." />
-        <WorkspaceTabs tabs={ANSWER_TABS} activeHref="/dashboard/faqs" label="Answers sections" />
+        <PageHeader title="Content" description="Everything your customers ask, by page." />
+        <WorkspaceTabs
+          tabs={ANSWER_TABS}
+          activeHref="/dashboard/faqs?tab=answers"
+          label="Content sections"
+        />
         <EmptyState
           title="That page isn’t here"
           body="It may have been deleted, or it belongs to a different site than the one selected."
-          action={<ButtonLink href="/dashboard/faqs">Back to answers</ButtonLink>}
+          action={<ButtonLink href="/dashboard/faqs?tab=answers">Back to answers</ButtonLink>}
         />
       </>
     );
@@ -110,6 +115,7 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
           answer: f.a,
           status,
           source: 'generated' as const,
+          topic: meta?.topic,
           tone: meta?.tone,
           language: meta?.language,
         })),
@@ -137,9 +143,13 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
     <>
       <PageHeader
         title={group.name}
-        description={`Answers published to ${site.domain}${group.path}`}
+        description={
+          group.path
+            ? `Answers published to ${site.domain}${group.path}`
+            : 'This set has no page yet — choose one when you paste it.'
+        }
         action={
-          <ButtonLink href="/dashboard/faqs" variant="ghost" size="sm">
+          <ButtonLink href="/dashboard/faqs?tab=answers" variant="ghost" size="sm">
             All pages
           </ButtonLink>
         }
@@ -147,7 +157,11 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
 
       {/* Exact-match tabs can't recognise a nested route, so the override says
           which one owns it. Without this neither tab highlights. */}
-      <WorkspaceTabs tabs={ANSWER_TABS} activeHref="/dashboard/faqs" label="Answers sections" />
+      <WorkspaceTabs
+          tabs={ANSWER_TABS}
+          activeHref="/dashboard/faqs?tab=answers"
+          label="Content sections"
+        />
 
       <div className="space-y-5">
         <Card className="p-4 sm:p-5">
@@ -155,8 +169,7 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
             <div className="flex flex-wrap items-center gap-3">
               {state.tone ? <Badge tone={state.tone}>{state.label}</Badge> : <Badge>{state.label}</Badge>}
               <code className="text-slate font-mono text-xs">
-                {site.domain}
-                {group.path}
+                {group.path ? `${site.domain}${group.path}` : 'No page chosen yet'}
               </code>
             </div>
 
@@ -214,11 +227,11 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
           </div>
         )}
 
-        {/* No destination picker: this route is the destination. */}
+        {/* No destination picker — this route is the destination, and the panel
+            no longer offers one to anybody. See the note in generator-panel.tsx
+            about where that choice moved to. */}
         <GeneratorPanel
           disabled={saving}
-          groups={groups}
-          targetGroupId={group.id}
           onGenerated={(generated, generationMeta) => {
             setCandidates(generated);
             setMeta(generationMeta);

@@ -242,7 +242,14 @@ export function FaqGenerator() {
           </div>
         </div>
 
-        <Button onClick={generate} disabled={busy} size="lg" arrow={!busy} className="mt-5 w-full">
+        <Button
+            onClick={generate}
+            disabled={busy}
+            size="lg"
+            shape="pill"
+            arrow={!busy}
+            className="mt-5 w-full"
+          >
           {busy && (
             <span
               className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent opacity-70"

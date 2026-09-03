@@ -14,7 +14,6 @@ import {
   type Language,
   type Tone,
 } from '@/lib/faq';
-import type { FaqGroup } from '@/lib/dashboard/types';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { isPro } from '@/lib/dashboard/plans';
 import { SectionTitle } from './section-title';
@@ -49,28 +48,22 @@ function countsFor(pro: boolean): number[] {
   return Array.from({ length: max - MIN_FAQ_COUNT + 1 }, (_, i) => MIN_FAQ_COUNT + i);
 }
 
-export type GenerationMeta = { tone: Tone; language: Language };
+/**
+ * What a run was, beyond the answers themselves.
+ *
+ * `topic` is the model's own name for the set — "Roof replacement costs". It is
+ * stored on every answer in the batch, which is what lets the Answers list show
+ * one row per topic instead of a flat pile. Empty when the model returned
+ * nothing usable; the list buckets those separately rather than showing a blank
+ * row.
+ */
+export type GenerationMeta = { tone: Tone; language: Language; topic: string };
 
 export function GeneratorPanel({
   onGenerated,
-  groups,
-  targetGroupId,
-  onTargetChange,
   disabled = false,
 }: {
   onGenerated: (faqs: Faq[], meta: GenerationMeta) => void;
-  /** Where the generated set will land. */
-  groups: FaqGroup[];
-  targetGroupId: string | null;
-  /**
-   * Omitted when the destination is fixed by the route.
-   *
-   * ⚠️ The point of choosing before generating is that an answer's page decides
-   * where it may claim to live. /dashboard/faqs/[groupId] makes that choice
-   * structural, so there is nothing left to pick — a select there would be a
-   * control offering to move work somewhere the URL says it isn't.
-   */
-  onTargetChange?: (id: string) => void;
   disabled?: boolean;
 }) {
   const { site, user } = useDashboard();
@@ -136,12 +129,12 @@ export function GeneratorPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content, count, tone, language, siteId: site?.id }),
       });
-      const data = (await res.json()) as { faqs?: Faq[]; error?: string };
+      const data = (await res.json()) as { faqs?: Faq[]; topic?: string; error?: string };
       if (!res.ok || !data.faqs) {
         setError(data.error ?? 'Generation failed. Please try again.');
         return;
       }
-      onGenerated(data.faqs, { tone, language });
+      onGenerated(data.faqs, { tone, language, topic: data.topic ?? '' });
     } catch {
       setError('Could not reach the generator. Check your connection and try again.');
     } finally {
@@ -222,37 +215,12 @@ export function GeneratorPanel({
           destination out differently from the other three made it read as a
           separate kind of thing. */}
       <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Where it lands is chosen before generating, not after: the group
-            decides which page these answers get pasted onto. With one group
-            there's nothing to choose, and a one-option select is a control that
-            does nothing — so it states the destination instead. */}
-        {groups.length > 1 && onTargetChange ? (
-          <label className="block">
-            <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-              Add to
-            </span>
-            <select
-              value={targetGroupId ?? ''}
-              onChange={(e) => onTargetChange(e.target.value)}
-              className="border-line text-navy focus:border-primary mt-1.5 w-full truncate rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name} · {g.path}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <div className="block">
-            <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
-              Add to
-            </span>
-            <p className="text-navy border-line mt-1.5 truncate rounded-input border border-dashed px-3 py-2 text-sm">
-              {groups.find((g) => g.id === targetGroupId)?.name ?? groups[0]?.name ?? '—'}
-            </p>
-          </div>
-        )}
+        {/* ⚠️ NO "ADD TO" SELECT, AND ITS OWN OLD COMMENT ARGUED FOR ONE. It
+            said "where it lands is chosen before generating, not after",
+            because an answer's page decides where it may claim to live. That
+            is still true — the choice just moved to where somebody actually
+            knows the answer. Each run now makes its own set, and the page it
+            goes on is asked for when it is pasted. See SetPublish. */}
 
         <label className="block">
           <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">

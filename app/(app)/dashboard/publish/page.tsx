@@ -13,5 +13,5 @@ import { redirect } from 'next/navigation';
   the sidebar was rewritten, URLs did not.
 */
 export default function PublishPage() {
-  redirect('/dashboard/faqs');
+  redirect('/dashboard/faqs?tab=answers');
 }

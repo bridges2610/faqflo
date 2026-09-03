@@ -176,7 +176,7 @@ export function Hero() {
                 "free" is also carrying the reassurance that the removed "No
                 signup for the check" line used to: this is the only word left
                 in the hero saying it costs nothing. */}
-            <Button type="submit" size="lg" arrow>
+            <Button type="submit" size="lg" shape="pill" arrow>
               Start free
             </Button>
           </form>

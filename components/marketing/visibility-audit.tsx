@@ -158,7 +158,7 @@ export function VisibilityAudit() {
           {/* The idle label names the thing you get; the pending one describes
               what is happening. "Free Report…" would read as a noun with an
               ellipsis stuck on it. */}
-          <Button type="submit" size="lg" disabled={busy || !url.trim()}>
+          <Button type="submit" size="lg" shape="pill" disabled={busy || !url.trim()}>
             {busy ? 'Checking…' : 'Free Report'}
           </Button>
         </form>
@@ -249,6 +249,7 @@ export function VisibilityAudit() {
               <ButtonLink
                 href={`/dashboard/start?domain=${encodeURIComponent(result.domain)}`}
                 size="md"
+                shape="pill"
                 arrow
               >
                 Check {result.domain} properly

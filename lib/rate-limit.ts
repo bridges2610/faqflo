@@ -59,6 +59,21 @@ export const AUDIT_FULL_RATE_LIMIT = 4;
 export const CONTENT_RATE_LIMIT = 10;
 
 /**
+ * Ceiling for article writing, per day.
+ *
+ * ⚠️ NOT THE ALLOWANCE. ARTICLE_CAP in lib/dashboard/plans.ts is what the
+ * customer bought — ten a month, counted over the billing window and enforced
+ * against stored rows. This is the abuse guard underneath it, and it exists for
+ * a case that one cannot cover: an account that is inside its monthly allowance
+ * but firing the button in a loop.
+ *
+ * Above ten so it never lands first in normal use. Somebody who legitimately
+ * wants their whole month in one afternoon should get it; the monthly cap is
+ * what stops them at ten, with a sentence that names the real reason.
+ */
+export const ARTICLE_RATE_LIMIT = 15;
+
+/**
  * Ceiling for question discovery.
  *
  * Same model and roughly the same context as the content plan, so the same

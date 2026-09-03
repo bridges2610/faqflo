@@ -5,9 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { matchMustHave, type MustHaveResult } from '@/lib/content';
+import { generateContentPlan } from '@/lib/dashboard/content-plan';
 import { canContent } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
-import type { ArticleTopic, ContentPlan, MustHavePage } from '@/lib/dashboard/types';
+import type { ArticleTopic } from '@/lib/dashboard/types';
 import { CopyIcon, DocIcon, FaqIcon, SearchIcon, TickIcon } from './nav-icons';
 import { BusinessProfile } from './business-profile';
 import { MetricTile } from './metric-tile';
@@ -30,12 +31,6 @@ import { SectionTitle } from './section-title';
   here calls the model on render — a plan that rewrote itself on every visit
   would be a slot machine, not a plan.
 */
-
-type Generated = {
-  profile: { industry: string; location: string };
-  mustHave: MustHavePage[];
-  topics: ArticleTopic[];
-};
 
 /** Present with answers / present without / absent. Never colour alone. */
 function RoleRow({ result }: { result: MustHaveResult }) {
@@ -184,72 +179,24 @@ export function ContentWorkspace() {
     );
   }
 
+  /* ⚠️ THE REQUEST LIVES IN lib/dashboard/content-plan.ts NOW, shared with the
+     Write about tab, which uses the same plan's topics. Two copies of this
+     would drift — see the note there. */
   async function generate() {
     if (!site) return;
     setError(null);
     setBusy(true);
 
-    /*
-      Precedence: what a person told us, then what the site's own markup says,
-      then nothing — in which case the model infers from the home page.
-
-      The middle step matters. A site publishing LocalBusiness markup has
-      already stated its trade and service area; asking a model to guess at
-      what it has been told outright is both slower and worse.
-    */
-    const fromSchema = site.lastAudit?.profile;
-    const knownIndustry = site.industry ?? fromSchema?.industry ?? null;
-    const knownLocation = site.location ?? fromSchema?.location ?? null;
-
     try {
-      const res = await fetch('/api/dashboard/content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        // The site id, not the domain — the server reads the domain off the
-        // row it owns rather than off whatever a caller names.
-        body: JSON.stringify({
-          siteId: site.id,
-          industry: knownIndustry,
-          location: knownLocation,
-          hint: site.lastAudit?.profileHint ?? '',
-          pages,
-        }),
-      });
-
-      const data = (await res.json()) as Partial<Generated> & { error?: string };
-      if (!res.ok || !data.mustHave || !data.topics || !data.profile) {
-        setError(data.error ?? 'That plan failed. Please try again.');
+      const result = await generateContentPlan(site);
+      if (!result.ok) {
+        setError(result.error);
         return;
       }
 
-      const plan: ContentPlan = {
-        siteId: site.id,
-        industry: data.profile.industry,
-        location: data.profile.location || null,
-        mustHave: data.mustHave,
-        topics: data.topics,
-        generatedAt: new Date().toISOString(),
-      };
-      await saveContentPlan(plan);
-
-      /*
-        Write the resolved profile back to the site, but never over a manual
-        one. The customer correcting us is the most reliable signal we have,
-        and a later generation quietly reverting it would be the feature
-        arguing with its user.
-      */
-      if (site.profileSource !== 'manual' && data.profile.industry) {
-        await renameSite(site.id, {
-          industry: data.profile.industry,
-          location: data.profile.location || null,
-          // Only "schema" when the markup supplied both — a half-read profile
-          // that the model completed is an inference, and the badge that says
-          // "check this" should appear.
-          profileSource: knownIndustry && knownLocation ? 'schema' : 'inferred',
-        });
-      }
-    } catch {
-      setError('Could not reach the server. Check your connection and try again.');
+      await saveContentPlan(result.plan);
+      // Never over a manual profile; the helper decides, this applies it.
+      if (result.profile) await renameSite(site.id, result.profile);
     } finally {
       setBusy(false);
     }
