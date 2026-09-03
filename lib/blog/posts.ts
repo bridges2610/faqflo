@@ -13,6 +13,7 @@ import * as googleReviews from '@/content/posts/does-ai-use-my-google-reviews-ho
 import * as llmsTxt from '@/content/posts/what-is-llms-txt-and-do-you-actually-need-one.mdx';
 import * as preferredSources from '@/content/posts/googles-preferred-sources-button-what-it-is-and-whether-you-need-it.mdx';
 import * as addHtml from '@/content/posts/how-to-add-html-to-wordpress-squarespace-webflow-or-wix.mdx';
+import * as wrongHours from '@/content/posts/ai-is-telling-customers-the-wrong-hours-about-your-business.mdx';
 
 /*
   The post registry.
@@ -66,6 +67,7 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  wrongHours,
   addHtml,
   preferredSources,
   llmsTxt,
