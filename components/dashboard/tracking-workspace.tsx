@@ -14,8 +14,8 @@ import type { CheckStatus } from '@/lib/audit/types';
 import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
-import { canRunCheckNow, isPro, trackingPlanFor } from '@/lib/dashboard/plans';
-import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
+import { isPro, nextCheckDate, trackingPlanFor } from '@/lib/dashboard/plans';
+import { formatNumber, formatShortDate, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import { ENGINES, type SiteTracking } from '@/lib/dashboard/types';
 import {
   checksByEngine,
@@ -156,6 +156,35 @@ function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.R
       </details>
     </li>
   );
+}
+
+/**
+ * When the next automatic check lands.
+ *
+ * ⚠️ THIS REPLACED A BUTTON, AND THE REPLACEMENT IS THE POINT. "Check now" spent
+ * out of the same 375-check monthly budget the weekly cron needs in full, so
+ * pressing it took a run away from the cadence the subscription is sold on.
+ * Removing it leaves one question worth answering in that corner — when does the
+ * next one happen — and this answers it.
+ *
+ * ⚠️ NEVER PRINT A DATE IN THE PAST. app-shell.tsx states the rule this copies:
+ * "a date in the past is not [reassuring]. Saying a check was due yesterday
+ * invites the question of where it is, and the answer is tonight." A cursor sits
+ * in the past for the hours between falling due and the 03:00 UTC sweep
+ * collecting it, which is a normal state rather than a fault.
+ */
+function NextCheck({ due, running }: { due: Date | null; running: boolean }) {
+  /* A run in flight outranks the schedule: the answer to "when is the next
+     check" is "it is happening" while it is happening. */
+  const text = running
+    ? 'Checking now…'
+    : !due
+      ? 'Checked automatically every week'
+      : due.getTime() <= Date.now()
+        ? 'Next check tonight'
+        : `Next check ${formatShortDate(due)}`;
+
+  return <p className="text-slate text-sm sm:text-right">{text}</p>;
 }
 
 type OutcomeFilter = 'all' | 'cited' | 'mentioned' | 'absent';
@@ -327,8 +356,10 @@ function useManualQuestion(): {
 }
 
 export function TrackingWorkspace() {
-  const { site, user, tracking, questions, coverQuestion, trackingRun, runTracking } =
-    useDashboard();
+  /* ⚠️ NO runTracking HERE ANY MORE — this page starts nothing. `trackingRun` is
+     still read, because a run started elsewhere (the cron, or free's own report)
+     still has progress worth showing while it is in flight. */
+  const { site, user, tracking, questions, coverQuestion, trackingRun } = useDashboard();
   const [filter, setFilter] = useState<OutcomeFilter>('all');
   const [shown, setShown] = useState(PAGE);
   const more = useFindMore();
@@ -382,31 +413,40 @@ export function TrackingWorkspace() {
   */
 
   /*
-    ⚠️ TWO QUESTIONS, AND THEY USED TO BE ONE VARIABLE.
+    ⚠️ canRunNow HAS GONE, AND WITH IT THE MANUAL BUTTON ON THIS PAGE.
 
-      canGrowList — may this account have more questions found or written?
-      canRunNow   — may this customer start a check by hand, right now?
+    It used to ask "may this customer start a check by hand, right now?", and
+    the honest answer on Pro is now "there is nothing to start by hand". Pro's
+    budget is 375 engine checks a month, which is exactly five weekly runs
+    (25 prompts × 3 engines × 5) — so the cron spends the whole allowance and a
+    manual run could only take from it. A button that steals from the cadence
+    the subscription sells is worse than no button.
 
-    They were both the same predicate, which was fine while every plan had a
-    button. Collapsing them again would silently switch question discovery off
-    for free accounts — a feature that costs an Opus call rather than engine
-    calls.
+    canGrowList stays, because it was always a different question: whether this
+    account may have more questions found or written. Collapsing the two would
+    silently switch question discovery off for free accounts, which costs an
+    Opus call rather than engine calls.
 
-    ⚠️ canRunNow IS TRUE FOR EVERYONE NOW, AND THE VARIABLE STAYS ANYWAY. Free
-    gained a Run button on its own report, so the predicate stopped
-    discriminating — but this route is Pro-only, so the branches below that test
-    it are unreachable rather than wrong. Left standing because the question is
-    still the right one to ask here: if the entitlement ever tightens again this
-    page reads correctly without being rewritten, and inlining `true` would lose
-    the reason the check exists.
+    ⚠️ FREE IS UNAFFECTED AND MUST STAY THAT WAY. Free's re-run button lives in
+    RunControl (prompt-ranking.tsx) on its own report, where three prompts times
+    three runs is the entire "fix something and look again" loop. This route is
+    Pro-only; nothing here reaches it.
   */
   const pro = isPro(user);
   const canGrowList = pro;
-  const canRunNow = canRunCheckNow();
   const oneShot = trackingPlanFor(user).schedule === 'once';
 
   const daily = tracking?.daily ?? [];
   const latest = tracking?.latest ?? [];
+
+  /*
+    When the cron next runs, for this site.
+
+    ⚠️ THE SAME TWO HELPERS THE SIDEBAR USES, ON PURPOSE. app-shell.tsx renders
+    this same fact in "Your plan", and two independent date derivations would
+    eventually disagree in front of somebody comparing one to the other.
+  */
+  const due = nextCheckDate(site);
 
   /*
     Nothing checked yet.
@@ -431,26 +471,18 @@ export function TrackingWorkspace() {
           />
         ) : (
           <EmptyState
-            title="You haven’t run a check yet"
-            body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else. It takes a minute or two.`}
+            title="Your first check hasn’t landed yet"
+            body={`We’ll put your ${questions.length} ${questions.length === 1 ? 'question' : 'questions'} to ${ENGINES.join(', ')} and record, for each one, whether they cited you, named you without a link, or pointed somewhere else.`}
+            /* ⚠️ NOTHING TO PRESS IN EITHER BRANCH NOW. The check is scheduled
+               work, so the only honest thing to say is when it happens — a
+               button here would offer to start something that starts itself. */
             action={
-              canRunNow ? (
-                /* ⚠️ `() => runTracking()`, never `onClick={runTracking}`. It
-                   takes an optional question list now, so passing the handler
-                   bare hands it the MouseEvent as that list. */
-                <Button onClick={() => void runTracking()} disabled={run.busy}>
-                  {runningHere
-                    ? 'Checking…'
-                    : run.busy
-                      ? 'Another check is running'
-                      : 'Run the first check'}
-                </Button>
-              ) : oneShot ? (
-                // Nothing to press: the check runs itself as part of setting the
-                // site up, and free gets exactly the one.
+              oneShot ? (
+                // Free: the check runs as part of setting the site up, and free
+                // gets exactly the one.
                 <p className="text-slate text-sm">Your check runs as part of setting up.</p>
               ) : (
-                <ButtonLink href="/dashboard/plan">See Pro</ButtonLink>
+                <NextCheck due={due} running={runningHere} />
               )
             }
           />
@@ -787,25 +819,10 @@ export function TrackingWorkspace() {
         className="mb-3"
         title="AI Mentions"
         description={`What ${ENGINES.join(', ')} say when asked about ${site.name}.`}
-        /* This route is Pro-only, so canRunNow is always true here now — see
-           the note where it is derived. The branch stays because the question
-           is still the right one for this screen to ask. */
-        action={
-          canRunNow ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void runTracking()}
-              disabled={run.busy}
-            >
-              {runningHere ? 'Checking…' : run.busy ? 'Another check is running' : 'Check now'}
-            </Button>
-          ) : (
-            <ButtonLink href="/dashboard/plan" variant="ghost" size="sm">
-              Check weekly with Pro
-            </ButtonLink>
-          )
-        }
+        /* ⚠️ A STATEMENT, NOT A CONTROL. There is nothing to press here any
+           more: the checks run themselves every week, so the only thing this
+           corner owes the reader is when the next one lands. */
+        action={<NextCheck due={due} running={runningHere} />}
       />
 
       {/* ⚠️ COLLAPSED, NOT CUT, AND THE DISTINCTION MATTERS.

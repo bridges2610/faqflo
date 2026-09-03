@@ -847,36 +847,21 @@ export function canTrack(): boolean {
   return true;
 }
 
-/**
- * May this customer start a check themselves, right now?
- *
- * ⚠️ NOT THE SAME QUESTION AS canTrack, and keeping them apart is still the
- * point even though both now answer yes for free. canTrack asks whether a
- * check may run at all — the onboarding scan needs that, and the scheduler
- * asks it too. This asks whether a PERSON may start one.
- *
- * ⚠️ THIS USED TO BE isPro, FOR A REASON THAT NO LONGER HOLDS. It read: "Free
- * gets a single automatic run; a button beside it would spend the whole
- * allowance on the first click and then do nothing forever, which reads as
- * broken twice." That was correct while free bought one run. It buys three, so
- * the first click leaves two and the button has somewhere to go.
- *
- * ⚠️ IT IS NOT A BUDGET CHECK, AND MUST NOT BECOME ONE. This says the plan
- * permits a person to press Run; whether there is anything left to spend is
- * counted server-side against checksPerPeriod in
- * app/api/dashboard/tracking/route.ts, from citation_checks rows. Deciding
- * "runs remaining" here would mean a second implementation of the meter, on the
- * client, reading numbers the client can't be trusted with. The UI derives a
- * runs-left figure for display from the same rows — see runsLeftFor() — and
- * the server still refuses independently.
- *
- * No argument, like canTrack() and canGenerate() beside it: a predicate that
- * ignores its input should not accept one, or every call site implies a
- * distinction that isn't there.
- */
-export function canRunCheckNow(): boolean {
-  return true;
-}
+/*
+  canRunCheckNow() USED TO SIT HERE, AND IT WENT WITH PRO'S MANUAL BUTTON.
+
+  It asked "may this customer start a check themselves, right now?" and returned
+  true for everyone. The only client that consulted it was the AI Mentions page's
+  "Check now", which has been removed: Pro's 375 checks a month are exactly the
+  five weekly runs the cron needs (25 prompts × 3 engines × 5), so a manual run
+  could only be taken from the cadence the subscription is sold on.
+
+  ⚠️ THE SERVER-SIDE canRunCheckNow() IN lib/auth/entitlements.ts STAYS, and is
+  not the same function. It guards /api/dashboard/tracking, which free's own
+  report still calls through RunControl in prompt-ranking.tsx — free buys three
+  runs on a 'once' schedule with no cron, and pressing that button is the whole
+  loop. Deleting that one would break the free tier.
+*/
 
 /**
  * How many more times this account can press Run.

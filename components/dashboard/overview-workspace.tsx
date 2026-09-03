@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
 import type { PostMeta } from '@/lib/blog/posts';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { canOfferDoneForYou, trackingPlanFor } from '@/lib/dashboard/plans';
@@ -72,8 +71,10 @@ function greeting(): { text: string; emoji: string } {
 */
 
 export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
-  const { site, sites, groups, faqs, questions, tracking, data, user, runAudit, auditBusy, auditError } =
-    useDashboard();
+  /* ⚠️ NO runAudit/auditBusy/auditError — this screen starts no crawl. They are
+     still on the provider and still read by audit-workspace.tsx, which is the
+     only place a check is started from now. */
+  const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
 
   /*
     ⚠️ THE PAST-RUNS FETCH HAS GONE WITH THE THINGS THAT READ IT.
@@ -148,34 +149,29 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
           </>
         }
         description={`This is how ${site.domain} looks to ChatGPT, Perplexity and Gemini — and what to change so they name you when someone asks.`}
-        action={
-          /* ⚠️ IT RUNS THE CHECK; IT DOES NOT GO AND FIND IT. This was a link to
-             /dashboard/audit, which meant the button labelled "Run a fresh
-             check" ran nothing — it navigated, and left the customer to press a
-             second button when they arrived.
+        /* ⚠️ NO ACTION HERE, AND SCANNING LIVES ON THE AUDIT PAGE ALONE. A
+           "Run a fresh check" button sat in this slot and called runAudit
+           directly. Two entry points to one crawl meant two places to keep in
+           step — this one had to carry its own copy of the busy state and its
+           own refusal line — for a control the Audit page already offers twice.
 
-             `disabled` is driven by the provider's flag rather than a local one,
-             so this button and the Audit page's cannot both start a crawl. See
-             the note on runAudit in lib/dashboard/provider.tsx. */
-          <Button variant="ghost" size="sm" onClick={runAudit} disabled={auditBusy}>
-            {auditBusy ? 'Checking…' : report ? 'Run a fresh check' : 'Check my site'}
-          </Button>
-        }
+           ⚠️ IT WAS NOT THE ONLY WAY IN FOR A NEW ACCOUNT, WHICH IS WHY IT COULD
+           GO. setupSteps() renders a `run-audit` step pointing at
+           /dashboard/audit for exactly as long as site.lastAudit is missing, and
+           the checklist below is shown in both branches of this component. The
+           button was a second door to a room that already had one. */
       />
 
       {/* The progress line that used to sit here is a toast now — see
           components/dashboard/audit-notice.tsx. Under the greeting it was a
           second slate paragraph directly below the first, and it scrolled away
-          on a page long enough that a minute-long check outlives the view. */}
+          on a page long enough that a minute-long check outlives the view.
 
-      {/* ⚠️ SHOWN WHERE THE BUTTON IS. Four full checks a day is a real ceiling
-          (AUDIT_FULL_RATE_LIMIT), and a refusal that appeared only on another
-          page would make this button look like it did nothing. */}
-      {auditError && (
-        <p role="alert" className="text-error-ink mb-5 text-sm">
-          {auditError}
-        </p>
-      )}
+          ⚠️ THE auditError LINE THAT FOLLOWED IT HAS GONE WITH THE BUTTON. It
+          existed to catch AUDIT_FULL_RATE_LIMIT refusals "where the button is",
+          and this page no longer starts a check — an error about a crawl nobody
+          asked for here reads as a fault in the page you are looking at. The
+          Audit page still shows its own. */}
 
       {/*
         ⚠️ THE SETUP CHECKLIST OUTRANKS EVERYTHING, AND ONLY WHILE UNFINISHED.

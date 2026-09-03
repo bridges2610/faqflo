@@ -1,7 +1,10 @@
 import 'server-only';
 
 import type Stripe from 'stripe';
+import { siteOrigin } from '@/lib/auth/origin';
+import { enqueueTrackingJob } from '@/lib/scan/enqueue';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { startWeeklySchedule, stopWeeklySchedule } from '@/lib/tracking/schedule';
 import { stripe } from './client';
 
 /**
@@ -168,35 +171,90 @@ export async function applySubscription(subscription: Stripe.Subscription): Prom
  * event rather than only on the transitions — a renewal that arrives while
  * next_check_at is somehow null puts it back.
  *
- * Failures are logged, not thrown. claim_due_checks() re-checks profiles.plan
- * on every sweep (see 0012), so a cursor left set on a lapsed account spends
- * nothing — the query simply will not match it. The cost of a failure here is a
- * Pro customer waiting up to a week extra for their first check, which is worth
- * far less than turning a successful payment into a webhook retry storm.
+ * ⚠️ THE WRITES THEMSELVES LIVE IN lib/tracking/schedule.ts NOW. This function
+ * used to do them inline while that module sat unused, so there were two
+ * implementations of "start the cadence" and only one of them ran. The stagger
+ * belongs to whichever one is real, so there is now only one.
+ *
+ * Failures are logged, not thrown, inside those helpers. claim_due_checks()
+ * re-checks profiles.plan on every sweep (see 0012), so a cursor left set on a
+ * lapsed account spends nothing — the query simply will not match it. The cost
+ * of a failure here is a Pro customer waiting for a check, which is worth far
+ * less than turning a successful payment into a webhook retry storm.
  */
 async function setWeeklySchedule(
   supabase: ReturnType<typeof createAdminClient>,
   userId: string,
   entitled: boolean,
 ): Promise<void> {
-  /*
-    now() rather than "a week from now" on upgrade: the first weekly check
-    should happen on the day they pay, not seven days into a subscription they
-    are still deciding about. The nightly sweep picks it up within the day.
-  */
-  const query = supabase
-    .from('sites')
-    .update({ next_check_at: entitled ? new Date().toISOString() : null })
-    .eq('user_id', userId);
+  if (!entitled) {
+    await stopWeeklySchedule(userId);
+    return;
+  }
 
-  // Only touch rows that need it, so a renewal does not reset a cadence that is
-  // already running and shunt everyone's check day to the invoice date.
-  const { error } = entitled
-    ? await query.is('next_check_at', null)
-    : await query.not('next_check_at', 'is', null);
+  await startWeeklySchedule(userId);
+
+  /*
+    ⚠️ AND ONE CHECK RIGHT NOW, BECAUSE THE CADENCE ALONE WOULD READ AS BROKEN.
+
+    The cursor is staggered 0-6 days out so customers do not all fire on the same
+    night. On its own that would mean somebody upgrades, and sees nothing new for
+    up to a week — and there IS something new to see: free tracks 3 prompts and
+    Pro tracks 25, so the first Pro run is what fills in the other 22. Paying and
+    then waiting a week for the thing you paid for is the wrong first day.
+
+    So: the recurring schedule is staggered, and the first run happens
+    immediately. Only for accounts that already have questions to ask — a brand
+    new signup's onboarding scan is doing this already, and enqueueTrackingJob
+    would be refused by the one-live-job-per-site index anyway.
+  */
+  await runCheckNow(supabase, userId);
+}
+
+/**
+ * Queue an immediate tracking run for every site on an upgraded account.
+ *
+ * ⚠️ QUEUED, NOT RUN. This is a Stripe webhook: it must answer fast or Stripe
+ * retries it, and asking 25 prompts across 3 engines takes minutes. The work
+ * goes to scan_jobs and /api/scan/tick slices through it, exactly as the nightly
+ * cron does — see app/api/cron/tracking/route.ts, which this mirrors down to the
+ * unawaited poke at the end.
+ *
+ * A refusal is not an error worth surfacing. `created: false` means a scan is
+ * already live for that site, which on a fresh signup is the onboarding scan
+ * doing this very job.
+ */
+async function runCheckNow(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+): Promise<void> {
+  const { data, error } = await supabase.from('sites').select('id').eq('user_id', userId);
 
   if (error) {
-    console.error(`Could not update the check schedule for user ${userId}:`, error.message);
+    console.error(`Could not read sites to check for user ${userId}:`, error.message);
+    return;
+  }
+
+  let queued = 0;
+  for (const site of data ?? []) {
+    const result = await enqueueTrackingJob(site.id as string, userId);
+    if (result.ok && result.created) queued += 1;
+  }
+
+  if (queued === 0) return;
+
+  /*
+    Unawaited, like the cron's own poke: awaiting the chain would make this
+    webhook wait for a check that takes minutes, and Stripe would give up on it
+    long before it finished.
+  */
+  try {
+    const base = await siteOrigin();
+    void fetch(`${base}/api/scan/tick`, { method: 'POST' }).catch(() => {});
+  } catch (err) {
+    // The job is queued either way; tonight's sweep pokes the queue if this
+    // failed, so a missing origin delays the first run rather than losing it.
+    console.error('Could not poke the scan queue after an upgrade:', err);
   }
 }
 
