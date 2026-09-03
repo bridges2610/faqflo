@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { MAX_ARTICLE_WORDS, countWords } from '@/lib/article';
+import { MAX_ARTICLE_FAQS, MAX_ARTICLE_WORDS, countWords } from '@/lib/article';
+import { MIN_FAQ_COUNT } from '@/lib/faq';
 import { answersTabHref } from '@/lib/dashboard/answers-tabs';
 import { buildArticleBlock, buildArticlePlain } from '@/lib/dashboard/export';
 import { formatPlainDate } from '@/lib/dashboard/format';
@@ -127,7 +128,7 @@ export function ArticleWorkspace({ articleId }: { articleId: string }) {
                 <button
                   onClick={() => setConfirming(true)}
                   aria-label={`Delete ${article.title}`}
-                  className="text-slate hover:text-error-ink rounded-input p-1.5 transition-colors duration-150"
+                  className="text-slate hover:text-error-ink rounded-input inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
@@ -257,8 +258,12 @@ function AddFaqs({ article }: { article: Article }) {
   const [error, setError] = useState<string | null>(null);
   const [added, setAdded] = useState<number | null>(null);
 
+  /* How many this article still has room for. Never negative: an article
+     written before the cap existed may already hold more, and those stay. */
+  const room = Math.max(0, MAX_ARTICLE_FAQS - article.faqs.length);
+
   async function add() {
-    if (!site) return;
+    if (!site || room === 0) return;
     setError(null);
     setBusy(true);
 
@@ -268,7 +273,13 @@ function AddFaqs({ article }: { article: Article }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           content: buildArticlePlain(article),
-          count: 5,
+          /* ⚠️ ASKS FOR AT LEAST THREE EVEN WHEN ONE IS WANTED, AND THE RESULT
+             IS TRIMMED BELOW. clampCount() in lib/faq.ts has a floor of
+             MIN_FAQ_COUNT (3) and silently substitutes its default for
+             anything under it — so requesting 1 comes back as 5. Asking for a
+             legal number and cutting what arrives is the only way to end up
+             with the one that was actually wanted. */
+          count: Math.max(MIN_FAQ_COUNT, room),
           tone: 'Professional',
           language: 'English',
           siteId: site.id,
@@ -283,7 +294,9 @@ function AddFaqs({ article }: { article: Article }) {
 
       const kept = payload.faqs
         .filter((f) => f.q?.trim() && f.a?.trim())
-        .map((f) => ({ q: f.q.trim(), a: f.a.trim() }));
+        .map((f) => ({ q: f.q.trim(), a: f.a.trim() }))
+        // The trim the comment above promises — never more than there was room for.
+        .slice(0, room);
 
       if (kept.length === 0) {
         setError('Nothing came back that was worth keeping. Try again.');
@@ -317,15 +330,22 @@ function AddFaqs({ article }: { article: Article }) {
         Add FAQs about this
       </SectionTitle>
       <p className="text-slate mt-1 text-sm leading-relaxed">
-        Five short answers, written from this article. They sit at the bottom of it and go out with
-        it when you copy the code — schema included. They don&rsquo;t count against your monthly
-        articles.
+        {/* ⚠️ THIS LINE USED TO SAY "Remove one above", AND THERE IS NOTHING
+            ABOVE TO REMOVE WITH. The per-question delete lives inside the
+            editor, behind the Edit button — the read view this card sits on
+            renders the answers with no controls at all. Copy that points at a
+            control the reader cannot see is worse than copy that says nothing,
+            because they go looking. Anything added here has to be reachable
+            from this screen. */}
+        {room === 0
+          ? `We've written ${MAX_ARTICLE_FAQS} answers for this article. That's what one piece needs.`
+          : `Short answers written from this article, up to ${MAX_ARTICLE_FAQS}. They sit at the bottom of it and go out with it when you copy the code — schema included. They don't count against your monthly articles.`}
       </p>
 
-      {added === null ? (
+      {room === 0 ? null : added === null ? (
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <Button size="sm" disabled={busy} onClick={add}>
-            {busy ? 'Writing…' : 'Add FAQs'}
+            {busy ? 'Writing…' : article.faqs.length === 0 ? 'Add FAQs' : `Add ${room} more`}
           </Button>
           {error && (
             <p role="alert" className="text-error-ink text-sm">
@@ -403,7 +423,7 @@ function ArticleEditor({
   return (
     <Card className="p-5 sm:p-7">
       <label className="block">
-        <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+        <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
           Headline
         </span>
         <input
@@ -414,7 +434,7 @@ function ArticleEditor({
       </label>
 
       <label className="mt-5 block">
-        <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+        <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
           Opening
         </span>
         <textarea
@@ -434,7 +454,7 @@ function ArticleEditor({
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <label className="block">
-                  <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+                  <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
                     Heading {i + 1}
                   </span>
                   <input
@@ -457,7 +477,7 @@ function ArticleEditor({
               <button
                 onClick={() => setSections((prev) => prev.filter((_, j) => j !== i))}
                 aria-label={`Remove section ${i + 1}`}
-                className="text-slate hover:text-error-ink rounded-input mt-6 p-1.5 transition-colors duration-150"
+                className="text-slate hover:text-error-ink rounded-input mt-6 inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
               >
                 <TrashIcon className="h-4 w-4" />
               </button>
@@ -509,7 +529,7 @@ function ArticleEditor({
                   <button
                     onClick={() => setFaqs((prev) => prev.filter((_, j) => j !== i))}
                     aria-label={`Remove question ${i + 1}`}
-                    className="text-slate hover:text-error-ink rounded-input mt-1 p-1.5 transition-colors duration-150"
+                    className="text-slate hover:text-error-ink rounded-input mt-1 inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>

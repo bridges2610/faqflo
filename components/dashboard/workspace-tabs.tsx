@@ -59,7 +59,11 @@ export function WorkspaceTabs({
 
   return (
     <nav aria-label={label} className="mb-6">
-      <ul className="bg-cloud border-line inline-flex items-center gap-1 rounded-full border p-1">
+      {/* ⚠️ flex-wrap, NOT inline-flex ALONE. Three labels at 320px was already
+          borderline, and a fourth tab or a longer word would have pushed one off
+          the edge with no way to reach it. Wrapping is the failure mode that
+          still works. */}
+      <ul className="bg-cloud border-line inline-flex flex-wrap items-center gap-1 rounded-2xl border p-1 sm:rounded-full">
         {tabs.map((tab) => {
           const active = activeHref !== undefined ? tab.href === activeHref : pathname === tab.href;
           return (
@@ -67,7 +71,7 @@ export function WorkspaceTabs({
               <Link
                 href={tab.href}
                 aria-current={active ? 'page' : undefined}
-                className={`block rounded-full px-4 py-1.5 text-sm transition-all duration-200 ${
+                className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
                   active
                     ? 'bg-primary shadow-soft font-semibold text-white'
                     : 'text-slate hover:text-navy'

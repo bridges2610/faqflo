@@ -97,7 +97,16 @@ export function EmbedStepList({
             <span
               aria-hidden="true"
               className={`bg-cloud text-navy mt-0.5 flex shrink-0 items-center justify-center rounded-full font-mono font-semibold ${
-                compact ? 'h-4 w-4 text-[0.625rem]' : 'h-5 w-5 text-[0.6875rem]'
+                /* ⚠️ NOT BELOW 11px EVEN COMPACT. The 10px numeral measured
+                   under the readable floor on a phone; the circle can be small,
+                   the digit inside it cannot. */
+                /* ⚠️ NOT BELOW THE READABLE FLOOR EVEN COMPACT. The numeral was
+                   10px, then 11px, and both measured under it on a phone. The
+                   circle grows with the digit rather than clipping it; both
+                   shrink back from `sm:` up. */
+                compact
+                  ? 'h-5 w-5 text-xs sm:h-4 sm:w-4 sm:text-[0.625rem]'
+                  : 'h-5 w-5 text-xs sm:text-[0.6875rem]'
               }`}
             >
               {i + 1}

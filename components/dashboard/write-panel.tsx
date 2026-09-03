@@ -525,7 +525,7 @@ export function WritePanel() {
                 value={brief}
                 onChange={(e) => setBrief(e.target.value.slice(0, MAX_BRIEF_CHARS))}
                 placeholder="Why our quotes include a full tear-off"
-                className="border-line bg-cloud text-navy focus:border-primary min-w-0 flex-1 rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150"
+                className="border-line bg-cloud text-navy focus:border-primary min-h-11 min-w-0 flex-1 rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
               />
               <Button
                 size="sm"
@@ -564,7 +564,7 @@ export function WritePanel() {
           <button
             onClick={() => setShowHidden((v) => !v)}
             aria-expanded={showHidden}
-            className="text-slate hover:text-navy text-sm transition-colors duration-150"
+            className="text-slate hover:text-navy inline-flex min-h-11 items-center sm:min-h-0 text-sm transition-colors duration-150"
           >
             {hiddenCount} hidden {hiddenCount === 1 ? 'topic' : 'topics'} ·{' '}
             {showHidden ? 'close' : 'show'}
@@ -577,7 +577,7 @@ export function WritePanel() {
                   <p className="text-slate min-w-0 flex-1 text-sm">{q.question}</p>
                   <button
                     onClick={() => dismissQuestion(q.id, false)}
-                    className="text-primary hover:text-primary-hover shrink-0 text-sm font-semibold transition-colors duration-150"
+                    className="text-primary hover:text-primary-hover inline-flex min-h-11 shrink-0 items-center text-sm font-semibold transition-colors duration-150 sm:min-h-0"
                   >
                     Put it back
                     <span className="sr-only"> — “{q.question}”</span>
@@ -592,7 +592,7 @@ export function WritePanel() {
                   <p className="text-slate min-w-0 flex-1 text-sm">{t.title}</p>
                   <button
                     onClick={() => hideTopic(t.title, false)}
-                    className="text-primary hover:text-primary-hover shrink-0 text-sm font-semibold transition-colors duration-150"
+                    className="text-primary hover:text-primary-hover inline-flex min-h-11 shrink-0 items-center text-sm font-semibold transition-colors duration-150 sm:min-h-0"
                   >
                     Put it back
                     <span className="sr-only"> — “{t.title}”</span>
@@ -626,7 +626,7 @@ function SectionLabel({
 }) {
   return (
     <p
-      className={`text-slate font-mono text-[0.6875rem] tracking-wide uppercase ${className || 'mt-4'}`}
+      className={`text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem] ${className || 'mt-4'}`}
     >
       {children}
     </p>
@@ -699,7 +699,7 @@ function TopicRow({
           <button
             onClick={onHide}
             disabled={busy}
-            className="text-slate hover:text-navy rounded-input px-1.5 py-1 text-xs transition-colors duration-150 disabled:opacity-40"
+            className="text-slate hover:text-navy rounded-input inline-flex min-h-11 min-w-11 items-center justify-center px-2 py-1 text-xs transition-colors duration-150 disabled:opacity-40 sm:min-h-0"
           >
             Hide
             <span className="sr-only"> the question “{title}”</span>

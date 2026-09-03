@@ -70,7 +70,7 @@ export function FaqRow({
             onClick={() => moveFaq(faq.id, 'up')}
             disabled={isFirst}
             aria-label="Move up"
-            className="text-slate hover:text-primary hover:bg-cloud rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
+            className="text-slate hover:text-primary hover:bg-cloud rounded-md inline-flex min-h-11 min-w-11 items-center justify-center p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-0 sm:min-w-0"
           >
             <ArrowUpIcon className="h-3.5 w-3.5" />
           </button>
@@ -78,7 +78,7 @@ export function FaqRow({
             onClick={() => moveFaq(faq.id, 'down')}
             disabled={isLast}
             aria-label="Move down"
-            className="text-slate hover:text-primary hover:bg-cloud rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
+            className="text-slate hover:text-primary hover:bg-cloud rounded-md inline-flex min-h-11 min-w-11 items-center justify-center p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-0 sm:min-w-0"
           >
             <ArrowDownIcon className="h-3.5 w-3.5" />
           </button>
@@ -126,7 +126,7 @@ export function FaqRow({
                     nowhere until now. It is the closest thing to a category the
                     data already holds, and it answers "did I write this, or did
                     the model?" without inventing a second taxonomy. */}
-                <span className="text-slate/80 text-[0.6875rem]">{SOURCE_LABEL[faq.source]}</span>
+                <span className="text-slate/80 text-xs sm:text-[0.6875rem]">{SOURCE_LABEL[faq.source]}</span>
               </div>
               {/* An entry drafted from an unanswered search arrives with no
                   answer on purpose — say so rather than rendering a blank. */}
@@ -144,13 +144,13 @@ export function FaqRow({
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               <button
                 onClick={startEdit}
-                className="text-primary hover:text-primary-hover text-sm font-medium transition-colors duration-150"
+                className="text-primary hover:text-primary-hover inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm font-medium transition-colors duration-150"
               >
                 Edit
               </button>
               <button
                 onClick={() => editFaq(faq.id, { status: published ? 'draft' : 'published' })}
-                className="text-slate hover:text-navy text-sm transition-colors duration-150"
+                className="text-slate hover:text-navy inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm transition-colors duration-150"
               >
                 {published ? 'Unpublish' : 'Publish'}
               </button>
@@ -171,7 +171,7 @@ export function FaqRow({
                         if (e.target.value) moveFaqToGroup(faq.id, e.target.value);
                         setMoving(false);
                       }}
-                      className="border-line text-navy focus:border-primary rounded-input border bg-white px-2 py-1 text-sm outline-none"
+                      className="border-line text-navy focus:border-primary min-h-11 rounded-input border bg-white px-2 py-1 text-sm outline-none sm:min-h-0"
                     >
                       <option value="" disabled>
                         Move to…
@@ -182,14 +182,14 @@ export function FaqRow({
                         </option>
                       ))}
                     </select>
-                    <button onClick={() => setMoving(false)} className="text-slate text-sm">
+                    <button onClick={() => setMoving(false)} className="text-slate inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm">
                       Cancel
                     </button>
                   </span>
                 ) : (
                   <button
                     onClick={() => setMoving(true)}
-                    className="text-slate hover:text-navy text-sm transition-colors duration-150"
+                    className="text-slate hover:text-navy inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm transition-colors duration-150"
                   >
                     Move to…
                   </button>
@@ -208,7 +208,7 @@ export function FaqRow({
               ) : (
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="text-slate hover:text-error-ink inline-flex items-center gap-1.5 text-sm transition-colors duration-150"
+                  className="text-slate hover:text-error-ink inline-flex min-h-11 items-center gap-1.5 text-sm transition-colors duration-150 sm:min-h-0"
                 >
                   <TrashIcon className="h-3.5 w-3.5" />
                   Delete

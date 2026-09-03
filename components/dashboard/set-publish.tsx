@@ -97,7 +97,7 @@ export function SetPublish({
       <p className="text-slate mt-1 text-sm">{status}</p>
 
       <label className="mt-3 block">
-        <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+        <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
           Which page is it going on?
         </span>
         <span className="mt-1.5 flex flex-wrap items-center gap-2">
@@ -108,7 +108,7 @@ export function SetPublish({
             onBlur={savePath}
             disabled={saving}
             placeholder="/roof-costs"
-            className="border-line text-navy focus:border-primary min-w-0 flex-1 rounded-input border bg-white px-3 py-1.5 font-mono text-xs outline-none transition-colors duration-150"
+            className="border-line text-navy focus:border-primary min-h-11 min-w-0 flex-1 rounded-input border bg-white px-3 py-1.5 font-mono text-xs outline-none transition-colors duration-150 sm:min-h-0"
           />
         </span>
       </label>

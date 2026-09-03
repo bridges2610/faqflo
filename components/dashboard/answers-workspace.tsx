@@ -504,7 +504,7 @@ function TopicGroup({
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="group/row flex w-full items-center gap-2.5 py-3 text-left"
+        className="group/row flex min-h-11 w-full items-center gap-2.5 py-3 text-left"
       >
         <ChevronIcon
           aria-hidden="true"

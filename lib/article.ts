@@ -33,6 +33,21 @@ export const MAX_ARTICLE_WORDS = 1200;
 /** How many H2 sections to ask for. Enough to be a structure, not an outline. */
 export const ARTICLE_SECTIONS = { min: 4, max: 6 } as const;
 
+/**
+ * The most Q&As one article may carry.
+ *
+ * ⚠️ A CEILING ON WHAT AN ARTICLE HOLDS, NOT ON WHAT ONE PRESS RETURNS. "Add
+ * FAQs" appends, so without this a fourth press left an article with twenty
+ * answers under it. It asks for however many are missing and stops offering
+ * once the article is full.
+ *
+ * ⚠️ AND IT DOES NOT TRIM WHAT IS ALREADY THERE. An article written before this
+ * existed may hold more, and quietly deleting somebody's answers to satisfy a
+ * new number would be this product editing their work without being asked. The
+ * cap governs adding.
+ */
+export const MAX_ARTICLE_FAQS = 5;
+
 /** A brief longer than this is a pasted document, not a note. */
 export const MAX_BRIEF_CHARS = 2000;
 

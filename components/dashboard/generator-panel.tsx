@@ -163,7 +163,7 @@ export function GeneratorPanel({
                 setMode(m);
                 setError(null);
               }}
-              className={`rounded-full px-4 py-1.5 text-sm transition-all duration-200 ${
+              className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
                 mode === m
                   ? 'text-navy shadow-soft bg-white font-semibold'
                   : 'text-slate hover:text-navy'
@@ -214,7 +214,10 @@ export function GeneratorPanel({
       {/* All four controls in one grid. They carry equal weight, so laying the
           destination out differently from the other three made it read as a
           separate kind of thing. */}
-      <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* ⚠️ THREE COLUMNS, NOT FOUR. This was sm:grid-cols-2 lg:grid-cols-4 when
+          the panel had a fourth control — "Add to" — and it has been leaving a
+          hole at the end of the row ever since that one was removed. */}
+      <div className="mt-5 grid gap-4 sm:grid-cols-3">
         {/* ⚠️ NO "ADD TO" SELECT, AND ITS OWN OLD COMMENT ARGUED FOR ONE. It
             said "where it lands is chosen before generating, not after",
             because an answer's page decides where it may claim to live. That
@@ -223,13 +226,13 @@ export function GeneratorPanel({
             goes on is asked for when it is pasted. See SetPublish. */}
 
         <label className="block">
-          <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+          <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
             How many
           </span>
           <select
             value={count}
             onChange={(e) => setCount(Number(e.target.value))}
-            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {counts.map((n) => (
               <option key={n} value={n}>
@@ -240,13 +243,13 @@ export function GeneratorPanel({
         </label>
 
         <label className="block">
-          <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+          <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
             Tone
           </span>
           <select
             value={tone}
             onChange={(e) => setTone(e.target.value as Tone)}
-            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {TONES.map((t) => (
               <option key={t} value={t}>
@@ -257,13 +260,13 @@ export function GeneratorPanel({
         </label>
 
         <label className="block">
-          <span className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">
+          <span className="text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem]">
             Language
           </span>
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {LANGUAGES.map((l) => (
               <option key={l} value={l}>

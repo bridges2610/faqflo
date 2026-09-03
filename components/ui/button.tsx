@@ -60,8 +60,19 @@ const VARIANTS: Record<Variant, string> = {
   light: 'bg-white text-navy shadow-lift hover:bg-white/90',
 };
 
+/*
+  ⚠️ `sm` IS TALLER ON A PHONE THAN ON A DESKTOP, AND THAT IS THE WHOLE POINT.
+  It was a flat h-9 — 36px — which is the size nearly every action on the
+  dashboard uses, and 36px is a poor thumb target. h-11 is 44px.
+
+  Released at `sm:` rather than raised everywhere: adding 8px to every button at
+  every width would push already-long lists further down the page on the screens
+  that are hardest to scroll. Desktop keeps its density; a phone gets a target.
+
+  md and lg were already 44px or more and need nothing.
+*/
 const SIZES: Record<Size, string> = {
-  sm: 'h-9 px-4 text-sm',
+  sm: 'h-11 sm:h-9 px-4 text-sm',
   md: 'h-11 px-6 text-[0.9375rem]',
   lg: 'h-13 px-8 text-base',
 };

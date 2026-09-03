@@ -117,7 +117,11 @@ export function ArticleCard({ article }: { article: Article }) {
         <button
           onClick={() => setConfirming(true)}
           aria-label={`Delete ${article.title}`}
-          className="text-slate hover:text-error-ink ml-auto rounded-md p-1.5 transition-colors duration-150"
+          /* ⚠️ ml-auto ONLY ONCE THERE IS ROOM FOR IT. On a phone the action
+             row wraps, and an auto-margin then pushes Delete alone to the far
+             right of its own line — a destructive control given the most
+             prominent spot on the card by accident. */
+          className="text-slate hover:text-error-ink rounded-md inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:ml-auto sm:min-h-0 sm:min-w-0"
         >
           <TrashIcon className="h-4 w-4" />
         </button>

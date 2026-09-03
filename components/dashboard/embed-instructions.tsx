@@ -120,7 +120,7 @@ export function EmbedInstructions({ compact = false }: { compact?: boolean }) {
             aria-pressed={platform === guide.id}
             aria-controls={panelId}
             onClick={() => choose(guide.id)}
-            className={`rounded-full px-4 py-1.5 text-sm transition-all duration-200 ${
+            className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
               platform === guide.id
                 ? 'text-navy shadow-soft bg-white font-semibold'
                 : 'text-slate hover:text-navy'
