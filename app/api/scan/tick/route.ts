@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { siteOrigin } from '@/lib/auth/origin';
-import { trySendEmail } from '@/lib/email/client';
-import { setUpEmail } from '@/lib/email/templates';
+import type { TopFix } from '@/lib/email/templates';
+import { welcomeOnce } from '@/lib/email/welcome';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NEXT_STAGE, runStage, ScanFailed, type ScanJob } from '@/lib/scan/run';
 
@@ -139,7 +139,11 @@ export async function POST() {
       ⚠️ THE ID COMES OFF THE CLAIMED ROW, NOT OFF THE REQUEST. This route takes
       no arguments and trusts no caller.
     */
-    if (finished) await announceIfFirst(db, job);
+    /* ⚠️ THE MERGED PROGRESS, NOT `job`. `job` was read at the start of this
+       slice, so its progress is missing whatever this slice just produced — the
+       same object written immediately above. Passing `job` meant the final
+       slice's counters were always one behind in the email. */
+    if (finished) await announceIfFirst(db, job, { ...job.progress, ...result.progress });
 
     if (!finished && slices < MAX_SLICES) await chain();
 
@@ -199,7 +203,11 @@ export async function POST() {
  * The Resend idempotency key is a second belt on top of that — two slices
  * racing to finish the same job would both count 1.
  */
-async function announceIfFirst(db: ReturnType<typeof createAdminClient>, job: ScanJob): Promise<void> {
+async function announceIfFirst(
+  db: ReturnType<typeof createAdminClient>,
+  job: ScanJob,
+  progress: Record<string, unknown>,
+): Promise<void> {
   try {
     const { count, error } = await db
       .from('scan_jobs')
@@ -208,31 +216,90 @@ async function announceIfFirst(db: ReturnType<typeof createAdminClient>, job: Sc
 
     if (error || (count ?? 0) !== 1) return;
 
-    const [{ data: profile }, { data: site }] = await Promise.all([
-      db.from('profiles').select('email, name').eq('id', job.user_id).maybeSingle<{
-        email: string;
-        name: string | null;
-      }>(),
-      db.from('sites').select('name').eq('id', job.site_id).maybeSingle<{ name: string }>(),
-    ]);
+    const { data: site } = await db
+      .from('sites')
+      .select('name')
+      .eq('id', job.site_id)
+      .maybeSingle<{ name: string }>();
 
-    if (!profile?.email || !site?.name) {
-      console.error(`No profile or site for the set-up email (job ${job.id}).`);
+    if (!site?.name) {
+      console.error(`No site for the welcome email (job ${job.id}).`);
       return;
     }
 
-    await trySendEmail(
+    /*
+      ⚠️ welcomeOnce, NOT trySendEmail DIRECTLY — AND THE CLAIM IS THE POINT.
+      This used to send setUpEmail with an idempotency key of `setup-${job.id}`,
+      which is once per JOB. A welcome is an account-level event, and
+      welcomed_at (migration 0004) is the column built to arbitrate exactly
+      that. It also means the address and name are read inside the claim, so
+      there is no window where we read a profile and then fail to mark it.
+
+      ⚠️ ONLY THE FIGURES THE JOB ACTUALLY REPORTED. Each is passed through as
+      undefined when absent rather than coerced to 0 — the template drops the
+      sentence, because "read 0 pages" is a claim about a crawl that said
+      nothing. `score` is deliberately allowed through at 0: a site really can
+      score zero, and that is a measurement rather than a gap.
+    */
+    const p = progress as {
+      score?: number;
+      pagesRead?: number;
+      questions?: number;
+      checked?: number;
+    };
+
+    /*
+      The single highest-ranked fix, so the mail can name what to do rather than
+      pointing at a dashboard and hoping.
+
+      ⚠️ BEST EFFORT, AND ITS ABSENCE COSTS NOTHING. The report is a large jsonb
+      blob written by the audit stage; an older row, a partial write or a shape
+      that has since moved all end up as `null` here and the email simply drops
+      that paragraph. It must never be the reason a welcome fails to send —
+      which is why it is read separately from the claim rather than inside it.
+    */
+    let topFix: TopFix | null = null;
+    try {
+      const { data: run } = await db
+        .from('audit_runs')
+        .select('report')
+        .eq('site_id', job.site_id)
+        .not('report', 'is', null)
+        .order('checked_at', { ascending: false })
+        .limit(1)
+        .maybeSingle<{ report: unknown }>();
+
+      const actions = (run?.report as { actions?: unknown } | null)?.actions;
+      const first = Array.isArray(actions) ? actions[0] : null;
+      if (
+        first &&
+        typeof first.what === 'string' &&
+        typeof first.why === 'string' &&
+        typeof first.effort === 'string'
+      ) {
+        topFix = { what: first.what, why: first.why, effort: first.effort };
+      }
+    } catch (err) {
+      console.error('Could not read the top fix for the welcome email:', err);
+    }
+
+    await welcomeOnce(
+      job.user_id,
+      site.name,
       {
-        to: profile.email,
-        ...setUpEmail(profile.name, site.name),
-        // Keyed on the job, so the same scan can never mail twice even if the
-        // count above is somehow raced.
-        idempotencyKey: `setup-${job.id}`,
+        score: typeof p.score === 'number' ? p.score : undefined,
+        pagesRead: typeof p.pagesRead === 'number' ? p.pagesRead : undefined,
+        questions: typeof p.questions === 'number' ? p.questions : undefined,
+        /* ⚠️ A BOOLEAN, NOT THE COUNT. `checked` counts question-and-engine
+           pairs; printing it told a roofer "75 checks in all", which is our
+           plumbing rather than their news. All the reader needs is that the
+           engines were actually asked. */
+        asked: typeof p.checked === 'number' && p.checked > 0,
       },
-      'set-up email',
+      topFix,
     );
   } catch (err) {
-    console.error('Set-up email failed (the scan itself is unaffected):', err);
+    console.error('Welcome email failed (the scan itself is unaffected):', err);
   }
 }
 

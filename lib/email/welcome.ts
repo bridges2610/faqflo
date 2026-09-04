@@ -2,32 +2,39 @@ import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { trySendEmail } from './client';
-import { welcomeEmail } from './templates';
+import { welcomeEmail, type ScanFindings, type TopFix } from './templates';
 
 /**
  * Send the welcome email, at most once per account, ever.
  *
- * Called from /auth/callback, which runs on EVERY sign-in — Google, the
- * confirmation link, a password reset, and every returning visit after that.
- * So "have we already done this?" cannot be answered by the caller; it has to
- * be answered by the database, atomically, or a frequent signer-in gets a
- * welcome email a week.
+ * ⚠️ CALLED WHEN THE FIRST SCAN FINISHES, NOT WHEN SOMEBODY SIGNS IN. It used to
+ * run from /auth/callback, which meant it fired the instant an account existed
+ * and the scan's own "we're done" mail followed a minute or two behind it — two
+ * emails almost back to back, the first with nothing measured to report. The
+ * claim below is unchanged; only the moment moved. See announceIfFirst() in
+ * app/api/scan/tick/route.ts.
  *
- * Claim-then-send. The update is the lock: whoever's UPDATE returns a row owns
- * the send, and every other caller gets nothing back and stops.
+ * ⚠️ THE CLAIM IS STILL PER ACCOUNT, NOT PER SCAN. announceIfFirst already
+ * guards on "the first scan this site ever completed", but that is a different
+ * question from "has this person been welcomed" — a second site, or a job row
+ * counted wrong, would be a second welcome. The write below arbitrates, the
+ * same shape claimEvent() uses in lib/stripe/fulfil.ts: select-then-check loses
+ * to concurrency, only the update can decide.
  *
- * ⚠️ THE TRADE-OFF, STATED: claiming first means a send that fails afterwards
- * is never retried — that person simply gets no welcome. The alternative,
- * send-then-mark, re-sends on every transient network failure. One missing
- * welcome is a non-event; three identical ones is a complaint. If this ever
- * needs to be reliable rather than best-effort, it wants a job queue, not a
- * reordering of these two statements.
+ * A send that fails is never retried — that person simply gets no welcome. The
+ * alternative, a retry that cannot tell a bounce from a timeout, risks sending
+ * two: one missing welcome is a non-event; three identical ones is a complaint.
  *
  * Uses the service-role client because `welcomed_at` has no UPDATE grant for
- * `authenticated` — deliberately, so a browser cannot clear it and make us
- * send again. See supabase/migrations/0004_welcome_email.sql.
+ * `authenticated` — a browser that could clear it could make us send again.
+ * See supabase/migrations/0004_welcome_email.sql.
  */
-export async function welcomeOnce(userId: string): Promise<void> {
+export async function welcomeOnce(
+  userId: string,
+  siteName: string,
+  findings: ScanFindings = {},
+  topFix: TopFix | null = null,
+): Promise<void> {
   const supabase = createAdminClient();
 
   const { data, error } = await supabase
@@ -50,7 +57,7 @@ export async function welcomeOnce(userId: string): Promise<void> {
   const profile = data?.[0] as { email: string; name: string | null } | undefined;
   if (!profile) return;
 
-  const mail = welcomeEmail(profile.name);
+  const mail = welcomeEmail(profile.name, siteName, findings, topFix);
   await trySendEmail(
     {
       to: profile.email,

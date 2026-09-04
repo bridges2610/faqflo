@@ -1,4 +1,6 @@
 import 'server-only';
+
+import { scoreBand } from '@/lib/audit/score';
 import { SITE_URL } from '@/lib/site';
 
 /**
@@ -66,70 +68,128 @@ ${body}
 }
 
 /**
- * Sent the first time someone gets into an account, however they got there.
- *
- * Deliberately does not sell anything. They have just made an account; the
- * next thing they do is decide whether this was worth it, and an email that
- * asks for money before they have seen the product answers that badly.
+ * Findings from the first scan. Every field optional, because every one of them
+ * is written by the stage that produced it and a stage can finish reporting
+ * nothing.
  */
-export function welcomeEmail(name: string | null): Rendered {
-  const who = escape(firstName(name));
-  const url = `${origin()}/dashboard`;
-
-  return {
-    subject: 'Welcome to FaqFlo',
-    html: wrap(
-      `<p>Hi ${who},</p>
-<p>Your FaqFlo account is ready.</p>
-<p>The quickest way to see where you stand is to run an audit on your site — it tells you what an AI assistant can actually read on your pages, and what it can't.</p>
-<p><a href="${url}" style="color:#2563eb">Open your dashboard</a></p>
-<p>If anything looks wrong, just reply to this email. It comes to me.</p>`,
-    ),
-    text: `Hi ${firstName(name)},
-
-Your FaqFlo account is ready.
-
-The quickest way to see where you stand is to run an audit on your site — it tells you what an AI assistant can actually read on your pages, and what it can't.
-
-Open your dashboard: ${url}
-
-If anything looks wrong, just reply to this email. It comes to me.
-
-${SIGN_OFF}`,
-  };
-}
+export type ScanFindings = {
+  score?: number;
+  pagesRead?: number;
+  questions?: number;
+  /**
+   * Whether the engines were actually asked. A count of question-and-engine
+   * pairs, which is plumbing — the email says that it happened, never the
+   * number, because "75 checks" means nothing to somebody who sells roofs.
+   */
+  asked?: boolean;
+};
 
 /**
- * Sent once, when a Get Cited purchase actually grants access.
+ * The single highest-ranked fix from the audit, if it produced one.
  *
- * States the 30-day window and what survives it, because that is the part of
- * the deal a customer is most likely to have skimmed on the pricing page — and
- * finding out on day 31 that audits have stopped is how a refund request
- * starts. The receipt itself comes from Stripe; this does not duplicate it.
+ * Straight off ActionItem, whose fields were already written for this reader:
+ * `what` is imperative and specific, `why` is one sentence tying it to being
+ * quoted, and `effort` is a plain duration. Nothing here needs rewording.
  */
-export function setUpEmail(name: string | null, siteName: string): Rendered {
+export type TopFix = { what: string; why: string; effort: string };
+
+/**
+ * The one email a new account gets from us, sent when the first scan lands.
+ *
+ * ⚠️ THERE USED TO BE TWO, AND THAT IS THE BUG THIS FIXES. `welcomeEmail` went
+ * out from /auth/callback the moment somebody signed in, and `setUpEmail`
+ * followed a minute or two later when the scan finished — two mails almost back
+ * to back, the first of which could only say "your account is ready" because
+ * nothing had been measured yet. This waits until there is something to say.
+ *
+ * ⚠️ THE OLD setUpEmail SOLD A PRODUCT THAT NO LONGER EXISTS. It offered "Get
+ * Cited", "90 days of full access", checks on "days 7, 30, 60 and 90" and
+ * "Stay Cited". The plans are Free and Pro and the cadence has been weekly
+ * since 0012. Do not reintroduce a template that describes the schedule; it
+ * outlived two pricing changes because nothing on screen ever showed it.
+ *
+ * ⚠️ EVERY FIGURE IS OPTIONAL AND A MISSING ONE REMOVES ITS SENTENCE. Not one
+ * of them is defaulted to zero: "we read 0 pages" is a claim about a crawl that
+ * did not report, and this codebase's rule is that not measured is not zero.
+ *
+ * ⚠️ IT NEVER SAYS WHETHER ANYONE IS CITING THEM. The scan asks the engines and
+ * stores what they said; summarising that as a count in an email would be a
+ * verdict delivered before they have seen the evidence, and a bad first run
+ * reads very differently in an inbox than it does beside its own answers.
+ */
+export function welcomeEmail(
+  name: string | null,
+  siteName: string,
+  findings: ScanFindings = {},
+  topFix: TopFix | null = null,
+): Rendered {
   const who = escape(firstName(name));
   const site = escape(siteName);
-  const url = `${origin()}/dashboard/audit`;
+  const url = `${origin()}/dashboard`;
+
+  const { score, pagesRead, questions, asked } = findings;
+  const num = (v: number | undefined) => (typeof v === 'number' && v > 0 ? v : null);
+  const pages = num(pagesRead);
+  const found = num(questions);
+
+  /*
+    ⚠️ THE VERDICT COMES FROM scoreBand(), NOT FROM WORDING INVENTED HERE. That
+    function already turns a score into a label and a plain sentence, and it is
+    what the dashboard prints — so the email and the screen cannot describe the
+    same site two different ways. It is also the problem statement: "an
+    assistant can read this site, it just has to work harder than it should to
+    quote it" is the point of the whole product in one line.
+  */
+  const band = typeof score === 'number' ? scoreBand(score) : null;
+
+  const lines: string[] = [];
+  if (pages) lines.push(`Read ${pages} ${pages === 1 ? 'page' : 'pages'} of your site.`);
+  if (found)
+    lines.push(
+      `Found ${found} ${found === 1 ? 'question' : 'questions'} people ask about your line of work.`,
+    );
+  if (asked) lines.push('Asked ChatGPT, Perplexity and Gemini about them, and saved every answer.');
+
+  const htmlList = lines.length
+    ? `<ul style="padding-left:18px;margin:14px 0">${lines
+        .map((l) => `<li style="margin-bottom:6px">${escape(l)}</li>`)
+        .join('')}</ul>`
+    : '';
+  const textList = lines.length ? `\n${lines.map((l) => `- ${l}`).join('\n')}\n` : '';
+
+  const verdictHtml = band
+    ? `<p style="margin:14px 0"><strong>${escape(band.label)}</strong> — ${score} out of 100.<br />${escape(band.summary)}</p>`
+    : '';
+  const verdictText = band ? `\n${band.label} - ${score} out of 100.\n${band.summary}\n` : '';
+
+  /* The solution, named rather than gestured at. Omitted entirely when the
+     audit ranked nothing, which is the same rule the figures follow. */
+  const fixHtml = topFix
+    ? `<p style="margin:14px 0"><strong>Worth doing first:</strong> ${escape(topFix.what)}<br />${escape(topFix.why)} About ${escape(topFix.effort)}.</p>`
+    : '';
+  const fixText = topFix
+    ? `\nWorth doing first: ${topFix.what}\n${topFix.why} About ${topFix.effort}.\n`
+    : '';
 
   return {
-    subject: `${siteName} is set up`,
+    subject: `What AI can read on ${siteName}`,
     html: wrap(
       `<p>Hi ${who},</p>
-<p>Get Cited is active for <strong>${site}</strong>. That unlocks the full audit, the questions people actually put to AI about your category, the content plan, and the publish-ready export.</p>
-<p><a href="${url}" style="color:#2563eb">See your audit</a></p>
-<p>You have 90 days of full access, and we check whether the engines are naming you five times across it — once now, then on days 7, 30, 60 and 90. Nothing to press. After that, everything you have made stays yours — the audit, the answers, the export — and running new ones is what Stay Cited covers.</p>
-<p>Reply here if you get stuck.</p>`,
+<p>We've read <strong>${site}</strong> the same way ChatGPT and Gemini do — because that is where more and more of your customers are asking.</p>
+${verdictHtml}${htmlList}${fixHtml}
+<p><a href="${url}" style="color:#2563eb">Open your dashboard</a></p>
+<p>${topFix ? 'The rest is' : 'What to change is'} listed there, in the order worth doing. Work through them and the engines have your real answers to hand out — instead of guessing, or naming somebody else.</p>
+<p>We'll look again every week. Nothing for you to press. If anything looks wrong, just reply to this — it comes to me.</p>`,
     ),
     text: `Hi ${firstName(name)},
 
-Get Cited is active for ${siteName}. That unlocks the full audit, the questions people actually put to AI about your category, the content plan, and the publish-ready export.
+We've read ${siteName} the same way ChatGPT and Gemini do - because that is where more and more of your customers are asking.
+${verdictText}${textList}${fixText}
+Open your dashboard: ${url}
 
-See your audit: ${url}
+${topFix ? 'The rest is' : 'What to change is'} listed there, in the order worth doing. Work through them and the engines have your real answers to hand out - instead of guessing, or naming somebody else.
 
-You have 90 days of full access, and we check whether the engines are naming you five times across it - once now, then on days 7, 30, 60 and 90. Nothing to press. After that, everything you have made stays yours - the audit, the answers, the export - and running new ones is what Stay Cited covers.
-
-Reply here if you get stuck.
+We'll look again every week. Nothing for you to press. If anything looks wrong, just reply to this - it comes to me.
 
 ${SIGN_OFF}`,
   };

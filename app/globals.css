@@ -252,6 +252,40 @@
   }
 
   /*
+    A row arriving, rather than being found already there.
+
+    ⚠️ THE SECOND KEYFRAME, AND IT PASSES THE TEST THE FIRST ONE SETS. The rule
+    above allows one "unless something genuinely needs one — a keyframe is for
+    the one case a transition cannot express: an element animating on first
+    paint, with no previous state to move from". A scan stage finishing appends
+    a row that did not exist a moment earlier, which is exactly that case; there
+    is no previous value for a transition to run from.
+
+    ⚠️ IT MUST NOT BECOME A SUBSTITUTE FOR EVIDENCE. audit-notice.tsx states the
+    rule this obeys — motion between events nobody measured is "a clock
+    pretending to be a measurement". This animates a row whose arrival IS the
+    event; it never runs on a timer, and nothing fades in that has not actually
+    happened.
+
+    translate rather than margin or top: it composites on the GPU and cannot
+    reflow the rows beneath it mid-animation.
+
+    The reduced-motion block above clamps this to 0.01ms like everything else,
+    so the row simply appears — the honest end state, as meter-fill notes of
+    itself.
+  */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      translate: 0 6px;
+    }
+  }
+
+  .motion-rise {
+    animation: rise 320ms var(--ease-bounce) both;
+  }
+
+  /*
     Fine film grain. Perfectly smooth gradients are one of the clearest signs a
     page was generated rather than made — real printed and photographed colour
     always has some noise in it. This is subtle by design: you shouldn't be able

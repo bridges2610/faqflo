@@ -48,12 +48,21 @@ export default async function SignUpPage({
       <OrDivider />
       <SignUpForm next={next || undefined} />
 
-      {/* The free check needs no account, and the marketing page promises that
-          in five places. Saying so here stops the form reading as a wall in
-          front of something that was advertised as open. */}
-      <p className="text-slate mt-5 text-xs leading-relaxed">
-        Just want the free check? <AuthLink href="/free-report">Run it without an account</AuthLink>.
-      </p>
+      {/*
+        ⚠️ THE "run it without an account" LINE WAS HERE, AND ITS REMOVAL WAS
+        DELIBERATE. It read "Just want the free check? Run it without an
+        account", and its note argued that the marketing pages promise an
+        account-free check in five places, so saying so here stopped the form
+        reading as a wall in front of something advertised as open.
+
+        That argument is still true; it was outweighed. This page is the last
+        step of the funnel, and an escape hatch at the final prompt is an offer
+        to not finish. Somebody who wants the account-free version still meets
+        it everywhere it is advertised — site-footer.tsx, final-cta.tsx,
+        mobile-nav.tsx, hero.tsx, the SEO guide and the done-for-you page all
+        link /free-report, and it stays in the sitemap. Nothing is stranded;
+        the offer simply is not repeated at the point of signing up.
+      */}
     </AuthCard>
   );
 }

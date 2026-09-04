@@ -1,7 +1,6 @@
-import { NextResponse, after, type NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { safeNext } from '@/lib/auth/origin';
-import { welcomeOnce } from '@/lib/email/welcome';
 
 /**
  * Where every route into an account converges.
@@ -59,31 +58,21 @@ export async function GET(request: NextRequest) {
   }
 
   /*
-    The welcome email, after the response rather than before it.
+    ⚠️ THE WELCOME EMAIL USED TO BE SENT FROM HERE, AND IT MOVED ON PURPOSE.
 
-    after() runs once the redirect has already been sent, so signing in never
-    waits on Resend and a mail outage cannot turn a successful sign-in into an
-    error page. That matters more than it sounds: this route is the ONLY way
-    into an account, so anything that can throw here can lock everybody out.
+    Signing in fired `welcomeOnce()` in an after(), and the first scan then sent
+    a second mail a minute or two later — two emails almost back to back, the
+    first of which could only say "your account is ready" because nothing had
+    been measured yet.
 
-    welcomeOnce() is safe to call on every sign-in — it claims the send in the
-    database and does nothing if somebody already has. This route runs on every
-    returning visit too, which is exactly why that guard lives there and not in
-    a condition here.
+    There is one now, sent when the first scan finishes, from
+    announceIfFirst() in app/api/scan/tick/route.ts. It still claims through
+    welcomed_at, so it is still once per account ever; it just waits until it
+    has something to tell them.
+
+    This route is the only way into an account, so having one less thing that
+    can throw in it is a bonus rather than a cost.
   */
-  const user = data?.user;
-  if (user) {
-    after(async () => {
-      try {
-        await welcomeOnce(user.id);
-      } catch (err) {
-        // Belt and braces: welcomeOnce already swallows send failures, so
-        // reaching this means something unexpected. Still must not escape —
-        // an unhandled rejection in after() is a logged crash for a courtesy.
-        console.error('Welcome email failed after sign-in:', err);
-      }
-    });
-  }
 
   return NextResponse.redirect(`${origin}${next}`);
 }

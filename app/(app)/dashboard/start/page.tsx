@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { DoneForYouCard } from '@/components/dashboard/done-for-you-card';
+import { OnboardingExperience } from '@/components/dashboard/onboarding-experience';
 import { OnboardingStart } from '@/components/dashboard/onboarding-start';
 import { PageHeader } from '@/components/dashboard/page-header';
 import { currentUser } from '@/lib/auth/dal';
@@ -47,6 +48,18 @@ export default async function StartPage({
         description="We're reading your site and asking the AI engines about you."
       />
       <OnboardingStart domain={domain?.trim() || null} />
+
+      {/*
+        ⚠️ UNDER THE PROGRESS, NOT ABOVE IT. The first thing this screen owes
+        somebody is proof that something is happening; a form above the progress
+        bar reads as another hoop before the thing they asked for. Below it, the
+        wait is the reason the form is there.
+
+        It renders nothing until the site row exists, which is the reload
+        OnboardingStart triggers after its POST — so on the first pass this is
+        absent and the screen is unchanged.
+      */}
+      <OnboardingExperience />
 
       {/*
         ⚠️ PRO ONLY, WHICH IN PRACTICE MEANS ALMOST NOBODY SEES IT HERE.
