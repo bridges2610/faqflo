@@ -89,7 +89,7 @@ export function GroupForm({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Services"
-            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150"
           />
         </label>
 
@@ -101,7 +101,7 @@ export function GroupForm({
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="/services"
-            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+            className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150"
           />
         </label>
       </div>

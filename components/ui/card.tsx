@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 type Tone = 'white' | 'cloud';
 
 // Surface colour is a prop, not a className override: `bg-cloud` passed in
-// alongside a hardcoded `bg-white` lands at equal specificity, so which one
+// alongside a hardcoded `bg-surface` lands at equal specificity, so which one
 // wins depends on Tailwind's output order rather than on intent.
 const TONES: Record<Tone, string> = {
-  white: 'bg-white shadow-card',
+  white: 'bg-surface shadow-card',
   cloud: 'bg-cloud',
 };
 

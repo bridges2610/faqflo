@@ -148,7 +148,7 @@ export function OnboardingProfile() {
   }
 
   const field =
-    'border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150';
+    'border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150';
   const label = 'text-slate font-mono text-[0.6875rem] tracking-wide uppercase';
 
   /* ⚠️ COUNTRY IS NOT COUNTED HERE. It has a real default — "not set" — so a

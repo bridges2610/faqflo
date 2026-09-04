@@ -90,7 +90,7 @@ export function DraftIntoGroup({
         onChange={(e) => {
           if (e.target.value) draft(e.target.value);
         }}
-        className="border-line text-navy focus:border-primary rounded-input border bg-white px-2 py-1 text-sm outline-none"
+        className="border-line text-navy focus:border-primary rounded-input border bg-surface px-2 py-1 text-sm outline-none"
       >
         <option value="" disabled>
           Into which page?

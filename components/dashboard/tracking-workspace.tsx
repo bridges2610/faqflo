@@ -1177,7 +1177,7 @@ export function TrackingWorkspace() {
                       }}
                       placeholder="Who is the best roofer in Nyack?"
                       aria-label="Add your own question to the watch list"
-                      className="border-line focus:border-primary text-navy placeholder:text-slate/70 w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none"
+                      className="border-line focus:border-primary text-navy placeholder:text-slate/70 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none"
                     />
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <p className="text-slate text-xs">

@@ -95,10 +95,10 @@ export function Overlay({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="bg-navy/40 absolute inset-0 backdrop-blur-sm"
+          className="bg-ink/40 absolute inset-0 backdrop-blur-sm"
         />
       ) : (
-        <div className="bg-navy/40 absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
+        <div className="bg-ink/40 absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
       )}
 
       {/*
@@ -111,7 +111,7 @@ export function Overlay({
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`shadow-lift relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-xl bg-white p-6 ${className}`}
+        className={`shadow-lift relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-xl bg-surface p-6 ${className}`}
       >
         {children}
       </div>

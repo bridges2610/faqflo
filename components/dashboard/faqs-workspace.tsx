@@ -137,7 +137,7 @@ export function FaqsWorkspace() {
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder="Search every answer on this site…"
-                  className="border-line text-navy focus:border-primary placeholder:text-slate/70 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+                  className="border-line text-navy focus:border-primary placeholder:text-slate/70 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150"
                 />
               </label>
 

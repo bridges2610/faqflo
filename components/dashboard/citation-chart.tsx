@@ -25,10 +25,18 @@ import { SectionTitle } from './section-title';
   end of each line, the always-present legend, and the table view.
 */
 
+/*
+  ⚠️ TOKENS, NOT LITERALS, BECAUSE THESE THREE HAD TO SURVIVE DARK MODE. They
+  were the light hex values, which on the dark card (#101d35) measure 3.25:1,
+  4.57:1 and 2.95:1 — the chart would have gone nearly invisible on two of its
+  three series. Each token carries a lightened dark counterpart of the SAME hue,
+  so the blue → teal → violet order the comment above calls load-bearing is
+  preserved in both themes.
+*/
 const SERIES: Record<Engine, string> = {
-  ChatGPT: '#2563EB', // --color-primary
-  Perplexity: '#0891B2', // --color-teal-ink
-  Gemini: '#7C3AED',
+  ChatGPT: 'var(--color-primary)',
+  Perplexity: 'var(--color-teal-ink)',
+  Gemini: 'var(--color-violet)',
 };
 
 /*
@@ -237,7 +245,7 @@ export function CitationChart({
         <div className="mt-4 max-h-80 overflow-auto">
           <table className="w-full text-sm">
             <caption className="sr-only">Daily citations per engine</caption>
-            <thead className="text-slate sticky top-0 bg-white text-left">
+            <thead className="text-slate sticky top-0 bg-surface text-left">
               <tr className="border-line border-b">
                 <th scope="col" className="py-2 font-medium">
                   Date
@@ -277,7 +285,7 @@ export function CitationChart({
                 x2={W - PAD.right}
                 y1={y(t)}
                 y2={y(t)}
-                stroke="#E2E8F0"
+                stroke="var(--color-line)"
                 strokeWidth="1"
               />
               <text
@@ -323,7 +331,7 @@ export function CitationChart({
                       cy={y(d.byEngine[engine] ?? 0)}
                       r="3"
                       fill={SERIES[engine]}
-                      stroke="#FFFFFF"
+                      stroke="var(--color-surface)"
                       strokeWidth="1.5"
                     />
                   ))}
@@ -335,7 +343,7 @@ export function CitationChart({
                   cy={endY}
                   r="4"
                   fill={SERIES[engine]}
-                  stroke="#FFFFFF"
+                  stroke="var(--color-surface)"
                   strokeWidth="2"
                 />
 
@@ -417,7 +425,7 @@ export function CitationChart({
             x2={W - PAD.right}
             y1={PAD.top + PLOT_H}
             y2={PAD.top + PLOT_H}
-            stroke="#E2E8F0"
+            stroke="var(--color-line)"
             strokeWidth="1"
           />
 

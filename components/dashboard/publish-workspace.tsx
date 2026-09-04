@@ -74,7 +74,7 @@ function CopyBlock({
       {/* Capped height with its own scrollbar: a long answer set runs to
           hundreds of lines, and a block that grows without limit pushes
           everything below it off the page. */}
-      <pre className="bg-navy mt-3 max-h-80 overflow-auto rounded-xl p-4">
+      <pre className="bg-ink mt-3 max-h-80 overflow-auto rounded-xl p-4">
         <code className="font-mono text-[0.75rem] leading-relaxed whitespace-pre text-white/90">
           {code}
         </code>

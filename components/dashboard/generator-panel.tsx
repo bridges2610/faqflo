@@ -198,7 +198,7 @@ export function GeneratorPanel({
               }}
               className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
                 mode === m
-                  ? 'text-navy shadow-soft bg-white font-semibold'
+                  ? 'text-navy shadow-soft bg-surface font-semibold'
                   : 'text-slate hover:text-navy'
               }`}
             >
@@ -265,7 +265,7 @@ export function GeneratorPanel({
           <select
             value={count}
             onChange={(e) => setCount(Number(e.target.value))}
-            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {counts.map((n) => (
               <option key={n} value={n}>
@@ -282,7 +282,7 @@ export function GeneratorPanel({
           <select
             value={tone}
             onChange={(e) => setTone(e.target.value as Tone)}
-            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {TONES.map((t) => (
               <option key={t} value={t}>
@@ -299,7 +299,7 @@ export function GeneratorPanel({
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {LANGUAGES.map((l) => (
               <option key={l} value={l}>

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { AppShell } from '@/components/dashboard/app-shell';
+import { ThemeProvider } from '@/components/dashboard/theme';
 import { requireUser, sitesForUser } from '@/lib/auth/dal';
 import { DashboardProvider } from '@/lib/dashboard/provider';
 import { toSite } from '@/lib/dashboard/store';
@@ -67,7 +68,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       }}
       sites={sites.map(toSite)}
     >
-      <AppShell>{children}</AppShell>
+      {/* ⚠️ THE PROVIDER BELONGS HERE, NOT AROUND THE TOGGLE. It owns the
+          <html> theme attribute, and its unmount is what returns a marketing
+          page to light — so it has to live exactly as long as the dashboard.
+          Mounted inside the account menu instead, its cleanup fired every time
+          the menu closed and dark mode reverted on the next click.
+
+          ⚠️ ThemeScript IS NOT HERE. A nested layout renders on the client, and
+          a script tag is inert when it does; it lives in app/layout.tsx. */}
+      <ThemeProvider>
+        <AppShell>{children}</AppShell>
+      </ThemeProvider>
     </DashboardProvider>
   );
 }

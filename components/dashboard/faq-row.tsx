@@ -171,7 +171,7 @@ export function FaqRow({
                         if (e.target.value) moveFaqToGroup(faq.id, e.target.value);
                         setMoving(false);
                       }}
-                      className="border-line text-navy focus:border-primary min-h-11 rounded-input border bg-white px-2 py-1 text-sm outline-none sm:min-h-0"
+                      className="border-line text-navy focus:border-primary min-h-11 rounded-input border bg-surface px-2 py-1 text-sm outline-none sm:min-h-0"
                     >
                       <option value="" disabled>
                         Move to…

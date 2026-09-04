@@ -56,7 +56,7 @@ export function PublishPanel({
 
   return (
     <div className="sticky bottom-0 z-30 -mx-5 mt-5 sm:-mx-8 lg:-mx-10">
-      <div className="border-line bg-white/95 border-t px-5 py-3 backdrop-blur-md sm:px-8 lg:px-10">
+      <div className="border-line bg-surface/95 border-t px-5 py-3 backdrop-blur-md sm:px-8 lg:px-10">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-navy min-w-0 text-sm font-semibold">
             {label}

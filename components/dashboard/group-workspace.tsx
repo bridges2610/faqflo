@@ -288,7 +288,7 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
                   aria-pressed={filter === f.id}
                   className={`rounded-full px-3.5 py-1 text-sm transition-all duration-200 ${
                     filter === f.id
-                      ? 'text-navy shadow-soft bg-white font-semibold'
+                      ? 'text-navy shadow-soft bg-surface font-semibold'
                       : 'text-slate hover:text-navy'
                   }`}
                 >

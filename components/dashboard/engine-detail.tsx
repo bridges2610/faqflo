@@ -70,13 +70,13 @@ export const OUTCOME_STYLE: Record<CitationCheck['outcome'], { label: string; cl
   {
     cited: { label: 'linked', className: 'bg-success/12 text-success-ink' },
     mentioned: { label: 'named', className: 'bg-accent-soft text-navy' },
-    absent: { label: 'not named', className: 'text-slate border-line border bg-white' },
+    absent: { label: 'not named', className: 'text-slate border-line border bg-surface' },
   };
 
 /** Not an outcome — the absence of one. Kept visually quieter than any verdict. */
 export const NOT_CHECKED = {
   label: 'not asked',
-  className: 'text-slate/80 border-line border bg-white',
+  className: 'text-slate/80 border-line border bg-surface',
 };
 
 /*

@@ -279,7 +279,7 @@ function PeriodToggle({
           aria-pressed={!annual}
           className={`rounded-full px-4 py-1.5 text-sm transition-all duration-200 ${
             !annual
-              ? 'bg-primary shadow-card font-semibold text-white'
+              ? 'bg-primary shadow-card font-semibold text-on-primary'
               : 'text-primary hover:text-primary-hover'
           }`}
         >
@@ -291,7 +291,7 @@ function PeriodToggle({
           aria-pressed={annual}
           className={`flex items-center gap-2 rounded-full py-1.5 pr-2 pl-4 text-sm transition-all duration-200 ${
             annual
-              ? 'bg-primary shadow-card font-semibold text-white'
+              ? 'bg-primary shadow-card font-semibold text-on-primary'
               : 'text-primary hover:text-primary-hover'
           }`}
         >
@@ -335,7 +335,7 @@ function PlanCard({
 }) {
   return (
     <div
-      className={`relative rounded-2xl border bg-white p-6 sm:p-7 ${
+      className={`relative rounded-2xl border bg-surface p-6 sm:p-7 ${
         featured ? 'border-primary shadow-hero' : 'border-line shadow-card'
       }`}
     >

@@ -108,7 +108,7 @@ export function SetPublish({
             onBlur={savePath}
             disabled={saving}
             placeholder="/roof-costs"
-            className="border-line text-navy focus:border-primary min-h-11 min-w-0 flex-1 rounded-input border bg-white px-3 py-1.5 font-mono text-xs outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary min-h-11 min-w-0 flex-1 rounded-input border bg-surface px-3 py-1.5 font-mono text-xs outline-none transition-colors duration-150 sm:min-h-0"
           />
         </span>
       </label>

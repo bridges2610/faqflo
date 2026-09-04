@@ -65,7 +65,7 @@ export function QuestionControls({
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="border-line bg-white text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150"
+            className="border-line bg-surface text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150"
           />
         </label>
         {error ? (
@@ -99,7 +99,7 @@ export function QuestionControls({
         onClick={() => moveQuestion(question.id, 'up')}
         disabled={isFirst}
         aria-label="Move this question up"
-        className="text-slate hover:text-primary hover:bg-white rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
+        className="text-slate hover:text-primary hover:bg-surface rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
       >
         <ArrowUpIcon className="h-3.5 w-3.5" />
       </button>
@@ -107,7 +107,7 @@ export function QuestionControls({
         onClick={() => moveQuestion(question.id, 'down')}
         disabled={isLast}
         aria-label="Move this question down"
-        className="text-slate hover:text-primary hover:bg-white rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
+        className="text-slate hover:text-primary hover:bg-surface rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
       >
         <ArrowDownIcon className="h-3.5 w-3.5" />
       </button>

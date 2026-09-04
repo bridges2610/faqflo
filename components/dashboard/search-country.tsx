@@ -101,7 +101,7 @@ export function SearchCountry({
               setSaving(false);
             }
           }}
-          className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150"
+          className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150"
         >
           <option value="">Not set — no location sent</option>
           {COUNTRIES.map((c) => (

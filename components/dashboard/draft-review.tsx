@@ -65,7 +65,7 @@ export function DraftReview({
               <label className="flex cursor-pointer gap-3">
                 <span
                   className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors duration-150 ${
-                    isKept ? 'bg-primary border-primary text-white' : 'border-line bg-white'
+                    isKept ? 'bg-primary border-primary text-on-primary' : 'border-line bg-surface'
                   }`}
                 >
                   {isKept && <Check className="h-3 w-3" />}

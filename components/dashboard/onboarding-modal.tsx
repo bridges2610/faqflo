@@ -102,7 +102,7 @@ export function OnboardingModal({ job, onClose }: { job: ScanJob; onClose: () =>
               <span
                 className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
                   isDone
-                    ? 'bg-primary text-white'
+                    ? 'bg-primary text-on-primary'
                     : isRunning
                       ? 'bg-primary/20 animate-pulse'
                       : 'bg-cloud'

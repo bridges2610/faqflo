@@ -46,6 +46,84 @@
   --color-tint-blue: #eff6ff;
   --color-line: #e2e8f0;
 
+  /*
+    The card surface, and the reason it is a token rather than `bg-white`.
+
+    ⚠️ DARK MODE CANNOT REDEFINE `bg-white`, WHICH IS WHY THIS EXISTS. Tailwind's
+    `bg-white` and `text-white` are the same built-in `--color-white`. Every
+    other dashboard colour re-themes for free because the utilities compile to
+    `var(--color-*)` — but flipping white would drag `text-white` with it, and
+    that sits on `bg-primary` and `bg-navy` buttons where white is the only
+    sanctioned pairing (5.17:1 and 17.04:1). So the SURFACE gets its own token
+    and the TEXT keeps the built-in.
+
+    ⚠️ MARKETING NEVER GETS THE DARK ATTRIBUTE, so Card and Button keep painting
+    #fff there even though they are shared components. That is what makes it
+    safe for components/ui/* to use this.
+  */
+  --color-surface: #ffffff;
+
+  /*
+    The dark FILL, which used to be `bg-navy` and could not stay that way.
+
+    ⚠️ `--color-navy` DOES TWO JOBS, AND DARK MODE SPLITS THEM. In light it is
+    both "the strongest text" (241 uses) and "a dark panel to put white text on"
+    (bg-navy, 16 uses). Dark mode inverts the first — navy becomes a pale
+    blue-white — which silently breaks the second: the audit-notice panel, the
+    free-report masthead, the <pre> code blocks and the `dark` button variant
+    would each have become a PALE box still carrying white text.
+
+    So the fill role gets its own token, and it stays dark in both themes. White
+    on it is 17.04:1 in light and 11.42:1 in dark — one of the two sanctioned
+    white-on-fill pairs either way.
+
+    ⚠️ NOT FOR THE `bg-navy/8` CHIPS. Those pair a faint wash with `text-navy`,
+    and BOTH sides flip together, so the relationship survives inversion on its
+    own — a faint pale wash under pale text is right on dark. Leave them.
+  */
+  --color-ink: #0b1b3a;
+
+  /*
+    What goes ON a primary fill — and the third token born from the same trap.
+
+    ⚠️ `--color-primary` IS A LINK COLOUR ~200 TIMES AND A BUTTON FILL ~25, and
+    dark mode pulls those two apart. A link on #101d35 needs to be LIGHT to be
+    read (#2563eb is only 3.25:1 there); a fill with white text needs to be DARK
+    (white on the light #7da3f8 is 2.48:1, a straight fail). No single value
+    does both, and the text usages outnumber the fills eight to one — so primary
+    follows the TEXT, and the fill's foreground becomes a token that inverts
+    with it.
+
+    Measured both ways round: white on #2563eb is 5.17:1, and #0a1426 on
+    #7da3f8 is 7.42:1. A primary button stays legible in either theme.
+
+    ⚠️ ONLY FOR bg-primary. `text-white` on a `bg-ink` fill is still white in
+    both themes and must not be swapped for this.
+  */
+  --color-on-primary: #ffffff;
+
+  /*
+    OpenAI's knot, which is the only brand mark that cannot survive inversion.
+
+    ⚠️ MEASURED ALL SEVEN BRAND COLOURS AGAINST THE DARK CARD; SIX WERE FINE.
+    Perplexity 3.63, Google's four 4.28–9.84, Claude 5.38 — all clear the 3:1 an
+    icon needs. OpenAI's #000 is 1.25:1, an invisible mark. Their own guidelines
+    use white on dark, so this is the sanctioned form rather than a tint we
+    invented; every other mark keeps its exact brand value in both themes.
+  */
+  --color-mark-openai: #000000;
+
+  /*
+    ⚠️ A SECOND BORDER, FOR THINGS YOU CAN CLICK. `--color-line` is a hairline
+    divider and is allowed to be nearly invisible — measured 1.27:1 against the
+    dark surface, which is correct for a rule between rows. WCAG 1.4.11 asks 3:1
+    of anything that IDENTIFIES a control, so input borders and focus rings need
+    a stronger value than a divider does. In light mode the two coincide closely
+    enough that only dark really needs the split; the token exists in both so a
+    component can state which job it means.
+  */
+  --color-line-strong: #cbd5e1;
+
   /* Semantic.
      The brand values below are for FILLS, dots, and icons. As text on a light
      surface they fail WCAG AA (#22C55E is 2.28:1 on white, #EF4444 is 3.76:1),
@@ -119,6 +197,103 @@
   --shadow-hero: 0 18px 48px rgba(37, 99, 235, 0.16);
 
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/*
+  ═══════════════════════════════════════════════════════════════════════════
+  DARK MODE — THE DASHBOARD ONLY.
+  ═══════════════════════════════════════════════════════════════════════════
+
+  ⚠️ THIS RE-THEMES ~1,000 UTILITY USAGES AND EDITS NO COMPONENT. Tailwind v4
+  compiles `bg-cloud` to `background-color: var(--color-cloud)`, so redefining
+  the custom properties here is the whole mechanism. Counted across
+  components/dashboard, components/ui and app/(app): text-slate 424, text-navy
+  241, border-line 121, bg-cloud 76, bg-primary 49, divide-line 35. Adding
+  `dark:` variants to each of those would be a thousand edits that can drift;
+  this cannot drift, because there is only one definition.
+
+  ⚠️ ON `html`, NOT ON A WRAPPER DIV. <body> paints var(--color-cloud) under a
+  fixed radial wash (@layer base below), so a wrapper inside body would leave
+  the real page background light and show it on overscroll and behind short
+  pages. app/(app)/layout.tsx sets the attribute; marketing never does, which
+  is what keeps the shared components/ui/* light out there.
+
+  ⚠️ THE NAMES NOW LIE, DELIBERATELY. `--color-navy` is a pale blue-white here
+  and `--color-cloud` is nearly black. Renaming them to `--color-fg`/`--color-bg`
+  would have been honest and would also have touched all 665 call sites of those
+  two alone. The names are kept as ROLES — navy is "the strongest text", cloud
+  is "the page" — and this comment is the compensation for that.
+*/
+html[data-theme='dark'] {
+  /* Surfaces, lightest-to-darkest by elevation: page → card → raised. */
+  --color-cloud: #0a1426;
+  --color-surface: #101d35;
+  --color-shell: #16263f;
+
+  /* Text. Measured against --color-surface #101d35. */
+  --color-navy: #e8eef7; /* 14.41:1 */
+  --color-slate: #9dabc2; /* 7.23:1 */
+
+  --color-line: #22304a; /* 1.27:1 — a hairline, and meant to be */
+  --color-line-strong: #64748b; /* 3.53:1 — inputs, focus rings, WCAG 1.4.11 */
+
+  /*
+    ⚠️ LIGHTER THAN LIGHT MODE'S, ON PURPOSE. #0b1b3a is only 1.08:1 against
+    this page — a "dark panel" that is invisible on a dark ground is not a
+    panel. This lifts it to 1.61:1 from the page and 1.47:1 from a card, so the
+    masthead and the code blocks still read as raised, and white on it is
+    11.42:1.
+  */
+  --color-ink: #233a5e;
+  --color-mark-openai: #ffffff; /* #000 is 1.25:1 here — see the token definition */
+
+  /*
+    ⚠️ FIVE OF THE SIX INKS FAILED HERE AND HAD TO BE REPLACED, NOT REUSED.
+    Every `-ink` value in the light theme was chosen for contrast on WHITE, so
+    on #101d35 they collapse. Measured before replacing:
+
+      error-ink   #b91c1c  2.60  FAIL          warn-ink #c2410c  3.25  fails text
+      violet      #7c3aed  2.95  FAIL          primary  #2563eb  3.25  fails text
+      success-ink #15803d  3.35  fails text    teal-ink #0891b2  4.57  the survivor
+
+    The replacements below keep each hue — a warning still reads as a warning —
+    and clear 4.5:1 on the card surface. Do not "simplify" these back to the
+    light values: that is the exact regression this block exists to prevent.
+  */
+  --color-primary: #7da3f8; /* 6.78:1 as text; as a FILL it carries on-primary */
+  --color-primary-hover: #9dbaff;
+  --color-on-primary: #0a1426; /* 7.42:1 on the fill above — white would be 2.48 */
+  --color-success-ink: #4ade80; /* 9.65:1 */
+  --color-error-ink: #f87171; /* 6.08:1 */
+  --color-warn-ink: #fb923c; /* 7.43:1 */
+  --color-teal-ink: #22d3ee; /* 9.30:1 */
+  --color-violet: #a78bfa; /* 6.18:1 */
+
+  /*
+    The soft tints are fills behind the inks above. Light mode's near-white
+    tints (#eff4ff, #ecfeff, #fffbeb) would be brighter than the page here and
+    read as glowing panels, so each becomes a dark, low-saturation wash of the
+    same hue — the same relationship, inverted.
+  */
+  --color-primary-soft: #17264a;
+  --color-accent-soft: #0e2f38;
+  --color-warn-soft: #33240f;
+  --color-tint-cyan: #0e2f38;
+  --color-tint-blue: #17264a;
+
+  /*
+    ⚠️ SHADOWS DO NOT WORK ON A DARK GROUND, so elevation switches to light.
+    A blue-tinted drop shadow is invisible against #0a1426 — the card would
+    simply lose its edge. These keep a real shadow for depth but add a top
+    inset highlight, which is how a raised surface reads when it cannot cast.
+  */
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  --shadow-lift: 0 10px 34px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --shadow-hero: 0 18px 48px rgba(0, 0, 0, 0.6);
+
+  /* Native form controls, scrollbars and the caret follow the theme. */
+  color-scheme: dark;
 }
 
 @layer base {
@@ -390,6 +565,44 @@
 @media print {
   @page {
     margin: 14mm 14mm 16mm;
+  }
+
+  /*
+    ⚠️ PAPER IS ALWAYS LIGHT, SO DARK MODE IS UNDONE HERE.
+
+    The theme attribute lives on <html> and survives printing, so without this
+    a customer who prints their report while in dark mode gets pale text on
+    white paper — the print block already forces `html, body { background: #fff }`
+    below, which would otherwise strip the only background making that text
+    readable. Ink on white is the one thing a printed report must be.
+
+    Every token the dark block redefines is restored to its light value. If a
+    token is added there, add it here too.
+  */
+  html[data-theme='dark'] {
+    --color-cloud: #f6f8fc;
+    --color-surface: #ffffff;
+    --color-shell: #fbfcfe;
+    --color-navy: #0b1b3a;
+    --color-slate: #475569;
+    --color-line: #e2e8f0;
+    --color-line-strong: #cbd5e1;
+    --color-ink: #0b1b3a;
+    --color-mark-openai: #000000;
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4fd8;
+    --color-on-primary: #ffffff;
+    --color-success-ink: #15803d;
+    --color-error-ink: #b91c1c;
+    --color-warn-ink: #c2410c;
+    --color-teal-ink: #0891b2;
+    --color-violet: #7c3aed;
+    --color-primary-soft: #eff4ff;
+    --color-accent-soft: #ecfeff;
+    --color-warn-soft: #fffbeb;
+    --color-tint-cyan: #ecfeff;
+    --color-tint-blue: #eff6ff;
+    color-scheme: light;
   }
 
   /*

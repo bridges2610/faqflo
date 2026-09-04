@@ -44,7 +44,7 @@ export function ManualForm({ groupId, onDone }: { groupId: string; onDone: () =>
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Do you offer weekend appointments?"
-          className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-[0.9375rem] outline-none transition-colors duration-150"
+          className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-[0.9375rem] outline-none transition-colors duration-150"
         />
       </label>
       <label className="mt-3 block">
@@ -56,7 +56,7 @@ export function ManualForm({ groupId, onDone }: { groupId: string; onDone: () =>
           onChange={(e) => setAnswer(e.target.value)}
           rows={3}
           placeholder="Two or three sentences, in plain words."
-          className="border-line text-navy focus:border-primary mt-1.5 w-full resize-y rounded-input border bg-white px-3 py-2 text-sm leading-relaxed outline-none transition-colors duration-150"
+          className="border-line text-navy focus:border-primary mt-1.5 w-full resize-y rounded-input border bg-surface px-3 py-2 text-sm leading-relaxed outline-none transition-colors duration-150"
         />
       </label>
       <div className="mt-3 flex items-center gap-2">

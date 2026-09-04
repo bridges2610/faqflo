@@ -104,7 +104,7 @@ export function ScanProgress({ siteId }: { siteId: string }) {
                   complete
                     ? 'bg-success-ink text-white'
                     : active
-                      ? 'bg-primary animate-pulse text-white'
+                      ? 'bg-primary animate-pulse text-on-primary'
                       : 'bg-cloud text-slate'
                 }`}
               >

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { SITE_URL } from '@/lib/site';
 import { Inter, JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
 import Script from 'next/script';
+import { ThemeScript } from '@/components/dashboard/theme';
 import './globals.css';
 
 const jakarta = Plus_Jakarta_Sans({
@@ -108,6 +109,27 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <body> and nowhere else.
       */}
       <body className="flex min-h-dvh flex-col" suppressHydrationWarning>
+        {/*
+          ⚠️ BEFORE {children}, AND IN THE ROOT LAYOUT RATHER THAN THE (app) ONE.
+
+          It sets the dashboard's dark attribute at parse time so a dark-mode
+          customer never gets a white first frame. Rendered from
+          app/(app)/layout.tsx it drew a React warning — "scripts inside React
+          components are never executed when rendering on the client" — because a
+          NESTED layout renders on the client when you soft-navigate into it, and
+          an inert script tag cannot prevent a flash. This layout is only ever
+          server-rendered.
+
+          It is site-wide by position and dashboard-only by behaviour: the script
+          returns immediately unless the path is under /dashboard. Marketing has
+          no dark palette, so that check is what keeps it light.
+
+          ⚠️ NOT next/script. The docs require `beforeInteractive` to live in this
+          file — which it does — but state its execution "does not block page
+          hydration", and the guarantee needed here is "runs at parse position".
+          A plain tag at a known position gives exactly that.
+        */}
+        <ThemeScript />
         {children}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}

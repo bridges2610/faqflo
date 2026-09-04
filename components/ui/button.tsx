@@ -67,13 +67,13 @@ const VARIANTS: Record<Variant, string> = {
   // Solid blue rather than the gradient: white text needs 4.5:1, and the
   // gradient's cyan end is far too light to carry it. The gradient is used for
   // surfaces and decoration instead.
-  primary: 'bg-primary text-white shadow-card hover:bg-primary-hover hover:shadow-lift',
-  ghost: 'bg-white text-navy border border-line shadow-soft hover:border-primary hover:text-primary',
-  dark: 'bg-navy text-white shadow-card hover:bg-navy/90 hover:shadow-lift',
+  primary: 'bg-primary text-on-primary shadow-card hover:bg-primary-hover hover:shadow-lift',
+  ghost: 'bg-surface text-navy border border-line shadow-soft hover:border-primary hover:text-primary',
+  dark: 'bg-ink text-white shadow-card hover:bg-ink/90 hover:shadow-lift',
   // For dark or gradient backgrounds. Exists as its own variant because
   // overriding `primary`'s colours through className is a coin-flip — both land
   // at the same specificity and whichever Tailwind emits last wins.
-  light: 'bg-white text-navy shadow-lift hover:bg-white/90',
+  light: 'bg-white text-ink shadow-lift hover:bg-white/90',
 };
 
 /*

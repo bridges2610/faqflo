@@ -337,7 +337,7 @@ export function HelpWorkspace({
       {/* Mobile contents. A <details> rather than a rail, collapsed by default,
           because a ten-item list above the content pushes the content off a
           phone screen entirely. */}
-      <details className="border-line group mb-6 rounded-xl border bg-white p-4 lg:hidden">
+      <details className="border-line group mb-6 rounded-xl border bg-surface p-4 lg:hidden">
         <summary className="text-navy flex cursor-pointer list-none items-center justify-between text-sm font-semibold [&::-webkit-details-marker]:hidden">
           On this page
           <span

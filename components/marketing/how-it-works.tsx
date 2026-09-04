@@ -27,7 +27,7 @@ const STEPS = [
   {
     n: '03',
     title: 'Generate',
-    body: 'Answer-first, factual, specific. Written to be lifted whole into an answer, with your name attached to it.',
+    body: 'Answer-first, factual, specific. Written to be lifted whole into an answer, with your name attached to it. Or turn any question into a full article in one click.',
   },
   {
     n: '04',

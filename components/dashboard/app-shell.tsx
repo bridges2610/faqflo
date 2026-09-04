@@ -424,7 +424,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <button
             onClick={() => setDrawerOpen(false)}
             aria-label="Close menu"
-            className="bg-navy/40 absolute inset-0 backdrop-blur-[2px]"
+            className="bg-ink/40 absolute inset-0 backdrop-blur-[2px]"
           />
           {/* Cloud, to match the permanent sidebar — it is the same nav, and
               the hovers inside it are written for a cloud surface. */}
@@ -464,7 +464,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 onClick={() => setDrawerOpen(true)}
                 aria-label="Open menu"
-                className="text-slate hover:text-navy border-line rounded-input border bg-white p-2 lg:hidden"
+                className="text-slate hover:text-navy border-line rounded-input border bg-surface p-2 lg:hidden"
               >
                 <MenuIcon className="h-5 w-5" />
               </button>
@@ -548,7 +548,7 @@ function LoadFailed({ message, onRetry }: { message: string; onRetry: () => void
     Card itself uses.
   */
   return (
-    <div role="alert" className="border-line rounded-xl border bg-white p-6 sm:p-8">
+    <div role="alert" className="border-line rounded-xl border bg-surface p-6 sm:p-8">
       <h1 className="text-navy text-lg font-semibold">We couldn&rsquo;t load your dashboard</h1>
       <p className="text-slate mt-2 text-sm leading-relaxed">
         Your pages, answers and questions are saved — we just couldn&rsquo;t reach them this time.
@@ -573,8 +573,8 @@ function ShellSkeleton() {
       <div className="bg-line h-8 w-56 rounded-lg" />
       <div className="bg-line/70 mt-3 h-4 w-80 rounded" />
       <div className="mt-8 grid gap-5 sm:grid-cols-2">
-        <div className="border-line h-44 rounded-xl border bg-white" />
-        <div className="border-line h-44 rounded-xl border bg-white" />
+        <div className="border-line h-44 rounded-xl border bg-surface" />
+        <div className="border-line h-44 rounded-xl border bg-surface" />
       </div>
     </div>
   );

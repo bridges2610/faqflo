@@ -63,6 +63,11 @@ const FEATURES = [
   'Every page on your site checked, not just the home page',
   'The questions people really ask AI in your line of work',
   'Answers written to be quoted, not skimmed',
+  /* ⚠️ ARTICLES WERE MISSING FROM THIS LIST ENTIRELY while the Pro card sold
+     them, which is the drift the note above warns about rather than a wording
+     difference. Kept to the mechanic — see the article row in PLAN_FEATURES for
+     why this must not claim anything about which questions AI names you on. */
+  'A full article from any customer question, in one click',
   'Ready-to-paste code for your own website',
   'An llms.txt file — a plain-text summary written for AI to read',
   // ⚠️ GEMINI, NOT AI OVERVIEWS. Overviews has no API and nobody can query it.

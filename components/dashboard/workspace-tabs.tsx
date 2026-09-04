@@ -26,7 +26,7 @@ import { usePathname } from 'next/navigation';
   It was a white pill on the grey field, which read as an unlit switch — you had
   to compare three labels' weight to work out where you were. `bg-primary` with
   `text-white` is 5.17:1 and one of only TWO sanctioned white-on-fill pairs in
-  this product (the other is `bg-navy`, 17.04:1). Any other fill here needs
+  this product (the other is `bg-ink`, 17.04:1). Any other fill here needs
   measuring against white text before it ships; `accent` in particular is 1.9:1
   on white and is fill-only for exactly this reason.
 
@@ -73,7 +73,7 @@ export function WorkspaceTabs({
                 aria-current={active ? 'page' : undefined}
                 className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
                   active
-                    ? 'bg-primary shadow-soft font-semibold text-white'
+                    ? 'bg-primary shadow-soft font-semibold text-on-primary'
                     : 'text-slate hover:text-navy'
                 }`}
               >

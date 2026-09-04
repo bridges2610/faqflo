@@ -663,10 +663,24 @@ export const PLAN_FEATURES: PlanFeature[] = [
     prosePro: 'Answers written for you, ready to paste on your site',
   },
   {
+    /*
+      ⚠️ THE ACTION IS THE SELL, AND THIS ROW USED TO DESCRIBE ONLY THE SOURCE
+      MATERIAL — "written from your own pages", which says where the words come
+      from and nothing about what the customer does. What Pro actually buys here
+      is that a topic row's button IS the whole flow: write-panel.tsx wires it as
+      `onWrite={() => run(q.question)}`, one press, no form.
+
+      ⚠️ AND IT STOPS AT THE MECHANIC ON PURPOSE. The topic list is sorted
+      least-named-first, but write-panel.tsx deliberately stopped narrating that
+      — some of those rows ARE questions AI names you on, and calling all five
+      gaps was "the invented-measurement rule broken in words instead of
+      digits". Do not sell this as "starting with the questions AI names you on
+      least": it would put back in marketing exactly what the app removed.
+    */
     label: 'Articles written for you',
     free: `${FREE_ARTICLE_CAP} to start`,
-    pro: `${ARTICLE_CAP} a month`,
-    prosePro: `${ARTICLE_CAP} articles a month, written from your own pages`,
+    pro: `${ARTICLE_CAP} a month, one click each`,
+    prosePro: `${ARTICLE_CAP} articles a month, written from the questions your customers actually ask — one click each`,
   },
   {
     label: 'Code to paste on your site',

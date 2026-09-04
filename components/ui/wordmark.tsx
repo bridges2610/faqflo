@@ -26,7 +26,7 @@ export function Wordmark({
       <span className={reverse ? 'text-white' : 'text-navy'}>Faq</span>
       <span
         className={`inline-block -rotate-3 rounded-[10px] px-2 py-1 ${
-          reverse ? 'text-navy bg-white' : 'bg-primary text-white'
+          reverse ? 'text-ink bg-white' : 'bg-primary text-on-primary'
         }`}
       >
         Flo

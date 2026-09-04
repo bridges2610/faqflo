@@ -90,7 +90,7 @@ export function AuditNotice() {
         moving parts use `accent` instead. It stays fill-only, beside the words
         and never carrying them, as globals.css requires.
       */}
-      <div className="bg-navy shadow-lift rounded-xl p-4">
+      <div className="bg-ink shadow-lift rounded-xl p-4">
         <div className="flex items-center gap-2.5">
           {/* Decoration. The heading beside it says what is happening, and the
               list below says how far along — this only signals "moving". */}

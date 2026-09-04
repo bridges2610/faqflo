@@ -6,6 +6,7 @@ import { signOut } from '@/lib/auth/actions';
 import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { PlanBadge } from './plan-badge';
+import { ThemeChoice } from './theme';
 
 /*
   Who you are signed in as, and the way out.
@@ -110,7 +111,7 @@ export function AccountMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="border-line hover:border-primary rounded-pill flex items-center gap-2 border bg-white py-1 pr-3 pl-1 transition-colors duration-150"
+        className="border-line hover:border-primary rounded-pill flex items-center gap-2 border bg-surface py-1 pr-3 pl-1 transition-colors duration-150"
       >
         <span
           className="bg-primary-soft text-primary flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
@@ -127,7 +128,7 @@ export function AccountMenu() {
       {open && (
         <div
           role="menu"
-          className="border-line shadow-lift absolute right-0 z-50 mt-2 w-64 rounded-xl border bg-white p-4"
+          className="border-line shadow-lift absolute right-0 z-50 mt-2 w-64 rounded-xl border bg-surface p-4"
         >
           <p className="text-navy truncate text-sm font-semibold">{user.name}</p>
           {/* Shown because on a shared machine "which account am I in?" is the
@@ -175,6 +176,15 @@ export function AccountMenu() {
             >
               Your plan
             </Link>
+          </div>
+
+          {/* ⚠️ NOT A menuitem, AND THE -mx IS DELIBERATE. The rows above are
+              links that close the menu and go somewhere; this is a setting you
+              change in place, so it keeps its own radiogroup semantics rather
+              than pretending to be a menu item. The negative margin lets the
+              track run to the panel's padding edge like the dividers do. */}
+          <div className="border-line -mx-1 mt-3 border-t pt-2">
+            <ThemeChoice />
           </div>
 
           <div className="border-line mt-3 border-t pt-3">

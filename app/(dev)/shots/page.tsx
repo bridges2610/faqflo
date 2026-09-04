@@ -198,7 +198,16 @@ export default function Shots() {
   */
   const panels = [
     { key: 'audit', offset: 0, node: <AuditWorkspace /> },
-    { key: 'answers', offset: 960, node: <GroupWorkspace groupId={liveGroup.id} /> },
+    /* ⚠️ 674 IS THE CONTENT HEIGHT MINUS THE WINDOW, AND THAT IS NOT A COINCIDENCE.
+       Measured: the workspace is 1534 CSS px tall, so 1534 − 860 is the furthest
+       this can scroll before it runs off the end. It was 960 — 286px past that —
+       which is exactly what the warning above predicted: the shot came back cut
+       mid-answer at the top with the bottom third empty cloud.
+
+       At 674 the frame lands on the generator's Generate button (291→776), the
+       20px gap, then the whole answers card (796→1534). 102 + 20 + 738 = 860,
+       so it fills exactly. Re-measure rather than nudge if this drifts again. */
+    { key: 'answers', offset: 674, node: <GroupWorkspace groupId={liveGroup.id} /> },
     { key: 'results', offset: 0, node: <TrackingWorkspace /> },
     { key: 'overview', offset: 0, node: <OverviewWorkspace /> },
     /*

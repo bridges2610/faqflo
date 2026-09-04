@@ -66,7 +66,7 @@ export function TaskRow({ task, index }: { task: Task; index: number }) {
               </Button>
               <span className="text-slate text-xs">{task.action.where}</span>
             </div>
-            <pre className="bg-navy mt-2 max-h-32 overflow-auto rounded-lg p-3">
+            <pre className="bg-ink mt-2 max-h-32 overflow-auto rounded-lg p-3">
               <code className="font-mono text-[0.6875rem] leading-relaxed whitespace-pre text-white/90">
                 {task.action.snippet}
               </code>

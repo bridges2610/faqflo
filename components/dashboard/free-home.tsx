@@ -128,7 +128,7 @@ export function FreeHome() {
         does two unrelated jobs: it is the page canvas, and it is "a surface
         slightly recessed from white". Around thirty of its sixty-odd uses want
         the second — segmented-control tracks whose active tab is signalled only
-        by bg-white sitting on them, unfilled Meter tracks with no border, the
+        by bg-surface sitting on them, unfilled Meter tracks with no border, the
         sixteen <Card tone="cloud"> that exist precisely so as not to be white
         beside a white card. Lighten the token and every one of those collapses.
 
@@ -148,7 +148,7 @@ export function FreeHome() {
         the report looks on screen and on paper instead of inventing a surface
         that exists in neither.
       */}
-      <div className="pointer-events-none fixed inset-0 -z-10 bg-white" aria-hidden="true" />
+      <div className="pointer-events-none fixed inset-0 -z-10 bg-surface" aria-hidden="true" />
 
       {/*
         The masthead, and a welcome above it.
@@ -206,14 +206,14 @@ export function FreeHome() {
         ⚠️ NAVY, NOT THE GRADIENT, AND THE CHIPS BELOW STAY bg-primary. The
         gradient's cyan end takes navy text only — final-cta.tsx has the numbers
         — so a gradient masthead could not carry white type. Navy is the one dark
-        surface this codebase already knows: bg-navy + shadow-hero + grain +
+        surface this codebase already knows: bg-ink + shadow-hero + grain +
         rounded-2xl is how-it-works.tsx's panel, verbatim.
 
         ⚠️ EVERY CHILD NEEDS `relative`. .grain is an absolute ::after at inset-0
         and paints over anything that is not in its own stacking context.
 
         ⚠️ print: OVERRIDES ARE NOT OPTIONAL. globals.css forces the page white
-        for print but does not strip bg-navy, and the white children keep their
+        for print but does not strip bg-ink, and the white children keep their
         colour — so without these the whole header prints white on white. This
         page has no print button, but Cmd+P is always there.
       */}
@@ -221,7 +221,7 @@ export function FreeHome() {
           grew. 24px of inset on each side of a 360px screen is 15% of the
           viewport spent on nothing, inside the block that was already the
           tallest thing on the page. */}
-      <header className="bg-navy shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-5 sm:p-7 print:mt-0 print:rounded-none print:bg-white print:p-0 print:shadow-none print:[&>*:after]:hidden">
+      <header className="bg-ink shadow-hero grain relative mt-4 overflow-hidden rounded-2xl p-5 sm:p-7 print:mt-0 print:rounded-none print:bg-surface print:p-0 print:shadow-none print:[&>*:after]:hidden">
         {/*
           ⚠️ THE WHOLE IDENTITY IS ONE SMALL LINE, AND THE h1 IS IT. "AI
           visibility report" was the biggest thing on the page and the least
@@ -514,7 +514,7 @@ export function FreeHome() {
  * REPLACES the structure the rules were providing rather than decorating on top
  * of structure that already worked. Widen it and that note applies again.
  *
- * ⚠️ bg-primary WITH text-white, NEVER THE GRADIENT AND NEVER accent. White on
+ * ⚠️ bg-primary WITH text-on-primary, NEVER THE GRADIENT AND NEVER accent. White on
  * #2563EB is 5.17:1. The gradient's cyan end and --color-accent are both
  * fill-only at roughly 1.9:1 and take navy text instead — see the note at the
  * top of globals.css and the VARIANTS comment in components/ui/button.tsx.
@@ -588,7 +588,7 @@ function Section({
           background override does not touch: `print:rotate-0` is what flattens
           it. What is left is a plain heading, which .print-report h2 then sets
           in 12pt uppercase. */}
-      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-3.5 py-2 text-[1rem] tracking-tight text-white sm:px-4 sm:py-2.5 sm:text-[1.25rem] print:rounded-none print:bg-transparent print:px-0 print:py-0 print:text-navy">
+      <h2 className="bg-primary tilt-a inline-block rounded-[10px] px-3.5 py-2 text-[1rem] tracking-tight text-on-primary sm:px-4 sm:py-2.5 sm:text-[1.25rem] print:rounded-none print:bg-transparent print:px-0 print:py-0 print:text-navy">
         {title}
       </h2>
       {lede && <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed">{lede}</p>}

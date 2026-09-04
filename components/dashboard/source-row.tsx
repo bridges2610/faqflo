@@ -114,7 +114,7 @@ function TrendHelp({ children }: { children: React.ReactNode }) {
   return (
     <span
       aria-hidden="true"
-      className="bg-navy pointer-events-none absolute right-0 bottom-full z-20 mb-1.5 hidden w-max max-w-56 rounded-lg px-2.5 py-1.5 text-[0.6875rem] leading-snug font-normal text-white shadow-lift sm:group-hover/trend:block sm:group-focus-within/trend:block"
+      className="bg-ink pointer-events-none absolute right-0 bottom-full z-20 mb-1.5 hidden w-max max-w-56 rounded-lg px-2.5 py-1.5 text-[0.6875rem] leading-snug font-normal text-white shadow-lift sm:group-hover/trend:block sm:group-focus-within/trend:block"
     >
       {children}
     </span>
@@ -259,7 +259,7 @@ export function SourceRow({
                     {source.engines.map((e) => (
                       <li
                         key={e}
-                        className="border-line text-navy rounded-full border bg-white px-2 py-0.5 text-[0.6875rem] font-medium"
+                        className="border-line text-navy rounded-full border bg-surface px-2 py-0.5 text-[0.6875rem] font-medium"
                       >
                         {e}
                       </li>
