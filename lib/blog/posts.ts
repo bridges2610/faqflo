@@ -16,6 +16,7 @@ import * as addHtml from '@/content/posts/how-to-add-html-to-wordpress-squarespa
 import * as wrongHours from '@/content/posts/ai-is-telling-customers-the-wrong-hours-about-your-business.mdx';
 import * as redditWins from '@/content/posts/reddit-beats-your-website-in-ai-answers-heres-why-that-should-worry-you.mdx';
 import * as blockCrawlers from '@/content/posts/should-you-block-ai-crawlers-the-case-for-and-against.mdx';
+import * as roofersAeo from '@/content/posts/aeo-for-roofers-how-to-get-more-work-from-ai.mdx';
 
 /*
   The post registry.
@@ -69,6 +70,7 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  roofersAeo,
   /* ⚠️ THREE POSTS SHARE 2026-09-03, SO THIS ORDER IS WHAT DECIDES. Per the
      note above, the sort is stable and same-day posts keep the order they have
      here — newest first. */
