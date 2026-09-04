@@ -1,0 +1,208 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: 'should-you-block-ai-crawlers-the-case-for-and-against',
+  title: 'Should You Block AI Crawlers? The Case For and Against',
+  date: '2026-09-03',
+  excerpt:
+    'A real question with two real sides. Here’s both, and then how to tell which one is yours.',
+  image: '/blog/should-you-block-ai-crawlers-the-case-for-and-against.png',
+  // Describes the illustration rather than repeating the headline, which is
+  // already the page's h1 immediately below it.
+  imageAlt:
+    'A two-column card. “Let them in — if you sell a service” lists: a mention works like a referral, you were never getting the click, silence names your competitor. “Block them — if you sell the words” lists: your content is the product, traffic is the revenue, licensing beats giving it away. Underneath: “Either way — decide it on purpose.”',
+};
+
+A real question with two real sides. Here’s both, and then how to tell which one is yours.
+
+<PostTldr>
+There is a real argument here, and the answer depends on what you sell.
+
+- **Two kinds of bot, two separate decisions.** Training crawlers take your content into a model.
+  Search crawlers read your page in order to cite you. You can allow one and block the other.
+- **Block if people pay for your words** — a publisher, a course, a paid newsletter, a research
+  firm. Your content is the product.
+- **Don’t block if your website is marketing for something else you sell.** Blocking doesn’t
+  protect a plumber; it just hands the answer to a competitor.
+- **Most blocking is accidental** — a theme, a redesign, a leftover staging rule. Whatever you
+  choose, choose it.
+
+</PostTldr>
+
+Somewhere in your website there’s a small file called robots.txt, and it decides whether AI
+companies are allowed to read your site. A lot of people have opinions about what it should say.
+
+We build a product that helps businesses get found by AI, so you can guess which way we lean. But
+this is a genuine disagreement with serious people on both sides, and you deserve the actual
+argument rather than a sales pitch. Some businesses absolutely should block these crawlers. Most
+shouldn’t. Here’s how to tell.
+
+## First, what a “crawler” is here
+
+Not all AI bots do the same job, and this trips people up.
+
+**Training crawlers** collect content used to train future AI models. `GPTBot`, `ClaudeBot` and
+`Google-Extended` are the main ones people mean. Content they collect may end up shaping what a
+model knows in general, without any link back to you.
+
+**Search and answer crawlers** fetch pages to answer a question happening right now, and typically
+cite the source. `OAI-SearchBot`, `Claude-SearchBot` and `PerplexityBot` operate in this mode.
+
+That distinction matters enormously. The first group takes your content into a model. The second
+group reads your page in order to name you in an answer. You can allow one and block the other, and
+for a lot of businesses that’s the sensible middle position.
+
+⚠️ The names are easy to mix up, and mixing them up is expensive — `ClaudeBot` and
+`Claude-SearchBot` are one letter apart in your head and opposite decisions in practice. If you
+want the full list of which bot does what,
+[we went through them one by one here](/blog/is-my-site-blocking-chatgpt).
+
+## The case for blocking
+
+These arguments are not silly, and if you’ve felt any of them, you’re not being paranoid.
+
+**Your content is your product.** If you sell writing, courses, research, recipes, patterns, or
+anything else where the words are the thing being bought, an AI that absorbs and paraphrases your
+work is competing with you using your own material. Publishers with real businesses built on
+content have taken this position deliberately, and several have negotiated paid licensing deals
+instead of giving it away.
+
+**You get nothing back.** A traditional search engine sends you a visitor. A training crawler
+doesn’t. That’s a genuinely different bargain than the one the web ran on for twenty-five years,
+and it was changed without asking you.
+
+**Zero-click answers can eat your traffic.** If someone asks a question, gets your answer inside
+the chat, and never visits your site, you lost a pageview and gained nothing measurable. For a
+business whose revenue depends on ad impressions or on-site conversion, that’s a direct loss.
+
+**It costs you something.** Aggressive crawling uses bandwidth and server resources. For a big
+site, that’s a real bill.
+
+**You may not want to be summarised.** Nuanced or sensitive content gets flattened in an AI
+summary, and you have no control over how.
+
+## The case against blocking
+
+Now the other side, which is the stronger one for most small businesses.
+
+**Blocking makes you invisible, not protected.** If an engine can’t read your site, it doesn’t say
+“this business declined to participate.” It recommends someone else. Silence isn’t neutral — the
+customer still gets an answer, and it names your competitor.
+
+**For a local business, a mention is a referral.** You’re not selling content. You’re selling roof
+repair or tax prep or haircuts. When an AI names you to someone who’s actively looking, that’s a
+lead — and it’s a warmer one than an ad, because the customer asked and a source they trust
+answered.
+
+**You were never getting the click anyway.** For a lot of local queries, the customer’s next action
+is calling you or opening your location in maps, not browsing your site. If your revenue doesn’t
+come from pageviews, “losing traffic” is measuring the wrong thing.
+
+**Most blocking is accidental.** This is the big one. In practice, an enormous number of sites
+block AI crawlers because a theme shipped that way, or a developer added a blanket rule during a
+redesign, or someone flipped a switch after reading a scary article. Almost nobody who’s blocking
+made a considered decision to block. If you’re going to block, block on purpose.
+
+**It’s a blunt instrument anyway.** robots.txt is a request, honoured voluntarily. The major,
+well-known crawlers do respect it. Plenty of smaller scrapers don’t. So blocking reliably costs you
+visibility with the reputable ones while doing less than you’d hope about the rest.
+
+## So which are you?
+
+Two questions decide it.
+
+### Question one: do people pay for your words?
+
+If **yes** — you’re a publisher, a course seller, a paid newsletter, a research firm, a stock photo
+business — you have a real case for blocking training crawlers, and possibly for pursuing a
+licensing arrangement instead of a free one.
+
+If **no** — you’re a plumber, a dentist, a restaurant, a law firm, a shop, a local service of any
+kind — your website content is marketing for something else you sell. Marketing wants to be read.
+Blocking is close to pure downside.
+
+### Question two: where does your money actually come from?
+
+If it comes from **traffic** — ad revenue, affiliate links, on-site conversion at volume — then
+zero-click answers genuinely take something from you and the calculation is real.
+
+If it comes from **phone calls, bookings, walk-ins, or contracts**, then being named is the thing
+you want, and how the customer got there matters less than that they arrived.
+
+## The middle position most people should take
+
+You don’t have to choose all-or-nothing.
+
+A reasonable setup for a lot of businesses: allow the search and answer crawlers, and make your own
+call on the training ones. That way you can be found, cited, and recommended in AI answers right
+now, while separately deciding how you feel about your content training future models.
+
+Whatever you decide, decide it. The worst outcome is the common one — blocking by accident, losing
+recommendations you’d have wanted, and never knowing.
+
+## How to check what you’re doing right now
+
+1. Go to **yoursite.com/robots.txt** in a browser.
+2. Look for these names: `GPTBot`, `OAI-SearchBot`, `ClaudeBot`, `Claude-SearchBot`,
+   `PerplexityBot`, `Google-Extended`.
+3. Look for `Disallow: /` underneath any of them — that blocks the whole site for that bot.
+4. Also check `User-agent: *` with `Disallow: /`, which blocks everyone including regular search
+   engines. That one’s usually a mistake left over from a staging site, and it’s worth fixing today
+   regardless of your view on AI.
+5. If the page doesn’t load at all, you don’t have a robots.txt file, which means nothing is
+   blocked. That’s fine.
+
+If you need to change it, most website builders have a robots.txt editor in their SEO settings. On
+WordPress it’s typically in your SEO plugin’s tools section.
+
+## One thing worth saying plainly
+
+Being allowed in and being readable are two different things, and allowing crawlers accomplishes
+nothing on its own.
+
+Plenty of businesses have a wide-open robots.txt and are still completely invisible, because their
+content is built by JavaScript after the page loads and the crawler never sees any words. Opening
+the door doesn’t help if the room is empty.
+
+That’s the same lesson traditional SEO has taught for years — a crawler has to be able to reach and
+read your content. AEO is the next floor up on that same foundation: not just being readable, but
+having something specific and factual to say when an engine comes looking.
+
+## Where FaqFlo comes in
+
+FaqFlo checks both halves: whether AI crawlers are allowed into your site, and whether there’s
+anything there they can actually read.
+
+Then it finds the questions people are asking about businesses like yours, helps you answer them in
+the direct, factual way engines quote, and [publishes those answers as crawlable HTML](/#try) on
+your own domain — so if you’ve decided you want to be found, you actually are. And it tracks
+whether ChatGPT, Perplexity and Gemini start naming you.
+
+Blocking is a legitimate choice. Making it by accident isn’t. You can
+[see what AI can currently read on your site](/free-report) in about a minute.
+
+<PostFaq
+  items={[
+    {
+      q: 'Should I block GPTBot in my robots.txt?',
+      a: 'It depends on your business model. If people pay for your writing or your revenue depends on site traffic, blocking training crawlers is a defensible choice; if your website is marketing for a service you sell, blocking mostly makes you invisible in AI answers without protecting anything valuable.',
+    },
+    {
+      q: 'What’s the difference between GPTBot and OAI-SearchBot?',
+      a: 'GPTBot collects content that may be used to train models, while OAI-SearchBot fetches pages so ChatGPT can retrieve and cite them — that second one is what gets you named. Anthropic splits the same way, with ClaudeBot for training and Claude-SearchBot for citations, so allowing one and blocking the other is a reasonable position.',
+    },
+    {
+      q: 'Does blocking AI crawlers hurt my Google rankings?',
+      a: 'Blocking Google-Extended does not affect normal Google Search rankings — it only opts your content out of training Gemini. It does not remove you from AI Overviews either, since those are fed by Googlebot. But a blanket User-agent: * with Disallow: / blocks regular search engines too, which absolutely does hurt you.',
+    },
+    {
+      q: 'How do I know if my site is blocking AI crawlers?',
+      a: 'Open yoursite.com/robots.txt in a browser and look for Disallow: / under GPTBot, OAI-SearchBot, ClaudeBot, Claude-SearchBot, PerplexityBot, Google-Extended, or User-agent: *. If the file doesn’t exist at all, nothing is being blocked.',
+    },
+    {
+      q: 'Can AI companies ignore my robots.txt?',
+      a: 'It’s a voluntary standard, so compliance isn’t guaranteed — the major, well-known crawlers do generally respect it, while smaller or less scrupulous scrapers may not. That’s part of why blocking tends to cost you visibility with reputable engines while doing less than expected about the rest.',
+    },
+  ]}
+/>
