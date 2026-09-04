@@ -149,13 +149,48 @@
     border-radius: 4px;
   }
 
-  ::selection {
-    background: var(--color-primary);
-    color: #fff;
+  /*
+    ⚠️ TOUCH FEEDBACK. WITHOUT THIS BLOCK A PHONE GETS NONE AT ALL.
+
+    Tailwind v4 compiles every `hover:` utility inside `@media (hover: hover)`,
+    which is correct — a sticky hover state left behind after a tap is worse
+    than no hover state. Measured: 20 of 20 hover rules in the built stylesheet
+    are inside that guard.
+
+    The consequence is easy to miss on a laptop. A touch device matches none of
+    them, and there was not a single `:active` rule in the codebase, so pressing
+    a button produced no visual response whatsoever — you tapped, nothing
+    happened, then the page changed. That gap is what reads as "clunky"; the
+    delay people assume is the cause was already gone, because the viewport meta
+    is set and modern browsers dropped the 300ms wait years ago.
+  */
+  a,
+  button,
+  [role='button'],
+  summary,
+  label,
+  input,
+  select,
+  textarea {
+    /* Removes the double-tap-to-zoom wait on the control itself. Panning and
+       pinch-zoom on the page are untouched — this is not `touch-action: none`. */
+    touch-action: manipulation;
   }
 
-  ::placeholder {
-    color: #94a3b8;
+  a,
+  button,
+  [role='button'],
+  summary {
+    /*
+      The platform default is a grey box that arrives late and matches nothing
+      else on the page. A faint brand tint reads as ours and lands immediately.
+
+      ⚠️ NOT `transparent`. Setting it to transparent is the usual advice, and it
+      is only safe once every control has its own :active state. Plenty here do
+      not — 53 components style hover and nothing else — so removing the
+      platform's feedback would take away the only response those still have.
+    */
+    -webkit-tap-highlight-color: color-mix(in oklab, var(--color-primary) 12%, transparent);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -168,6 +203,21 @@
       animation-duration: 0.01ms !important;
       transition-duration: 0.01ms !important;
     }
+    /* ⚠️ THE RULE ABOVE DOES NOT COVER THIS. It zeroes transition DURATION, so a
+       press-scale would still happen — instantly, which is a jump rather than a
+       motion someone asked not to see. The transform has to be cancelled. */
+    *:active {
+      scale: 1 !important;
+    }
+  }
+
+  ::selection {
+    background: var(--color-primary);
+    color: #fff;
+  }
+
+  ::placeholder {
+    color: #94a3b8;
   }
 }
 

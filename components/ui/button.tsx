@@ -5,8 +5,24 @@ type Variant = 'primary' | 'ghost' | 'dark' | 'light';
 type Size = 'sm' | 'md' | 'lg';
 type Shape = 'soft' | 'pill';
 
+/*
+  ⚠️ `active:` IS WHAT A PHONE ACTUALLY SEES, AND IT WAS MISSING.
+
+  Every visual response this component had was a `hover:` utility, and Tailwind
+  v4 compiles those inside `@media (hover: hover)` — so a touch device matched
+  none of them and a press did nothing until the page moved. The scale is
+  deliberately small: 0.97 reads as a button taking a press, 0.9 reads as a toy.
+
+  `active:duration-75` rather than one duration for both states: 200ms is right
+  for a pointer drifting onto a button and far too slow for a finger already on
+  it. Press is near-instant, release eases back over the full 200ms.
+
+  ⚠️ `disabled:active:scale-100` OR A DEAD BUTTON STILL FLINCHES. `disabled`
+  drops the opacity but does not stop :active matching, so without this a button
+  that refuses to do anything would still animate as though it had.
+*/
 const BASE =
-  'inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+  'inline-flex items-center justify-center gap-2 font-medium whitespace-nowrap transition-all duration-200 active:scale-[0.97] active:duration-75 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100';
 
 /*
   ⚠️ `soft` IS THE DEFAULT AND `pill` IS THE OPT-IN, WHICH IS THE OPPOSITE OF
