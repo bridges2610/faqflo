@@ -141,7 +141,7 @@ export function BusyButton() {
               Fair enough — here&rsquo;s the short version.
             </h2>
 
-            <p className="text-slate mt-3.5 text-[0.9375rem] leading-relaxed">
+            <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed sm:mt-3.5">
               Your customers are opening ChatGPT and typing &ldquo;who&rsquo;s good for X near
               me.&rdquo; They get two or three names back, and they call one of them. Yours
               probably isn&rsquo;t in there — not because you aren&rsquo;t good at what you do,
@@ -167,7 +167,7 @@ export function BusyButton() {
               has been told twice. The photo is decoration for a line that
               already says who is speaking.
             */}
-            <div className="mt-5 flex items-center gap-3">
+            <div className="mt-4 flex items-center gap-3 sm:mt-5">
               <Image
                 src={AUTHOR_AVATAR}
                 alt=""
@@ -190,7 +190,7 @@ export function BusyButton() {
               language for "a list of things you get" in a product that already
               has one. A tick also says these are benefits; a dot says nothing.
             */}
-            <ul className="border-line mt-6 space-y-3 border-t pt-6">
+            <ul className="border-line mt-5 space-y-2.5 border-t pt-5 sm:mt-6 sm:space-y-3 sm:pt-6">
               {/* ⚠️ "WE" AND "YOU", NOT HEADLESS FRAGMENTS. These read
                   "Checks what AI can read…", which is how a spec sheet talks.
                   Naming who does what — we do three of these, you do one — is
@@ -198,7 +198,14 @@ export function BusyButton() {
               {[
                 'We check what AI can actually read on your site',
                 'We write your answers in the shape it likes to quote',
-                'You paste one block onto your own site — that’s the work',
+                /* ⚠️ "OR HAVE US DO IT" IS A REAL OFFER, NOT A FIGURE OF SPEECH
+                   — /done-for-you is $497 for one site, two weeks. It is worded
+                   as an alternative rather than an inclusion for exactly that
+                   reason: every other bullet here describes what the product
+                   does, so "we can do it" sitting among them would read as
+                   included. No price, because this panel carries no digits at
+                   all; the link is one click away on the page behind it. */
+                'You paste one block onto your own site, or have us do it for you',
                 'We tell you when ChatGPT, Perplexity and Gemini start naming you',
               ].map((line) => (
                 <li key={line} className="text-slate flex gap-2.5 text-sm">
@@ -208,10 +215,30 @@ export function BusyButton() {
               ))}
             </ul>
 
+            {/*
+              ⚠️ THE PAYOFF LINE, AND IT BORROWS A FRAMING THAT ALREADY EXISTS.
+              The bullets say what happens; this says why it is worth anything.
+              "Works like a referral" is the whole argument of
+              content/posts/why-getting-your-business-mentioned-by-ai-is-a-great-referral.mdx
+              — "That's a referral. And a referral is the best lead in business…
+              same trust, same moment, same pre-sold customer" — so the panel
+              lands on the same idea the blog already makes at length.
+
+              ⚠️ A MECHANISM, NOT A RESULT. It says what a citation IS, not what
+              it will earn: no volume, no percentage, no "grow your business by".
+              Nothing here has been measured, so nothing here is quantified —
+              same reason the panel carries no digits anywhere.
+            */}
+            <p className="text-navy mt-5 text-[0.9375rem] leading-relaxed sm:mt-6">
+              <span className="font-semibold">Every answer that names you works like a referral</span>{' '}
+              — same trust, same pre-sold customer, and you never had to ask. That&rsquo;s more of
+              the right calls, without chasing them.
+            </p>
+
             {/* ⚠️ FULL-WIDTH CTA BELOW sm:. At 320 the button and "Not now" wrapped
                 onto two ragged rows; a phone gets one obvious target and the
                 dismissal underneath it. */}
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="mt-5 flex flex-col gap-3 sm:mt-7 sm:flex-row sm:items-center">
               <ButtonLink
                 href="/free-report"
                 arrow
