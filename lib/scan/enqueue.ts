@@ -30,6 +30,19 @@ import { createAdminClient } from '@/lib/supabase/admin';
   comes back and spends its other two runs reaches 27 engine calls, or roughly
   $0.55 all in.
 
+  ⚠️ AND THE SCAN IS NO LONGER ALL A FREE ACCOUNT CAN SPEND. This note once
+  described the whole free tier, because free could not write anything. It can
+  now, so the lifetime bill has three parts and the scan is only the first:
+
+    - the scan above — crawl, Opus discovery, 27 engine calls at the ceiling;
+    - FREE_GENERATED_FAQ_SET_CAP sets on Haiku 4.5, max_tokens 8192 each;
+    - FREE_ARTICLE_CAP article on Sonnet 5, max_tokens 8192.
+
+  Both writing caps live in lib/dashboard/plans.ts. The six writing calls are
+  small beside the search fees — output ceilings, and real responses land well
+  under them — but they are not nothing, and they are not in the $0.55 above:
+  call the lifetime ceiling roughly $0.65–$0.90 rather than $0.55.
+
   ⚠️ THE NOTE HERE USED TO SAY $0.50–$1.00 FOR A SIGNUP, AND IT WAS RIGHT WHEN
   WRITTEN. Two things moved under it: Opus went from $15/$75 per Mtok to $5/$25,
   and free went from asking five questions once to asking three, three times. So
@@ -37,8 +50,12 @@ import { createAdminClient } from '@/lib/supabase/admin';
   Gemini's grounded rate is promotional until 1 Jan 2027 — so re-derive rather
   than trusting this line if the number matters.
 
-  What bounds it is hasScanned() below, the per-account check meter, and
-  SITE_CAP. Removing any of those three makes free signup an unbounded bill.
+  ⚠️ FIVE THINGS BOUND A FREE ACCOUNT'S BILL, NOT THREE. hasScanned() below, the
+  per-account check meter and SITE_CAP bound the scan; free_articles_used and
+  free_faq_sets_used (migration 0021, claimed through claim_free_generation())
+  bound the writing. Removing any of the five makes free signup an unbounded
+  bill — and the two counters are the ones with no UI, so they are the easiest
+  to forget.
 */
 
 /**
