@@ -54,7 +54,7 @@ export function SignUpForm({ next }: { next?: string }) {
         hint="At least 8 characters."
       />
 
-      <Button type="submit" size="md" shape="pill" className="w-full" disabled={pending}>
+      <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Creating your account…' : 'Create account'}
       </Button>
 

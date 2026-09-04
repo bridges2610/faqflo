@@ -246,7 +246,7 @@ export function FaqGenerator() {
             onClick={generate}
             disabled={busy}
             size="lg"
-            shape="pill"
+           
             arrow={!busy}
             className="mt-5 w-full"
           >

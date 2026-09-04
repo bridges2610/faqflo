@@ -1,5 +1,5 @@
-import { Button } from '@/components/ui/button';
 import { Sparkle, Underline } from '@/components/ui/doodle';
+import { StartForm } from './start-form';
 
 /*
   The hero visual is a small story rather than a screenshot: someone asks an
@@ -94,92 +94,13 @@ export function Hero() {
             domain.
           </p>
 
-          {/*
-            The hero IS the start of the audit, and it starts it by handing the
-            domain to machinery that already exists.
-
-            /dashboard/start is where a check begins: it creates the site row
-            and enqueues the scan (app/api/onboarding/start/route.ts). It is
-            listed in SIGNUP_FIRST in proxy.ts, so a signed-out visitor is sent
-            to /sign-up with the whole destination — query string included — in
-            `next`, and lands back here with a free account and their domain
-            still attached. That path was built for the old home page audit's
-            hand-off; the hero now feeds it directly, and proxy.ts's comment
-            about "?domain= from the home page audit" still describes the truth.
-
-            ⚠️ A PLAIN GET FORM, AND IT SHOULD STAY ONE. `method="get"`
-            serialises the field into the query string and the browser navigates
-            to /dashboard/start?domain=… by itself: no state, no fetch, no
-            Server Action, and no 'use client' — so the hero, which every
-            visitor loads first, still ships zero JavaScript. The instinct on a
-            later edit is useState + fetch, the house rule for other non-auth
-            forms (components/marketing/done-for-you-form.tsx). That rule is for
-            forms which POST and render a result. This one hands a value to the
-            next page, which a link with a field in it already does.
-
-            No client-side validation of the domain either. normalizeDomain()
-            in the onboarding route is what actually decides, and it accepts
-            more shapes than a regex here would — a second rule in the hero
-            could only reject an address the server would have taken.
-          */}
-          <form
-            action="/dashboard/start"
-            method="get"
-            className="mt-9 flex max-w-md flex-col gap-3 sm:flex-row"
-          >
-            <label htmlFor="hero-domain" className="sr-only">
-              Your website address
-            </label>
-            <input
-              id="hero-domain"
-              type="text"
-              name="domain"
-              inputMode="url"
-              autoComplete="url"
-              required
-              placeholder="yourbusiness.com"
-              /*
-                White and lifted, NOT the bg-cloud the same field uses on
-                /free-report. That page is a white section, where a faintly grey
-                field reads as an inset. This one sits on the hero's `bloom`
-                gradient, which is itself pale — grey-on-pale left the input
-                looking like empty space with a hairline round it, beside a
-                solid blue button that took all the attention.
-
-                bg-white + shadow-soft is how everything else on this gradient
-                holds its edge: the eyebrow pill above uses exactly that, and so
-                do the AnswerCard panels.
-
-                h-13 matches the lg Button's height (see SIZES in
-                components/ui/button.tsx) so the two line up. py-3 alone left
-                the field a few pixels shorter than the button next to it.
-
-                ⚠️ sm:flex-1, NOT flex-1 — AND h-13 IS WHY. `flex-1` is
-                `flex: 1 1 0%`, and below sm this form is flex-col, so that
-                basis of 0 governs the HEIGHT and overrides h-13. The form has
-                no height of its own, so there is no free space for flex-grow
-                to claim and the field collapsed to its content: 21px, one line
-                of text, beside a 52px button. Scoping the modifier to sm keeps
-                the grow where the main axis is horizontal and it means
-                something, and leaves h-13 in charge when the two are stacked.
-              */
-              className="border-line focus:border-primary text-navy shadow-soft h-13 min-w-0 rounded-input border bg-white px-4 text-[0.9375rem] outline-none transition-colors duration-150 sm:flex-1"
-            />
-            {/* ⚠️ NOT "Check my site" — that label belongs to the free tool.
-
-                The nav, the mobile drawer and the final CTA all say "Check my
-                site" and all go to /free-report, which needs no account at all.
-                This button creates one. Sharing the label made the same three
-                words promise two different things on one page, so the button
-                that starts an account is the one that says so.
-
-                "free" is also carrying the reassurance that the removed "No
-                signup for the check" line used to: this is the only word left
-                in the hero saying it costs nothing. */}
-            <Button type="submit" size="lg" shape="pill" arrow>
-              Start free
-            </Button>
-          </form>
+          {/* ⚠️ THE FORM IS SHARED WITH /free-report NOW — see
+              components/marketing/start-form.tsx, which carries the reasoning
+              that used to live here: why it is a plain GET, why there is no
+              client-side validation, and why the field is white on this
+              gradient. Both pages start a check the same way, so there is one
+              form rather than two that agree today. */}
+          <StartForm id="hero-domain" className="mt-9" />
         </div>
 
         <AnswerCard />

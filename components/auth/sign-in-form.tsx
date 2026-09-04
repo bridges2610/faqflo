@@ -38,7 +38,7 @@ export function SignInForm({ next }: { next?: string }) {
 
       <PasswordField label="Password" name="password" autoComplete="current-password" />
 
-      <Button type="submit" size="md" shape="pill" className="w-full" disabled={pending}>
+      <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Signing in…' : 'Sign in'}
       </Button>
 

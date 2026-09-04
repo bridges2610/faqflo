@@ -60,7 +60,7 @@ export function GoogleButton({
       <Button
       variant="ghost"
       size="md"
-      shape="pill"
+     
       className="w-full"
       onClick={signIn}
       disabled={busy}

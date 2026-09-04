@@ -218,7 +218,7 @@ const FAQS = [
   },
   {
     q: 'What does it cost to find out if it’s worth it?',
-    a: 'Nothing. The visibility check and the FAQ generator are free, with no account and no card — the full audit, the publish-ready export, and citation tracking are the paid parts. Run the check first. If it turns out AI can already see and cite you, we’ll tell you that instead of selling you something.',
+    a: 'Nothing. The FAQ generator needs no account at all, and the visibility check is free too — it makes you a free account so the report is still there when you come back, and it never asks for a card. The full audit, the publish-ready export, and citation tracking are the paid parts. Run the check first. If it turns out AI can already see and cite you, we’ll tell you that instead of selling you something.',
   },
 ];
 

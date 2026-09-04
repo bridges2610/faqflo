@@ -37,8 +37,8 @@ export function FinalCta() {
             Find out what AI sees.
           </h2>
           <p className="text-navy/75 mt-4 max-w-lg text-[1.0625rem] leading-relaxed">
-            One address, one honest answer about whether the engines can read you — no account, no
-            card, no catch.
+            One address, one honest answer about whether the engines can read you — free, no card,
+            no catch.
           </p>
         </div>
 

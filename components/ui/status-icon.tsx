@@ -5,7 +5,8 @@ import type { CheckStatus } from '@/lib/audit/types';
 
   ⚠️ THREE COPIES OF THIS EXISTED BEFORE IT WAS A FILE, and the third is what
   forced the extraction. components/dashboard/audit-workspace.tsx and
-  components/marketing/visibility-audit.tsx each carried a byte-identical glyph
+  the since-deleted components/marketing/visibility-audit.tsx each carried a
+  byte-identical glyph
   switch and a near-identical chip map — near, not identical: one called a
   warning "Worth a look" and the other "Needs a look", so the same finding
   described itself differently depending on whether the reader had signed up.

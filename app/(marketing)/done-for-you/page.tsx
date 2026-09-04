@@ -334,7 +334,7 @@ export default function DoneForYou() {
             <a href="/free-report" className="text-primary hover:text-primary-hover font-semibold">
               free visibility check
             </a>{' '}
-            first — thirty seconds, no account. If AI can already read and cite you, I&rsquo;ll tell
+            first — it&rsquo;s free and takes a minute. If AI can already read and cite you, I&rsquo;ll tell
             you that instead of selling you something.
           </p>
         </div>

@@ -27,9 +27,15 @@ import {
 
   TWO CALLERS, TWO RULES — this is the only route with a split personality.
 
-  `quick` is the free check on the marketing page. It stays open to anonymous
-  callers on purpose: the site promises "Free · No signup" in five places, and
-  it reads one page, which is a cheap thing to give away. IP-limited, as before.
+  `quick` is the one-page check. It is still open to anonymous callers, but
+  NOTHING WE SHIP CALLS IT THAT WAY ANY MORE: /free-report used to run it
+  signed-out through components/marketing/visibility-audit.tsx, and that page now
+  renders StartForm and creates an account instead. The remaining caller is
+  lib/dashboard/provider.tsx, which is signed in. The old justification here —
+  'the site promises "Free · No signup" in five places' — no longer holds, since
+  those promises were rewritten with that page. Closing `quick` to anonymous
+  callers is therefore now possible; it is left open deliberately rather than by
+  omission, and is Beau's call. IP-limited either way.
 
   `full` is the Pro crawl. It requires a session, a `siteId` the caller actually
   owns, and a Pro plan on that account — and the page budget is computed HERE

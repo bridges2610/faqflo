@@ -38,21 +38,41 @@ const BASE =
   holds nine. Defaulting to pill would have meant editing 98 files to change 98
   buttons. Defaulting to soft means nine callers say `shape="pill"`.
 
-  ⚠️ EVERYTHING A VISITOR SEES KEEPS ITS PILLS ON PURPOSE. The public pages
-  were not part of this change and nobody has reviewed a squared-off home page.
-  That means components/marketing (hero, final-cta, site-nav, mobile-nav,
-  pricing-teaser, visibility-audit x2, done-for-you-form), the blog index, the
-  homepage's own FAQ generator in components/generator, AND the five forms in
-  components/auth — the sign-in screens are reached from the marketing nav and
-  are styled to match it, so they belong on that side of the line.
+  ⚠️ ON PUBLIC PAGES THE SHAPE NOW DEPENDS ON WHAT THE BUTTON IS ATTACHED TO.
+  This note used to read "EVERYTHING A VISITOR SEES KEEPS ITS PILLS ON PURPOSE…
+  nobody has reviewed a squared-off home page", and listed start-form and
+  done-for-you-form among the keepers. That review happened. The rule now:
+
+    ATTACHED TO A FORM  → `soft`. It takes the field's radius, because every
+                          field on the site is `rounded-input` and a 999px
+                          button beside a 14px input reads as two design
+                          languages arguing. This is the DEFAULT, so these
+                          callers simply pass no `shape` at all:
+                          marketing/start-form, marketing/done-for-you-form,
+                          generator/faq-generator, and all five of
+                          components/auth (the Google button included — it is
+                          OAuth rather than a submit, but it shares a card with
+                          one, and a pill beside a soft button in one card is
+                          worse than either shape on its own).
+
+    STANDALONE CTA      → `shape="pill"`. Nothing to match, and the shape is
+                          what marks it as the page's action: site-nav,
+                          mobile-nav, final-cta, pricing-teaser, the blog
+                          index, and marketing/busy-button's floating trigger.
+
+  ⚠️ WHY AUTH SITS WITH MARKETING RATHER THAN WITH THE DASHBOARD. /sign-up is
+  the next screen after the hero's form — StartForm hands off to
+  /sign-up?next=/dashboard/start?domain=… — so a soft button that turned back
+  into a pill one click later would be the exact inconsistency this rule exists
+  to remove.
 
   ⚠️ THE SIGNED-IN SURFACES TAKE THE DEFAULT, INCLUDING THE ONES THAT DO NOT
   LOOK LIKE THE DASHBOARD. app/(app)/error.tsx and the checkout return page are
   behind the login and square off with everything else.
 
-  Adding a button to a public page? It needs `shape="pill"`, and nothing
+  Adding a button to a public page? Decide by the two lines above, and nothing
   enforces that but this note — grep for `<Button` outside components/dashboard
-  and check the list above before assuming a directory is covered.
+  and check which list it belongs on.
 
   Badges are untouched: components/ui/badge.tsx stays rounded-pill because a
   badge reads as a tag rather than a control. Segmented toggles keep their pill

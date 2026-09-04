@@ -32,7 +32,7 @@ export function ForgotPasswordForm() {
         />
       </label>
 
-      <Button type="submit" size="md" shape="pill" className="w-full" disabled={pending}>
+      <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Sending…' : 'Send me a reset link'}
       </Button>
 
@@ -75,7 +75,7 @@ export function ResetPasswordForm() {
         minLength={8}
       />
 
-      <Button type="submit" size="md" shape="pill" className="w-full" disabled={pending}>
+      <Button type="submit" size="md" className="w-full" disabled={pending}>
         {pending ? 'Saving…' : 'Save new password'}
       </Button>
 

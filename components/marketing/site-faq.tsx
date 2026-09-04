@@ -15,7 +15,7 @@ import { jsonLd } from '@/lib/site';
 const FAQS = [
   {
     q: 'Is the check really free?',
-    a: 'Yes — the visibility score and the FAQ generator are free, with no account and no card. The full audit, the publish-ready export, and citation tracking are the paid parts.',
+    a: 'Yes. The FAQ generator on the home page runs with no account at all. The visibility check is free too — it makes you a free account so your report is still there when you come back, and it never asks for a card. The full audit, the publish-ready export, and citation tracking are the paid parts.',
   },
   {
     q: 'What is answer engine optimisation?',

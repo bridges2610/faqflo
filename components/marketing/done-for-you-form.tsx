@@ -238,7 +238,7 @@ export function DoneForYouForm() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
-          <Button type="submit" size="lg" shape="pill" disabled={busy} arrow={!busy}>
+          <Button type="submit" size="lg" disabled={busy} arrow={!busy}>
             {busy ? 'Sending…' : 'Send this to Beau'}
           </Button>
           <p className="text-slate text-sm">
