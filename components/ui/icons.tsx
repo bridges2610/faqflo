@@ -37,3 +37,20 @@ export function CloseIcon({ className = '' }: IconProps) {
     </svg>
   );
 }
+
+/**
+ * A clock, for the "I'm busy" explainer.
+ *
+ * ⚠️ IT NEVER TRAVELS ALONE. The button beside it always carries the words, and
+ * its accessible name is a full sentence — a clock face on its own could mean
+ * opening hours, a schedule, or history. Same rule as the padlock in
+ * nav-icons.tsx: the glyph decorates the meaning, it is never the meaning.
+ */
+export function ClockIcon({ className = '' }: IconProps) {
+  return (
+    <svg {...BASE} className={className}>
+      <circle cx="10" cy="10" r="7" />
+      <path d="M10 6v4.2l2.8 1.7" />
+    </svg>
+  );
+}

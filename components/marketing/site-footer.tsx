@@ -37,7 +37,19 @@ const COLUMNS = [
 export function SiteFooter() {
   return (
     <footer className="border-line border-t bg-white">
-      <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8">
+      {/*
+        ⚠️ THE EXTRA BOTTOM PADDING BELOW sm: RESERVES ROOM FOR THE FLOATING
+        "I'm busy" BUTTON, which is `fixed` and therefore cannot push anything
+        out of its own way. Measured at 320px before it existed: the pill spans
+        x 192–304 at the very bottom of the viewport and sat directly on top of
+        the "Terms & Conditions" link at x 123–234 — a legal link you could see
+        and could not tap.
+
+        Reserved here rather than by shrinking the button, because the button is
+        already at its short label by then and a 44px touch target is the floor.
+        See components/marketing/busy-button.tsx.
+      */}
+      <div className="mx-auto max-w-6xl px-5 pt-14 pb-28 sm:px-8 sm:pb-14">
         {/*
           Four even-ish tracks rather than brand-left / links-right. With
           justify-between the whole link group got pushed against the right

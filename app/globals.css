@@ -114,6 +114,22 @@
   --color-mark-openai: #000000;
 
   /*
+    What a modal dims the page with.
+
+    ⚠️ ITS OWN TOKEN BECAUSE `bg-ink` WAS THE WRONG ONE, AND MEASURABLY SO. The
+    scrim reused --color-ink, which dark mode defines as a RAISED PANEL (#233a5e)
+    — lighter than the page it sits on. Composited over the dark page at 40% that
+    came out rgb(20,35,60) against a rgb(10,20,38) page: the "dimmer" was making
+    the background BRIGHTER. A scrim has exactly one job and it was doing the
+    opposite of it.
+
+    This is the one colour that must be dark in BOTH themes, so it is defined
+    against the darkest thing each theme has rather than borrowed from a
+    surface. Never point this at a token that inverts.
+  */
+  --color-scrim: #0b1b3a;
+
+  /*
     ⚠️ A SECOND BORDER, FOR THINGS YOU CAN CLICK. `--color-line` is a hairline
     divider and is allowed to be nearly invisible — measured 1.27:1 against the
     dark surface, which is correct for a rule between rows. WCAG 1.4.11 asks 3:1
@@ -246,6 +262,9 @@ html[data-theme='dark'] {
   */
   --color-ink: #233a5e;
   --color-mark-openai: #ffffff; /* #000 is 1.25:1 here — see the token definition */
+  /* Near-black, NOT --color-ink: the scrim must darken the page, and ink is a
+     raised panel out here. Measured over the page at 55%: rgb(7,13,24). */
+  --color-scrim: #04070d;
 
   /*
     ⚠️ FIVE OF THE SIX INKS FAILED HERE AND HAD TO BE REPLACED, NOT REUSED.
@@ -589,6 +608,7 @@ html[data-theme='dark'] {
     --color-line-strong: #cbd5e1;
     --color-ink: #0b1b3a;
     --color-mark-openai: #000000;
+    --color-scrim: #0b1b3a;
     --color-primary: #2563eb;
     --color-primary-hover: #1d4fd8;
     --color-on-primary: #ffffff;

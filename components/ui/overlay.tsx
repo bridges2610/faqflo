@@ -29,8 +29,20 @@ import { createPortal } from 'react-dom';
   ⚠️ z-[55], AND THE LAYERS EITHER SIDE ARE THE REASON. The dashboard stacks
   z-30 for the sticky publish bar, z-40 for the sticky header and the audit
   toast, z-50 for the mobile drawer and the account menu. This has to clear all
-  of them or the header sits on top of a modal. It stays below marketing's
-  z-[60], which is a different tree and never on screen at the same time.
+  of them or the header sits on top of a modal.
+
+  ⚠️ IT STAYS BELOW MARKETING'S z-[60], AND THE REASON CHANGED. That used to be
+  safe because marketing was "a different tree and never on screen at the same
+  time" — which stopped being true when components/marketing/busy-button.tsx
+  started opening this overlay on public pages.
+
+  It is still correct, for a reason that now has to be maintained rather than
+  assumed: mobile-nav.tsx is `fixed inset-0 z-[60]`, and the busy button sits at
+  z-40 UNDER it, so an open drawer covers the trigger and the trigger cannot be
+  clicked. The drawer's own opener lives in the z-50 header, which an open panel
+  covers. Neither can be reached while the other is up, so the two never stack —
+  but that now depends on the trigger staying below z-[60]. Anything new that
+  opens this overlay from a marketing surface has to keep that property.
 */
 export function Overlay({
   children,
@@ -95,10 +107,10 @@ export function Overlay({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="bg-ink/40 absolute inset-0 backdrop-blur-sm"
+          className="bg-scrim/40 absolute inset-0 backdrop-blur-sm"
         />
       ) : (
-        <div className="bg-ink/40 absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
+        <div className="bg-scrim/40 absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
       )}
 
       {/*
@@ -111,7 +123,15 @@ export function Overlay({
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`shadow-lift relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-xl bg-surface p-6 ${className}`}
+        /*
+          ⚠️ rounded-2xl HERE, BECAUSE A CALLER CANNOT OVERRIDE IT. Passing
+          `rounded-2xl` through className was measured and it LOST — the panel
+          still computed 18px, because two radius utilities land at the same
+          specificity and the winner is whichever Tailwind emits later, not
+          whichever the class attribute lists last. So the radius is a property
+          of the shell, and changing it changes every modal.
+        */
+        className={`shadow-lift relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl bg-surface p-6 ${className}`}
       >
         {children}
       </div>
