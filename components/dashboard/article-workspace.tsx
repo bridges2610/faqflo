@@ -283,6 +283,13 @@ function AddFaqs({ article }: { article: Article }) {
           tone: 'Professional',
           language: 'English',
           siteId: site.id,
+          /* ⚠️ THIS IS WHAT KEEPS THE ARTICLE'S FAQs OFF THE ANSWERS ALLOWANCE.
+             Without it the route cannot tell this call from the Answers tab's
+             and charges a free account a set for it — which is exactly what
+             happened. The server re-reads the article and checks its remaining
+             room rather than believing the id alone, so sending it grants
+             nothing beyond the exemption it is entitled to. */
+          articleId: article.id,
         }),
       });
 

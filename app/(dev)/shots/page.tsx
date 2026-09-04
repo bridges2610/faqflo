@@ -78,6 +78,9 @@ const SHOT_USER: User = {
   plan: 'pro',
   planSince: '2026-01-06T09:00:00.000Z',
   createdAt: '2026-01-06T09:00:00.000Z',
+  /* Pro in the shots, so the free allowance is never consulted. */
+  freeArticlesUsed: 0,
+  freeFaqSetsUsed: 0,
 };
 
 const SHOT_SITE_ID = 'shots-site';

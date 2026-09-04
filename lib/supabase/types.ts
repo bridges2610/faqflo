@@ -48,6 +48,17 @@ export type ProfileRow = {
    * welcomed_at is null`.
    */
   welcomed_at: string | null;
+  /**
+   * What a free account has already had the model write, ever. See 0021.
+   *
+   * ⚠️ READABLE BY THE OWNER, WRITABLE BY NOBODY BUT THE SERVICE ROLE. 0001's
+   * column grants are an allow-list, so these are unwritable from a browser
+   * while the owner's SELECT policy still returns them — which is what lets the
+   * generator show what is left without being able to change it.
+   */
+  free_articles_used: number;
+  /** Generation RUNS spent in the Answers tab, not answers. See 0021. */
+  free_faq_sets_used: number;
   created_at: string;
 };
 

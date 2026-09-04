@@ -368,7 +368,7 @@ export function HelpWorkspace({
             <P>
               {pro
                 ? 'Four steps, and you can stop after any of them — nothing here expires halfway through. Most people do the first two in an evening and come back to the writing.'
-                : 'Four steps, and the first two happen without you. Your report has all of it on one page — there is nowhere else to go and nothing to set up.'}
+                : 'Four steps, and the first two happen without you. Your report has the findings on one page; the rest of the dashboard is open to look through.'}
             </P>
 
             <ol className="mt-6 space-y-4">
@@ -405,7 +405,7 @@ export function HelpWorkspace({
             <P className="mt-6">
               {pro
                 ? 'Your dashboard home tracks these four for you and shows whichever is next, so you don’t have to hold the order in your head.'
-                : 'Your report is the only screen you need. It opens with the score, then what the engines actually said, then the answers you can write from it.'}
+                : 'Your report is the one to start on. It opens with the score, then what the engines actually said, then the answers you can write from it.'}
             </P>
           </Section>
 
@@ -439,14 +439,22 @@ export function HelpWorkspace({
             */}
             {!pro ? (
               <>
+                {/* ⚠️ THIS USED TO SAY "everything is on one screen", AND IT WAS
+                    TRUE UNTIL FREE COULD NAVIGATE. Every dashboard screen is open
+                    to a free account now — what differs is which actions on them
+                    are part of Pro. A help page describing a single screen would
+                    be teaching a product that no longer exists, which is the
+                    failure the note above this block warns about in reverse. */}
                 <P className="mt-2">
-                  Everything is on one screen: <strong>your report</strong>. If you read the
-                  marketing site first, its five-step loop — audit, discover, generate, publish,
-                  track — all lands there, in that order, top to bottom.
+                  Start on <strong>your report</strong>. If you read the marketing site first, its
+                  five-step loop — audit, discover, generate, publish, track — all lands there, in
+                  that order, top to bottom.
                 </P>
                 <P className="mt-4">
-                  Pro splits the same work across five screens, adds the pages beyond your home
-                  page, and re-checks every week. Your report says what it costs at the bottom.
+                  The other screens are open to look through, and they show what we have measured
+                  for you so far. Pro is what fills them in: the pages beyond your home page,
+                  writing the answers, and a re-check every week. Your report says what it costs at
+                  the bottom.
                 </P>
               </>
             ) : (

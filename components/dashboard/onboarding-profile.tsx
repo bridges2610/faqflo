@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { isNamedAfterDomain } from '@/lib/dashboard/domain';
+import { COUNTRIES } from './search-country';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { useScanJob } from '@/lib/dashboard/use-scan-job';
 
@@ -52,7 +53,12 @@ export function OnboardingProfile() {
     ordering. Deriving makes "typed wins" a property of the expression below
     rather than a rule anybody has to maintain.
   */
-  const [edited, setEdited] = useState<{ name?: string; industry?: string; location?: string }>({});
+  const [edited, setEdited] = useState<{
+    name?: string;
+    industry?: string;
+    location?: string;
+    country?: string;
+  }>({});
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +114,11 @@ export function OnboardingProfile() {
   const name = edited.name ?? detectedName;
   const industry = edited.industry ?? site.industry ?? '';
   const location = edited.location ?? site.location ?? '';
+  /* ⚠️ '' IS "Not set" AND IS A REAL ANSWER, NOT A MISSING ONE. search-country.tsx
+     is explicit: sending no location is what every run did before that control
+     existed, and guessing one from the free-text service area would present an
+     inference as a setting — wrong for exactly the customers who check. */
+  const country = edited.country ?? site.country ?? '';
 
   /* Whether anything in front of them came from the crawl rather than their own
      keyboard. Drives the one line of copy that says so. */
@@ -140,6 +151,10 @@ export function OnboardingProfile() {
     'border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-white px-3 py-2 text-sm outline-none transition-colors duration-150';
   const label = 'text-slate font-mono text-[0.6875rem] tracking-wide uppercase';
 
+  /* ⚠️ COUNTRY IS NOT COUNTED HERE. It has a real default — "not set" — so a
+     form where only the dropdown was touched has still told us nothing about
+     the business, and stamping profile_source 'manual' over three blanks would
+     permanently stop the audit filling them in. */
   /* Nothing typed is not an answer. Saving it would stamp profile_source
      'manual' over three empty strings and permanently stop the audit filling
      them in — the one outcome worse than not asking. */
@@ -155,6 +170,8 @@ export function OnboardingProfile() {
         ...(name.trim() ? { name: name.trim() } : {}),
         industry: industry.trim() || null,
         location: location.trim() || null,
+        /* Empty string means "no location sent", which updateSite maps to null. */
+        country: country || null,
         profileSource: 'manual',
       });
       setDone(true);
@@ -171,8 +188,8 @@ export function OnboardingProfile() {
       {/* Says what it buys them. Without this it reads as account admin, and
           there is no reason to fill in account admin. */}
       <p className="text-slate mt-1.5 text-sm leading-relaxed">
-        Three quick answers. They decide which questions we look for, what we suggest you write,
-        and how the AI engines get asked about you — so the more specific, the better everything
+        Four quick answers. They decide which questions we look for, what we suggest you write,
+        and where the AI engines are asked from — so the more specific, the better everything
         below gets.
       </p>
 
@@ -194,7 +211,7 @@ export function OnboardingProfile() {
           424px and clipped every placeholder. @lg asks the container, so it
           stacks in the modal and goes three-wide inline, from one rule. */}
       <div className="@container mt-4">
-        <div className="grid gap-3 @lg:grid-cols-3">
+        <div className="grid gap-3 @lg:grid-cols-2">
         <label className="block">
           <span className={label}>Business name</span>
           <input
@@ -223,8 +240,41 @@ export function OnboardingProfile() {
             placeholder="Rockland County, NY"
           />
         </label>
+
+        {/* ⚠️ THE SEARCH LOCATION, NOT THE BUSINESS ADDRESS — search-country.tsx
+            is emphatic about the difference. Service area above describes the
+            company; this changes what the assistants are shown when we ask.
+            Verified against the live APIs: asked as GB, ChatGPT returns .co.uk
+            directories where US returns US ones, with no overlap. */}
+        <label className="block">
+          <span className={label}>Ask the engines as someone in</span>
+          <select
+            className={field}
+            value={country}
+            onChange={(e) => setEdited((prev) => ({ ...prev, country: e.target.value }))}
+          >
+            <option value="">Not set</option>
+            {COUNTRIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+        </label>
         </div>
       </div>
+
+      {/* ⚠️ TWO ENGINES OF THREE, SAID OUT LOUD. Gemini rejects a location
+          parameter outright (see lib/tracking/gemini.ts), so somebody who picks
+          a country while seeing three engines named elsewhere in the product
+          would reasonably assume all three were asked from there. The full
+          control on the Sites page carries the same sentence. */}
+      {country ? (
+        <p className="text-slate mt-3 text-xs leading-relaxed">
+          That applies to ChatGPT and Perplexity. Gemini has no way to be asked from a country, so
+          its results are not location-specific.
+        </p>
+      ) : null}
 
       {error && (
         <p role="alert" className="text-error-ink mt-3 text-sm">

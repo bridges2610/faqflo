@@ -427,10 +427,16 @@ export function TrackingWorkspace() {
     silently switch question discovery off for free accounts, which costs an
     Opus call rather than engine calls.
 
-    ⚠️ FREE IS UNAFFECTED AND MUST STAY THAT WAY. Free's re-run button lives in
-    RunControl (prompt-ranking.tsx) on its own report, where three prompts times
-    three runs is the entire "fix something and look again" loop. This route is
-    Pro-only; nothing here reaches it.
+    ⚠️ FREE'S OWN RE-RUN BUTTON IS ELSEWHERE AND MUST STAY THERE. It lives in
+    RunControl (prompt-ranking.tsx) on the free report, where three prompts
+    times three runs is the entire "fix something and look again" loop.
+
+    ⚠️ AND FREE REACHES THIS SCREEN NOW, WHICH IT DID NOT WHEN THIS WAS WRITTEN.
+    The note here used to end "this route is Pro-only; nothing here reaches it",
+    which was true of the route rather than of the component — requirePro() has
+    since gone and the nav is open to every plan. Nothing below needed changing:
+    the `pro`, `canGrowList` and `oneShot` branches were already written for a
+    free reader and are now actually used.
   */
   const pro = isPro(user);
   const canGrowList = pro;

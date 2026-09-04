@@ -60,6 +60,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         // Anchors the free tier's lifetime check allowance — see
         // trackingPeriod() in lib/dashboard/plans.ts.
         createdAt: user.created_at,
+        /* Read-only here by construction: the columns have no UPDATE grant for
+           `authenticated`, so the browser can see the spend and not touch it. */
+        freeArticlesUsed: user.free_articles_used ?? 0,
+        freeFaqSetsUsed: user.free_faq_sets_used ?? 0,
       }}
       sites={sites.map(toSite)}
     >

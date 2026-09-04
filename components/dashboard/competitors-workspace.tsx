@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatNumber } from '@/lib/dashboard/format';
+import { isPro, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { COMPETITOR_CAP } from '@/lib/dashboard/store';
 import { CompetitorRow } from './competitor-row';
@@ -52,7 +53,7 @@ const ADD_ERROR: Record<string, string> = {
 };
 
 export function CompetitorsWorkspace() {
-  const { site, tracking, competitors: watched, addCompetitor } = useDashboard();
+  const { site, tracking, competitors: watched, addCompetitor, user } = useDashboard();
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -118,11 +119,20 @@ export function CompetitorsWorkspace() {
       ? `${enginesUsed.slice(0, -1).join(', ')} and ${enginesUsed[enginesUsed.length - 1]}`
       : (enginesUsed[0] ?? 'the AI tools');
 
+  /*
+    ⚠️ "We ask again every week" IS A PRO PROMISE AND MUST NOT BE MADE TO FREE.
+    This sentence was hardcoded when only Pro could open this screen. Free's
+    schedule is 'once' (see TRACKING_PLANS), so telling a free account we will
+    ask again weekly is a claim about work that will not happen — and they now
+    read this page. The cadence comes off the plan instead.
+  */
+  const weekly = trackingPlanFor(user).schedule === 'weekly';
+
   const sourceLine =
     enginesUsed.length > 0 && askedCount > 0
       ? `Every website ${engineList} pointed to when we asked them ${askedCount} ${
           askedCount === 1 ? 'question' : 'questions'
-        } about ${site.name}. We ask again every week.`
+        } about ${site.name}.${weekly ? ' We ask again every week.' : ''}`
       : `Once your first check runs, this shows every website the AI tools pointed to when answering questions about ${site.name}.`;
 
   async function add(e: React.FormEvent) {
@@ -179,6 +189,30 @@ export function CompetitorsWorkspace() {
   return (
     <>
       <PageHeader className="mb-2" title="Competitors" description={sourceLine} />
+
+      {/*
+        ⚠️ THE CEILING, ON THE ONE SCREEN THAT NEVER MENTIONED IT. Everything on
+        this page is real for a free account — it is built from the checks that
+        actually ran — but three questions asked once produces a thin list, and
+        without this line that thinness reads as "hardly anyone is being cited"
+        rather than "we have not asked much yet".
+
+        ⚠️ IT COMPARES, IT DOES NOT WITHHOLD. Nothing here is hidden from free;
+        the sentence exists so the reader knows what would make the same page
+        say more. LOCKED IS NOT DISABLED, and this is not even locked.
+      */}
+      {user && !isPro(user) && (
+        <p className="text-slate mb-4 text-sm leading-relaxed">
+          This is built from the questions your one check asked. Pro puts{' '}
+          <span className="text-navy font-semibold">
+            {TRACKING_PLANS.pro.promptCap} questions
+          </span>{' '}
+          to the engines every week, so this list keeps filling in.{' '}
+          <Link href="/dashboard/plan" className="text-primary hover:text-primary-hover font-semibold">
+            See what Pro includes
+          </Link>
+        </p>
+      )}
 
       {/* ⚠️ ATTRIBUTION, NOT NAVIGATION, WHICH IS WHY IT SITS UNDER THE
           DESCRIPTION RATHER THAN IN PageHeader's action SLOT. That slot is

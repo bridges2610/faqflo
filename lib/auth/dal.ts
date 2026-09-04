@@ -102,6 +102,13 @@ function fromClaims(claims: Record<string, unknown>): ProfileRow {
     email: typeof claims.email === 'string' ? claims.email : '',
     plan: 'free',
     plan_since: null,
+    /* ⚠️ ZERO, WHICH FAILS OPEN — AND THAT IS THE RIGHT WAY ROUND HERE. This
+       fallback runs when the profile row cannot be read, and the claim that
+       actually spends the allowance is a conditional UPDATE against the real
+       row: it will refuse on its own if the allowance is gone. Reporting zero
+       used means the UI offers the control; the server still decides. */
+    free_articles_used: 0,
+    free_faq_sets_used: 0,
     /* Null, not a date: this account has no profile row, so no welcome email
        has been sent for it. Claiming otherwise here would let the guarded
        update in 0004 think the job was done. */

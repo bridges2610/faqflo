@@ -42,6 +42,18 @@ export type User = {
    * See trackingPeriod() in lib/dashboard/plans.ts.
    */
   createdAt: string | null;
+  /**
+   * What the model has already written for this account, ever.
+   *
+   * ⚠️ ONLY MEANINGFUL ON FREE, AND ONLY FOR DISPLAY. Pro's article budget is
+   * monthly and counted from rows; these are the free tier's lifetime spend,
+   * used so the generator can say what is left instead of offering a control
+   * the server will refuse. The numbers the customer is actually held to are
+   * claimed server-side — see claim_free_generation() in 0021.
+   */
+  freeArticlesUsed: number;
+  /** Generation RUNS spent in the Answers tab. An article's own FAQs are not counted. */
+  freeFaqSetsUsed: number;
 };
 
 export type Site = {

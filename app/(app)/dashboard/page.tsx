@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
-import { FreeHome } from '@/components/dashboard/free-home';
 import { OverviewWorkspace } from '@/components/dashboard/overview-workspace';
 import { POSTS } from '@/lib/blog/posts';
-import { currentUser } from '@/lib/auth/dal';
-import { isPro } from '@/lib/auth/entitlements';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -30,7 +27,6 @@ export const metadata: Metadata = { title: 'Dashboard' };
   query — the same reasoning start/page.tsx and help/page.tsx state.
 */
 export default async function DashboardPage() {
-  const user = await currentUser();
 
   /*
     ⚠️ THE POSTS ARE READ HERE, NOT IN THE WORKSPACE. lib/blog/posts.ts imports
@@ -41,5 +37,16 @@ export default async function DashboardPage() {
   */
   const posts = POSTS.slice(0, 3).map((post) => post.meta);
 
-  return isPro(user) ? <OverviewWorkspace posts={posts} /> : <FreeHome />;
+  /*
+    ⚠️ ONE HOME FOR BOTH PLANS NOW. This used to hand a free account FreeHome —
+    a separate conversion page — and the note above explains why that choice was
+    made server-side. FreeHome still exists and is still that page; it moved to
+    /dashboard/audit, where it replaced a screen saying nearly the same thing.
+
+    What free gets here is the real Home, thinner: every HomeSnapshot cell
+    resolves from data a free account has, the chart already reads "from your one
+    check" on a 'once' schedule, and buildWorklist's `locked: 'pro'` tasks —
+    written for this and never rendered until now — carry the upgrade.
+  */
+  return <OverviewWorkspace posts={posts} />;
 }

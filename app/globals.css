@@ -69,7 +69,20 @@
     icons, the ink for type.
   */
   --color-warn: #f59e0b;
-  --color-warn-ink: #b45309; /* 5.02:1 on white, 4.84:1 on --color-warn-soft */
+  /*
+    ⚠️ BRIGHTENED FROM #b45309, AND IT COST NOTHING — every surface it sits on
+    got MORE contrast, not less: 5.02→5.18 on white, 4.84→4.99 on warn-soft,
+    4.72→4.87 on cloud. #b45309 is amber-700, which carries enough green to
+    read brown at small sizes; this is orange-700, the same step on the scale
+    with the mud taken out.
+
+    ⚠️ ANYTHING GENUINELY BRIGHT FAILS HERE, so do not "fix" this again by
+    reaching for --color-warn. Measured on white at text-sm, where 4.5:1 is the
+    bar: amber-600 #d97706 is 3.19, orange-600 #ea580c is 3.56, and
+    --color-warn #f59e0b itself is 2.15. The mid value is for fills and icons
+    precisely because it cannot carry type — see the convention note above.
+  */
+  --color-warn-ink: #c2410c; /* 5.18:1 on white, 4.99:1 on --color-warn-soft */
   --color-warn-soft: #fffbeb;
 
   /*

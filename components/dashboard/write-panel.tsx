@@ -7,12 +7,12 @@ import { Card } from '@/components/ui/card';
 import { MAX_BRIEF_CHARS, type ArticleStreamPhase } from '@/lib/article';
 import { generateContentPlan } from '@/lib/dashboard/content-plan';
 import { formatPlainDate } from '@/lib/dashboard/format';
-import { articleAllowance, canContent } from '@/lib/dashboard/plans';
+import { ARTICLE_CAP, articleAllowance, canContent, isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { groupByQuestion, isOpenQuestion, namedIn } from '@/lib/dashboard/questions';
 import { questionKey } from '@/lib/questions';
 import type { ArticleSection, ArticleTopic, DiscoveredQuestion } from '@/lib/dashboard/types';
-import { SearchIcon } from './nav-icons';
+import { LockIcon, SearchIcon } from './nav-icons';
 import { SectionTitle } from './section-title';
 import { WritingModal } from './writing-modal';
 
@@ -96,6 +96,14 @@ export function WritePanel() {
   */
   const allowance = articleAllowance(user, data?.articles ?? []);
   const noneLeft = allowance !== null && allowance.left <= 0;
+
+  /* ⚠️ THE PLAN DECIDES WHETHER "A MONTH" IS TRUE, AND FOR FREE IT IS NOT.
+     Pro's article budget really is monthly — articleAllowance() counts rows
+     inside trackingPeriod() and hands back a resetsAt. Free's is a lifetime
+     counter (profiles.free_articles_used, 0021: "Never decremented"), so every
+     month/reset word below is Pro-only. This read "articles left this month"
+     for everybody, which promised a free account a refill that never arrives. */
+  const pro = isPro(user);
 
   const pages = site?.lastAudit?.pages ?? [];
   const hidden = questions.filter((q) => q.dismissed);
@@ -377,10 +385,18 @@ export function WritePanel() {
               own at the bottom of the page. It is one figure; a whole card for
               it was the largest thing on screen saying the least. The number is
               counted from the account's own rows — see articleAllowance(). */}
+          {/* ⚠️ USED, NOT LEFT. "0 of 1 articles left" makes the number that
+              matters a zero, and a zero reads as nothing-here rather than
+              all-spent — the same figure said backwards. Counting up also
+              survives the cap changing under it. */}
           {allowance && (
             <p className={`text-sm ${noneLeft ? 'text-warn-ink font-semibold' : 'text-slate'}`}>
-              {allowance.left} of {allowance.cap} articles left this month
-              {allowance.resetsAt ? (
+              {allowance.used} of {allowance.cap} {allowance.cap === 1 ? 'article' : 'articles'}{' '}
+              used{pro ? ' this month' : ''}
+              {/* ⚠️ PRO ONLY. trackingPeriod() returns a period for a free
+                  account too, so this rendered "resets <date>" beside a
+                  lifetime allowance — a date on which nothing happens. */}
+              {pro && allowance.resetsAt ? (
                 <span className="text-slate">
                   {' · '}
                   {/* ⚠️ formatPlainDate, NOT toISOString(). Every date this
@@ -544,12 +560,49 @@ export function WritePanel() {
           </p>
         )}
 
-        {noneLeft && (
-          <p className="text-slate mt-3 text-sm">
-            You&rsquo;ve used all {allowance?.cap} articles this month. You can still write
-            questions and answers on the Answers tab — those have no limit.
-          </p>
-        )}
+        {/* ⚠️ TWO MESSAGES, BECAUSE THE TWO PLANS RUN OUT OF DIFFERENT THINGS.
+            Pro has hit a monthly ceiling that lifts on a date it can be told;
+            free has spent an allowance that does not come back, so the only
+            honest next step is the plan. LOCKED IS NOT DISABLED — the free one
+            names what it needs and goes somewhere. */}
+        {noneLeft &&
+          (pro ? (
+            <p className="text-slate mt-3 text-sm">
+              You&rsquo;ve used all {allowance?.cap} articles this month
+              {allowance?.resetsAt
+                ? `, and ${allowance.cap} more arrive ${formatPlainDate(allowance.resetsAt.toISOString())}`
+                : ''}
+              . You can still write questions and answers on the Answers tab — those have no limit.
+            </p>
+          ) : (
+            /* ⚠️ THE HOUSE UPGRADE TREATMENT, NOT A NEW ONE. Tinted cloud panel,
+               accent-soft lock chip, solid primary button — the same three parts
+               UpgradeCard uses, so the two places a free account meets a limit
+               look like the same product. It was a hairline rule and a ghost
+               button, which read as a footnote to the card above it rather than
+               the thing to do next. Inline rather than a whole UpgradeCard
+               because this sits at the foot of a panel and has one sentence to
+               say; the card carries a title, price and terms. */
+            <div className="border-line bg-cloud mt-5 flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border p-4">
+              <span className="bg-accent-soft text-teal-ink flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
+                <LockIcon className="h-4.5 w-4.5" />
+              </span>
+              <p className="text-slate min-w-0 flex-1 text-sm">
+                {/* ⚠️ NO "this month" AND NO PROMISE ABOUT THE ANSWERS TAB. The
+                    article is gone for good, and free's answers are capped at
+                    FREE_GENERATED_FAQ_SET_CAP sets — the old copy told a free
+                    account both that the article would return and that answers
+                    were unlimited, and neither is true. */}
+                <span className="text-navy font-semibold">
+                  That&rsquo;s the {allowance?.cap} article your free plan writes.
+                </span>{' '}
+                Pro writes {ARTICLE_CAP} a month.
+              </p>
+              <ButtonLink href="/dashboard/plan" size="sm">
+                Get more with Pro
+              </ButtonLink>
+            </div>
+          ))}
       </Card>
 
       {/* Hidden questions, tucked away but never gone. Somebody who hides the

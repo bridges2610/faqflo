@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { ButtonLink } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import type { PostMeta } from '@/lib/blog/posts';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { canOfferDoneForYou, trackingPlanFor } from '@/lib/dashboard/plans';
+import { canOfferDoneForYou, isPro, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { buildWorklist, setupSteps } from '@/lib/dashboard/worklist';
 import { DoneForYouCard } from './done-for-you-card';
 import { CitationChart } from './citation-chart';
@@ -11,6 +13,9 @@ import { HomeReading } from './home-reading';
 import { HomeRivals } from './home-rivals';
 import { HomeSnapshot } from './home-snapshot';
 import { HomeWorklist } from './home-worklist';
+import { LockedPreview } from './locked-preview';
+import { SectionTitle } from './section-title';
+import { FaqIcon, TickIcon } from './nav-icons';
 import { PageHeader } from './page-header';
 import { SetupChecklist } from './setup-checklist';
 
@@ -126,6 +131,11 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
   const daily = tracking?.daily ?? [];
   const oneShot = trackingPlanFor(user).schedule === 'once';
 
+  /* The questions actually put to the engines for this account, deduplicated —
+     `latest` holds one row per question AND engine. */
+  const watched = [...new Set((tracking?.latest ?? []).map((c) => c.question))];
+  const moreWithPro = Math.max(0, TRACKING_PLANS.pro.promptCap - watched.length);
+
   return (
     <>
       <PageHeader
@@ -230,6 +240,57 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
           />
           <HomeRivals />
         </div>
+      )}
+
+      {/*
+        ⚠️ FREE ONLY, AND IT SHOWS THE REAL QUESTIONS FIRST. What a free account
+        is watching is genuinely theirs — three prompts, put to three engines,
+        with real answers stored. The blurred bars underneath are the SHAPE of
+        the rest of Pro's list and carry nothing at all; see locked-preview.tsx
+        for why nothing is the only safe thing to put behind a blur.
+
+        ⚠️ THE REMAINDER IS ARITHMETIC ON THE PLAN, NOT A TYPED NUMBER. Pro's
+        promptCap minus what they actually hold — an account may have fewer than
+        the free cap, and hardcoding "22" would be wrong the moment either cap
+        moves.
+      */}
+      {!isPro(user) && watched.length > 0 && moreWithPro > 0 && (
+        <Card className="mt-5 p-5 sm:p-6">
+          {/* ⚠️ SectionTitle, LIKE EVERY OTHER CARD ON THIS PAGE. This was a bare
+              <h2 at text-[1.0625rem] with no weight — larger and lighter than
+              the headings either side of it, so the one card a free account
+              sees that a Pro account does not was also the one card in a
+              different typeface. Every sibling here is
+              text-[0.9375rem] font-bold tracking-normal, which is what
+              SectionTitle renders; home-worklist.tsx writes those same classes
+              by hand rather than inventing its own. */}
+          <SectionTitle icon={<FaqIcon className="h-4 w-4" />} tint="bg-cloud text-slate">
+            Questions we&rsquo;re watching for you
+          </SectionTitle>
+          <p className="text-slate mt-1 text-sm">
+            We put these to ChatGPT, Perplexity and Gemini and saved what they said.
+          </p>
+
+          <LockedPreview
+            bars={3}
+            label={`${moreWithPro} more questions with Pro, re-checked every week`}
+          >
+            <ul className="mt-4 space-y-2">
+              {watched.map((q) => (
+                <li key={q} className="text-navy flex items-start gap-2 text-sm leading-snug">
+                  <TickIcon className="text-primary mt-0.5 h-4 w-4 shrink-0" />
+                  {q}
+                </li>
+              ))}
+            </ul>
+          </LockedPreview>
+
+          <div className="mt-4">
+            <ButtonLink href="/dashboard/plan" size="sm" variant="ghost">
+              See what Pro includes
+            </ButtonLink>
+          </div>
+        </Card>
       )}
 
       {/* Full width, because it is the tallest thing on the page and nothing

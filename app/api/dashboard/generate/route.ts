@@ -12,7 +12,16 @@ import {
 } from '@/lib/faq';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
 import { canGenerate, isPro } from '@/lib/auth/entitlements';
-import { checkRateLimit, DASHBOARD_RATE_LIMIT, limitKey, RATE_LIMIT } from '@/lib/rate-limit';
+import { claimFreeGeneration } from '@/lib/auth/free-allowance';
+import { FREE_GENERATED_FAQ_SET_CAP } from '@/lib/dashboard/plans';
+import { MAX_ARTICLE_FAQS } from '@/lib/article';
+import {
+  checkRateLimit,
+  DASHBOARD_RATE_LIMIT,
+  FREE_DASHBOARD_RATE_LIMIT,
+  limitKey,
+} from '@/lib/rate-limit';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 /*
   Generation for the dashboard: same model and same schema as the public route,
@@ -68,7 +77,10 @@ export async function POST(request: Request) {
     below and the limit above can never be scaled from different answers.
   */
   const pro = isPro(user);
-  const dailyLimit = pro ? DASHBOARD_RATE_LIMIT : RATE_LIMIT;
+  /* ⚠️ FREE'S OWN CEILING, NOT THE ANONYMOUS ONE. This read RATE_LIMIT, which
+     is /api/generate's limit for strangers — three a day, against a plan that
+     sells five sets. See the note on FREE_DASHBOARD_RATE_LIMIT. */
+  const dailyLimit = pro ? DASHBOARD_RATE_LIMIT : FREE_DASHBOARD_RATE_LIMIT;
   const perCall = pro ? MAX_FAQ_COUNT_PRO : MAX_FAQ_COUNT;
 
   if (!checkRateLimit(`dash:${limitKey(user.id, request.headers)}`, dailyLimit)) {
@@ -95,7 +107,10 @@ export async function POST(request: Request) {
     return fail('Invalid request body.', 400);
   }
 
-  const { content, count, tone, language, siteId } = (body ?? {}) as Record<string, unknown>;
+  const { content, count, tone, language, siteId, articleId } = (body ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   if (typeof content !== 'string' || content.trim().length < 10) {
     return fail('Content is required and must be at least 10 characters.', 400);
@@ -110,6 +125,82 @@ export async function POST(request: Request) {
      didn't earn. */
   const site = await siteForUser(siteId, user.id);
   if (!site) return fail('No such site on your account.', 404);
+
+  /*
+    ⚠️ RESOLVED ONCE, HERE, SO THE CLAIM AND THE PROMPT CANNOT DISAGREE. The
+    count was clamped inline at the model call; spending an allowance meant it
+    had to be known before that, and computing it twice is how the number
+    charged for and the number written drift apart.
+  */
+  const wanted = clampCount(count, perCall);
+
+  /*
+    ⚠️ AN ARTICLE'S OWN FAQs ARE EXEMPT, AND THE EXEMPTION IS VERIFIED RATHER
+    THAN TRUSTED.
+
+    article-workspace.tsx posts here too — its comment says so approvingly,
+    "NO NEW ENDPOINT… the article's plain text is just another piece of source
+    material" — which was harmless until this route started spending an
+    allowance. It meant adding FAQs to an article burned the Answers grant, and
+    the Answers tab then refused work the plan had sold.
+
+    ⚠️ A `forArticle: true` FLAG WOULD HAVE BEEN A BACK DOOR. Anyone could set
+    it and generate for ever. So the request names an article, and this reads
+    that article from the database: it must exist, it must belong to the caller,
+    and it must have room under MAX_ARTICLE_FAQS. Lying gains nothing, because
+    the ceiling comes from the stored row — the list is append-only, so room
+    only shrinks, and a free account gets one article. Total exemption for a
+    free account: one article's worth of FAQs, once.
+  */
+  let articleRoom: number | null = null;
+
+  if (typeof articleId === 'string' && articleId) {
+    const { data: article } = await createAdminClient()
+      .from('articles')
+      .select('faqs')
+      .eq('id', articleId)
+      .eq('user_id', user.id)
+      .maybeSingle<{ faqs: unknown }>();
+
+    /* 404, not 403 — matching /api/audit. Confirming an id exists but belongs to
+       somebody else tells a guesser their guess was right. */
+    if (!article) return fail('No such article on your account.', 404);
+
+    const held = Array.isArray(article.faqs) ? article.faqs.length : 0;
+    articleRoom = Math.max(0, MAX_ARTICLE_FAQS - held);
+
+    if (articleRoom === 0) {
+      return fail(`This article already has its ${MAX_ARTICLE_FAQS} answers.`, 409);
+    }
+  }
+
+  /*
+    ⚠️ FREE SPENDS A SET PER RUN; PRO SPENDS NOTHING BUT A RATE LIMIT. Free gets
+    FREE_GENERATED_FAQ_SET_CAP runs in the Answers tab, ever — runs, not answers,
+    so every set may be as large as the plan allows. Claimed before the model is
+    asked, because a claim after a successful generation would hand out work
+    already paid for.
+  */
+  let setsLeft: number | null = null;
+
+  if (!pro && articleRoom === null) {
+    const claimed = await claimFreeGeneration(user.id, 'faq_set', 1);
+
+    /* ⚠️ TWO DIFFERENT FAILURES, TWO DIFFERENT ANSWERS. A spent allowance is the
+       customer's news and a 429; a claim that could not run is ours and a 502.
+       They shared a message once, and a stale claim function told people they
+       had used five sets they had never written. */
+    if (!claimed.ok && claimed.reason === 'error') {
+      return fail('We could not check your writing allowance. Please try again.', 502);
+    }
+    if (!claimed.ok) {
+      return fail(
+        `That's the ${FREE_GENERATED_FAQ_SET_CAP} sets of answers your free plan writes. Pro writes as many as you need.`,
+        429,
+      );
+    }
+    setsLeft = claimed.left;
+  }
 
   /* No plan gate here any more — see the header. What the plan decides is
      `perCall` and `dailyLimit` above, both already applied. */
@@ -129,7 +220,7 @@ export async function POST(request: Request) {
           role: 'user',
           content: buildPrompt({
             content,
-            count: clampCount(count, perCall),
+            count: wanted,
             tone: coerceTone(tone),
             language: coerceLanguage(language),
             withTopic: true,
@@ -165,7 +256,10 @@ export async function POST(request: Request) {
        the list. An empty string is left for the caller to bucket. */
     const topic = typeof parsed.topic === 'string' ? parsed.topic.trim().slice(0, 80) : '';
 
-    return NextResponse.json({ topic, faqs });
+    /* ⚠️ `left` IS null FOR PRO, NOT A BIG NUMBER. Pro has no answer allowance
+       to report, and sending a made-up ceiling would put a limit on screen that
+       nothing enforces. The panel shows the line only when a number arrives. */
+    return NextResponse.json({ topic, faqs, left: setsLeft });
   } catch (err) {
     // Same taxonomy as /api/generate — APIConnectionError extends APIError in
     // the TS SDK, so it has to be tested first.

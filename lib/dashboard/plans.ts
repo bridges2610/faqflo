@@ -65,8 +65,15 @@ export const GUARANTEE_DAYS = 30;
  * A cap on what may be STORED, not on what may be generated in one go — that
  * is MAX_FAQ_COUNT_PRO in lib/faq.ts. Someone who generates six, deletes four
  * and generates six more is at eight, not twelve.
+ *
+ * ⚠️ IT WAS 10 AND HAD TO RISE, BECAUSE IT WAS SILENTLY CANCELLING A GRANT.
+ * Free writes FREE_GENERATED_FAQ_SET_CAP sets and a set is 3-12 answers, so at
+ * ten stored the third set had nowhere to go — the plan offered five and the
+ * storage refused after two. Twenty-five is five sets at free's five-answer
+ * per-call maximum. A cap that blocks something the pricing table sells is the
+ * refund this file's header warns about.
  */
-export const FREE_FAQ_CAP = 10;
+export const FREE_FAQ_CAP = 25;
 
 /**
  * Articles a Pro account may generate per month.
@@ -80,11 +87,47 @@ export const FREE_FAQ_CAP = 10;
  * this product per press of a button — every other generator returns a page of
  * short answers — and ten a month is more than a small business publishes.
  *
- * Free is zero, and there is no FREE constant to pair with this one, because
- * the whole dashboard generator is already Pro-only. See canGenerate() below;
- * articles sit behind that same predicate rather than a second, drifting copy.
+ * ⚠️ FREE IS NO LONGER ZERO. This note used to end "there is no FREE constant
+ * to pair with this one, because the whole dashboard generator is already
+ * Pro-only". Free now writes one article and five answers, so the pair below
+ * exists — and canGenerate() no longer answers the question on its own.
  */
 export const ARTICLE_CAP = 10;
+
+/**
+ * What a FREE account may have written for it, ever.
+ *
+ * ⚠️ EVER, NOT PER PERIOD, AND NOT A CAP ON WHAT IS HELD. trackingPeriod()
+ * never ends for a free account, so a period-based count would be lifetime
+ * anyway — saying "ever" plainly avoids implying a monthly refill that is never
+ * coming. And it counts model calls that happened: deleting the article or the
+ * answers does not hand the allowance back, because the call is what cost
+ * money. That is why the count lives in profiles.free_articles_used /
+ * free_faqs_used (migration 0021) rather than being derived from rows, which
+ * are hard-deleted.
+ *
+ * ⚠️ FIVE RUNS, NOT FIVE ANSWERS, AND AN EARLIER VERSION OF THIS COUNTED
+ * ANSWERS. One run writes MIN_FAQ_COUNT to MAX_FAQ_COUNT of them, so counting
+ * answers meant a run of 3 left a remainder of 2 that no run could use —
+ * clampCount()'s floor turns a request for 2 into the maximum. Counting runs
+ * removes the whole problem: every set may be as large as the plan allows.
+ *
+ * ⚠️ AN ARTICLE'S OWN FAQs ARE NOT ONE OF THESE. They are bounded by
+ * MAX_ARTICLE_FAQS on the article itself and are exempt here — see the note in
+ * app/api/dashboard/generate/route.ts about why that exemption is verified
+ * against the stored article rather than trusted from the request.
+ *
+ * ⚠️ DIFFERENT FROM FREE_FAQ_CAP, WHICH CAPS WHAT IS STORED and includes
+ * hand-written answers. This caps how many times the model is asked.
+ */
+export const FREE_ARTICLE_CAP = 1;
+export const FREE_GENERATED_FAQ_SET_CAP = 5;
+
+/** What this account may still have written. Pro's article budget is monthly and
+ *  counted from rows; free's is a lifetime counter it cannot reach. */
+export function articleCapFor(user: User | null): number {
+  return isPro(user) ? ARTICLE_CAP : FREE_ARTICLE_CAP;
+}
 
 /**
  * Articles used and left in the current window, or null when the account has no
@@ -111,6 +154,12 @@ export function articleAllowance(
 ): { used: number; left: number; cap: number; resetsAt: Date | null } | null {
   if (!canGenerate(user)) return null;
 
+  /* ⚠️ PRO'S BUDGET IS MONTHLY AND COUNTED FROM ROWS; FREE'S IS A LIFETIME
+     COUNTER THIS CANNOT SEE. profiles.free_articles_used is service-role only
+     (0021), so the honest client-side answer for a free account is the cap and
+     whatever rows survive — the server is what actually refuses. */
+  const cap = articleCapFor(user);
+
   const period = trackingPeriod({
     plan: planOf(user),
     planSince: user?.planSince ?? null,
@@ -123,8 +172,8 @@ export function articleAllowance(
 
   return {
     used,
-    left: Math.max(0, ARTICLE_CAP - used),
-    cap: ARTICLE_CAP,
+    left: Math.max(0, cap - used),
+    cap,
     resetsAt: period?.end ?? null,
   };
 }
@@ -603,10 +652,21 @@ export const PLAN_FEATURES: PlanFeature[] = [
     /* Dropped from the bullet list — see the note above PLAN_FEATURES. */
   },
   {
+    /* ⚠️ free IS A NUMBER NOW, NOT null. It read null while writing was Pro-only;
+       free writes FREE_GENERATED_FAQ_SET_CAP sets and FREE_ARTICLE_CAP article,
+       so a blank here would sell less than the dashboard grants — which the
+       header of this file calls a refund waiting to happen. Built from the
+       constants so the table cannot drift from what the routes enforce. */
     label: 'Answers written to be quoted',
-    free: null,
+    free: `${FREE_GENERATED_FAQ_SET_CAP} sets to start`,
     pro: 'A complete set',
     prosePro: 'Answers written for you, ready to paste on your site',
+  },
+  {
+    label: 'Articles written for you',
+    free: `${FREE_ARTICLE_CAP} to start`,
+    pro: `${ARTICLE_CAP} a month`,
+    prosePro: `${ARTICLE_CAP} articles a month, written from your own pages`,
   },
   {
     label: 'Code to paste on your site',
@@ -662,10 +722,14 @@ export const PLAN_FEATURES: PlanFeature[] = [
       of what the upgrade sells: a single reading versus a line on a chart".
 
       ⚠️ IT IS A REAL SCREEN, NOT AN ASPIRATION. CitationChart plots citations
-      per engine across the last thirty days on /dashboard/tracking, and that
-      route calls requirePro(), so free genuinely cannot reach it. Free's own
-      schedule is 'once', which is why the chart's span prop reads "from your
-      one check" for that plan — a reading, not a trend.
+      per engine across the last thirty days on /dashboard/tracking.
+
+      ⚠️ FREE CAN NOW SEE THAT SCREEN, WHICH MAKES THIS ROW A COMPARISON RATHER
+      THAN A DESCRIPTION OF SOMEWHERE THEY CANNOT GO. The route used to call
+      requirePro(); it does not any more. Free's schedule is still 'once', which
+      is why the chart's span prop reads "from your one check" for that plan —
+      a reading, not a trend. That difference is now visible side by side, which
+      is a better argument than a locked door was.
     */
     label: 'Where you show up over time',
     free: 'One reading at a time',
@@ -783,14 +847,27 @@ export function canDiscover(user: User | null): boolean {
  * The moment this predicate is used to gate that route, the backwards tier is
  * back: someone who signed up would be worse off than someone who did not.
  *
- * What changed is the free report itself. It is one page, and that page now
- * ends in three prompts put to the engines rather than in an answer writer —
- * so free is sold a diagnosis, and writing the answers is part of what Pro
- * buys. FREE_FAQ_CAP and faqCapFor() stay as they are: accounts that wrote
- * answers under the old shape still own those rows.
+ * ⚠️ IT IS NO LONGER isPro, AND THE REFUSAL MOVED FROM THE PLAN TO THE
+ * ALLOWANCE. This used to read "free is sold a diagnosis, and writing the
+ * answers is part of what Pro buys". Free now gets FREE_ARTICLE_CAP articles
+ * and FREE_GENERATED_FAQ_SET_CAP sets of answers, so the question it answers
+ * changed shape: everybody may write, and what differs is how much.
+ *
+ * ⚠️ SO A `true` HERE IS NOT PERMISSION TO SPEND. It says the screen should
+ * offer the control. Whether there is anything left is claimed server-side in
+ * app/api/dashboard/generate and app/api/dashboard/article, by a conditional
+ * update that cannot be raced — the same division of labour canRunCheckNow()
+ * drew with the tracking meter before it. Deciding "how many left" here would
+ * be a second implementation of a counter the client cannot be trusted with.
+ *
+ * ⚠️ THE ARGUMENT IS KEPT THOUGH IT IS UNUSED, WHICH canRunCheckNow() ARGUES
+ * AGAINST — and the reason it stays is that this predicate is one plan change
+ * away from discriminating again, while dropping it would edit every call site
+ * twice. articleAllowance() below reads the CAP per plan rather than this, so
+ * nothing downstream mistakes `true` for "unlimited".
  */
-export function canGenerate(user: User | null): boolean {
-  return isPro(user);
+export function canGenerate(_user: User | null): boolean {
+  return true;
 }
 
 /** The content plan: which pages the site is missing, and what to write next. */

@@ -11,9 +11,10 @@ import {
   type ArticleGeneration,
 } from '@/lib/article';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
-import { canGenerate } from '@/lib/auth/entitlements';
+import { canGenerate, isPro } from '@/lib/auth/entitlements';
+import { claimFreeGeneration } from '@/lib/auth/free-allowance';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ARTICLE_CAP, trackingPeriod } from '@/lib/dashboard/plans';
+import { ARTICLE_CAP, FREE_ARTICLE_CAP, trackingPeriod } from '@/lib/dashboard/plans';
 import { ARTICLE_RATE_LIMIT, checkRateLimit, limitKey } from '@/lib/rate-limit';
 
 /*
@@ -95,7 +96,12 @@ export async function POST(request: Request) {
 
   /* The same predicate that gates the answer generator, not a second one. An
      articles-only entitlement would be a third thing to keep in step with the
-     pricing page. See canGenerate() in lib/auth/entitlements.ts. */
+     pricing page. See canGenerate() in lib/auth/entitlements.ts.
+
+     ⚠️ IT IS A CONSTANT NOW AND THE REAL REFUSAL IS BELOW. Every plan may write;
+     free's allowance is FREE_ARTICLE_CAP, claimed atomically further down. This
+     line survives so the day writing is gated again there is one place to do
+     it. */
   if (!canGenerate(user)) {
     return fail('Writing articles is part of Pro.', 403);
   }
@@ -130,44 +136,70 @@ export async function POST(request: Request) {
     they would hit second. It also means a refused request never reaches
     Anthropic.
   */
-  const period = trackingPeriod({
-    plan: user.plan,
-    planSince: user.plan_since,
-    accountCreatedAt: user.created_at,
-  });
+  /*
+    ⚠️ TWO BUDGETS OF DIFFERENT SHAPES, AND ONLY ONE OF THEM IS COUNTABLE FROM
+    ROWS. Pro buys ARTICLE_CAP a month, counted from `articles` created since the
+    billing anniversary — deleting one does hand it back, which is a small leak
+    on ten a month and documented as such. Free buys FREE_ARTICLE_CAP ever, where
+    the same leak would mean one article at a time forever, so its spend lives in
+    a counter on the profile row that deleting cannot touch (0021).
+  */
+  let left: number | null = null;
 
-  if (!period) {
-    // trackingPeriod() always answers for a real plan, so this means the profile
-    // row is in a shape nothing anticipated. Refuse rather than spend against an
-    // unknown budget — the same call /api/dashboard/tracking makes.
-    console.error('No period for user', user.id);
-    return fail('We could not work out your current month. Please contact support.', 409);
-  }
+  if (!isPro(user)) {
+    const claimed = await claimFreeGeneration(user.id, 'article', 1);
 
-  const db = createAdminClient();
-  const { count: used, error: countError } = await db
-    .from('articles')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .gte('created_at', period.start.toISOString());
+    /* A claim that could not run is our fault, not a limit they reached — see
+       the same split in the generate route. */
+    if (!claimed.ok && claimed.reason === 'error') {
+      return fail('We could not check your writing allowance. Please try again.', 502);
+    }
+    if (!claimed.ok) {
+      return fail(
+        `That's the ${FREE_ARTICLE_CAP === 1 ? 'one article' : `${FREE_ARTICLE_CAP} articles`} your free plan writes. Pro writes ${ARTICLE_CAP} a month.`,
+        429,
+      );
+    }
+    left = claimed.left;
+  } else {
+    const period = trackingPeriod({
+      plan: user.plan,
+      planSince: user.plan_since,
+      accountCreatedAt: user.created_at,
+    });
 
-  if (countError) {
-    console.error('Could not read the article allowance:', countError);
-    return fail('Could not check how many articles you have left. Please try again.', 502);
-  }
+    if (!period) {
+      // trackingPeriod() always answers for a real plan, so this means the profile
+      // row is in a shape nothing anticipated. Refuse rather than spend against an
+      // unknown budget — the same call /api/dashboard/tracking makes.
+      console.error('No period for user', user.id);
+      return fail('We could not work out your current month. Please contact support.', 409);
+    }
 
-  if ((used ?? 0) >= ARTICLE_CAP) {
-    /* Built from the constant rather than typed, so the number in the sentence
-       cannot drift from the number enforced — the rule the other routes state
-       about their own messages. `period.end` is null only for a plan whose
-       allowance never refills, which no article-writing plan has; the branch is
-       here so the day that changes it does not print 1970. */
-    return fail(
-      period.end
-        ? `That's all ${ARTICLE_CAP} articles for this month. Your allowance resets on ${period.end.toISOString().slice(0, 10)}.`
-        : `That's all ${ARTICLE_CAP} articles on your plan.`,
-      429,
-    );
+    const db = createAdminClient();
+    const { count: used, error: countError } = await db
+      .from('articles')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .gte('created_at', period.start.toISOString());
+
+    if (countError) {
+      console.error('Could not read the article allowance:', countError);
+      return fail('Could not check how many articles you have left. Please try again.', 502);
+    }
+
+    if ((used ?? 0) >= ARTICLE_CAP) {
+      /* Built from the constant rather than typed, so the number in the sentence
+         cannot drift from the number enforced. */
+      return fail(
+        period.end
+          ? `That's all ${ARTICLE_CAP} articles for this month. Your allowance resets on ${period.end.toISOString().slice(0, 10)}.`
+          : `That's all ${ARTICLE_CAP} articles on your plan.`,
+        429,
+      );
+    }
+
+    left = Math.max(0, ARTICLE_CAP - (used ?? 0) - 1);
   }
 
   if (!checkRateLimit(`article:${limitKey(user.id, request.headers)}`, ARTICLE_RATE_LIMIT)) {
@@ -242,7 +274,12 @@ export async function POST(request: Request) {
       */
       wordCount: countWords(article),
       limit: MAX_ARTICLE_WORDS,
-      left: Math.max(0, ARTICLE_CAP - (used ?? 0) - 1),
+      /* ⚠️ COMPUTED WHERE THE BUDGET WAS DECIDED, NOT RE-DERIVED HERE. The two
+         plans count differently — a claim for free, a row count for Pro — so
+         re-doing the arithmetic at this point would need both branches again
+         and would drift from whichever one changed. `left` already holds what
+         remains AFTER this article. */
+      left,
     };
   };
 

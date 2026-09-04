@@ -161,6 +161,25 @@ export function CitationChart({
   const ticks = [0, max / 2, max];
 
   const last = daily[daily.length - 1];
+
+  /*
+    ⚠️ WHEN EVERY SERIES ENDS ON ONE VALUE THEY SHARE ONE DOT, AND THREE LABELS
+    POINTING AT IT IS THE BUG. dodge() below anticipated this — "the 'all three
+    equal' case has to stay legible" — and made it legible rather than right: at
+    zero the three stacked into 26px above the date row, each with a leader line
+    converging on the same point, which reads as a fault.
+
+    One label is what is actually true there. It is also the only version that
+    fits: PAD.right is 92px, and joining the names ("Perplexity · Gemini" alone
+    measures about 106px at this size) would run off the panel.
+
+    ⚠️ ONLY WHEN ALL OF THEM AGREE. Two coincident series still dodge, because
+    two labels 13px apart are readable and naming them individually keeps the
+    per-series encoding the header argues for. This collapses the one case where
+    there is nothing left to tell apart.
+  */
+  const endValue = (engine: Engine) => last?.byEngine[engine] ?? 0;
+  const allShareEnd = ENGINES.every((e) => endValue(e) === endValue(ENGINES[0]));
   // +4 puts the text baseline level with the dot's centre; dodging works in
   // baseline space so the result can be handed straight to <text y>.
   const endLabels = dodge(
@@ -321,8 +340,12 @@ export function CitationChart({
                 />
 
                 {/* Drawn only when the label was actually moved. A leader to a
-                    label already sitting on its own line is noise. */}
-                {Math.abs(textY - (endY + 4)) > 1 && (
+                    label already sitting on its own line is noise.
+
+                    ⚠️ AND NEVER WHEN THE LABELS HAVE COLLAPSED INTO ONE. Three
+                    leaders to a single shared label is the converging-lines
+                    picture this change exists to remove. */}
+                {!allShareEnd && Math.abs(textY - (endY + 4)) > 1 && (
                   <line
                     x1={endX + 5}
                     y1={endY}
@@ -336,12 +359,58 @@ export function CitationChart({
 
                 {/* Coloured, not grey. Once a label can sit off its own line,
                     colour is what ties it back to the series. */}
-                <text x={endX + 10} y={textY} fontSize="11" fill={SERIES[engine]}>
-                  {engine}
-                </text>
+                {!allShareEnd && (
+                  <text x={endX + 10} y={textY} fontSize="11" fill={SERIES[engine]}>
+                    {engine}
+                  </text>
+                )}
               </g>
             );
           })}
+
+          {/*
+            The three marks, in a row, where three stacked labels used to be.
+
+            ⚠️ THE MARKS ARE THE LABEL HERE, WHICH IS THE ONE PLACE THAT IS
+            HONEST. Everywhere else in this product a glyph is decoration beside
+            a word — the legend above pairs each mark with its engine's name for
+            exactly that reason. This row is different because the three series
+            are on one point: there is nothing to tell apart, so the row is
+            saying "all of these", and the names are already in the legend a few
+            pixels up.
+
+            ⚠️ WHICH IS WHY THE GROUP CARRIES AN accessible NAME. The marks are
+            each aria-hidden by their own definition, so without this the whole
+            row is silent — and the file's header counts these end labels as one
+            of the three non-colour encodings that make blue and teal legal
+            together. role="img" plus aria-label is what keeps that true.
+
+            ⚠️ THE SIZE COMES FROM svg ATTRIBUTES, NOT FROM TAILWIND, AND THE
+            FIRST ATTEMPT GOT THIS WRONG. Each mark is an <svg> with a viewBox
+            and no width/height of its own, which per spec defaults to 100% of
+            its viewport — so a `h-3 w-3` class did nothing useful and all three
+            marks painted at full chart size, clipped, in the corner. Wrapping
+            each in a nested <svg> that carries real x/y/width/height gives the
+            mark a 12-unit viewport to fill, in the chart's own coordinate
+            system, so it scales with the panel.
+
+            ⚠️ ABOVE THE POINT, for the reason the text was: a shared value is
+            usually zero, and zero is a gridline. Sitting on it drew the rule
+            straight through the marks.
+          */}
+          {allShareEnd && (
+            <g
+              role="img"
+              aria-label={`All ${ENGINES.length} engines: ${endValue(ENGINES[0])}`}
+              transform={`translate(${x(daily.length - 1) + 10}, ${y(endValue(ENGINES[0])) - 18})`}
+            >
+              {ENGINES.map((engine, i) => (
+                <svg key={engine} x={i * 16} y={0} width={12} height={12}>
+                  <EngineMark engine={engine} className="" />
+                </svg>
+              ))}
+            </g>
+          )}
 
           <line
             x1={PAD.left}

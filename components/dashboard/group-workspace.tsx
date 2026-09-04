@@ -271,7 +271,13 @@ export function GroupWorkspace({ groupId }: { groupId: string }) {
 
           {faqs.length > 0 && (
             <div
-              className="bg-cloud border-line mt-4 inline-flex items-center gap-1 rounded-full border p-1"
+              /* ⚠️ flex-wrap, NOT inline-flex ALONE. Measured at 320px: the four
+                 filters total 304px and the strip starts 45px in, so its right
+                 edge landed at 349 and the whole page scrolled sideways. It
+                 predates free reaching this screen and affected Pro identically
+                 — the same defect workspace-tabs.tsx was fixed for, where a
+                 no-wrap strip pushed a tab past the viewport. */
+              className="bg-cloud border-line mt-4 flex flex-wrap items-center gap-1 rounded-2xl border p-1 sm:inline-flex sm:rounded-full"
               role="group"
               aria-label="Filter answers"
             >

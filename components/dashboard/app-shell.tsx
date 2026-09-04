@@ -9,7 +9,7 @@ import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { formatShortDate } from '@/lib/dashboard/format';
 import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
-import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, LockIcon, SearchIcon } from './nav-icons';
+import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { AuditNotice } from './audit-notice';
 import { RunNotice } from './run-notice';
@@ -112,121 +112,42 @@ function isActive(pathname: string, href: string): boolean {
 }
 
 /*
-  What a free account can actually go to.
+  What a free account sees, which is now everything Pro does.
 
-  ⚠️ ONE ITEM, AND THE REST ARE NOT MERELY HIDDEN — each gated route redirects
-  a free account back to /dashboard in its own page.tsx. Hiding a link that
-  still works would leave the nav lying about what exists; redirecting without
-  hiding would leave five links that all go to the same place. Both halves are
-  needed, and if one is changed the other has to move with it.
+  ⚠️ IT USED TO BE ONE ITEM, AND THE OTHER HALF WAS A REDIRECT. Eight routes
+  called requirePro() and bounced a free account back to /dashboard; this list
+  held a single link so the nav did not advertise doors that were locked. The
+  note here said "both halves are needed, and if one is changed the other has to
+  move with it" — so they moved together: lib/auth/pro-only.ts is gone and every
+  screen is reachable.
 
-  The free plan's whole product is a single report: one audit of one page, and
-  three prompts put to the engines that the reader can re-run as they fix
-  things. All of it lives on /dashboard. There is no second screen to navigate
-  to.
+  The reasoning that file carried is worth keeping even though the guard is not.
+  A per-route check was the only workable shape: proxy.ts must not do database
+  work (its own header records the ERR_TOO_MANY_REDIRECTS incident that followed
+  when it and the DAL disagreed, and `plan` lives on the profiles row rather
+  than the JWT), and a server layout is never given the pathname, so it could
+  not let /dashboard through while redirecting its siblings. Anything Pro-only
+  in future needs that same per-route shape rather than either alternative.
 
-  ⚠️ Home's label changes with it. "Home" implies somewhere else to go back
-  from, which is true on Pro's five-item nav and false here.
+  ⚠️ THE LOCKS MOVED INTO THE SCREENS, THEY DID NOT DISAPPEAR. Every Pro action
+  behind these links still refuses a free account — server-side, in
+  lib/auth/entitlements.ts, which is the only gate that counts. What changed is
+  that a free account can now SEE what it is being refused and what it costs,
+  which is the rule the rest of the product already follows: LOCKED IS NOT
+  DISABLED.
+
+  ⚠️ Home keeps a different label. app/(app)/dashboard/page.tsx still renders
+  FreeHome for a free account — a conversion page, not a gated OverviewWorkspace
+  — and "Your report" names what is actually there.
 */
-const FREE_NAV: NavItem[] = [{ href: '/dashboard', label: 'Your report', Icon: HomeIcon }];
-
-/*
-  What each locked row is actually worth, in the reader's terms.
-
-  ⚠️ THE LABELS ALONE DO NOT SELL ANYTHING. "Opportunities" means nothing to a
-  plumber, and neither does "Your site" — they are names for screens, chosen for
-  a Pro account that has already paid and needs to find things. A free account
-  has not paid and is not navigating; it is deciding. So each row gets a second
-  line that says what the screen DOES, and that second line is the reason this
-  block earns space in a 256px column instead of being four dead menu items.
-
-  ⚠️ NO NUMBERS HERE, DELIBERATELY, AND THE FIRST DRAFT HAD THEM. "All 44
-  checks" and "the 4 you're missing" were both considered and both rejected.
-  44 is a real count — it is exactly how many findings the four check modules
-  emit — but the report itself says "Based on N checks" where N is the SCORED
-  count, which can never reach 44 (coverage is always unscored) and lands
-  somewhere in the thirties. Two true numbers that disagree on screen read as
-  one wrong number. It also derives from no constant, so adding a check would
-  silently make this copy stale; help-workspace.tsx:52 declines to repeat the
-  figure for that exact reason and this is not the place to overrule it.
-
-  The "4 you're missing" was worse: it looks like it ties to the report's "the
-  other 4 went to somebody else", but that 4 is questions no engine named you
-  on — a tracking result — while Opportunities holds discovered questions you
-  have not answered. They would match only by coincidence.
-
-  General copy has neither failure mode, needs nothing from useDashboard(), and
-  cannot flash a zero while the provider resolves.
-
-  ⚠️ ≤30 CHARACTERS EACH, AND THAT IS MEASURED, NOT A STYLE PREFERENCE. The
-  aside is w-64 (256px); minus its p-5 (40) and the row's px-3 (24) leaves
-  192px, and minus the icon and gap leaves ~160px — about 30 characters at
-  11px. Longer copy wraps to a third line and the row stops reading as one
-  thing. The budget was ~26 while these sat in a padded box; losing the box and
-  dropping to 11px bought the rest. Re-measure before writing longer copy —
-  every string here is well inside the limit and none of them should crowd it.
-*/
-const PRO_VALUE: Record<string, string> = {
-  '/dashboard/audit': 'Every page, not just one',
-  /* Re-counted against the 30-character budget above, not just retyped: this is
-     25. The old string, "Written and ready to paste", described the export;
-     this screen now writes the content too. "Articles and answers written" said
-     that in 28 characters but read three grades harder — three long words in a
-     row with no verb to break them up. */
-  '/dashboard/faqs': 'We write it, you paste it',
-  '/dashboard/competitors': 'Who AI names instead',
-  '/dashboard/tracking': 'Re-checked every week',
-};
-
-/*
-  What Pro adds, shown to a free account underneath its one real destination.
-
-  ⚠️ THE NOTE ABOVE REJECTED TWO OPTIONS AND THIS IS A THIRD. It weighed hiding
-  the links against leaving them working, and ruled out "redirecting without
-  hiding" because that leaves five links that all go to the same place. That is
-  still true and still bad — when the links look like navigation. These do not.
-
-  ⚠️ WHAT MAKES ONE SHARED DESTINATION LEGIBLE IS THE CONTAINER, AND IT USED TO
-  BE FOUR PADLOCKS. The earlier version put a lock on every row under a mono
-  "WITH PRO" label, on the reasoning that a padlock per row is what stops these
-  reading as four ways to four screens. It stopped them reading as navigation
-  and started them reading as four denials — the same refusal, refused four
-  times. The tint now does the grouping, one padlock on the header does the
-  gating, and the value lines describe rather than point. Do not put the
-  per-row padlocks back without also removing the container; they were two
-  answers to one question and having both is what made it feel like a wall.
-
-  ⚠️ IT IS AN ADVERT, NOT NAVIGATION, and the distinction is what keeps the 8→5
-  pruning argument at the top of this file intact. A free account's real
-  destination count is still one. Nothing here is a place to check; it is a
-  description of the plan they are not on, placed where the question "what else
-  is there?" actually occurs to somebody. It renders OUTSIDE the <nav> for that
-  reason — inside, a screen reader's navigation landmark would list five
-  destinations for an account that has one.
-
-  ⚠️ DERIVED FROM NAV, NEVER RETYPED. A second literal list would drift from
-  the first the moment a destination is renamed, and the drift would be
-  invisible — an advert promising a screen that no longer exists by that name.
-  Only the value line is looked up, and a renamed route loses its line rather
-  than keeping a stale one.
-
-  ⚠️ LOCKED IS NOT DISABLED. These are ordinary full-opacity links; the tint,
-  the header lock and the heading do the work. copy-html-button.tsx settled this
-  for its own padlock, and prompt-ranking.tsx states the rule: "a greyed-out
-  control with a tooltip makes the reader hunt for why". They also genuinely go
-  somewhere, which is what account-menu.tsx's note about "a menu item that
-  closes the menu and goes nowhere" requires of anything Pro-shaped in a nav.
-
-  ⚠️ THE PATTERN WAS ALREADY WRITTEN AND NEVER RAN. worklist.ts has a
-  `locked: 'pro'` task type and task-row.tsx has the styling for it, but
-  buildWorklist's only consumer is Pro's Home, so the free branch is dead code.
-  This is the first live use; it follows those conventions rather than inventing
-  new ones, and if that branch ever wakes up the two should still agree.
-*/
-const PRO_TEASE = NAV.filter((item) => item.href !== '/dashboard').map((item) => ({
-  ...item,
-  value: PRO_VALUE[item.href],
-}));
+const FREE_NAV: NavItem[] = NAV.map((item) =>
+  /* ⚠️ THE LABEL MOVED OFF Home AND ONTO Audit, BECAUSE THE SCREENS DID. Home
+     is the real dashboard for both plans now. /dashboard/audit is where a free
+     account's report lives — the two had grown to say nearly the same thing, so
+     that route renders FreeHome for free and the audit for Pro. Same slot, same
+     icon, the name each plan's screen actually deserves. */
+  item.href === '/dashboard/audit' ? { ...item, label: 'Your report' } : item,
+);
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -235,11 +156,13 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   /*
     ⚠️ isPro(null) is false, so the first frame shows the free nav.
 
-    That is the right way round: the provider resolves `user` a frame late, and
-    a free account briefly seeing five links it cannot use is worse than a Pro
-    account briefly seeing one. The page composition itself is chosen
-    server-side for exactly this reason — see app/(app)/dashboard/page.tsx —
-    but the sidebar is client-rendered and has no server equivalent.
+    That used to matter a great deal — a free account briefly seeing five links
+    it could not use was worse than a Pro account briefly seeing one. Both lists
+    now hold the same destinations, so the only thing that flips a frame late is
+    Home's label. Left as it is rather than collapsed: the page composition is
+    still chosen server-side for the same reason (see
+    app/(app)/dashboard/page.tsx), and the day anything is Pro-only again this
+    is where it belongs.
   */
   const items = isPro(user) ? NAV : FREE_NAV;
 
@@ -268,93 +191,29 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
       </nav>
 
       {/*
-        ⚠️ `user &&`, NOT JUST `!isPro(user)`. The note above records that
-        isPro(null) is false, so the first frame renders the free nav — and
-        without this a PAYING customer would flash an upgrade panel before the
-        provider resolved and swapped it out. Waiting for a resolved user means
-        the null frame shows one item and nothing else, which is the same thing
-        it showed before this group existed.
+        ⚠️ A "What Pro unlocks" BLOCK USED TO SIT HERE, AND IT WENT WHEN THE
+        LINKS ABOVE STARTED WORKING.
 
-        ⚠️ NO isActive AND NO aria-current. Every row here points at
-        /dashboard/plan, so isActive() would light up all four the moment
-        somebody is on the plan page. None of them is ever "current".
+        It listed the same four destinations a second time, each as a padlocked
+        row pointing at /dashboard/plan and labelled "… is part of Pro". That
+        was right while a free account had exactly one real destination and the
+        other four redirected. Now every one of them opens, so the block would
+        have shown each screen twice — once as somewhere to go, once as
+        somewhere it cannot — and its label would be false: the screens are not
+        part of Pro, the actions inside them are.
 
-        ⚠️ THE aria-label CARRIES THE MEANING, AND IT MATTERS MORE NOW THAN IT
-        DID. LockIcon inherits aria-hidden from nav-icons' shared BASE, so the
-        padlock says nothing to a screen reader — and with one lock on the
-        header instead of four on the rows, this label is the ONLY per-row
-        signal that a row is gated. Same reason copy-html-button.tsx spells out
-        "needs Pro" in its own label. "part of Pro" is the phrase five API
-        routes already use.
+        ⚠️ WHERE THE UPSELL WENT, RATHER THAN VANISHING. Into the screens
+        themselves, next to the thing being withheld: the generator says
+        "Writing needs Pro", competitors states what Pro measures, and
+        content-workspace still renders an UpgradeCard. That is the rule this
+        block's own note quoted — LOCKED IS NOT DISABLED — applied one level
+        down, where the reader is actually looking at the feature.
 
-        ⚠️ NOT <MicroLabel>, AND THAT IS THE POINT OF THE HEADING. MicroLabel is
-        mono/uppercase/slate by definition, which is exactly the treatment this
-        replaced: mono uppercase reads as a field label, and this is a promise.
-        Do not "restore consistency" by swapping it back.
-
-        ⚠️ NO CONTAINER AT ALL — NO FILL AND NO BORDER — AND IT HAS HAD BOTH.
-        It was a cloud fill when the sidebar was white, then an outline when the
-        sidebar went grey. What groups these rows now is the heading, the value
-        lines and the gap above: four rows that each say what they do are not
-        mistakable for four broken menu items, which is the only thing a box was
-        ever protecting against. The chrome was scaffolding for copy that had
-        not been written yet. Do not re-add a box without first checking whether
-        the copy still does the job.
-
-        ⚠️ THE ROWS SHARE THE NAV'S INDENT NOW, and that is safe only because
-        this is the free sidebar. px-3 aligns them under the one real
-        destination above, which on a Pro nav would be five real links and a
-        genuine ambiguity. There is exactly one link above them, it is styled
-        active, and every row here carries a second line no nav row has.
+        Worth keeping from it if anything like it returns: the padlocks belong
+        on the container OR the rows and never both, and it must render outside
+        <nav> so a screen reader's navigation landmark does not list places the
+        account cannot go.
       */}
-      {user && !isPro(user) && (
-        <div className="mt-7">
-          <div className="mb-2 flex items-center gap-2 px-3">
-            <LockIcon className="text-slate h-3.5 w-3.5 shrink-0" />
-            <p className="text-navy text-sm font-semibold">What Pro unlocks</p>
-          </div>
-          <ul className="flex flex-col gap-1.5">
-            {PRO_TEASE.map(({ href, label, Icon, value }) => (
-              <li key={href}>
-                <Link
-                  href="/dashboard/plan"
-                  onClick={onNavigate}
-                  aria-label={`${label} is part of Pro`}
-                  className="rounded-input flex gap-3 px-3 py-2 transition-colors duration-150 hover:bg-cloud"
-                >
-                  <Icon className="text-slate mt-0.5 h-5 w-5 shrink-0" />
-                  <span className="min-w-0">
-                    {/* ⚠️ text-slate, NOT text-navy, AND THE HEADING KEEPS THE
-                        NAVY. These labels were navy — darker and heavier than
-                        the real destination above them whenever that one was
-                        inactive, which put the advert on top of the thing the
-                        customer actually came for. Slate is the same colour an
-                        inactive nav row uses, so the block now reads under the
-                        nav rather than over it. The heading stays navy because
-                        it is what anchors the group. */}
-                    <span className="text-slate block text-sm leading-snug font-medium">{label}</span>
-                    {/* 11px, the smallest type in the sidebar. It is a
-                        supporting line under a label, not a second label —
-                        at text-xs the two lines competed and the row read as
-                        two entries rather than one. Same size MicroLabel uses,
-                        which is the floor this codebase already sets.
-
-                        ⚠️ SAME SLATE AS THE LABEL, ON PURPOSE. Size and weight
-                        already separate the two lines, and slate is 7.46:1
-                        here. Going lighter to separate them by colour as well
-                        runs out of room fast: slate/85 measures 5.07:1 on this
-                        surface and slate/75 only 3.95:1, which fails AA for
-                        type this small. */}
-                    {value && (
-                      <span className="text-slate block text-[0.6875rem] leading-snug">{value}</span>
-                    )}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </>
   );
 }

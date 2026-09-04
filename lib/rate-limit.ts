@@ -28,6 +28,29 @@ export const RATE_LIMIT = 3;
 export const DASHBOARD_RATE_LIMIT = 40;
 
 /**
+ * Daily ceiling for a signed-in FREE account on the dashboard generator.
+ *
+ * ⚠️ IT EXISTS BECAUSE THE FREE ROUTE WAS BORROWING THE ANONYMOUS ONE, AND THAT
+ * CANCELLED A GRANT. app/api/dashboard/generate read
+ * `pro ? DASHBOARD_RATE_LIMIT : RATE_LIMIT`, so a free account got RATE_LIMIT's
+ * three a day — while the plan sells five sets plus an article's FAQs. Five
+ * sets could not be written in one sitting, which is the wall Beau hit testing
+ * it.
+ *
+ * ⚠️ AND RATE_LIMIT ITSELF MUST NOT MOVE TO FIX THAT. It is the ceiling on
+ * /api/generate, which is genuinely anonymous — its own note calls the limiter
+ * "the ONLY thing between a stranger and an unmetered Claude endpoint". Raising
+ * it to serve signed-in accounts would loosen the one route with no session
+ * behind it. Two ceilings, the way FETCH_URL_RATE_LIMIT and
+ * FETCH_URL_ANON_RATE_LIMIT split for the same reason.
+ *
+ * Ten is the grant plus room to redo one: five sets, one article's FAQs, and a
+ * few retries. The real spend control is now the lifetime cap in 0021 — this is
+ * only a speed bump against a loop.
+ */
+export const FREE_DASHBOARD_RATE_LIMIT = 10;
+
+/**
  * Ceiling for the free visibility audit.
  *
  * Higher than the generator's limit because an audit costs us two HTTP fetches

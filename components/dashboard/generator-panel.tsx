@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { Button, ButtonLink } from '@/components/ui/button';
+import { LockIcon } from './nav-icons';
 import { Card } from '@/components/ui/card';
 import {
   LANGUAGES,
@@ -15,7 +16,7 @@ import {
   type Tone,
 } from '@/lib/faq';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { isPro } from '@/lib/dashboard/plans';
+import { FREE_GENERATED_FAQ_SET_CAP, isPro } from '@/lib/dashboard/plans';
 import { SectionTitle } from './section-title';
 
 /*
@@ -38,10 +39,18 @@ type Mode = 'text' | 'url';
   1–12 list would let a free user choose twelve, receive five, and have nothing
   on screen explain the difference.
 
-  This panel used to have no plan awareness at all and a worse version of the
-  same problem: it rendered the full form to a free account whose first click
-  came back "Writing new answers is part of Pro." Generation is open to every
-  plan now; what differs is the ceiling, and the ceiling is visible.
+  ⚠️ THIS COMMENT USED TO CLAIM "generation is open to every plan now", AND THE
+  SERVER NEVER AGREED. app/api/dashboard/generate/route.ts refuses a free
+  account outright — `if (!canGenerate(user)) fail('Writing answers is part of
+  Pro.', 403)` — so the panel was describing a policy that did not exist, and a
+  free account clicking Generate got exactly the failure the paragraph above
+  says this file was rewritten to remove. It stayed invisible only because free
+  could not navigate here.
+
+  Both halves now say the same thing: free sees the panel and what it produces,
+  and the control is a lock rather than a button that 403s. The ceiling below
+  still matters for Pro, where the dropdown must not offer more than the server
+  will return.
 */
 function countsFor(pro: boolean): number[] {
   const max = pro ? MAX_FAQ_COUNT_PRO : MAX_FAQ_COUNT;
@@ -68,7 +77,26 @@ export function GeneratorPanel({
 }) {
   const { site, user } = useDashboard();
   const pro = isPro(user);
+
+  /*
+    ⚠️ WHAT IS LEFT, NOT WHETHER THEY MAY. Free writes
+    FREE_GENERATED_FAQ_SET_CAP sets in this tab, ever, so the question changed
+    from "is this account Pro" to "is there a set left". The count is read off
+    the profile row, which the owner may SELECT and nobody but the service role
+    may UPDATE (0021) — showable without being worth forging.
+
+    ⚠️ SETS, NOT ANSWERS, AND THAT IS WHY THE COUNT PICKER IS UNTOUCHED BELOW.
+    An earlier version counted answers, which forced this to filter the dropdown
+    to what remained and left a 2-answer remainder that no run could spend —
+    clampCount()'s floor turns a request for 2 into the maximum. Counting runs
+    means every set may be as large as the plan allows.
+  */
+  const setsLeft = pro
+    ? Number.POSITIVE_INFINITY
+    : Math.max(0, FREE_GENERATED_FAQ_SET_CAP - (user?.freeFaqSetsUsed ?? 0));
+
   const counts = countsFor(pro);
+  const spent = setsLeft === 0;
 
   const [mode, setMode] = useState<Mode>('text');
   const [text, setText] = useState('');
@@ -76,6 +104,11 @@ export function GeneratorPanel({
   /* Clamped for the same reason the list is: the Pro default is above free's
      ceiling, and an initial value the dropdown cannot show would submit a
      number the server then quietly reduces. */
+  /* ⚠️ counts IS EMPTY WHEN THE ALLOWANCE IS SPENT, and Math.min(n, undefined)
+     is NaN — which is precisely the "initial value the dropdown cannot show"
+     the note above warns about, arriving by a different route. The fallback is
+     never submitted (the control is a lock by then); it exists so the state is
+     a number whatever happens. */
   const [count, setCount] = useState<number>(
     Math.min(DEFAULT_FAQ_COUNT_PRO, counts[counts.length - 1]),
   );
@@ -278,12 +311,43 @@ export function GeneratorPanel({
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-4">
-        <Button onClick={generate} disabled={busy || disabled}>
-          {busy ? 'Writing…' : 'Generate'}
-        </Button>
+        {/* ⚠️ LOCKED IS NOT DISABLED. A greyed-out Generate would make a free
+            account hunt for why; a lock that names the plan and links to it
+            answers the question in the control itself. The form above stays
+            live and fillable on purpose — seeing what you would be asking for
+            is the taste, and nothing is spent until this is pressed. */}
+        {/* ⚠️ THE LOCK IS NOW ABOUT THE ALLOWANCE, NOT THE PLAN. It used to read
+            "Writing needs Pro" for every free account; free writes now, and what
+            runs out is the allowance. LOCKED IS NOT DISABLED either way — the
+            control says what it needs and goes somewhere.
+
+            ⚠️ SHORT LABEL, BECAUSE BUTTON LABELS DO NOT WRAP. BASE sets
+            whitespace-nowrap; "Writing answers is part of Pro" measured 286px
+            and pushed a 320px page sideways. */}
+        {spent ? (
+          <ButtonLink href="/dashboard/plan" variant="ghost">
+            <LockIcon className="h-4 w-4" />
+            Get more with Pro
+          </ButtonLink>
+        ) : (
+          <Button onClick={generate} disabled={busy || disabled}>
+            {busy ? 'Writing…' : 'Generate'}
+          </Button>
+        )}
         {error && (
           <p role="alert" className="text-error-ink text-sm">
             {error}
+          </p>
+        )}
+
+        {/* ⚠️ FREE ONLY, AND IT COUNTS ANSWERS RATHER THAN RUNS. Pro has no
+            answer allowance, so there is no number to show it — and printing
+            one would be a limit nothing enforces. */}
+        {!pro && (
+          <p className="text-slate text-sm">
+            {spent
+              ? `You've used all ${FREE_GENERATED_FAQ_SET_CAP} sets on the free plan.`
+              : `${setsLeft} of ${FREE_GENERATED_FAQ_SET_CAP} free sets left. Each one writes up to ${counts[counts.length - 1]} answers.`}
           </p>
         )}
       </div>

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { requirePro } from '@/lib/auth/pro-only';
 import { AnswersWorkspace } from '@/components/dashboard/answers-workspace';
 import { answersTabFrom } from '@/lib/dashboard/answers-tabs';
 
@@ -23,8 +22,6 @@ export default async function AnswersPage({
 }) {
   /* Pro only — a free account is redirected to its report.
      See the reasoning in lib/auth/pro-only.ts. */
-  await requirePro();
-
   const { tab } = await searchParams;
 
   return <AnswersWorkspace tab={answersTabFrom(tab)} />;

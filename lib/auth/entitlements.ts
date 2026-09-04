@@ -58,8 +58,17 @@ export function canRunFullAudit(user: ProfileRow | null): boolean {
   return isPro(user);
 }
 
-export function canContent(user: ProfileRow | null): boolean {
-  return isPro(user);
+/**
+ * Reaching the Content screen.
+ *
+ * ⚠️ NO LONGER isPro — FREE WRITES NOW, WITHIN AN ALLOWANCE. A free account gets
+ * FREE_ARTICLE_CAP articles and FREE_GENERATED_FAQ_SET_CAP sets of answers,
+ * ever, so the
+ * screen has to be reachable for the allowance to be spendable. What refuses is
+ * the claim in the generate and article routes, not this.
+ */
+export function canContent(_user: ProfileRow | null): boolean {
+  return true;
 }
 
 export function canDiscover(user: ProfileRow | null): boolean {
@@ -67,16 +76,20 @@ export function canDiscover(user: ProfileRow | null): boolean {
 }
 
 /**
- * Writing answers with the model, in the dashboard — Pro only.
+ * Writing with the model, in the dashboard. Every plan; the size differs.
  *
- * The twin of canGenerate in lib/dashboard/plans.ts, which carries the
- * reasoning and the warning that goes with it: this gates
- * /api/dashboard/generate and NOTHING ELSE. The public tool at /free-report
- * posts to /api/generate and must stay open to strangers, or signing up makes
- * somebody worse off than not signing up.
+ * The twin of canGenerate in lib/dashboard/plans.ts, which carries the fuller
+ * reasoning: this gates /api/dashboard/generate and NOTHING ELSE. The public
+ * tool at /free-report posts to /api/generate and must stay open to strangers,
+ * or signing up makes somebody worse off than not signing up.
+ *
+ * ⚠️ IT USED TO BE isPro AND IS NOW A CONSTANT, WHICH MEANS THE REAL GATE MOVED.
+ * Free's allowance is a spend counter on the profile row, claimed by a
+ * conditional update in the routes — see claimFreeGeneration(). A predicate
+ * cannot enforce a quantity, so do not put the counting back here.
  */
-export function canGenerate(user: ProfileRow | null): boolean {
-  return isPro(user);
+export function canGenerate(_user: ProfileRow | null): boolean {
+  return true;
 }
 
 /**

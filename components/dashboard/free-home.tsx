@@ -42,9 +42,15 @@ import { UpgradeCard } from './upgrade-card';
   ⚠️ IT USED TO END IN AN ANSWER WRITER, AND THAT WAS THE WRONG LAST STEP. The
   page finished with a generator — write some FAQs, copy them out — which put
   the work before the reason for it. Somebody who has not yet seen an assistant
-  name a directory instead of them has no reason to write anything. Free is a
-  diagnosis now; writing the answers is part of what Pro buys, and the pricing
-  page was changed in the same commit to say so.
+  name a directory instead of them has no reason to write anything. So this page
+  is still the diagnosis, and it still ends with the evidence rather than a form.
+
+  ⚠️ BUT "writing is part of what Pro buys" IS NO LONGER TRUE, AND THAT SENTENCE
+  USED TO LIVE HERE. Free now writes FREE_ARTICLE_CAP article and
+  FREE_GENERATED_FAQ_SET_CAP sets of answers — on the Content tab, after the
+  diagnosis,
+  which is the order this note was really arguing for. What Pro buys is the
+  amount, not the ability.
 
   ⚠️ TWO SECTIONS BECAME ONE. "Every question we asked" listed ratios and
   "Who's getting named instead" listed domains — the same run, split across two

@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { requirePro } from '@/lib/auth/pro-only';
 import { ArticleWorkspace } from '@/components/dashboard/article-workspace';
 
 export const metadata: Metadata = { title: 'Article' };
@@ -21,8 +20,6 @@ export default async function ArticlePage({
 }) {
   /* Pro only — a free account is redirected to its report.
      See the reasoning in lib/auth/pro-only.ts. */
-  await requirePro();
-
   const { articleId } = await params;
 
   return <ArticleWorkspace articleId={articleId} />;

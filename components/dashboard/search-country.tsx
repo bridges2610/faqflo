@@ -32,7 +32,9 @@ import { useDashboard } from '@/lib/dashboard/provider';
  * change; offering every ISO code would bury the four that matter behind a
  * scroll. Values are ISO 3166-1 alpha-2, which is what both vendors take.
  */
-const COUNTRIES: { code: string; label: string }[] = [
+/* Exported so the onboarding form can offer the same list rather than retyping
+   it — two copies would drift the first time a market is added. */
+export const COUNTRIES: { code: string; label: string }[] = [
   { code: 'US', label: 'United States' },
   { code: 'GB', label: 'United Kingdom' },
   { code: 'CA', label: 'Canada' },

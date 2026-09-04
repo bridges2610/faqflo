@@ -1,8 +1,17 @@
 import type { Metadata } from 'next';
-import { requirePro } from '@/lib/auth/pro-only';
 import { AuditWorkspace } from '@/components/dashboard/audit-workspace';
+import { FreeHome } from '@/components/dashboard/free-home';
+import { currentUser } from '@/lib/auth/dal';
+import { isPro } from '@/lib/auth/entitlements';
 
-export const metadata: Metadata = { title: 'Audit' };
+/*
+  ⚠️ THE TITLE FOLLOWS THE PLAN, BECAUSE THE SCREEN DOES. A free account reading
+  "Audit" in the browser tab while the sidebar says "Your report" is exactly the
+  duplication this route was changed to remove.
+*/
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: isPro(await currentUser()) ? 'Audit' : 'Your report' };
+}
 
 /*
   Two search params, both read on the server and handed down as props rather
@@ -24,11 +33,23 @@ export default async function AuditPage({
 }: {
   searchParams: Promise<{ upgraded?: string; view?: string }>;
 }) {
-  /* Pro only — a free account is redirected to its report.
-     See the reasoning in lib/auth/pro-only.ts. */
-  await requirePro();
-
   const { upgraded, view } = await searchParams;
+
+  /*
+    ⚠️ ONE ROUTE, TWO COMPOSITIONS — AND FREE'S IS THE REPORT, NOT A THINNER
+    AUDIT. The two screens had grown to say nearly the same thing to a free
+    account: one page crawled, a score, and what to do about it. FreeHome is the
+    one written for that reader — free-home.tsx calls itself "a conversion page:
+    somebody who has had one check so far, can run three, and is deciding
+    whether any of this is real" — so it takes the slot rather than being
+    reachable only from Home.
+
+    ⚠️ THE CHOICE IS MADE SERVER-SIDE, for the reason app/(app)/dashboard/page.tsx
+    states at length: the provider resolves `user` a frame late, so deciding in
+    the workspace would flash the wrong screen at every paying customer on every
+    load. currentUser() is cache()-wrapped and the layout has already awaited it.
+  */
+  if (!isPro(await currentUser())) return <FreeHome />;
 
   return (
     <AuditWorkspace

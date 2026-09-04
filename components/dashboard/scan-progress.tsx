@@ -138,7 +138,11 @@ export function ScanProgress({ siteId }: { siteId: string }) {
               </ButtonLink>
             </>
           ) : (
-            <ButtonLink href="/dashboard" size="sm">
+            /* ⚠️ /dashboard/audit, NOT /dashboard. The report moved there when
+               Home became the real dashboard for both plans; sending someone to
+               /dashboard under the words "see your report" would land them on a
+               different screen than the one promised. */
+            <ButtonLink href="/dashboard/audit" size="sm">
               See your report
             </ButtonLink>
           )}
