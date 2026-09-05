@@ -14,9 +14,26 @@
  * is nothing to sanitise.
  *
  * Only the subset these answers actually use is recognised: bold, italics and
- * inline links. Anything unrecognised — a half-written `**`, a stray bracket, a
- * table — stays as text. This is evidence, and showing it plainly beats
- * mangling it into something tidier.
+ * inline links. Anything unrecognised — a half-written `**`, a stray bracket —
+ * stays as text. This is evidence, and showing it plainly beats mangling it
+ * into something tidier.
+ *
+ * ⚠️ TABLES ARE THE ONE EXCEPTION, AND THIS NOTE USED TO LIST THEM AS PROOF OF
+ * THE RULE. Gemini answers questions like "what does this cost" with a Markdown
+ * table, and under the old reading a customer opening an answer was shown
+ * `| :--- | :--- | :--- |` — a line the engine never meant as words.
+ *
+ * The rule survives with a sharper edge: **no word an engine wrote is ever
+ * removed.** An alignment row is pure delimiter and carries no content, so it
+ * goes. A body row keeps every cell; only the pipes between them are traded for
+ * a separator you can read. That is the same job as turning `**Gikas Roofing**`
+ * into bold text — finishing the render — rather than a reformat.
+ *
+ * ⚠️ AND NOT REBUILT INTO A <table>, WHICH IS THE OBVIOUS THING TO TRY.
+ * MAX_EXCERPT_CHARS is 600 and the classifier cuts at a word boundary, so a
+ * five-column table is usually severed mid-row. A real table would then render
+ * a header with a ragged body, or a header over nothing at all. Lines degrade;
+ * grids do not.
  */
 
 export type Token =
@@ -116,9 +133,76 @@ export function parseInline(text: string, depth = 0): Token[] {
  * show the answer, not to reformat it into something it never was.
  */
 export function parseAnswer(text: string): Token[][][] {
-  return text
-    .split(/\n{2,}/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean)
-    .map((paragraph) => paragraph.split('\n').map((line) => parseInline(line)));
+  return (
+    text
+      .split(/\n{2,}/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean)
+      .map((paragraph) =>
+        paragraph
+          .split('\n')
+          /* Alignment rows first: they carry nothing, so they never reach the
+             flattener and never become an empty line to clean up after. */
+          .filter((line) => !isTableRule(line))
+          .map((line) => flattenTableRow(line))
+          /* A row of empty cells — `| | |` — flattens to nothing. Dropped here
+             rather than rendered as a blank line inside the answer. */
+          .filter((line) => line.trim().length > 0)
+          .map((line) => parseInline(line)),
+      )
+      /* A paragraph that was ONLY an alignment row is now empty. Without this it
+         would render as an empty <p> and space the answer out for no reason. */
+      .filter((lines) => lines.length > 0)
+  );
+}
+
+/**
+ * A Markdown table's alignment row — `| :--- | ---: |`.
+ *
+ * ⚠️ THE ONLY LINE THIS FILE DELETES, AND IT IS SAFE TO DELETE BECAUSE IT HAS NO
+ * CONTENT BY DEFINITION. Pipes, dashes, colons and spaces are the whole of its
+ * grammar; there is no arrangement of them that is something an engine said.
+ *
+ * Conservative on both sides. It must start with a pipe, so a horizontal rule
+ * (`---`) — which is content people do write — is untouched. And it needs a run
+ * of at least two dashes, so a one-cell row holding a literal "-" survives.
+ */
+export function isTableRule(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('|')) return false;
+  return /^[|\s:-]+$/.test(trimmed) && /-{2,}/.test(trimmed);
+}
+
+/**
+ * `| Tier | Typical Cost |` → `Tier · Typical Cost`.
+ *
+ * ⚠️ EVERY CELL SURVIVES. Only the delimiters change, which is what keeps this
+ * on the right side of the rule in this file's header: the pipes are syntax, the
+ * cells are what the engine wrote.
+ *
+ * ⚠️ IT MUST START WITH A PIPE. Prose contains the occasional pipe and a line
+ * split on one would lose its shape for no reason; a leading pipe is the
+ * unambiguous signal, and it is what the engines actually emit. A table written
+ * without outer pipes therefore stays as text — the conservative failure, and
+ * the same one the header's "anything unrecognised stays as text" describes.
+ *
+ * ` · ` rather than a comma or a tab: it is the separator this dashboard already
+ * uses between facts on one line, and unlike a comma it cannot be confused with
+ * punctuation inside a cell.
+ *
+ * The result goes back through parseInline, so `**bold**` inside a cell still
+ * renders as bold.
+ */
+export function flattenTableRow(line: string): string {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('|')) return line;
+
+  const cells = trimmed
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+    .filter(Boolean);
+
+  return cells.join(' · ');
 }
