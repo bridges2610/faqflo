@@ -17,6 +17,27 @@ import { createClient } from '@/lib/supabase/client';
  * between signing up and signing in — the first time creates the account, and
  * every time after finds it — so offering two different buttons would invent a
  * choice the user can get wrong.
+ *
+ * ⚠️ "TO CONTINUE TO <project-ref>.supabase.co" IS NOT SET FROM THIS FILE, AND
+ * THIS IS WHERE PEOPLE COME LOOKING FOR IT. Google's account chooser renders
+ * that line from the OAuth client's own consent-screen configuration in Google
+ * Cloud Console, and the host it falls back to is the client's registered
+ * redirect URI — which belongs to Supabase
+ * (https://<project-ref>.supabase.co/auth/v1/callback), not to us.
+ *
+ * The `redirectTo` passed below is a different thing entirely: it is where
+ * SUPABASE returns the browser once Google is done. Google never sees it, so
+ * changing it cannot change that line.
+ *
+ * Two levers, neither of them code:
+ *   1. Google Cloud Console → OAuth consent screen → App name, logo, authorized
+ *      domains. Free, and often enough on its own.
+ *   2. If Google keeps showing the raw host: it requires the redirect URI's
+ *      domain to be an AUTHORIZED domain, and nobody can verify ownership of
+ *      supabase.co. That needs a Supabase custom domain (a paid add-on) so the
+ *      callback lives on a domain we do own — at which point
+ *      NEXT_PUBLIC_SUPABASE_URL changes too. See the note beside it in
+ *      .env.example.
  */
 export function GoogleButton({
   label,
