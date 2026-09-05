@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { ScoreDial } from '@/components/ui/score-dial';
-import { DownloadIcon } from './nav-icons';
+import { DownloadIcon, HomeIcon } from './nav-icons';
 import { scoreBand } from '@/lib/audit/score';
 import { PRO_PRICE } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
@@ -269,15 +270,39 @@ export function FreeHome() {
             print:hidden is belt and braces — the print block strips every
             <button> — but it says the intent at the call site.
           */}
-          <button
-            type="button"
-            onClick={() => window.print()}
-            aria-label="Download this report as a PDF"
-            title="Download PDF"
-            className="rounded-input shrink-0 p-2 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white print:hidden"
-          >
-            <DownloadIcon className="h-5 w-5" />
-          </button>
+          {/*
+            ⚠️ THE WAY OUT OF THE REPORT, AND IT IS NEW BECAUSE THERE WAS NONE.
+            Onboarding now finishes on this page rather than on Home — the report
+            is what somebody waited through the whole scan for — which turned a
+            screen you arrived at by choice into the screen you land on. It owed
+            the reader a door.
+
+            Labelled, not icon-only like its neighbour: "download" is guessable
+            from the glyph and "go to the dashboard" is not. The sidebar has Home
+            too, but it is collapsed behind a menu button on a phone, which is
+            exactly where a fresh signup reads this.
+          */}
+          <div className="flex shrink-0 items-center gap-1 print:hidden">
+            <Link
+              href="/dashboard"
+              className="rounded-input flex items-center gap-1.5 px-2.5 py-2 text-[0.8125rem] font-semibold text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white"
+            >
+              {/* No aria-hidden here: nav-icons' BASE already carries it, and
+                  the component takes className only. */}
+              <HomeIcon className="h-4 w-4" />
+              Home
+            </Link>
+
+            <button
+              type="button"
+              onClick={() => window.print()}
+              aria-label="Download this report as a PDF"
+              title="Download PDF"
+              className="rounded-input shrink-0 p-2 text-white/70 transition-colors duration-150 hover:bg-white/10 hover:text-white print:hidden"
+            >
+              <DownloadIcon className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/*

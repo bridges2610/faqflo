@@ -1,7 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { NextResponse } from 'next/server';
-import type { PageContent } from '@/lib/audit/types';
-import { buildContentPrompt, CONTENT_SCHEMA, TOPIC_COUNT, type ContentGeneration } from '@/lib/content';
+import { buildContentPlan, isPageContent } from '@/lib/content-generate';
 import { currentUser, siteForUser } from '@/lib/auth/dal';
 import { canContent } from '@/lib/auth/entitlements';
 import { checkRateLimit, CONTENT_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
@@ -18,41 +16,18 @@ import { checkRateLimit, CONTENT_RATE_LIMIT, limitKey } from '@/lib/rate-limit';
   The rule this route has always stated still holds and is now enforceable:
   there is no `plan` or tier field read from the body. Entitlement comes from
   the row, via lib/auth/entitlements.ts.
+
+  ⚠️ THE MODEL CALL ITSELF NOW LIVES IN lib/content-generate.ts, and this route
+  is only the caller-facing half: auth, rate limiting, ownership, and turning a
+  failure back into an HTTP code. The onboarding scan builds a topic list from
+  the same function with no request and no session to work from — see the note
+  at the top of that module, and the identical split questions-generate.ts made
+  first. The prompt, the model, the token budget and the page cap live there;
+  none of them should reappear here.
 */
-
-/*
-  Not claude-haiku-4-5, which the two FAQ routes use.
-
-  Their choice is right for what they do — turning supplied text into questions
-  and answers is transcription, and Haiku is fast and cheap at it. This is a
-  different job: read a company's home page, work out what trade it is in and
-  where it operates, then reason about what pages that trade needs and what its
-  customers would actually search for. That is judgment, and it is the whole
-  value of the feature.
-*/
-const MODEL = 'claude-opus-5';
-
-/*
-  Larger than the 8192 the FAQ routes use, for a reason specific to this model:
-  thinking is on by default on Claude Opus 5, and max_tokens caps thinking AND
-  response text together. At 8192 a plan that reasons carefully about a hundred
-  pages can run out of budget mid-answer. 16000 also keeps a non-streaming
-  request inside the SDK's HTTP timeout.
-*/
-const MAX_TOKENS = 16_000;
-
-/** Guard against a caller pasting an entire crawl of somebody else's site. */
-const MAX_PAGES = 120;
 
 function fail(message: string, status: number) {
   return NextResponse.json({ error: message }, { status });
-}
-
-/** Trusted only for shape — everything here came from a client we don't auth. */
-function isPageContent(value: unknown): value is PageContent {
-  if (!value || typeof value !== 'object') return false;
-  const p = value as Partial<PageContent>;
-  return typeof p.url === 'string' && typeof p.title === 'string' && Array.isArray(p.headings);
 }
 
 export async function POST(request: Request) {
@@ -63,11 +38,6 @@ export async function POST(request: Request) {
 
   if (!checkRateLimit(`content:${limitKey(user.id, request.headers)}`, CONTENT_RATE_LIMIT)) {
     return fail("That's the content plans for today. They reset at midnight UTC.", 429);
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === 'sk-ant-your-key-here') {
-    return fail('ANTHROPIC_API_KEY is not configured.', 500);
   }
 
   let body: unknown;
@@ -96,75 +66,23 @@ export async function POST(request: Request) {
     return fail('Run a full audit first — there are no pages to plan from.', 400);
   }
 
-  const clean = pages.filter(isPageContent).slice(0, MAX_PAGES);
+  /* Shape-filtered here as well as inside buildContentPlan, so a body of a
+     hundred junk objects is refused with the message that names the fix rather
+     than the generic one. */
+  const clean = pages.filter(isPageContent);
   if (clean.length === 0) {
     return fail('Those pages could not be read. Run the audit again.', 400);
   }
 
-  const client = new Anthropic({ apiKey });
+  const result = await buildContentPlan({
+    domain: site.domain,
+    industry: typeof industry === 'string' && industry.trim() ? industry.trim() : null,
+    location: typeof location === 'string' && location.trim() ? location.trim() : null,
+    hint: typeof hint === 'string' ? hint : '',
+    pages: clean,
+  });
 
-  try {
-    const message = await client.messages.create({
-      model: MODEL,
-      max_tokens: MAX_TOKENS,
-      output_config: {
-        // Medium rather than the default high: the reasoning here is wide (a
-        // hundred pages) but not deep, and high spends thinking tokens on a
-        // problem that does not get more correct for having them.
-        effort: 'medium',
-        format: { type: 'json_schema', schema: CONTENT_SCHEMA },
-      },
-      messages: [
-        {
-          role: 'user',
-          content: buildContentPrompt({
-            domain: site.domain,
-            industry: typeof industry === 'string' && industry.trim() ? industry.trim() : null,
-            location: typeof location === 'string' && location.trim() ? location.trim() : null,
-            hint: typeof hint === 'string' ? hint : '',
-            pages: clean,
-          }),
-        },
-      ],
-    });
+  if (!result.ok) return fail(result.error, result.status);
 
-    // Checked before the content is read: on a refusal there is nothing in it.
-    if (message.stop_reason === 'refusal') {
-      return fail('Claude declined to build a plan for that site.', 400);
-    }
-    if (message.stop_reason === 'max_tokens') {
-      return fail('The plan came back too long to finish. Please try again.', 500);
-    }
-
-    const text = message.content.find((block) => block.type === 'text')?.text;
-    if (!text) return fail('No plan came back. Please try again.', 500);
-
-    const plan = JSON.parse(text) as ContentGeneration;
-    if (!Array.isArray(plan.mustHave) || !Array.isArray(plan.topics) || !plan.topics.length) {
-      return fail('No plan came back. Please try again.', 500);
-    }
-
-    return NextResponse.json({
-      ...plan,
-      topics: plan.topics.slice(0, TOPIC_COUNT),
-    });
-  } catch (err) {
-    // Same taxonomy as the other routes — APIConnectionError extends APIError
-    // in the TS SDK, so it has to be tested first.
-    if (err instanceof Anthropic.AuthenticationError) {
-      return fail('The configured API key was rejected.', 500);
-    }
-    if (err instanceof Anthropic.RateLimitError) {
-      return fail("We're getting a lot of requests right now. Try again in a moment.", 429);
-    }
-    if (err instanceof Anthropic.APIConnectionError) {
-      return fail("Couldn't reach Claude. Check your connection and try again.", 502);
-    }
-    if (err instanceof Anthropic.APIError) {
-      console.error('Anthropic API error:', err.status, err.message);
-      return fail('Claude returned an error. Please try again.', 502);
-    }
-    console.error('Unexpected content plan error:', err);
-    return fail('Something went wrong. Please try again.', 500);
-  }
+  return NextResponse.json(result.plan);
 }

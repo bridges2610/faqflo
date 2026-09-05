@@ -8,7 +8,7 @@ import type { ScanJob } from '@/lib/dashboard/use-scan-job';
   ⚠️ SEGMENTED, NOT A SINGLE PERCENTAGE, AND THAT IS A HONESTY DECISION RATHER
   THAN A VISUAL ONE.
 
-  The three stages are not comparable. Audit and questions are one slice each
+  The stages are not comparable. Audit, questions and topics are one slice each
   and report nothing but "finished"; tracking is several slices and is the only
   one that counts anything real. Rolled into one 0-100% figure the bar would
   jump 0 → 33 → 55 and only move smoothly at the end, and the number in between
@@ -16,23 +16,33 @@ import type { ScanJob } from '@/lib/dashboard/use-scan-job';
   refuses to draw 0% for an unknown denominator because it "would claim a
   measurement not taken".
 
-  Three segments say the same thing without the fabrication — a finished stage
-  is solid because it finished, the running one pulses because it is running,
-  and tracking fills by a count we actually have.
+  Segments say the same thing without the fabrication — a finished stage is
+  solid because it finished, the running one pulses because it is running, and
+  tracking fills by a count we actually have.
 
-  ⚠️ WEIGHTED 1:1:3 BY EXPECTED SLICES, not by a guess at wall-clock. Tracking
-  takes about seven slices for a full watch list against one apiece for the
-  others, so it gets the room. Weighting by seconds would mean inventing
-  durations nobody measured, which is the thing being avoided.
+  ⚠️ WEIGHTED BY EXPECTED SLICES, not by a guess at wall-clock. Tracking takes
+  about seven slices for a full watch list against one apiece for the others, so
+  it gets the room. Weighting by seconds would mean inventing durations nobody
+  measured, which is the thing being avoided.
+
+  ⚠️ THE STEP COUNT IS DERIVED FROM SEGMENTS, NOT TYPED OUT. It read "Step 3 of
+  3" in two places, so adding the topics stage left the bar showing four
+  segments under a sentence still promising three. One list, counted.
 */
 
 const SEGMENTS = [
   { key: 'audit', weight: 1, label: 'reading your site' },
   { key: 'questions', weight: 1, label: 'finding your questions' },
+  { key: 'topics', weight: 1, label: 'working out what to write' },
   { key: 'tracking', weight: 3, label: 'asking the AI engines' },
 ] as const;
 
-const ORDER = ['audit', 'questions', 'tracking', 'done'] as const;
+/* ⚠️ SEGMENTS plus 'done', in order — fillFor and ScanMeter both index SEGMENTS
+   with a position found in here, so a stage in one and not the other silently
+   mis-fills the bar. */
+const ORDER = ['audit', 'questions', 'topics', 'tracking', 'done'] as const;
+
+const STEPS = SEGMENTS.length;
 
 /** How full one segment is, 0 to 1. */
 function fillFor(job: ScanJob, index: number): number {
@@ -69,10 +79,10 @@ export function scanStatusLine(job: ScanJob): string {
 
   const { checked, total } = job.progress ?? {};
   if (job.stage === 'tracking' && typeof checked === 'number' && typeof total === 'number' && total > 0) {
-    return `Step 3 of 3 · ${checked} of ${total} questions asked`;
+    return `Step ${STEPS} of ${STEPS} · ${checked} of ${total} questions asked`;
   }
 
-  return `Step ${index + 1} of 3 · ${segment.label}`;
+  return `Step ${index + 1} of ${STEPS} · ${segment.label}`;
 }
 
 export function ScanMeter({ job, className = '' }: { job: ScanJob; className?: string }) {

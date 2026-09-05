@@ -131,7 +131,7 @@ export function AuditWorkspace({
     payment, and burns one of only four daily full audits
     (AUDIT_FULL_RATE_LIMIT) on a duplicate. And the customer no longer arrives
     on this page at all: /dashboard/checkout/return sends them to
-    /dashboard/start to watch all three stages.
+    /dashboard/start to watch the scan through.
 
     The banner below reads `?upgraded=pro` and does nothing but congratulate.
     ⚠️ It must stay that way: a new subscriber DOES land here now (see the
@@ -188,10 +188,20 @@ export function AuditWorkspace({
         <PageHeader
           title="Audit"
           description={`What AI sees when it reads ${site.domain}, and what to do about it.`}
+          /* ⚠️ TWO ACTIONS NOW, BECAUSE THIS IS A LANDING SCREEN AND NOT ONLY A
+             VISITED ONE. Onboarding finishes here rather than on Home, so the
+             first thing a new Pro account sees is this page and it owes them a
+             door — the same one free-home.tsx grows in its report header. Ghost
+             so the audit stays the primary thing to press. */
           action={
-            <Button size="sm" onClick={runAudit} disabled={auditBusy}>
-              {auditBusy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" onClick={runAudit} disabled={auditBusy}>
+                {auditBusy ? 'Scanning…' : shown ? 'Run it again' : 'Run the audit'}
+              </Button>
+              <ButtonLink size="sm" variant="ghost" href="/dashboard">
+                Home
+              </ButtonLink>
+            </div>
           }
         />
 

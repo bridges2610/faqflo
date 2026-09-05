@@ -47,9 +47,22 @@ import { ChevronIcon } from './nav-icons';
 export function PromptMatrix({
   groups,
   action,
+  locked,
+  lockedNote,
 }: {
   groups: QuestionGroup[];
   action?: (group: QuestionGroup) => ReactNode;
+  /**
+   * Questions whose engine cells are gated, by question text.
+   *
+   * ⚠️ A SET OF TEXT, NOT A COUNT OR AN INDEX. `groups` arrives re-sorted by
+   * result quality, so "the first n rows" here would gate whichever questions
+   * happened to sort last. The caller decides membership from the owner's own
+   * position order; this only asks whether a given row is in it.
+   */
+  locked?: ReadonlySet<string>;
+  /** What a gated row says instead of "runs with your next check". */
+  lockedNote?: string;
 }) {
   /*
     Which rows are open, by question text.
@@ -136,6 +149,8 @@ export function PromptMatrix({
               open={open.has(group.question)}
               onToggle={() => toggle(group.question)}
               action={action?.(group)}
+              locked={locked?.has(group.question) ?? false}
+              lockedNote={lockedNote}
             />
           ))}
         </tbody>
@@ -158,11 +173,26 @@ function MatrixRow({
   open,
   onToggle,
   action,
+  locked = false,
+  lockedNote,
 }: {
   group: QuestionGroup;
   open: boolean;
   onToggle: () => void;
   action?: ReactNode;
+  /**
+   * This question is not on the plan's watch list.
+   *
+   * ⚠️ GATES THE CELLS, NEVER THE QUESTION, AND NEVER THE ROW'S CONTROLS. The
+   * question is the customer's own and reads the same on Opportunities; hiding
+   * it would take away something they have rather than withhold something they
+   * have not bought. And the controls under an open row are how a question gets
+   * MOVED into the watch list — the tracked set is the top of the owner's own
+   * position order — so locking those would remove the one action this row
+   * exists to offer.
+   */
+  locked?: boolean;
+  lockedNote?: string;
 }) {
   const instead = insteadFor(group);
   /* Encoded because a question is free text and this lands in an id and an
@@ -207,7 +237,16 @@ function MatrixRow({
                   ADDED. Printing "2 days ago" beside three "not asked" cells
                   would date a measurement that never happened. */}
               <span className="text-slate mt-0.5 block text-[0.6875rem]">
-                {group.checks.length === 0 ? (
+                {/* ⚠️ A LOCKED ROW MUST NOT SAY "runs with your next check",
+                    WHICH IS THE LINE IT USED TO GET. That promise is true for a
+                    question waiting its turn on a plan that will reach it, and
+                    false for one past the watch list's end — those are never
+                    asked, on any run, until the owner moves them up or upgrades.
+                    An empty state that quietly lies is worse than a locked one
+                    that does not. */}
+                {locked ? (
+                  lockedNote ?? 'Not on your watch list'
+                ) : group.checks.length === 0 ? (
                   'Not asked yet — runs with your next check'
                 ) : (
                   <>
@@ -232,12 +271,38 @@ function MatrixRow({
              read as "we asked and got nothing" — see questions.ts on cellFor.
              The chip renders "not checked" for null on its own. */
           <td key={engine} className="px-2 py-2.5 text-center align-middle">
-            {/* Back up to 11px from 10. The 10px was chosen to survive a
-                column the browser had squeezed to 123px; table-fixed above
-                gives each AI column ~18.6% instead, and the word IS the
-                outcome here — no other text in the cell carries it — so the
-                right move with the extra room is to spend it on legibility. */}
-            <OutcomeChip check={check} size="px-2.5 py-1 text-[0.6875rem]" />
+            {locked ? (
+              /*
+                ⚠️ AN EMPTY BAR, NOT A BLURRED OUTCOME. There is nothing behind
+                this — no check was run, so there is no result to obscure — and
+                locked-preview.tsx sets the rule the bar borrows: a blur is
+                defeated by a screenshot or `filter: none`, so the only thing
+                safe to put behind one is nothing at all. Here that is not even a
+                precaution, it is the literal state of the data.
+
+                ⚠️ AND THE WORD, NOT THE BLUR, CARRIES THE MEANING. A blurred
+                rectangle says nothing to a screen reader and nothing to anyone
+                who cannot see it, so the bar is aria-hidden and each cell keeps
+                a real word — the same contract every padlock in this product
+                follows. One word per cell rather than a sentence: in a table the
+                cell is already the answer to "what did ChatGPT say", and three
+                sentences per row is noise.
+              */
+              <>
+                <span
+                  aria-hidden="true"
+                  className="bg-line mx-auto block h-4 w-14 rounded-full blur-[3px]"
+                />
+                <span className="sr-only">Locked</span>
+              </>
+            ) : (
+              /* Back up to 11px from 10. The 10px was chosen to survive a
+                  column the browser had squeezed to 123px; table-fixed above
+                  gives each AI column ~18.6% instead, and the word IS the
+                  outcome here — no other text in the cell carries it — so the
+                  right move with the extra room is to spend it on legibility. */
+              <OutcomeChip check={check} size="px-2.5 py-1 text-[0.6875rem]" />
+            )}
           </td>
         ))}
       </tr>

@@ -26,13 +26,16 @@ import { SiteForm } from './site-form';
  * The stages, in the order the runner advances them.
  *
  * ⚠️ Answers is deliberately absent, and its absence is the honest thing here.
- * The other three are measurements — true whether or not the customer agrees.
- * Writing their answers would be authoring content in their voice, and nothing
- * in this product saves model output without a person accepting it first.
+ * The others are measurements, or suggestions clearly labelled as such — true
+ * whether or not the customer agrees. Writing their answers would be authoring
+ * content in their voice, and nothing in this product saves model output
+ * without a person accepting it first. Topics belong on this list precisely
+ * because they are proposals to be picked from, not published prose.
  */
 const STAGES = [
   { key: 'audit', label: 'Reading your site', done: 'Read your site' },
   { key: 'questions', label: 'Finding the questions people ask', done: 'Found your questions' },
+  { key: 'topics', label: 'Working out what to write', done: 'Picked what to write' },
   { key: 'tracking', label: 'Asking the AI engines about you', done: 'Asked the AI engines' },
 ] as const;
 

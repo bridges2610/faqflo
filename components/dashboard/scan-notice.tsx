@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { useScanJob } from '@/lib/dashboard/use-scan-job';
 import { ScanMeter, scanStatusLine } from './scan-meter';
@@ -21,11 +23,65 @@ import { ScanMeter, scanStatusLine } from './scan-meter';
  * /api/scan/tick.
  */
 export function ScanNotice() {
+  const router = useRouter();
   const { site } = useDashboard();
   const { job } = useScanJob(site?.id ?? null);
 
+  /*
+    ⚠️ WHEN THE SCAN FINISHES, THE DASHBOARD REFRESHES ITSELF. Nobody should
+    have to press reload to see work they watched happen.
+
+    The scan writes server-side, but everything on screen was read BEFORE it
+    ran: `sites` is server-rendered by app/(app)/layout.tsx, and the provider
+    loads the rest client-side once, keyed on that array. Neither notices a row
+    that appeared afterwards, so a customer arriving on their report found the
+    empty version of it and had to reload by hand.
+
+    One router.refresh() is enough for all three, and the cascade is worth
+    stating because it is not obvious: the layout re-runs → `sites` is a new
+    array → the provider's load effect re-keys on it and refetches → its
+    loadTracking callback is keyed on `sites` too, so citations reload behind
+    the same one call.
+
+    ⚠️ THIS COMPONENT, NOT THE ONBOARDING MODAL, AND THAT IS THE POINT. The
+    modal only exists on /dashboard/start. Somebody who wandered to Content
+    while the scan ran has exactly the same stale screen and no modal to fix it.
+    This is mounted by AppShell on every dashboard page, which is what makes
+    "they should just see it" true everywhere rather than on one route.
+
+    ⚠️ ONLY ON A TRANSITION SOMEBODY WATCHED — hence `sawLive`. `job` is the
+    site's latest scan, and it stays 'done' for ever, so firing whenever it is
+    terminal would re-run the server layout once on every single dashboard load
+    for the rest of the account's life. `applied` then keeps it to one refresh
+    per session.
+
+    Same guard, and the same reasoning, as `wasFinishedOnMount` in
+    onboarding-modal.tsx.
+  */
+  const sawLive = useRef(false);
+  const applied = useRef(false);
+
+  useEffect(() => {
+    if (!job || applied.current) return;
+
+    if (job.status !== 'done' && job.status !== 'failed') {
+      sawLive.current = true;
+      return;
+    }
+
+    // Already over when we got here: nothing was missed, so nothing to refetch.
+    if (!sawLive.current) return;
+
+    applied.current = true;
+    router.refresh();
+  }, [job, router]);
+
   // Only while there is something to watch. A finished or failed scan is the
   // splash page's business; a banner about it on every page would be nagging.
+  //
+  // ⚠️ AFTER THE HOOKS ABOVE, NOT BEFORE THEM. The refresh has to run on the
+  // render where the job turns terminal, which is the same render this stops
+  // drawing anything on.
   if (!job || job.status === 'done' || job.status === 'failed') return null;
 
   return (

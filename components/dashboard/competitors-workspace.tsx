@@ -217,11 +217,23 @@ export function CompetitorsWorkspace() {
         adding to "Competitors you watch" is Pro (canWatchCompetitors), and that
         card carries its own locked control. Everything this paragraph is about
         — the measured list, who got cited instead of you — is still shown in
-        full to a free account, on the questions its own check asked.
+        full to a free account, on the questions its own checks asked.
+
+        ⚠️ IT NAMES THE QUESTIONS, NOT THE NUMBER OF CHECKS, AND IT USED TO DO
+        THE OPPOSITE. This read "the questions your one check asked", which was
+        left behind when free moved from a single run to a budget of three — and
+        the count of runs was never the real contrast anyway. What makes this
+        list thin is that it is built on three questions where Pro is built on
+        twenty-five. Both halves come off the plan now, so neither can go stale
+        the way the old sentence did.
       */}
       {user && !isPro(user) && (
         <p className="text-slate mb-4 text-sm leading-relaxed">
-          This is built from the questions your one check asked. Pro puts{' '}
+          This is built from the{' '}
+          <span className="text-navy font-semibold">
+            {trackingPlanFor(user).promptCap} questions
+          </span>{' '}
+          we put to the engines for you. Pro puts{' '}
           <span className="text-navy font-semibold">
             {TRACKING_PLANS.pro.promptCap} questions
           </span>{' '}

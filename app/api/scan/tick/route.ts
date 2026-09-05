@@ -109,7 +109,28 @@ export async function POST() {
     const stage = result.done ? NEXT_STAGE[job.stage] : job.stage;
     const finished = stage === 'done';
 
-    await db
+    /*
+      ⚠️ THE ERROR ON THIS WRITE IS READ, AND IT USED TO BE DROPPED ON THE FLOOR.
+
+      supabase-js returns `{ error }` rather than throwing, so a rejected UPDATE
+      here landed as a value nobody looked at. The catch block below never saw
+      it and the code carried straight on to chain another slice.
+
+      That is not theoretical, and the shape of it is worth recording. When the
+      'topics' stage was added, scan_jobs.stage still carried the four-value
+      check constraint from 0010 until 0022 was applied. The advancing write was
+      refused every time, the row stayed at `stage = 'questions'` with
+      `status = 'running'`, and two minutes later the expired lease made it
+      claimable again — whereupon the questions stage reported "already done"
+      and the same write failed again. An infinite loop that never reported
+      `done`, never reported `failed`, and left tracking unrun, so the customer's
+      dashboard stayed empty with the job apparently still working.
+
+      A write that cannot land is exactly the "this stage cannot succeed" case
+      the catch block already handles well. It just arrived by the one path that
+      was not being watched. Throwing it makes the two paths one.
+    */
+    const { error: writeError } = await db
       .from('scan_jobs')
       .update({
         stage,
@@ -124,6 +145,13 @@ export async function POST() {
         finished_at: finished ? new Date().toISOString() : null,
       })
       .eq('id', job.id);
+
+    if (writeError) {
+      /* Logged with the stage that could not be written, because the useful
+         question on seeing this is always "which value was refused". */
+      console.error(`Scan job ${job.id} could not advance to '${stage}':`, writeError.message);
+      throw new ScanFailed('Your scan could not be saved. Please try again.');
+    }
 
     /*
       Tell them it's ready — once, on the first scan a site ever completes.

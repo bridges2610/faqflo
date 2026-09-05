@@ -38,7 +38,7 @@ import { useScanJob } from '@/lib/dashboard/use-scan-job';
   enter something generic and inflate their own citation count. `name` is the
   display label, which is exactly what a person should get to choose.
 */
-export function OnboardingProfile() {
+export function OnboardingProfile({ onResolved }: { onResolved?: () => void } = {}) {
   const { site, renameSite } = useDashboard();
   const router = useRouter();
 
@@ -64,6 +64,30 @@ export function OnboardingProfile() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [skipped, setSkipped] = useState(false);
+
+  /*
+    ⚠️ TELL THE PARENT WHEN THIS FORM IS FINISHED WITH, AND NOTE THAT ONLY
+    `skipped` IS ACTUALLY HIDDEN. save() writes profileSource: 'manual' onto the
+    site row, which anything holding the store can already see; skipping writes
+    nothing anywhere, so without this it is invisible outside this component.
+
+    It matters because the onboarding modal waits for this before moving anyone
+    on to their report. Redirecting the moment the last scan stage landed would
+    throw away a half-typed industry with no warning — `edited` lives in local
+    state behind the Save and Skip buttons below, so a person being done with
+    the form is the only safe cue that nothing is lost.
+
+    ⚠️ AN EFFECT, NOT A CALL INSIDE save()/onClick, so the two paths cannot drift
+    — and above every early return, because it is a hook.
+  */
+  const resolved = done || skipped;
+  const told = useRef(false);
+  useEffect(() => {
+    if (resolved && !told.current) {
+      told.current = true;
+      onResolved?.();
+    }
+  }, [resolved, onResolved]);
 
   /*
     ⚠️ ONE REFRESH, WHEN THE AUDIT HAS FINISHED WRITING.

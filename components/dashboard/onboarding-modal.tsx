@@ -1,8 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Overlay } from '@/components/ui/overlay';
+import { useDashboard } from '@/lib/dashboard/provider';
 import { TickIcon } from './nav-icons';
 import { OnboardingProfile } from './onboarding-profile';
 import { ScanMeter } from './scan-meter';
@@ -34,10 +36,11 @@ import type { ScanJob } from '@/lib/dashboard/use-scan-job';
 const STAGES = [
   { key: 'audit', running: 'Reading your site', done: 'Read your site' },
   { key: 'questions', running: 'Finding the questions people ask', done: 'Found your questions' },
+  { key: 'topics', running: 'Working out what to write', done: 'Picked what to write' },
   { key: 'tracking', running: 'Asking the AI engines about you', done: 'Asked the AI engines' },
 ] as const;
 
-const ORDER = ['audit', 'questions', 'tracking', 'done'] as const;
+const ORDER = ['audit', 'questions', 'topics', 'tracking', 'done'] as const;
 
 /**
  * What a finished stage has to show for itself, or null when it counted nothing.
@@ -47,7 +50,7 @@ const ORDER = ['audit', 'questions', 'tracking', 'done'] as const;
  * the row says it finished and stops talking, rather than reaching for a zero.
  */
 function evidenceFor(stage: string, job: ScanJob): string | null {
-  const { pagesRead, questions, checked, total } = job.progress ?? {};
+  const { pagesRead, questions, topics, checked, total } = job.progress ?? {};
 
   if (stage === 'audit' && typeof pagesRead === 'number' && pagesRead > 0) {
     return `${pagesRead} ${pagesRead === 1 ? 'page' : 'pages'} read`;
@@ -55,27 +58,155 @@ function evidenceFor(stage: string, job: ScanJob): string | null {
   if (stage === 'questions' && typeof questions === 'number' && questions > 0) {
     return `${questions} ${questions === 1 ? 'question' : 'questions'} people ask`;
   }
+  /* > 0 rather than a number check, and it matters here more than elsewhere:
+     the topics stage swallows its own failures and reports 0 so the scan can
+     carry on to tracking. "0 topics to write" under a ticked line would be the
+     invented figure this file's header refuses. Silence is the honest render. */
+  if (stage === 'topics' && typeof topics === 'number' && topics > 0) {
+    return `${topics} ${topics === 1 ? 'topic' : 'topics'} to write`;
+  }
   if (stage === 'tracking' && typeof checked === 'number' && typeof total === 'number' && total > 0) {
     return `${checked} of ${total} asked`;
   }
   return null;
 }
 
-export function OnboardingModal({ job, onClose }: { job: ScanJob; onClose: () => void }) {
+export function OnboardingModal({
+  job,
+  onClose,
+  stalled = false,
+}: {
+  job: ScanJob;
+  /**
+   * How to leave — **or `undefined`, which is what makes this modal a hold.**
+   *
+   * ⚠️ THIS USED TO BE MANDATORY, AND THE REVERSAL IS DELIBERATE. The note that
+   * stood here argued the scan runs server-side, scan-notice.tsx reports it on
+   * every other screen, and "holding somebody still for two minutes is the
+   * opposite of the smoothness this was built for". That was true while the only
+   * cost of leaving was impatience.
+   *
+   * It stopped being true when the scan started filling the whole dashboard.
+   * Closing early now lands somebody on Content, Competitors and AI Mentions
+   * that are empty *because the work is still running* — and an empty screen
+   * does not read as "not finished", it reads as broken. The strip was never
+   * going to out-argue four blank pages.
+   *
+   * So the caller passes this only when leaving genuinely costs nothing —
+   * exactly the condition components/ui/overlay.tsx sets for the same prop.
+   * onboarding-experience.tsx owns that decision; see it for the two cases.
+   */
+  onClose?: () => void;
+  /** Live, but not moving. Never true at the same time as a failed status. */
+  stalled?: boolean;
+}) {
   const router = useRouter();
   const current = ORDER.indexOf(job.stage);
   const finished = job.status === 'done';
   const failed = job.status === 'failed';
 
+  /*
+    Has the person finished with the profile form below?
+
+    ⚠️ SEEDED FROM THE SITE ROW, NOT FROM false. profileSource === 'manual' can
+    only have come from a person, so somebody who answered on a previous visit
+    has already resolved this and must not be made to answer again before the
+    modal will let them through. OnboardingProfile returns null in that case, so
+    without the seed there would be no form on screen and no way to satisfy the
+    condition — a locked modal with nothing to do in it.
+  */
+  const { site } = useDashboard();
+  const [profileResolved, setProfileResolved] = useState(site?.profileSource === 'manual');
+
+  /*
+    ⚠️ THE MOVE TO THE REPORT IS AUTOMATIC, AND IT WAITS FOR TWO THINGS.
+
+    The scan finishing is what triggers it — that is the whole point of holding
+    somebody here rather than letting them wander into a half-built dashboard.
+    But the form above holds what they have typed in local state, so firing the
+    moment the last stage lands would discard a half-typed industry with no
+    warning. Waiting for saved-or-skipped costs nothing when they are already
+    done (the seed above makes it immediate) and costs a keystroke otherwise.
+
+    replace() rather than push(): this screen is finished with, and leaving it in
+    the history means the back button returns somebody to a modal that will
+    immediately try to move them forward again.
+  */
+  /*
+    ⚠️ ONLY A SCAN THAT FINISHED WHILE SOMEBODY WATCHED IT MOVES THEM ON.
+
+    Seeded at mount, so a job that was ALREADY done when this rendered never
+    triggers the redirect. Without the guard, /dashboard/start becomes a page
+    nobody can open again: every later visit finds a completed job and bounces
+    straight to the report. The existing note in onboarding-experience.tsx
+    describes that revisit as a real case — somebody landing there after their
+    scan should get the screen, not a redirect and a celebration of work that
+    finished last week.
+
+    The handover is for the moment of completion, which is the only moment it
+    means anything.
+  */
+  const [wasFinishedOnMount] = useState(finished);
+
+  /*
+    ⚠️ A SHORT HOLD BEFORE THE MOVE, AND IT IS NOT THE THING globals.css BANS.
+
+    That rule is about motion "between events nobody measured — a clock
+    pretending to be a measurement". This is the opposite case: every stage has
+    landed, the meter is full, and the payoff state exists. Without the pause
+    that state is rendered and navigated away from inside the same tick, so the
+    one frame that says "your dashboard is ready" is never seen — which is the
+    whole thing somebody just waited two minutes for. Nothing here claims
+    progress; it holds still on a result that is already true.
+
+    Cleared on unmount so a fast Skip cannot fire a navigation into a modal that
+    has already gone.
+  */
+  useEffect(() => {
+    if (!finished || wasFinishedOnMount || !profileResolved) return;
+    const t = setTimeout(() => router.replace('/dashboard/audit'), 1200);
+    return () => clearTimeout(t);
+  }, [finished, wasFinishedOnMount, profileResolved, router]);
+
+  /*
+    ⚠️ max-w-2xl IS MEASURED AGAINST THE FORM'S CONTAINER QUERY, NOT PICKED FOR
+    LOOKS — AND max-w-xl WOULD HAVE LOOKED WIDER WHILE CHANGING NOTHING.
+
+    OnboardingProfile lays its fields out with `@lg:grid-cols-2`, a CONTAINER
+    query, precisely because it renders both inline and in here; its own note
+    records that a viewport query "laid three fields across 424px and clipped
+    every placeholder". @lg is 32rem = 512px of container, and the container is
+    the Card's content box, so the arithmetic decides the width:
+
+      max-w-lg  512 − 48 (Overlay p-6) = 464 → Card inner 416px → one column
+      max-w-xl  576 − 48               = 528 → Card inner 480px → STILL one
+      max-w-2xl 672 − 48               = 624 → Card inner 576px → two columns
+
+    So this is the first standard step that actually reaches the threshold. The
+    payoff is not only width: two columns halve the field stack, and this modal
+    cannot be closed while a scan runs, so its height is the thing somebody is
+    stuck with.
+
+    Overlay's `className` is a DEFAULT PARAMETER and its base string carries no
+    max-w of its own, so this replaces rather than competes — unlike the
+    `rounded-2xl` trap its line 128 warns about, where two utilities of one kind
+    are resolved by stylesheet order rather than by the class attribute.
+  */
   return (
-    <Overlay labelledBy="onboarding-modal-title" onClose={onClose} className="max-w-lg">
+    <Overlay labelledBy="onboarding-modal-title" onClose={onClose} className="max-w-2xl">
       <h2 id="onboarding-modal-title" className="text-navy text-[1.25rem]">
-        {finished ? 'Your dashboard is ready' : 'Setting you up'}
+        {finished ? 'Your dashboard is ready' : stalled ? 'This is taking longer than it should' : 'Setting you up'}
       </h2>
       <p className="text-slate mt-1.5 text-sm leading-relaxed">
         {finished
           ? 'Everything below is measured from your own site and from what the engines actually said.'
-          : 'This takes a minute or two. You can close this — it keeps running either way.'}
+          : stalled
+            ? // ⚠️ NO INVENTED DIAGNOSIS. We know it has stopped moving and we do
+              // not know why, so this says exactly that and hands back control.
+              // Whatever finished is stored and is on the dashboard already.
+              'Your scan has stopped moving. Whatever finished is saved and already on your dashboard — you can carry on and we’ll keep trying in the background.'
+            : // ⚠️ NO LONGER OFFERS TO BE CLOSED. It cannot be, until it is done.
+              'This takes a minute or two. Hang tight — we’re filling your dashboard as each part lands.'}
       </p>
 
       {/* The same weighted bar the page uses, so the two can never disagree
@@ -150,18 +281,41 @@ export function OnboardingModal({ job, onClose }: { job: ScanJob; onClose: () =>
       {/* No padding of its own: OnboardingProfile is a Card carrying mt-5, and
           adding pt-5 here would stack two gaps. */}
       <div className="border-line mt-5 border-t">
-        <OnboardingProfile />
+        <OnboardingProfile onResolved={() => setProfileResolved(true)} />
       </div>
 
+      {/* ⚠️ /dashboard/audit, NOT /dashboard — THE REPORT IS THE PAYOFF. Somebody
+          who has just watched every stage tick over wants to see what they
+          bought with the wait, and Home is a working surface rather than a
+          result. The route suits both plans: app/(app)/dashboard/audit/page.tsx
+          renders FreeHome for a free account, which app-shell's FREE_NAV already
+          labels "Your report", and AuditWorkspace for Pro.
+
+          Both of those screens carry their own link on to Home, so this is a
+          detour rather than a dead end. If either loses it, this line strands
+          people on a report. */}
+      {/*
+        ⚠️ THE BUTTON IS THE MANUAL PATH FOR A MOVE THAT ALSO HAPPENS BY ITSELF.
+        The effect above navigates as soon as the scan is done and the form is
+        resolved. This stays for the window in between — finished, but the
+        profile still open — where there is somewhere to go and nothing is
+        carrying anyone there yet. Pressing it skips the form, which is a choice
+        the person is making, unlike a redirect that would have made it for them.
+      */}
       <div className="mt-5 flex flex-wrap items-center gap-2">
         {finished ? (
-          <Button size="sm" onClick={() => router.push('/dashboard')}>
-            See my dashboard
+          <Button size="sm" onClick={() => router.replace('/dashboard/audit')}>
+            See my report
           </Button>
         ) : null}
-        <Button size="sm" variant="ghost" type="button" onClick={onClose}>
-          {finished ? 'Stay here' : 'Close and keep it running'}
-        </Button>
+        {/* ⚠️ ONLY WHEN THERE IS SOMEWHERE TO GO. While the scan is genuinely
+            running this renders nothing, which is what makes the modal a hold;
+            onClose arrives only on a failed or stalled job. */}
+        {onClose ? (
+          <Button size="sm" variant="ghost" type="button" onClick={onClose}>
+            {finished ? 'Stay here' : 'Carry on to my dashboard'}
+          </Button>
+        ) : null}
       </div>
     </Overlay>
   );

@@ -111,7 +111,9 @@ Pages on the site:
 ${pageSummary(pages)}
 
 ${answered.length ? `The business already publishes answers to these, so do NOT propose them again:\n${answered.map((q) => `- ${q}`).join('\n')}\n` : ''}
-Give exactly ${QUESTION_COUNT} questions.
+Give exactly ${QUESTION_COUNT} questions, in priority order: most valuable to this business first.
+
+The order is used, not decorative. Only the first few are put to the assistants on a smaller plan, so question 1 should be the one you would choose if you could ask only one — the question where being the cited answer would most obviously win this business work.
 
 What makes a good one:
 - It is phrased the way a person actually talks to an assistant — full sentences, natural wording, often longer than a search query. "How much does it cost to replace a roof in Franklin?" not "roof replacement cost".
@@ -119,7 +121,7 @@ What makes a good one:
 - It is a question this business could genuinely answer well. Do not propose questions that would need information they do not have.
 - It is not already answered on the site above.
 
-Spread them across the reasons people ask, and label each with its intent:
+Across the ${QUESTION_COUNT} as a whole, spread them over the reasons people ask, and label each with its intent. Spread the set; do not let it disturb the ranking — if the three best questions are all about price, rank them first anyway:
 - pricing — what things cost, what affects the price, whether there are hidden fees
 - service — what they do, what they don't, what's included
 - trust — are they any good, licensed, insured, how long they've been going

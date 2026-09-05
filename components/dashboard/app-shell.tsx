@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { formatShortDate } from '@/lib/dashboard/format';
-import { isPro, nextCheckDate, PRO_PRICE, runsLeftFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
+import { isPro, nextCheckDate, PRO_PRICE } from '@/lib/dashboard/plans';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { AuditNotice } from './audit-notice';
@@ -149,6 +149,47 @@ const FREE_NAV: NavItem[] = NAV.map((item) =>
   item.href === '/dashboard/audit' ? { ...item, label: 'Your report' } : item,
 );
 
+/**
+ * The spinner on a nav link that has been clicked but not yet arrived.
+ *
+ * ⚠️ WHY THIS EXISTS AT ALL, GIVEN app/(app)/loading.tsx ALREADY DRAWS A
+ * SKELETON. That file only paints once the navigation COMMITS. Every route under
+ * this shell is dynamic — the (app) layout is force-dynamic and awaits
+ * requireUser() + sitesForUser() — so between the click and the server answering
+ * there is a real pause in which nothing on screen changes at all. This covers
+ * that gap; the skeleton covers the one after it.
+ *
+ * ⚠️ IT MUST BE A DESCENDANT OF THE <Link>, NOT A SIBLING. useLinkStatus reports
+ * on the Link it is rendered inside; hoisting this into NavLinks and passing
+ * `pending` down would return false forever, silently.
+ *
+ * ⚠️ ALWAYS RENDERED AT A FIXED SIZE, WITH ONLY OPACITY CHANGING. The hook's own
+ * docs warn that "inline indicators can easily introduce layout shifts" and
+ * recommend exactly this. Mounting the spinner on click would widen the row by
+ * 14px plus a gap at the moment the pointer is on it.
+ *
+ * ⚠️ aria-hidden, AND THAT IS NOT AN OVERSIGHT. app/(app)/loading.tsx carries
+ * role="status" with "Loading your dashboard" a beat later. Two announcements
+ * for one navigation is noise, and this one is the less informative of the two.
+ *
+ * ⚠️ NO prefetch={false} ON THE LINKS. The docs suggest it to make the pending
+ * state fire more often, which would be optimising the wait rather than the
+ * navigation — deliberately slowing arrival to show a nicer spinner. Where a
+ * prefetch has already landed and this never appears, that is the good outcome.
+ */
+function NavPending() {
+  const { pending } = useLinkStatus();
+
+  return (
+    <span
+      aria-hidden="true"
+      className={`ml-auto h-3.5 w-3.5 shrink-0 rounded-full border-2 border-current border-t-transparent transition-opacity duration-150 ${
+        pending ? 'animate-spin opacity-60' : 'opacity-0'
+      }`}
+    />
+  );
+}
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useDashboard();
@@ -185,6 +226,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
             >
               <Icon className="h-5 w-5 shrink-0" />
               {label}
+              <NavPending />
             </Link>
           );
         })}
@@ -242,7 +284,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
  * count would always read "1 of 1" or "0 of 1" and teach nothing.
  */
 function PlanFooter() {
-  const { user, tracking, site } = useDashboard();
+  /* No `tracking` any more — the free allowance line that read it has gone. See
+     the note beside the Pro-only paragraph below. */
+  const { user, site } = useDashboard();
   const pro = isPro(user);
 
   /*
@@ -266,26 +310,6 @@ function PlanFooter() {
       : `Checked every week — next one ${formatShortDate(due)}`;
 
   /*
-    ⚠️ "ALREADY TAKEN" IS A CLAIM ABOUT THE PAST AND HAS TO BE CHECKED.
-
-    This line read "One check, already taken" for every free account, which is
-    false for the majority of the time somebody spends on this screen: a brand
-    new signup has not had their check yet, and the first thing the sidebar told
-    them was that they had used up the thing they came for.
-
-    `checksUsed` is the count the meter on Results is drawn from, so the sidebar
-    and that page cannot disagree about whether a check has happened.
-  */
-  /*
-    ⚠️ THE COUNT IS DERIVED, NOT A FLAG, and it is now a number rather than a
-    yes/no. Free used to buy exactly one check, so "has it been spent" was the
-    whole story. It buys three, so the honest line is how many are left — and
-    runsLeftFor() reads that off the stored rows for the same reason `spent`
-    did: a flag can disagree with reality, and this one is already knowable.
-  */
-  const left = runsLeftFor(tracking);
-
-  /*
     ⚠️ NO FILL, AND IT HAD ONE. This was `bg-cloud`, from when the sidebar was
     white and a tint was how a box announced itself. Against `bg-shell` that
     fill is very nearly the surface it sits on, and the border alone says
@@ -300,13 +324,31 @@ function PlanFooter() {
     <div className="border-line rounded-xl border p-4">
       <p className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Your plan</p>
       <p className="text-navy mt-1 text-sm font-semibold">{pro ? 'Pro' : 'Free'}</p>
-      <p className="text-slate mt-1 text-xs leading-relaxed">
-        {pro
-          ? proLine
-          : left > 0
-            ? `${left} of ${TRACKING_PLANS.free.runsPerPeriod} checks left`
-            : 'You’ve used all three checks'}
-      </p>
+      {/*
+        ⚠️ PRO ONLY, AND THE FREE HALF WAS REMOVED RATHER THAN REWORDED.
+
+        This used to read "2 of 3 checks left" to a free account, which was
+        arithmetically true and still confusing — and the reason is visible the
+        moment both places that say it are put side by side.
+
+        prompt-ranking.tsx states the same allowance on the free report, beside
+        the button that spends it: "2 checks left. Fix something first — that's
+        what makes the answer change", or "Checked today. You can run it again
+        tomorrow", or the spent-state copy about what Pro adds. Here the same
+        number arrived with none of that — no button, no explanation of what a
+        "check" is, nothing about how one gets spent — just a count under the
+        word "Free". A duplicate stripped of the context that made it mean
+        something reads as a puzzle.
+
+        So the allowance is now stated in exactly one place, which is the one
+        that can act on it. ⚠️ That makes prompt-ranking.tsx the only surface
+        carrying it: if that copy ever goes, free accounts lose all sight of
+        the re-check budget rather than merely one of two mentions.
+
+        Pro's line stays. It is not duplicated anywhere, and "next one 12 Sep"
+        is the thing the subscription actually buys.
+      */}
+      {pro ? <p className="text-slate mt-1 text-xs leading-relaxed">{proLine}</p> : null}
       {/* Straight to the in-app plan page, not out to /#pricing. Sending a
           signed-in customer back to the marketing site to buy means they land on
           a page written for strangers and have to find their way back in. */}
@@ -342,6 +384,7 @@ function HelpLink({ onNavigate }: { onNavigate?: () => void }) {
     >
       <DocIcon className="h-4 w-4 shrink-0" />
       Help
+      <NavPending />
     </Link>
   );
 }

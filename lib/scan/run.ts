@@ -10,7 +10,8 @@ import { TRACKING_PLANS, trackingPeriod } from '@/lib/dashboard/plans';
 import { PAGE_BUDGET } from '@/lib/dashboard/plans';
 import { trackingPlanFor } from '@/lib/auth/entitlements';
 import type { ProfileRow } from '@/lib/supabase/types';
-import type { Engine } from '@/lib/dashboard/types';
+import type { ContentPlan, Engine } from '@/lib/dashboard/types';
+import { buildContentPlan } from '@/lib/content-generate';
 import { generateQuestions } from '@/lib/questions-generate';
 import { questionKey } from '@/lib/questions';
 import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/lib/tracking/run';
@@ -37,7 +38,16 @@ import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/
   worked this way; the other two are written to match.
 */
 
-export type Stage = 'audit' | 'questions' | 'tracking' | 'done';
+/* ⚠️ 'topics' IS NEW AND IT NEEDS MIGRATION 0022 IN THE DATABASE FIRST. The
+   column is text, but 0010 put a check constraint on it listing the four stages
+   that existed then — so without 0022 the tick route's UPDATE to 'topics' is
+   rejected and every scan stalls after discovery, never reaching tracking.
+   0022 swaps the constraint for one that includes it.
+
+   A job already mid-flight when this deploys is at one of the older values and
+   still advances through NEXT_STAGE below; the new stage is idempotent by
+   check, so nothing double-spends. */
+export type Stage = 'audit' | 'questions' | 'topics' | 'tracking' | 'done';
 
 export type ScanJob = {
   id: string;
@@ -197,7 +207,69 @@ export async function runAuditStage(db: Db, job: ScanJob): Promise<SliceResult> 
     checked_at: report.checkedAt,
   });
 
+  await seedFirstGroup(db, job, site, report);
+
   return { done: true, progress: { pagesRead: report.pages?.length ?? 0, score: report.score } };
+}
+
+/**
+ * The first page on the Content screen, made from the page we just crawled.
+ *
+ * ⚠️ WHY THIS EXISTS: Content opened on "No pages yet" for every new account.
+ * A group is the thing answers hang off, and nothing created one until the
+ * customer did — so the screen that holds a free plan's whole allowance greeted
+ * them with an empty state and a form, immediately after a scan that had just
+ * read the very page this row describes. The crawl already knows the page; the
+ * customer typing its name back in was ceremony.
+ *
+ * ⚠️ A ROW, NOT A GENERATION. This writes a container and no content. Filling it
+ * would mean spending the free plan's one set of answers on a page nobody chose
+ * — and, worse, publishing model output the customer never accepted, which
+ * scan-progress.tsx states as the reason the answers stage does not exist.
+ *
+ * ⚠️ FAILURES ARE SWALLOWED. An empty Content screen is a poor welcome; a failed
+ * scan is a broken product. The `path` unique constraint per site is the likely
+ * one — a customer who already made "/" between the queue and this line — and
+ * being second is a reason to do nothing, not to fail.
+ */
+async function seedFirstGroup(
+  db: Db,
+  job: ScanJob,
+  site: SiteRow,
+  report: AuditReport,
+): Promise<void> {
+  try {
+    const { count } = await db
+      .from('faq_groups')
+      .select('id', { count: 'exact', head: true })
+      .eq('site_id', site.id);
+
+    if ((count ?? 0) > 0) return;
+
+    /* Nothing crawled, nothing to describe. A group pointing at a page we never
+       reached would be a container for answers about an unknown. */
+    if ((report.pages ?? []).length === 0) return;
+
+    /*
+      Named the way a person would name it rather than by the page's <title>:
+      titles are written for search engines and run to sixty characters of
+      keywords, which is not a label for a list.
+
+      "/" for the reason the column's own note in 0009 gives — the site row owns
+      the domain, and a full URL here would let the two disagree.
+    */
+
+    await db.from('faq_groups').insert({
+      id: `grp_${crypto.randomUUID()}`,
+      site_id: site.id,
+      user_id: job.user_id,
+      name: 'Home page',
+      path: '/',
+      position: 0,
+    });
+  } catch (err) {
+    console.error('Could not seed the first content group:', err);
+  }
 }
 
 /* -------------------------------------------------------------- stage 2 --- */
@@ -289,7 +361,7 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
       server-side in app/api/dashboard/questions.
     */
     .slice(0, TRACKING_PLANS.pro.discoveredCap)
-    .map((q) => ({
+    .map((q, i) => ({
       id: `q_${crypto.randomUUID()}`,
       site_id: site.id,
       user_id: job.user_id,
@@ -298,6 +370,23 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
       intent: q.intent ?? null,
       covered: false,
       source: 'discovered',
+      /*
+        ⚠️ THE MODEL'S RANKING, WRITTEN DOWN. buildQuestionsPrompt asks for the
+        questions in priority order and the tracking stage below takes the top
+        `promptCap` of them — three, on free. That only means anything if the
+        order survives the round trip, and until this line it did not.
+
+        Every row here goes in on one INSERT, so they share `added_at` to the
+        microsecond; ordering by it returned them in whatever order Postgres
+        felt like. A free account's three tracked prompts were effectively
+        arbitrary while the code read as though they were the best three.
+
+        questions.position already exists for exactly this (0015, modelled on
+        faqs.position) and the store already knows the swap-two-positions
+        idiom for reordering. Nothing new to migrate — it was simply never
+        populated here.
+      */
+      position: i,
     }));
 
   if (rows.length) {
@@ -309,6 +398,99 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
 }
 
 /* -------------------------------------------------------------- stage 3 --- */
+
+/**
+ * Ten things worth writing, built from the same crawl discovery just read.
+ *
+ * ⚠️ THIS STAGE EXISTS SO THE CONTENT SCREEN IS NOT EMPTY ON DAY ONE. The plan
+ * used to be built only by a button press, so a new account — free especially,
+ * where this is most of what they get — landed on "Build your content plan" and
+ * a blank page after watching a scan tell them their site was hard to quote.
+ *
+ * ⚠️ A FAILURE HERE DOES NOT FAIL THE SCAN, AND THAT IS THE WHOLE POINT OF THE
+ * try/catch BELOW. Every other stage throws ScanFailed because the thing it
+ * produces is the product; a topic list is a head start. Tracking runs after
+ * this one, and killing the job — and with it the citation checks the customer
+ * actually signed up to see — because a suggestion list timed out would trade
+ * the valuable half for the cheap half. The Content screen keeps its own
+ * "Build the plan" button, so an account that lands here with nothing is one
+ * click from the same result.
+ */
+export async function runTopicsStage(db: Db, job: ScanJob): Promise<SliceResult> {
+  const site = await siteFor(db, job.site_id);
+
+  /*
+    Idempotent by check, like discovery above. A lease can expire mid-call, and
+    a second Opus call would both cost again and overwrite a plan the customer
+    may already have dismissed topics from — hiddenTopics lives inside this same
+    jsonb blob.
+  */
+  const { count: existing } = await db
+    .from('content_plans')
+    .select('id', { count: 'exact', head: true })
+    .eq('site_id', site.id);
+
+  /* ⚠️ NO `topics` COUNT ON THIS PATH. `existing` counts content_plans ROWS —
+     always 1, since the table is one plan per site — and reporting it as the
+     progress field would put "1 topic to write" under a ticked line describing
+     a plan of ten. The modal renders a stage with nothing to report as its
+     label alone, which is the honest outcome for a stage that did nothing. */
+  if ((existing ?? 0) > 0) return { done: true, progress: {} };
+
+  try {
+    const report = await latestReport(db, site.id);
+    const pages = (report?.pages ?? []) as PageContent[];
+    if (pages.length === 0) return { done: true, progress: { topics: 0 } };
+
+    const result = await buildContentPlan({
+      domain: site.domain,
+      industry: site.industry,
+      location: site.location,
+      hint: report?.profileHint ?? '',
+      pages,
+    });
+
+    if (!result.ok) {
+      console.error('Scan topics stage skipped:', result.error);
+      return { done: true, progress: { topics: 0 } };
+    }
+
+    /*
+      mustHave arrives already emptied when the crawl was a single page — a free
+      audit reads the home page and nothing else, and "we did not look" must not
+      render as "you are missing". buildContentPlan owns that rule so the button
+      on the Content screen obeys it too; the long note is at the point it is
+      applied.
+    */
+    const plan: ContentPlan = {
+      siteId: site.id,
+      industry: result.plan.profile.industry,
+      location: result.plan.profile.location || null,
+      mustHave: result.plan.mustHave,
+      topics: result.plan.topics,
+      generatedAt: new Date().toISOString(),
+    };
+
+    const { error } = await db
+      .from('content_plans')
+      .upsert(
+        { id: `plan_${crypto.randomUUID()}`, site_id: site.id, user_id: job.user_id, plan },
+        { onConflict: 'site_id' },
+      );
+
+    if (error) {
+      console.error('Scan topics stage could not save:', error.message);
+      return { done: true, progress: { topics: 0 } };
+    }
+
+    return { done: true, progress: { topics: plan.topics.length } };
+  } catch (err) {
+    console.error('Scan topics stage failed:', err);
+    return { done: true, progress: { topics: 0 } };
+  }
+}
+
+/* -------------------------------------------------------------- stage 4 --- */
 
 /**
  * Key for one question × engine pair.
@@ -355,14 +537,26 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
 
   const plan = trackingPlanFor((profile as ProfileRow | null) ?? null);
 
+  /*
+    ⚠️ BY position, NOT added_at — THE SAME CALL lib/dashboard/store.ts MADE AT
+    0015 AND THIS STAGE MISSED. Discovery writes all fifteen rows on one INSERT,
+    so their added_at values are identical and ordering by that column put the
+    slice below in an order Postgres never promised. The questions stage now
+    records the model's ranking in `position`; this reads it back.
+
+    added_at stays as the tiebreaker for anything typed in later — a manual
+    question and a discovered one can share a position, and a stable order beats
+    an arbitrary one even where the choice barely matters.
+  */
   const { data: questionRows } = await db
     .from('questions')
     .select('question')
     .eq('site_id', site.id)
+    .order('position')
     .order('added_at');
 
   /*
-    Capped to the plan, oldest first.
+    Capped to the plan, best first.
 
     ⚠️ THIS SLICE IS NEW AND IT IS NOT COSMETIC. The list used to be taken whole,
     which was survivable when the interactive route capped it on the way in.
@@ -545,9 +739,20 @@ async function periodBudget(
   return ceiling - (count ?? 0);
 }
 
+/*
+  ⚠️ topics SITS BEFORE tracking, NOT AFTER IT. Both orderings work on the data
+  — topics needs the audit, tracking needs the questions — so the tie is broken
+  on what the customer is looking at. Tracking is the long tail: ~45 engine
+  calls that re-enter over minutes, which is why the report says "we're asking
+  AI about you now". Putting one bounded Opus call ahead of it means the Content
+  screen is populated by the time anyone finishes reading their report, at the
+  cost of starting the citation checks about half a minute later. After it, the
+  screen would stay empty for the whole of the slowest stage.
+*/
 export const NEXT_STAGE: Record<Stage, Stage> = {
   audit: 'questions',
-  questions: 'tracking',
+  questions: 'topics',
+  topics: 'tracking',
   tracking: 'done',
   done: 'done',
 };
@@ -558,6 +763,8 @@ export async function runStage(db: Db, job: ScanJob): Promise<SliceResult> {
       return runAuditStage(db, job);
     case 'questions':
       return runQuestionsStage(db, job);
+    case 'topics':
+      return runTopicsStage(db, job);
     case 'tracking':
       return runTrackingStage(db, job);
     default:

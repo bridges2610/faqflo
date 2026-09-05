@@ -14,7 +14,7 @@ import type { CheckStatus } from '@/lib/audit/types';
 import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
-import { isPro, nextCheckDate, trackingPlanFor } from '@/lib/dashboard/plans';
+import { isPro, nextCheckDate, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { formatNumber, formatShortDate, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import { ENGINES, type SiteTracking } from '@/lib/dashboard/types';
 import {
@@ -88,7 +88,19 @@ function prettyUrl(url: string): string {
  * Perplexity and absent from ChatGPT on the same question is one finding, and it
  * was previously spread across three rows a customer had to hunt for.
  */
-function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.ReactNode }) {
+function QuestionRow({
+  group,
+  action,
+  locked = false,
+  lockedNote,
+}: {
+  group: QuestionGroup;
+  action?: React.ReactNode;
+  /** Not on the plan's watch list. The twin of PromptMatrix's prop — see it for
+      why this gates the pills and never the question or the controls. */
+  locked?: boolean;
+  lockedNote?: string;
+}) {
   const byEngine = checksByEngine(group);
 
   // Who took the click, from the first engine that named someone else. One
@@ -112,23 +124,60 @@ function QuestionRow({ group, action }: { group: QuestionGroup; action?: React.R
 
               {/* The comparison, without opening anything. */}
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                {byEngine.map(({ engine, check }) => (
-                  <EnginePill key={engine} engine={engine} check={check} />
-                ))}
+                {locked ? (
+                  /* The phone's answer to the matrix's locked cells, and it
+                     follows the same rule: empty bars because there is nothing
+                     behind them, aria-hidden because a blur says nothing out
+                     loud, and one real word carrying the meaning. */
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="bg-line h-4 w-16 rounded-full blur-[3px]"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="bg-line h-4 w-20 rounded-full blur-[3px]"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="bg-line h-4 w-14 rounded-full blur-[3px]"
+                    />
+                    <span className="sr-only">Locked on your plan</span>
+                  </>
+                ) : (
+                  byEngine.map(({ engine, check }) => (
+                    <EnginePill key={engine} engine={engine} check={check} />
+                  ))
+                )}
               </div>
 
+              {/* ⚠️ NO TIMESTAMP WITHOUT A CHECK, WHICH THIS LIST USED TO PRINT
+                  ANYWAY. `checkedAt` on a row that has never been asked is the
+                  date the QUESTION was added, so "2 days ago" here dated a
+                  measurement that never happened — exactly the bug the matrix
+                  calls out and suppresses, on the layout nobody re-read after
+                  the rows started coming from the question list. Same reading,
+                  now on both. */}
               <p className="text-slate mt-1.5 text-xs">
-                {timeAgo(group.checkedAt)}
-                {group.sources > 0 && (
+                {locked ? (
+                  (lockedNote ?? 'Not on your watch list')
+                ) : group.checks.length === 0 ? (
+                  'Not asked yet — runs with your next check'
+                ) : (
                   <>
-                    {' '}
-                    · {group.sources} {group.sources === 1 ? 'source' : 'sources'}
-                  </>
-                )}
-                {instead && (
-                  <>
-                    {' '}
-                    · AI sent people to <span className="text-navy font-medium">{instead}</span>
+                    {timeAgo(group.checkedAt)}
+                    {group.sources > 0 && (
+                      <>
+                        {' '}
+                        · {group.sources} {group.sources === 1 ? 'source' : 'sources'}
+                      </>
+                    )}
+                    {instead && (
+                      <>
+                        {' '}
+                        · AI sent people to <span className="text-navy font-medium">{instead}</span>
+                      </>
+                    )}
                   </>
                 )}
               </p>
@@ -435,12 +484,29 @@ export function TrackingWorkspace() {
     The note here used to end "this route is Pro-only; nothing here reaches it",
     which was true of the route rather than of the component — requirePro() has
     since gone and the nav is open to every plan. Nothing below needed changing:
-    the `pro`, `canGrowList` and `oneShot` branches were already written for a
+    the `pro`, `canGrowList` and `unscheduled` branches were already written for a
     free reader and are now actually used.
   */
   const pro = isPro(user);
   const canGrowList = pro;
-  const oneShot = trackingPlanFor(user).schedule === 'once';
+  /* One lookup for the whole screen. This read `schedule` inline and the
+     watch-list gate below needs promptCap off the same object — two calls would
+     be two chances to ask about different users. */
+  const caps = trackingPlanFor(user);
+  /*
+    ⚠️ `unscheduled`, AND IT WAS CALLED `oneShot` UNTIL IT CAUSED A BUG.
+
+    The field means "no automatic weekly re-check", which is what plans.ts spells
+    out: "It describes the SCHEDULER, not the button: free still gets no
+    automatic weekly re-check… Whether a person may press Run is
+    canRunCheckNow(), which is a different question and now has a different
+    answer."
+
+    Under the old name two of its four uses quietly came to mean "free only ever
+    gets one check" and printed that on the chart, from the day free started
+    buying three. A name that says unscheduled cannot be misread as single.
+  */
+  const unscheduled = caps.schedule === 'once';
 
   const daily = tracking?.daily ?? [];
   const latest = tracking?.latest ?? [];
@@ -483,9 +549,12 @@ export function TrackingWorkspace() {
                work, so the only honest thing to say is when it happens — a
                button here would offer to start something that starts itself. */
             action={
-              oneShot ? (
-                // Free: the check runs as part of setting the site up, and free
-                // gets exactly the one.
+              unscheduled ? (
+                /* Free: the FIRST check runs as part of setting the site up.
+                   The comment here used to add "and free gets exactly the one",
+                   which stopped being true when free moved to a three-run
+                   budget — the sentence on screen only claims the first one, so
+                   it needed no change. */
                 <p className="text-slate text-sm">Your check runs as part of setting up.</p>
               ) : (
                 <NextCheck due={due} running={runningHere} />
@@ -784,6 +853,41 @@ export function TrackingWorkspace() {
      the same join the rows themselves are built on. */
   const ordered = [...questions].sort((a, b) => a.position - b.position);
 
+  /*
+    Which questions this plan will never ask, and why they have to be marked.
+
+    ⚠️ THE ROWS ARE THE QUESTION LIST, AND THE WATCH LIST IS ONLY THE TOP OF IT.
+    Discovery stores fifteen questions for every account (see the note in
+    lib/scan/run.ts about storing at the Pro ceiling), while the tracking stage
+    asks `promptCap` of them — three on free. So twelve rows here belong to
+    questions that are not watched and will not be asked on the next run or any
+    run after it. Unmarked, they read as twelve pending checks.
+
+    ⚠️ COMPUTED FROM `ordered`, NOT FROM THE RENDER ORDER. `visible` above is
+    sorted best-results-first, so slicing that would gate whichever questions
+    happened to sort last rather than the ones actually off the list. This
+    mirrors the server exactly: runTrackingStage orders by `position` and slices
+    to the same cap, which is also why moving a question up in the controls
+    genuinely promotes it into the watch list.
+
+    ⚠️ A ROW WITH CHECKS IS NEVER LOCKED, WHATEVER ITS POSITION. Reordering after
+    a run, or a cap that shrank, can leave a real measurement below the line —
+    and hiding a reading we actually took would be the one unforgivable version
+    of this feature.
+  */
+  const lockedQuestions = pro
+    ? null
+    : new Set(
+        ordered
+          .slice(caps.promptCap)
+          .map((q) => q.question)
+          .filter((text) => !(measured.get(text)?.checks.length ?? 0)),
+      );
+
+  /* Derived, never typed out — the cap and the Pro figure both come from
+     TRACKING_PLANS, so a plan change cannot leave this sentence behind. */
+  const lockedNote = `Not watched — your plan checks ${caps.promptCap}, Pro checks ${TRACKING_PLANS.pro.promptCap}`;
+
   const draftAction = (group: QuestionGroup) => {
     const q = ordered.find((x) => x.question === group.question);
     const index = q ? ordered.indexOf(q) : -1;
@@ -983,9 +1087,22 @@ export function TrackingWorkspace() {
 
       <div className="mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
         <div className="space-y-5">
+          {/*
+            ⚠️ "your checks so far", NOT "your one check", WHICH IS WHAT THIS
+            SAID FOR A WEEK AFTER IT STOPPED BEING TRUE. Free buys three runs,
+            one of which the onboarding scan spends and two of which are pressed
+            — so the count is 1, 2 or 3 depending on when somebody looks, and
+            any fixed number here is wrong two-thirds of the time.
+
+            ⚠️ AND NO NUMBER DERIVED FROM `daily` EITHER. CitationChart's own
+            docstring records that exact bug: `daily` holds days a check RAN,
+            not days elapsed, and it once described "five checkpoints spread
+            across three months" as "the last 5 days". A phrase with no count in
+            it cannot drift.
+          */}
           <CitationChart
             daily={daily}
-            span={oneShot ? 'from your one check' : 'over the last 30 days'}
+            span={unscheduled ? 'from your checks so far' : 'over the last 30 days'}
           />
 
           {/*
@@ -997,7 +1114,7 @@ export function TrackingWorkspace() {
             weekly cadence has no such list to keep score against: what ran is
             the chart above, and what is coming is one date.
           */}
-          {!oneShot && tracking?.nextCheckAt && (
+          {!unscheduled && tracking?.nextCheckAt && (
             <p className="text-slate text-sm">
               Next automatic check {timeUntil(tracking.nextCheckAt)}. We ask every week without you
               having to do anything.
@@ -1302,12 +1419,23 @@ export function TrackingWorkspace() {
           */
           <>
             <div className="mt-2 hidden sm:block">
-              <PromptMatrix groups={visible} action={draftAction} />
+              <PromptMatrix
+                groups={visible}
+                action={draftAction}
+                locked={lockedQuestions ?? undefined}
+                lockedNote={lockedNote}
+              />
             </div>
 
             <ul className="divide-line mt-2 divide-y sm:hidden">
               {visible.map((group) => (
-                <QuestionRow key={group.question} group={group} action={draftAction(group)} />
+                <QuestionRow
+                  key={group.question}
+                  group={group}
+                  action={draftAction(group)}
+                  locked={lockedQuestions?.has(group.question) ?? false}
+                  lockedNote={lockedNote}
+                />
               ))}
             </ul>
           </>

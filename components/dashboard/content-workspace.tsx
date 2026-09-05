@@ -207,9 +207,19 @@ export function ContentWorkspace() {
       <>
         <PageHeader title="Content" description={description} />
         <WorkspaceTabs tabs={OPPORTUNITY_TABS} label="Opportunities sections" />
+        {/* ⚠️ THE PROMISE CHANGES WITH THE CRAWL, because on one page half of it
+            cannot be kept: buildContentPlan drops the page comparison when
+            there is only the home page to compare against, and offering it here
+            would be selling something the next screen then has to explain away.
+            Same plan, same button — only the sentence is honest about which
+            halves this account is going to get. */}
         <EmptyState
           title="Build your content plan"
-          body={`We'll read the ${pages.length} page${pages.length === 1 ? '' : 's'} we found on ${site.domain}, work out which pages a business like yours is expected to have, and suggest ten things worth writing.`}
+          body={
+            pages.length === 1
+              ? `We'll read your home page, work out what you do and who you do it for, and suggest ten things worth writing about.`
+              : `We'll read the ${pages.length} pages we found on ${site.domain}, work out which pages a business like yours is expected to have, and suggest ten things worth writing.`
+          }
           action={
             <Button onClick={generate} disabled={busy}>
               {busy ? 'Working…' : 'Build the plan'}
@@ -264,6 +274,38 @@ export function ContentWorkspace() {
       )}
 
       <div className="space-y-5">
+        {/*
+          ⚠️ THE PAGE-COMPARISON HALF CAN BE ABSENT, AND ABSENT IS NOT EMPTY.
+          buildContentPlan drops mustHave when the audit read a single page,
+          because deciding a page is "missing" from a crawl that never looked for
+          it is a finding nobody measured — its note carries the full reasoning.
+          A free plan's audit reads exactly one page, so this is the normal state
+          for most accounts rather than an edge case.
+
+          Rendered as its own explanation rather than by letting the tiles run on
+          a zero-length list. That path was measured before this branch existed:
+          "Pages expected 0", "You're missing 0" footed with "Nothing missing",
+          and "Answering questions 0 of 0" — three tiles agreeing that a site we
+          had not examined was in perfect shape.
+        */}
+        {contentPlan.mustHave.length === 0 ? (
+          <Card className="p-5 sm:p-7">
+            <SectionTitle>The pages your industry expects</SectionTitle>
+            <p className="text-slate mt-1 text-sm leading-relaxed">
+              We haven&apos;t checked this yet. Working out which pages you&apos;re missing means
+              reading your whole site, and your last check read{' '}
+              {pages.length === 1 ? 'your home page only' : `${pages.length} pages`}. Rather than
+              guess at what isn&apos;t there, we&apos;ve left it out — the suggestions below are
+              written from your home page and your trade, so they stand on their own.
+            </p>
+            <div className="mt-4">
+              <ButtonLink href="/dashboard/audit" variant="ghost" size="sm">
+                Read my whole site
+              </ButtonLink>
+            </div>
+          </Card>
+        ) : (
+          <>
         {/* One divided card, matching the dashboard home and Results. */}
         <Card className="divide-line grid grid-cols-1 divide-y overflow-hidden sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <MetricTile
@@ -302,6 +344,8 @@ export function ContentWorkspace() {
             ))}
           </ul>
         </Card>
+          </>
+        )}
 
         <Card className="p-5 sm:p-7">
           <SectionTitle>Worth writing next</SectionTitle>

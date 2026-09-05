@@ -129,7 +129,10 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
   /* Both copied from the AI Mentions page rather than derived a second way —
      the chart is the same chart and must describe the same window. */
   const daily = tracking?.daily ?? [];
-  const oneShot = trackingPlanFor(user).schedule === 'once';
+  /* ⚠️ `unscheduled`, not `oneShot` — it means "no automatic weekly re-check",
+     never "only one check ever". See the fuller note in tracking-workspace.tsx,
+     which this line is copied from and where the old name went wrong. */
+  const unscheduled = trackingPlanFor(user).schedule === 'once';
 
   /* The questions actually put to the engines for this account, deduplicated —
      `latest` holds one row per question AND engine. */
@@ -236,7 +239,7 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
               as "the last 5 days". */}
           <CitationChart
             daily={daily}
-            span={oneShot ? 'from your one check' : 'over the last 30 days'}
+            span={unscheduled ? 'from your checks so far' : 'over the last 30 days'}
           />
           <HomeRivals />
         </div>
