@@ -75,6 +75,14 @@ export type QuestionsInput = {
   hint?: string;
   pages: PageContent[];
   answered?: string[];
+  /**
+   * What the business is called, when we know it.
+   *
+   * Drives the branded question 1 — see the note on buildQuestionsPrompt's own
+   * `name`, which explains why every branded instruction is gated on it rather
+   * than assumed.
+   */
+  name?: string | null;
 };
 
 /**
@@ -127,6 +135,7 @@ export async function generateQuestions(input: QuestionsInput): Promise<Question
             hint: input.hint ?? '',
             pages: clean,
             answered: (input.answered ?? []).slice(0, MAX_ANSWERED),
+            name: input.name,
           }),
         },
       ],

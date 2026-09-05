@@ -91,8 +91,23 @@ export function buildQuestionsPrompt(opts: {
   pages: PageContent[];
   /** Questions the customer has already published, so they aren't proposed again. */
   answered: string[];
+  /**
+   * What the business is actually called, when we know.
+   *
+   * ⚠️ OPTIONAL, AND EVERY BRANDED INSTRUCTION BELOW IS GATED ON IT. Callers pass
+   * `brand_name ?? name`, and both can be missing or be a dressed-up version of
+   * the domain. Asked for unconditionally, question 1 comes back as "What do
+   * people say about gikas-roofing-com?" — a prompt no customer would type, put
+   * top of a list where it is the one thing a free account gets tracked on.
+   * isNamedAfterDomain() in lib/dashboard/domain.ts is what keeps a domain echo
+   * out of `brand_name` in the first place; this handles the rest.
+   */
+  name?: string | null;
 }): string {
   const { domain, industry, location, hint, pages, answered } = opts;
+
+  /* Trimmed to nothing counts as absent — a name of spaces is not a name. */
+  const business = opts.name?.trim() || null;
 
   const known = [
     industry ? `Industry: ${industry}` : null,
@@ -111,17 +126,30 @@ Pages on the site:
 ${pageSummary(pages)}
 
 ${answered.length ? `The business already publishes answers to these, so do NOT propose them again:\n${answered.map((q) => `- ${q}`).join('\n')}\n` : ''}
-Give exactly ${QUESTION_COUNT} questions, in priority order: most valuable to this business first.
+Give exactly ${QUESTION_COUNT} questions, in priority order.
 
-The order is used, not decorative. Only the first few are put to the assistants on a smaller plan, so question 1 should be the one you would choose if you could ask only one — the question where being the cited answer would most obviously win this business work.
+The order is used, not decorative: only the first few are put to the assistants on a smaller plan, so the top of this list is the whole of what some businesses ever get measured on.
+
+${
+  business
+    ? `Question 1 must name the business — "${business}" — the way somebody who has already heard of them would ask. Someone who has been given their name, or seen their van, and is checking them out: whether they are any good, what they do, whether to call them.
+
+It leads for a reason. It is the one question this business is almost certainly already part of the answer to, so it tells them something true on day one: whether the assistants know this business exists, and whether what they say about it is right. Every other question on the list is about work they have not won yet; this one is about the reputation they already have.
+
+Questions 2 onward must NOT name the business. Those are for people who have never heard of them, and are ordered by winnable AND valuable together — questions this business could genuinely be the answer to, given what the pages above show they actually do. A question they would obviously lose is worth less than a slightly smaller one they can win.`
+    : `Question 1 should be the one you would choose if you could ask only one — the question where being the cited answer would most obviously win this business work.
+
+The rest are ordered by winnable AND valuable together: questions this business could genuinely be the answer to, given what the pages above show they actually do. A question they would obviously lose is worth less than a slightly smaller one they can win.`
+}
 
 What makes a good one:
 - It is phrased the way a person actually talks to an assistant — full sentences, natural wording, often longer than a search query. "How much does it cost to replace a roof in Franklin?" not "roof replacement cost".
+- Vary how BROAD they are. Not every question should be a narrow one. Mix the big high-intent questions a lot of people ask — "Who is the best roofer in Franklin?", "Who should I call for a leaking roof?" — with specific ones like "Do you repair cedar shake roofs?". A list where every entry is a niche detail misses the questions that actually send people somewhere.
 - It is specific to THIS business's trade and area, not generic to all businesses.
 - It is a question this business could genuinely answer well. Do not propose questions that would need information they do not have.
-- It is not already answered on the site above.
+- ${business ? 'From question 2 onward, it is not already answered on the site above. (Question 1 is exempt: being already covered is the point of it.)' : 'It is not already answered on the site above.'}
 
-Across the ${QUESTION_COUNT} as a whole, spread them over the reasons people ask, and label each with its intent. Spread the set; do not let it disturb the ranking — if the three best questions are all about price, rank them first anyway:
+Across the ${QUESTION_COUNT} as a whole, spread them over the reasons people ask, and label each with its intent. Spread the set; do not let it disturb the ranking${business ? ' or move question 1' : ''} — if the best of the rest are all about price, rank them first anyway:
 - pricing — what things cost, what affects the price, whether there are hidden fees
 - service — what they do, what they don't, what's included
 - trust — are they any good, licensed, insured, how long they've been going

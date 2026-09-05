@@ -14,6 +14,7 @@ import type { ContentPlan, Engine } from '@/lib/dashboard/types';
 import { buildContentPlan } from '@/lib/content-generate';
 import { generateQuestions } from '@/lib/questions-generate';
 import { questionKey } from '@/lib/questions';
+import { pickWatchList } from '@/lib/dashboard/questions';
 import { ALL_ENGINES, checkBatch, PROMPTS_PER_RUN, type QuestionSlice } from '@/lib/tracking/run';
 
 /*
@@ -318,6 +319,18 @@ export async function runQuestionsStage(db: Db, job: ScanJob): Promise<SliceResu
     industry: site.industry,
     location: site.location,
     pages: (report.pages ?? []) as PageContent[],
+    /*
+      ⚠️ brand_name FIRST, AND IT IS THE ONE WORTH TRUSTING. The audit stage
+      above only writes it when the crawl found a real name that
+      isNamedAfterDomain() would not dismiss as the domain wearing a hat — the
+      same test that keeps "Gikas Roofing Com" out of the column.
+
+      sites.name is the fallback and is weaker: it is whatever the customer or
+      the signup typed, which is often just the domain. buildQuestionsPrompt
+      treats a missing name as "no branded question", so passing a weak one is
+      the failure mode to watch — not passing none.
+    */
+    name: site.brand_name ?? site.name,
   });
 
   if (!result.ok) throw new ScanFailed(result.error);
@@ -492,6 +505,15 @@ export async function runTopicsStage(db: Db, job: ScanJob): Promise<SliceResult>
 
 /* -------------------------------------------------------------- stage 4 --- */
 
+/*
+  ⚠️ pickWatchList MOVED TO lib/dashboard/questions.ts, AND THE MOVE IS THE
+  POINT. This file is `server-only`, so AI Mentions could not import the rule
+  that decides which prompts are watched — and it ended up deciding for itself,
+  with `ordered.slice(promptCap)`. The moment promptCap went from 3 to 4 for the
+  manual slot, the screen stopped blurring the fourth row while the scan carried
+  on asking three. One rule, one module, both callers.
+*/
+
 /**
  * Key for one question × engine pair.
  *
@@ -550,23 +572,34 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
   */
   const { data: questionRows } = await db
     .from('questions')
-    .select('question')
+    /* `source` too: pickWatchList below sorts the customer's own questions to
+       the front, and without this column every row looks discovered. */
+    .select('question, source')
     .eq('site_id', site.id)
     .order('position')
     .order('added_at');
 
   /*
-    Capped to the plan, best first.
+    Capped to the plan: the customer's own questions first, then the best of the
+    discovered ones.
 
-    ⚠️ THIS SLICE IS NEW AND IT IS NOT COSMETIC. The list used to be taken whole,
-    which was survivable when the interactive route capped it on the way in.
-    A scheduled check has no browser in front of it, so an account that
-    accumulated 40 questions would have asked all 40 — nearly triple what the
-    window is priced for, four times over.
+    ⚠️ THE CAP IS NOT COSMETIC. The list used to be taken whole, which was
+    survivable when the interactive route capped it on the way in. A scheduled
+    check has no browser in front of it, so an account that accumulated 40
+    questions would have asked all 40 — nearly triple what the window is priced
+    for, four times over.
+
+    ⚠️ AND IT IS NO LONGER A PLAIN SLICE, because a plain slice silently dropped
+    every question a customer typed. pickWatchList carries the reasoning; the
+    short version is that a manual question is appended at the END of the
+    position order, so "top N" and "the ones that matter" were opposites.
   */
-  const wanted = [...new Set((questionRows ?? []).map((r) => r.question as string))].slice(
-    0,
-    plan.promptCap,
+  const wanted = pickWatchList(
+    (questionRows ?? []).map((r) => ({
+      question: r.question as string,
+      source: (r as { source?: string | null }).source ?? null,
+    })),
+    plan,
   );
   if (wanted.length === 0) return { done: true, progress: { checked: 0, remaining: 0 } };
 

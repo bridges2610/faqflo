@@ -21,6 +21,7 @@ import {
   checksByEngine,
   groupByQuestion,
   insteadFor,
+  pickWatchList,
   type QuestionGroup,
 } from '@/lib/dashboard/questions';
 import { CitationChart } from './citation-chart';
@@ -367,14 +368,19 @@ function useManualQuestion(): {
   room: number;
   clearError: () => void;
 } {
-  const { site, user, questions, addManualQuestion } = useDashboard();
+  const { site, user, questions, addManualQuestion, runTracking } = useDashboard();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mine = site ? questions.filter((q) => q.siteId === site.id) : [];
   const used = mine.filter((q) => q.source === 'manual').length;
   const caps = trackingPlanFor(user);
-  const room = Math.min(caps.manualCap - used, Math.max(0, caps.promptCap - mine.length));
+  /* ⚠️ manualCap ALONE. This used to also subtract `mine.length` from promptCap,
+     which counts the stored question library against the watch-list cap — 15
+     against 3 on a free account, so `room` was always 0 and the form never
+     appeared. The store's own note, where the matching guard was removed,
+     carries the full reasoning. */
+  const room = Math.max(0, caps.manualCap - used);
 
   async function add(text: string): Promise<boolean> {
     if (!site || busy) return false;
@@ -384,7 +390,38 @@ function useManualQuestion(): {
 
     try {
       const result = await addManualQuestion(site.id, text);
-      if (result.ok) return true;
+
+      if (result.ok) {
+        /*
+          ⚠️ ASKED IMMEDIATELY, AND AWAITED RATHER THAN FIRED OFF.
+
+          A question that sits on the list until somebody presses Run is the
+          thing lib/dashboard/plans.ts warns about — "a field that accepts a
+          typed question and then never checks it is worse than no field". This
+          is what makes the answer arrive because you typed it.
+
+          ⚠️ awaited so `busy` above spans the check. runTracking guards itself
+          with a `running` ref and returns immediately when a run is already in
+          flight, so a Pro account adding a second question while the first is
+          still being asked would have the second silently never checked.
+          Holding the form disabled until this settles is what prevents that —
+          and it is also the honest UI, since three engines are being called.
+
+          `only` is not a way past the budget: the route reads the plan off the
+          profile row, caps the list at promptCap and refuses once the allowance
+          is spent. See its note in lib/dashboard/provider.tsx.
+
+          ⚠️ result.question, NOT `text`. The store trims and collapses runs of
+          whitespace before saving, so the two differ whenever somebody types a
+          double space or a trailing one. Asking the raw string spends three
+          engine calls and files the answers under a question that is not in the
+          table — the row then reads "not asked" for ever, while the money is
+          gone. Everything downstream joins on this text by plain string
+          equality; the store's own note on ManualQuestionResult spells it out.
+        */
+        await runTracking([result.question]);
+        return true;
+      }
 
       setError(
         {
@@ -392,7 +429,6 @@ function useManualQuestion(): {
           'too-long': 'That is too long for a prompt — trim it to a single question.',
           duplicate: 'You are already watching that question.',
           'manual-cap': `You can add ${caps.manualCap} of your own. Remove one on Opportunities to make room.`,
-          'prompt-cap': `Your watch list is full at ${caps.promptCap} prompts.`,
         }[result.reason],
       );
       return false;
@@ -488,7 +524,17 @@ export function TrackingWorkspace() {
     free reader and are now actually used.
   */
   const pro = isPro(user);
-  const canGrowList = pro;
+  /*
+    ⚠️ TWO GATES NOW, BECAUSE THEY WERE ALWAYS TWO QUESTIONS SHARING ONE ANSWER.
+    `canGrowList` covered both halves of the block below, so making free able to
+    type a question would also have offered it a Discover run it cannot have.
+
+    Finding more is Pro because it spends an Opus call — canDiscover() is isPro
+    and the route refuses it server-side. Adding your own spends nothing until
+    the next check, so it follows the PLAN rather than the tier: free's manualCap
+    is 1, Pro's is 10, and a plan with 0 simply never sees the form.
+  */
+  const canDiscoverMore = pro;
   /* One lookup for the whole screen. This read `schedule` inline and the
      watch-list gate below needs promptCap off the same object — two calls would
      be two chances to ask about different users. */
@@ -833,9 +879,53 @@ export function TrackingWorkspace() {
     attached to nothing — the exact failure this dashboard keeps writing down.
     Filtering still narrows; it never reorders.
   */
+  /* The question rows in the owner's own order. Also what the controls below
+     match a group back to, by text — the same join the rows are built on.
+
+     ⚠️ DECLARED HERE, ABOVE ITS FIRST USE, AND IT USED TO SIT LOWER. Both this
+     and `watched` were declared after the row list that reads them, which threw
+     "Cannot access 'watched' before initialization" the moment the page
+     rendered — a const is hoisted but not initialised, so the sort below found
+     the temporal dead zone rather than a Set. */
+  const ordered = [...questions].sort((a, b) => a.position - b.position);
+
+  /*
+    ⚠️ THE SAME FUNCTION THE SCAN USES, AND IT REPLACED A COPY THAT DRIFTED. This
+    screen decided the boundary itself with `ordered.slice(caps.promptCap)`,
+    which was right only while promptCap and "how many discovered prompts get
+    asked" were the same number. Adding the typed slot made promptCap 4 while the
+    scan still asked three, so the fourth row stopped being blurred and claimed
+    to be watched when nothing was asking it. pickWatchList is now the single
+    answer to "what is watched", on both sides.
+  */
+  const watched = new Set(pickWatchList(ordered, caps));
+
   const filtered =
     filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter));
-  const visible = filtered.slice(0, shown);
+
+  /*
+    ⚠️ WATCHED ROWS FIRST, AND THIS IS THE ONLY REORDERING ON THIS PAGE.
+
+    The owner's order still decides everything else — the note above records why
+    sortByCitations was removed, and this does not bring it back. It groups on
+    one bit: is this question being asked? Within each group the owner's position
+    order is untouched, because Array.prototype.sort is stable.
+
+    It exists because a typed question is appended at the END of the position
+    order (position 15 on a free account), so without this it renders below a
+    dozen blurred rows — the one prompt somebody chose themselves, buried under
+    the ones they cannot have. Grouping puts it immediately after the three
+    discovered prompts, which is the fourth row, which is where the locked
+    placeholder it replaces used to sit.
+
+    A no-op for Pro, where discovery stops at discoveredCap and everything stored
+    is watched.
+  */
+  const sorted = [...filtered].sort(
+    (a, b) => Number(!watched.has(a.question)) - Number(!watched.has(b.question)),
+  );
+
+  const visible = sorted.slice(0, shown);
 
   /*
     The loop closing: see you weren't cited, write the answer, the question
@@ -849,10 +939,6 @@ export function TrackingWorkspace() {
     It is a function rather than JSX because both layouts below need their own
     instance of it per row, and the two must offer the identical button.
   */
-  /* The question row this group came from, for the controls. Matched by text,
-     the same join the rows themselves are built on. */
-  const ordered = [...questions].sort((a, b) => a.position - b.position);
-
   /*
     Which questions this plan will never ask, and why they have to be marked.
 
@@ -863,12 +949,12 @@ export function TrackingWorkspace() {
     questions that are not watched and will not be asked on the next run or any
     run after it. Unmarked, they read as twelve pending checks.
 
-    ⚠️ COMPUTED FROM `ordered`, NOT FROM THE RENDER ORDER. `visible` above is
-    sorted best-results-first, so slicing that would gate whichever questions
-    happened to sort last rather than the ones actually off the list. This
-    mirrors the server exactly: runTrackingStage orders by `position` and slices
-    to the same cap, which is also why moving a question up in the controls
-    genuinely promotes it into the watch list.
+    ⚠️ COMPUTED FROM `watched`, NOT FROM THE RENDER ORDER. The rows on screen are
+    grouped watched-first, so slicing THAT would gate whichever questions
+    happened to land last rather than the ones actually off the list. `watched`
+    comes from pickWatchList — the same function the scan uses to decide what to
+    ask — which is also why moving a question up in the controls genuinely
+    promotes it into the watch list.
 
     ⚠️ A ROW WITH CHECKS IS NEVER LOCKED, WHATEVER ITS POSITION. Reordering after
     a run, or a cap that shrank, can leave a real measurement below the line —
@@ -879,14 +965,14 @@ export function TrackingWorkspace() {
     ? null
     : new Set(
         ordered
-          .slice(caps.promptCap)
           .map((q) => q.question)
-          .filter((text) => !(measured.get(text)?.checks.length ?? 0)),
+          .filter((text) => !watched.has(text) && !(measured.get(text)?.checks.length ?? 0)),
       );
 
-  /* Derived, never typed out — the cap and the Pro figure both come from
-     TRACKING_PLANS, so a plan change cannot leave this sentence behind. */
-  const lockedNote = `Not watched — your plan checks ${caps.promptCap}, Pro checks ${TRACKING_PLANS.pro.promptCap}`;
+  /* Derived from what is ACTUALLY watched, not from promptCap. An account that
+     has not used its typed slot is having three questions checked, not four, and
+     saying four would be a promise nothing is keeping. */
+  const lockedNote = `Not watched — your plan checks ${watched.size}, Pro checks ${TRACKING_PLANS.pro.promptCap}`;
 
   const draftAction = (group: QuestionGroup) => {
     const q = ordered.find((x) => x.question === group.question);
@@ -1179,7 +1265,7 @@ export function TrackingWorkspace() {
                   more?", and none of them is a disabled button with no reason
                   given. */}
               <div className="border-line mt-4 border-t pt-4">
-                {!canGrowList ? (
+                {!canDiscoverMore ? (
                   <p className="text-slate text-xs">
                     Finding more questions is part of Pro. Your list and results stay
                     here either way.
@@ -1252,16 +1338,24 @@ export function TrackingWorkspace() {
               <div className="border-line mt-4 border-t pt-4">
                 <p className="text-navy text-sm font-semibold">Add your own question</p>
 
-                {!canGrowList ? (
+                {/* ⚠️ GATED ON manualCap, NOT ON THE TIER. A plan that allows
+                    none never renders the form; free allows one and Pro ten, and
+                    both get the same control. The branch that used to stand here
+                    told a free account to come back "when the window opens",
+                    which described a plan that could not type a question at all. */}
+                {tracking.manualCap === 0 ? (
                   <p className="text-slate text-xs">
-                    You can add your own again when the window opens. Right now there is
-                    nothing to check them with.
+                    Writing your own questions is part of Pro. Your list and results
+                    stay here either way.
                   </p>
                 ) : manual.room === 0 ? (
+                  /* ⚠️ ONE REASON LEFT, BECAUSE THERE IS ONLY ONE. This was a
+                     ternary whose other half said "your watch list is full at N
+                     prompts" — a state that cannot happen now that adding a
+                     question displaces a discovered one rather than overflowing
+                     the list. `room` is manualCap minus used and nothing else. */
                   <p className="text-slate mt-1 text-xs">
-                    {manual.used >= tracking.manualCap
-                      ? `You've added all ${tracking.manualCap} of your own. Remove one on `
-                      : `Your watch list is full at ${formatNumber(tracking.promptCap)} prompts. Make room on `}
+                    {`You've added all ${formatNumber(tracking.manualCap)} of your own. Remove one on `}
                     <Link
                       href="/dashboard/questions"
                       className="text-primary hover:text-primary-hover font-semibold"

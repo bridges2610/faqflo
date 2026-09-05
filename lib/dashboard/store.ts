@@ -2334,8 +2334,23 @@ const MANUAL_QUESTION_MAX_CHARS = 200;
  * press the button again with the same input. The caller needs to know which.
  */
 export type ManualQuestionResult =
-  | { ok: true; data: DashboardData }
-  | { ok: false; reason: 'empty' | 'too-long' | 'duplicate' | 'manual-cap' | 'prompt-cap' };
+  /**
+   * ⚠️ `question` IS THE STORED TEXT, NOT WHAT WAS TYPED, AND CALLERS MUST USE
+   * IT. addManualQuestion normalises — trim, then collapse runs of whitespace —
+   * so what lands in the row is frequently not the string handed in.
+   *
+   * Everything downstream joins on that text by plain string equality:
+   * tracked_prompts to questions (0006), and citation_checks to the row on
+   * screen. A caller that goes on to check the raw input spends real engine
+   * calls storing results under a question that does not exist, and the row
+   * sits there looking as though it was never asked. editQuestion's note above
+   * describes the same hazard from the other direction.
+   */
+  | { ok: true; data: DashboardData; question: string }
+  /* 'prompt-cap' is gone: addManualQuestion no longer has a reason to return it
+     — see the note where that check used to be. Removed from the union rather
+     than left unreachable, so a caller cannot render a message nothing sends. */
+  | { ok: false; reason: 'empty' | 'too-long' | 'duplicate' | 'manual-cap' };
 
 /**
  * A question the customer wrote, rather than one a model proposed.
@@ -2474,9 +2489,21 @@ export async function addManualQuestion(
     return { ok: false, reason: 'manual-cap' };
   }
 
-  if (mine.length >= caps.promptCap) {
-    return { ok: false, reason: 'prompt-cap' };
-  }
+  /*
+    ⚠️ THERE IS NO promptCap CHECK HERE ANY MORE, AND IT WAS REMOVED BECAUSE IT
+    REFUSED EVERY FREE ACCOUNT.
+
+    It read `mine.length >= caps.promptCap`, which counts the stored question
+    LIBRARY against a WATCH LIST cap. Those are different numbers on purpose:
+    runQuestionsStage stores the model's whole list "AT THE PRO CEILING, NOT AT
+    THE ACCOUNT'S OWN CAP", so a free account holds 15 rows and watches 3. The
+    test was `15 >= 3` on every single add.
+
+    It was dead on Pro as well — 15 discovered plus 10 manual is exactly 25, so
+    the manualCap check above always fired first — and nothing it guarded can
+    happen anyway: pickWatchList() slices to promptCap, so the watch list is
+    bounded by construction rather than by a check here.
+  */
 
   const created: DiscoveredQuestion = {
     id: newId('q'),
@@ -2492,7 +2519,13 @@ export async function addManualQuestion(
     addedAt: now(),
   };
 
-  return { ok: true, data: await write({ ...data, questions: [...data.questions, created] }) };
+  /* `created.question`, not the argument — see the note on ManualQuestionResult.
+     This is the only string anything downstream can match on. */
+  return {
+    ok: true,
+    data: await write({ ...data, questions: [...data.questions, created] }),
+    question: created.question,
+  };
 }
 
 /**

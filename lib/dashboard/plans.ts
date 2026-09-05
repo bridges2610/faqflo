@@ -300,12 +300,30 @@ export type TrackingPlan = {
  * shapes are 15 calls and 27, and the second one is the one that can show a
  * number moving.
  *
- * ⚠️ FREE'S manualCap IS 0 ON PURPOSE, AND THAT IS WHY THE BUTTON TAKES NO
- * INPUT. The three prompts are the ones discovery already found and the
- * onboarding scan already asked; the button re-asks exactly those. A field
- * that accepts a typed question and then never checks it is worse than no
- * field, so there isn't one — the UI says "Pro watches questions you write
- * yourself" instead.
+ * ⚠️ THE 27 ABOVE IS HISTORY, NOT THE CURRENT CEILING. It compares the two old
+ * shapes and is still the right comparison for why free re-runs. What free
+ * actually spends now is 27 on an account that only watches what the model
+ * found, and up to 36 on one that adds a question of its own — see the manualCap
+ * note below.
+ *
+ * ⚠️ FREE'S manualCap IS 1, AND IT WAS 0 UNTIL THE WATCH LIST COULD HONOUR ONE.
+ * The old note here said a field that accepts a typed question and then never
+ * checks it is worse than no field — which was true, and is now the condition
+ * this cap depends on rather than an argument against it. pickWatchList() in
+ * lib/scan/run.ts takes manual questions FIRST, so the one a customer types is
+ * asked on the next run instead of sitting below the cut at position 15.
+ *
+ * ⚠️ IT ADDS A FOURTH PROMPT RATHER THAN TAKING ONE OF THE THREE. promptCap is 4
+ * and discoveredCap stays 3, so the discovered set is untouched and the question
+ * a customer types is watched alongside it. That is the whole reason promptCap
+ * and discoveredCap are separate numbers here: the ceiling counts what may be
+ * ASKED, the other counts what may be FOUND.
+ *
+ * ⚠️ AND THE CEILING ONLY RISES FOR ACCOUNTS THAT USE IT. checksPerPeriod is
+ * 4 × 3 × 3 = 36, but pickWatchList() in lib/scan/run.ts caps the discovered
+ * take at discoveredCap, so an account that never types a question watches three
+ * prompts and spends the same 27 it always did. Take that cap out and every free
+ * signup quietly starts billing for a fourth prompt nobody asked for.
  *
  * ⚠️ FREE'S schedule STAYS 'once'. It describes the SCHEDULER, not the button:
  * free still gets no automatic weekly re-check, which is most of what Pro
@@ -321,7 +339,7 @@ export type TrackingPlan = {
  * fifth run was the day-0 scan.
  */
 export const TRACKING_PLANS: Record<PlanId, TrackingPlan> = {
-  free: build('free', { promptCap: 3, manualCap: 0, runs: 3, schedule: 'once' }),
+  free: build('free', { promptCap: 4, manualCap: 1, runs: 3, schedule: 'once' }),
   pro: build('pro', { promptCap: 25, manualCap: 10, runs: 5, schedule: 'weekly' }),
 };
 
@@ -737,7 +755,11 @@ export const PLAN_FEATURES: PlanFeature[] = [
     label: 'Questions put to AI',
     free: `${TRACKING_PLANS.free.promptCap}`,
     pro: `${TRACKING_PLANS.pro.promptCap}`,
-    proseFree: `${TRACKING_PLANS.free.promptCap} real questions your customers ask`,
+    /* Both halves derived, and the free one names its manual slot for the same
+       reason the Pro one always has: a customer comparing the two rows should
+       be able to see that writing your own question is a difference of degree
+       between the plans, not something only one of them can do. */
+    proseFree: `${TRACKING_PLANS.free.promptCap} real questions your customers ask — ${TRACKING_PLANS.free.manualCap} of them yours`,
     prosePro: `${TRACKING_PLANS.pro.promptCap} questions asked every week — ${TRACKING_PLANS.pro.manualCap} of them yours`,
   },
   {

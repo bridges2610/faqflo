@@ -99,6 +99,11 @@ export async function POST(request: Request) {
     hint: typeof hint === 'string' ? hint : '',
     pages: pages.filter(isPageContent),
     answered: alreadyAnswered,
+    /* Off the row, never off the body — the same rule the domain follows two
+       lines up. Passed here as well as in the scan so the two callers cannot
+       come to disagree about what question 1 is for; see lib/scan/run.ts on why
+       brand_name leads. */
+    name: site.brand_name ?? site.name,
   });
 
   if (!result.ok) return fail(result.error, result.status);

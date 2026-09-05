@@ -188,3 +188,82 @@ export type EngineOutcome = 'named' | 'absent' | null;
 export function insteadFor(group: QuestionGroup): string | null {
   return group.checks.find((c) => c.outcome !== 'cited' && c.citedInstead)?.citedInstead ?? null;
 }
+
+/* ------------------------------------------------------ the watch list --- */
+
+/**
+ * One row of the question list, as far as choosing a watch list cares.
+ *
+ * ⚠️ `source` ALLOWS undefined AS WELL AS null, BECAUSE THE TWO CALLERS DISAGREE
+ * ABOUT ABSENCE. The scan reads a Postgres row, where a missing source is
+ * `null`; the browser holds DiscoveredQuestion, where it is an optional field
+ * and so `undefined`. Both mean "not typed by a person", and the test below is
+ * `=== 'manual'`, so either lands on the discovered side without a coercion at
+ * the call site.
+ */
+export type WatchCandidate = { question: string; source?: string | null };
+
+/**
+ * Which of a site's questions actually get asked.
+ *
+ * ⚠️ IT LIVES HERE, NOT IN lib/scan/run.ts, AND THAT IS A BUG FIX RATHER THAN
+ * TIDYING. The scan is `server-only`, so AI Mentions could not import this and
+ * open-coded its own boundary as `ordered.slice(promptCap)`. When promptCap went
+ * from 3 to 4 to make room for a typed question, the screen quietly stopped
+ * blurring the fourth row while the scan carried on asking three — the two
+ * disagreed for as long as there were two copies. Both import this now.
+ *
+ * ⚠️ MANUAL FIRST. A question the customer types is created with
+ * `position: mine.length` — 15 on a free account, because the scan stores the
+ * model's whole list at the Pro ceiling — so a plain "top N by position" would
+ * leave it permanently below the cut. lib/dashboard/plans.ts states the standard
+ * that makes that unacceptable: "a field that accepts a typed question and then
+ * never checks it is worse than no field".
+ *
+ * ⚠️ A MANUAL QUESTION ADDS A SLOT, IT DOES NOT TAKE ONE. The caps are enforced
+ * separately on purpose: `manualCap` bounds what a person may type,
+ * `discoveredCap` bounds what the model may contribute, and `promptCap` is only
+ * the ceiling on the two together. Free is 3 discovered plus 1 typed, capped
+ * at 4.
+ *
+ * ⚠️ DISCOVERED IS CAPPED AT discoveredCap, NOT AT "WHATEVER MANUAL LEFT OVER",
+ * AND THE DIFFERENCE IS A BILL. Filling discovered up to `promptCap - manual`
+ * would give an account that typed nothing FOUR discovered prompts — spending
+ * the raised ceiling on every free signup, whether or not the feature it was
+ * raised for was ever used.
+ *
+ * ⚠️ PURE, AND `rows` MUST ARRIVE IN position ORDER. It does no sorting of its
+ * own — the caller's ordering is what makes "best discovered" mean anything.
+ */
+export function pickWatchList(
+  rows: WatchCandidate[],
+  plan: { promptCap: number; manualCap: number; discoveredCap: number },
+): string[] {
+  const seen = new Set<string>();
+
+  const take = (list: WatchCandidate[], limit: number) => {
+    const out: string[] = [];
+    for (const row of list) {
+      if (out.length >= limit) break;
+      if (!row.question || seen.has(row.question)) continue;
+      seen.add(row.question);
+      out.push(row.question);
+    }
+    return out;
+  };
+
+  const manual = take(
+    rows.filter((r) => r.source === 'manual'),
+    plan.manualCap,
+  );
+
+  /* `discoveredCap`, and then promptCap as the ceiling on the pair. Both are
+     needed: the first stops a fourth discovered prompt appearing on an account
+     that typed nothing, the second is what the budget is priced against. */
+  const discovered = take(
+    rows.filter((r) => r.source !== 'manual'),
+    Math.min(plan.discoveredCap, Math.max(0, plan.promptCap - manual.length)),
+  );
+
+  return [...manual, ...discovered];
+}
