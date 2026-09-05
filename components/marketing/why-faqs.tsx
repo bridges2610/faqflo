@@ -23,9 +23,26 @@ const STEPS = [
     body: 'It is looking for a specific question with a short, factual answer attached. Marketing prose spread across a page gives it nothing it can lift.',
   },
   {
+    /*
+      ⚠️ THIS STEP NAMES BOTH FORMATS NOW, AND THE CLAIM WAS CHECKED BEFORE IT
+      WAS WRITTEN. It used to end "that is why FAQs are the vehicle", which was
+      true when a Q&A block was the only thing FaqFlo produced. It writes
+      articles too, and the promise here — your own domain, plain HTML, readable
+      on the first request — has to hold for both or it should not name both.
+
+      It holds. lib/dashboard/export.ts builds an article through the same rules
+      as a Q&A block: "no JavaScript, real heading and paragraph elements, and
+      nothing pointing at faqflo.com", with a Copy-code button beside the FAQ
+      one. The only difference it records is structural rather than about
+      readability — an article is a whole page body and leads with an <h1>,
+      where the block "is a guest on somebody else's page" and never does.
+
+      So "a few lines on a service page or a whole article" is the honest span,
+      and the closing reframe generalises from FAQs to the shape itself.
+    */
     n: '03',
-    title: 'A Q&A block is exactly that shape',
-    body: 'Question, answer, on your own domain, in plain HTML a crawler can read on the first request. That is why FAQs are the vehicle — not because FAQs are the point.',
+    title: 'A Q&A block or an article, same shape',
+    body: 'Question first, answer underneath, on your own domain in plain HTML a crawler reads on the first request. A few lines on a service page or a whole article — the shape is the vehicle, not the point.',
   },
 ];
 
@@ -79,10 +96,26 @@ export function WhyFaqs() {
           <p className="text-primary text-xs font-bold tracking-[0.14em] uppercase">
             Why Q&amp;A
           </p>
+          {/*
+            ⚠️ "marketing", NOT "content" — AND IT MUST NOT GO BACK. This read
+            "Why answers, and not more content?" from before FaqFlo wrote
+            anything long. It now writes articles, and the same home page sells
+            them twice: who-and-features.tsx offers "A full article from any
+            customer question, in one click", and how-it-works' Generate step
+            ends "Or turn any question into a full article in one click." A
+            section arguing against content, two sections above one selling it.
+
+            The villain was never content. Step 02 below names the real one in
+            its own words — "Marketing prose spread across a page gives it
+            nothing it can lift" — so the headline now says that instead, and
+            agrees with the step beneath it rather than arguing past it.
+
+            One underlined word either way, which is what <Underline> wraps.
+          */}
           <h2 className="mt-4 text-[2rem] text-balance sm:text-[2.5rem]">
             Why answers, and not more{' '}
             <span className="relative inline-block">
-              content
+              marketing
               <Underline className="text-accent absolute -bottom-2 left-0 h-3.5 w-full" />
             </span>
             ?

@@ -101,7 +101,7 @@ export function SiteFooter() {
             above is fixed at three link tracks, and this is where people look
             for them anyway. flex-wrap so the two don't collide on a phone. */}
         <div className="border-line text-slate mt-12 flex flex-wrap items-center justify-between gap-4 border-t pt-6 text-xs">
-          <span>&copy; {new Date().getFullYear()} FaqFlo. Made by Tenichi.</span>
+          <span>&copy; {new Date().getFullYear()} FaqFlo.</span>
           {/* Grouped, not two more children of the justify-between row — three
               siblings would spread copyright / Privacy / Terms edge to edge. */}
           <span className="flex flex-wrap items-center gap-x-6 gap-y-2">

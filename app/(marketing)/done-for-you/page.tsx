@@ -29,9 +29,11 @@ import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
     - More than three FAQs     → the other four were answered above them.
 
   ⚠️ IT SPEAKS AS "I". Every other page says "we" — /about says "a small,
-  focused team", the footer says "Made by Tenichi". That is not an
-  inconsistency to tidy up; it is the product. If this ever becomes a team of
-  three, the copy changes before the delivery does.
+  focused team". That is not an inconsistency to tidy up; it is the product. If
+  this ever becomes a team of three, the copy changes before the delivery does.
+
+  (This used to cite the footer's "Made by Tenichi" as the second example. That
+  credit was removed site-wide; /about carries the point on its own.)
 
   ⚠️ THE PRO SUBSCRIPTION PRICE IS DELIBERATELY NOT MENTIONED, AND THAT IS A
   STATEMENT ABOUT WHO READS THIS.

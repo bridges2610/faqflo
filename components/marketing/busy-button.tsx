@@ -141,20 +141,37 @@ export function BusyButton() {
               Fair enough — here&rsquo;s the short version.
             </h2>
 
+            {/*
+              ⚠️ WHAT IT IS, NOT THE SCENARIO. This used to open by acting out a
+              customer typing into ChatGPT and getting somebody else's name —
+              three sentences of problem before the reader learned what FaqFlo
+              was. Somebody who pressed "I'm busy" has already agreed they are
+              busy; making them read a story first is the opposite of the ask.
+
+              ⚠️ AND IT DOES NOT LIST THE STEPS. "Finds the questions, writes the
+              answers, puts them on your site" belongs to the ticks below, and
+              saying it twice makes the panel longer without making it clearer.
+              This says what the thing is and what it gets you; the list says how.
+            */}
             <p className="text-slate mt-3 text-[0.9375rem] leading-relaxed sm:mt-3.5">
-              Your customers are opening ChatGPT and typing &ldquo;who&rsquo;s good for X near
-              me.&rdquo; They get two or three names back, and they call one of them. Yours
-              probably isn&rsquo;t in there — not because you aren&rsquo;t good at what you do,
-              but because AI can&rsquo;t find anything readable about you.
+              FaqFlo gets your business named when someone asks an AI who to hire. It puts clear
+              answers about what you do somewhere the assistants can actually read them — so when
+              the question comes up, you&rsquo;re in the answer.
             </p>
 
             {/*
-              ⚠️ THE ONE FIRST-PERSON LINE, AND IT IS THE POINT OF THE REWRITE.
-              Beau's voice already exists in AUTHOR_BIO ("Hi, I'm Beau…") but had
-              never reached a marketing surface — every panel spoke as a company.
-              One sentence naming the person who built it is what makes this read
-              as somebody talking rather than a product tour, and it costs a
-              line. Do not grow it into an About paragraph.
+              ⚠️ THE ONE FIRST-PERSON LINE. Beau's voice already exists in
+              AUTHOR_BIO ("Hi, I'm Beau…") but had never reached a marketing
+              surface — every panel spoke as a company. One sentence naming the
+              person who built it is what makes this read as somebody talking
+              rather than a product tour, and it costs a line. Do not grow it
+              into an About paragraph.
+
+              ⚠️ IT NO LONGER STARTS WITH "That's". It read "That's the whole
+              reason I built FaqFlo", where "that" pointed at a problem the
+              paragraph above used to describe. That paragraph now says what
+              FaqFlo IS, so the pronoun had nothing left to refer to — this line
+              has to stand on its own, and does.
 
               ⚠️ AUTHOR AND AUTHOR_AVATAR FROM lib/blog/author.ts, NOT A PASTED
               PATH — AND NOT FROM posts.ts, WHICH IS WHERE THEY USED TO COME
@@ -180,7 +197,7 @@ export function BusyButton() {
                 className="bg-cloud h-11 w-11 shrink-0 rounded-full object-cover"
               />
               <p className="text-navy text-[0.9375rem] leading-snug font-semibold">
-                That&rsquo;s the whole reason I built FaqFlo.
+                I built FaqFlo for people who don&rsquo;t have time for marketing.
                 <span className="text-slate mt-0.5 block text-sm font-normal">
                   — {AUTHOR}, who built it
                 </span>

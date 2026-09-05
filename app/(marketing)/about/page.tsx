@@ -194,7 +194,7 @@ const PROMISES = [
 const FAQS = [
   {
     q: 'Who’s behind FaqFlo?',
-    a: 'A small, focused team — FaqFlo is made by Tenichi. We’ve worked with countless clients helping with their AEO and SEO. We’ve built something we use… every day.',
+    a: 'A small, focused team. We’ve worked with countless clients helping with their AEO and SEO. We’ve built something we use… every day.',
   },
   {
     q: 'Why build the whole product around FAQs?',
