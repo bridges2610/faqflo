@@ -194,6 +194,17 @@ export function articleAllowance(
  */
 export const SITE_CAP = 1;
 
+/*
+  How many rivals a Pro account may name.
+
+  ⚠️ MOVED HERE FROM store.ts WHEN WATCHING BECAME PRO-ONLY. PLAN_FEATURES has
+  to quote this number, and store.ts already imports from this file — reaching
+  back the other way would have made the cycle plans → store → plans. Every
+  other allowance already lives here; this one was simply in the wrong place
+  while it was a storage detail rather than something a plan buys.
+*/
+export const COMPETITOR_CAP = 10;
+
 /**
  * How many discovered questions a FREE account sees.
  *
@@ -608,6 +619,25 @@ export const PLAN_FEATURES: PlanFeature[] = [
     prosePro: 'Who gets named instead of you, ranked',
   },
   {
+    /*
+      ⚠️ THIS ROW DID NOT EXIST WHILE THE FEATURE WAS FREE, AND THAT WAS THE
+      BUG. Watching named competitors moved behind Pro (canWatchCompetitors),
+      and a Pro-only feature absent from this table is one nobody is ever sold —
+      the mirror of the failure the header of this file describes, where the
+      table promised less than the dashboard granted.
+
+      ⚠️ DELIBERATELY NOT THE SAME THING AS THE ROW ABOVE. That one is who the
+      engines DID cite, which free still sees on its own questions. This one is
+      the list the owner writes: ten rivals counted by name whether or not they
+      came up. Two rows because they are two features, and collapsing them would
+      make free look like it has neither.
+    */
+    label: 'Competitors you watch',
+    free: null,
+    pro: `${COMPETITOR_CAP} you name yourself`,
+    prosePro: `Track ${COMPETITOR_CAP} rivals you name, counted every week`,
+  },
+  {
     label: 'Pages checked',
     free: PAGE_BUDGET.free === 1 ? 'Your home page' : `${PAGE_BUDGET.free} pages`,
     pro: 'Every page on your site',
@@ -896,6 +926,22 @@ export function canContent(user: User | null): boolean {
  * be, for a reason that no longer holds.
  */
 export function canPublish(user: User | null): boolean {
+  return isPro(user);
+}
+
+/**
+ * Naming the rivals you want counted — "Competitors you watch".
+ *
+ * ⚠️ THIS IS THE CURATED LIST, NOT THE MEASURED ONE, AND THE COMPETITORS PAGE
+ * SHOWS BOTH. Free keeps the measured summary: who the engines actually cited
+ * on the questions its check asked, which the "Who got named instead of you"
+ * row above sells honestly. What Pro buys is the list you build BY HAND — ten
+ * names you choose, counted whether or not they happened to come up.
+ *
+ * Gating the page would take the measured half away too, which free is
+ * entitled to and which is most of why that screen is worth opening.
+ */
+export function canWatchCompetitors(user: User | null): boolean {
   return isPro(user);
 }
 

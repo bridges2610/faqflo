@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { formatNumber } from '@/lib/dashboard/format';
-import { isPro, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
+import { canWatchCompetitors, isPro, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { COMPETITOR_CAP } from '@/lib/dashboard/store';
 import { CompetitorRow } from './competitor-row';
@@ -50,10 +50,18 @@ const ADD_ERROR: Record<string, string> = {
   duplicate: 'You’re already watching that website.',
   'own-domain': 'That’s your own website. It’s already in the list below.',
   cap: `You can watch ${COMPETITOR_CAP} competitors. Remove one to add another.`,
+  /* Reachable only if the locked control below is bypassed — the store refuses
+     independently of the UI, and a refusal with no sentence is a dead form. */
+  pro: 'Watching competitors by name is part of Pro.',
 };
+
+const PRO_NOTE_ID = 'competitors-pro-note';
 
 export function CompetitorsWorkspace() {
   const { site, tracking, competitors: watched, addCompetitor, user } = useDashboard();
+  /* The form is shown to everyone; only the submit is withheld. See the note on
+     the Button below for why it is greyed rather than replaced. */
+  const canAdd = canWatchCompetitors(user);
   const [name, setName] = useState('');
   const [domain, setDomain] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -104,8 +112,14 @@ export function CompetitorsWorkspace() {
     ones with `checked > 0` — naming all three when Gemini never answered would
     be a claim about work we did not do — and the question count is the distinct
     questions actually put to them, not the prompts on the watch list, which can
-    differ. "Every week" is safe here and only here: this route is Pro-only
-    (requirePro in its page.tsx), and free checks are pressed by hand.
+    differ.
+
+    ⚠️ "Every week" IS RENDERED FROM THE PLAN, NOT HARDCODED, AND THIS NOTE USED
+    TO EXPLAIN WHY IT COULD BE. It said the phrase was safe "because this route
+    is Pro-only (requirePro in its page.tsx)" — that stopped being true when
+    requirePro and lib/auth/pro-only.ts were deleted and every dashboard route
+    became reachable by free. Free checks are pressed by hand and do not repeat,
+    so the cadence has to come from trackingPlanFor(user), never a literal.
 
     ⚠️ IT DEGRADES TO A PROMISE, NOT A ZERO. Before the first run there are no
     engines and no questions, so the sentence describes what will happen rather
@@ -197,9 +211,13 @@ export function CompetitorsWorkspace() {
         without this line that thinness reads as "hardly anyone is being cited"
         rather than "we have not asked much yet".
 
-        ⚠️ IT COMPARES, IT DOES NOT WITHHOLD. Nothing here is hidden from free;
-        the sentence exists so the reader knows what would make the same page
-        say more. LOCKED IS NOT DISABLED, and this is not even locked.
+        ⚠️ IT COMPARES, IT DOES NOT WITHHOLD — AND THAT IS STILL TRUE OF THIS
+        SENTENCE, THOUGH NO LONGER OF THE WHOLE PAGE. It used to end "nothing
+        here is hidden from free… this is not even locked". One thing is now:
+        adding to "Competitors you watch" is Pro (canWatchCompetitors), and that
+        card carries its own locked control. Everything this paragraph is about
+        — the measured list, who got cited instead of you — is still shown in
+        full to a free account, on the questions its own check asked.
       */}
       {user && !isPro(user) && (
         <p className="text-slate mb-4 text-sm leading-relaxed">
@@ -300,10 +318,48 @@ export function CompetitorsWorkspace() {
                   className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150"
                 />
               </label>
-              <Button type="submit" size="sm" disabled={!domain.trim()} className="shrink-0">
+              {/*
+                ⚠️ DISABLED FOR FREE, WITH aria-describedby — AND THAT SECOND
+                HALF IS NOT OPTIONAL. A disabled button is not focusable, so a
+                keyboard or screen-reader user can never land on it to find out
+                why it will not work; the note below is wired to it by id so the
+                reason is read out with the control instead of being a sentence
+                they may never reach.
+
+                ⚠️ THIS SOFTENS "LOCKED IS NOT DISABLED", WHICH THIS CODEBASE
+                STATES ELSEWHERE (generator-panel.tsx, locked-preview.tsx).
+                Beau asked for the form and the button to stay visible with the
+                button greyed. The rule's actual worry is a control that fails
+                silently and leaves the reader hunting — so the compromise is
+                that the fields stay live and fillable, the button greys, and
+                the sentence under it names Pro and links to it. Do not delete
+                that sentence and leave the grey button on its own; that is the
+                state the rule was written against.
+              */}
+              <Button
+                type="submit"
+                size="sm"
+                disabled={!canAdd || !domain.trim()}
+                aria-describedby={canAdd ? undefined : PRO_NOTE_ID}
+                className="shrink-0"
+              >
                 Add
               </Button>
             </div>
+            {!canAdd && (
+              <p id={PRO_NOTE_ID} className="text-slate mt-2.5 text-sm">
+                <span className="text-navy font-semibold">
+                  Watching rivals by name is part of Pro
+                </span>{' '}
+                — {COMPETITOR_CAP} you choose, counted every week whether or not they came up.{' '}
+                <Link
+                  href="/dashboard/plan"
+                  className="text-primary hover:text-primary-hover font-semibold"
+                >
+                  See what Pro includes
+                </Link>
+              </p>
+            )}
             {error ? (
               <p role="alert" className="text-error-ink mt-2 text-sm">
                 {error}

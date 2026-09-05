@@ -42,6 +42,8 @@ import { contentHash, normalizePath } from './export';
 import type { TrackingPeriod } from './plans';
 import {
   canAddSite,
+  canWatchCompetitors,
+  COMPETITOR_CAP,
   faqCapFor,
   SITE_CAP,
   TRACKING_PLANS,
@@ -1366,7 +1368,7 @@ export type NewCompetitor = { name: string; domain: string };
 
 export type AddCompetitorResult =
   | { ok: true; data: DashboardData }
-  | { ok: false; reason: 'bad-domain' | 'duplicate' | 'own-domain' | 'cap' };
+  | { ok: false; reason: 'bad-domain' | 'duplicate' | 'own-domain' | 'cap' | 'pro' };
 
 /**
  * How many rivals one site may watch.
@@ -1376,13 +1378,34 @@ export type AddCompetitorResult =
  * becomes the measured table with extra steps — which already exists directly
  * below it and is better at the job.
  */
-export const COMPETITOR_CAP = 10;
+/* ⚠️ RE-EXPORTED, NOT DEFINED. It lives in plans.ts now — PLAN_FEATURES quotes
+   it, and plans.ts cannot import from here without making the cycle
+   plans → store → plans. Still exported from this module so the callers that
+   already import it from store keep working. */
+export { COMPETITOR_CAP };
 
 export async function addCompetitor(
   siteId: string,
   input: NewCompetitor,
 ): Promise<AddCompetitorResult> {
   const data = requireData('addCompetitor');
+
+  /*
+    ⚠️ CHECKED HERE AND NOT ONLY IN THE UI. The Competitors screen hides the add
+    form from a free account, but hiding a form is a decoration — this is the
+    function the form calls, and it is exported, so it is the last thing that can
+    actually refuse.
+
+    ⚠️ AND IT IS STILL NOT UNFORGEABLE, WHICH IS DELIBERATE. write() below goes
+    to supabaseBrowser(); there is no API route for competitors, and the RLS
+    policies in 0015_ordering_and_competitors.sql check ownership only. Somebody
+    with devtools could insert a row. That is the same standing FREE_FAQ_CAP has
+    a few hundred lines down, and the reason is proportionality: the heavier
+    treatment — a SECURITY DEFINER RPC, as claim_free_generation() — exists for
+    allowances where every call SPENDS MONEY on a model. A competitor row costs
+    nothing per row. Do not add an RPC here without a reason that names a cost.
+  */
+  if (!canWatchCompetitors(data.user)) return { ok: false, reason: 'pro' };
 
   /* ⚠️ NORMALISED ON THE WAY IN, ONCE. The Competitors page joins this row to
      the measured list by `domain`, and the measured side is built from
