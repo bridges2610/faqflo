@@ -133,6 +133,16 @@ function shortDate(key: string): string {
   return `${Number(m)}/${Number(d)}`;
 }
 
+/**
+ * "ChatGPT", "ChatGPT and Gemini", "ChatGPT, Perplexity and Gemini" — for the
+ * chart's accessible name, which is read as a sentence rather than scanned.
+ * "ChatGPT and Perplexity and Gemini" is not a sentence anybody says.
+ */
+function listNames(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
 export function CitationChart({
   daily,
   /**
@@ -166,6 +176,42 @@ export function CitationChart({
   const [showTable, setShowTable] = useState(false);
 
   /*
+    Which engines the reader has picked out. Any number of them, and an EMPTY
+    LIST MEANS ALL THREE — not "none". A legend that can filter down to a blank
+    chart is a legend that can strand someone on an empty card with no clue what
+    to click, so unpicking the last one comes back to the default rather than to
+    nothing. Same reason the first click focuses rather than hides: it takes one
+    click to isolate a series, one more to add a second for comparison, and
+    unpicking your way back is always a route home.
+
+    ⚠️ FADE, NOT HIDE, AND THE AXIS DOES NOT MOVE. Removing series would raise
+    the question of whether axisMax refits to what is left — and if it did, the
+    scale would jump on every click, on a chart whose scale exists to make small
+    differences legible. Dimming keeps the comparison too: "ahead of Gemini" is
+    still readable while ChatGPT is focused, which is most of why three series
+    are drawn at all.
+  */
+  const [focused, setFocused] = useState<Engine[]>([]);
+  const isFocused = (engine: Engine) => focused.includes(engine);
+  const toggleEngine = (engine: Engine) =>
+    setFocused((current) =>
+      current.includes(engine) ? current.filter((e) => e !== engine) : [...current, engine],
+    );
+
+  /* Full strength for a picked series, or for everything when nothing is picked. */
+  const seriesOpacity = (engine: Engine) => (focused.length === 0 || isFocused(engine) ? 1 : 0.12);
+
+  /*
+    ⚠️ DERIVED FROM THE OPACITY RULE, NOT FROM `focused`, so the accessible name
+    can never describe dimming that isn't on screen. Picking all three back one
+    at a time leaves `focused` full but nothing faded — the same picture as the
+    default — and a label reading "with the other engines dimmed" there would be
+    describing a chart that does not exist.
+  */
+  const shown = ENGINES.filter((engine) => seriesOpacity(engine) === 1);
+  const anyDimmed = shown.length < ENGINES.length;
+
+  /*
     ⚠️ ONE SCAN IS NOT A TREND, AND THIS IS THE BRANCH THAT ADMITS IT. The code
     used to centre the lone point so the first run "does not render as a chart
     that looked broken" — which fixed the look and left the shape wrong. A line
@@ -176,20 +222,77 @@ export function CitationChart({
   const single = daily.length === 1;
 
   /*
-    ⚠️ THE DENOMINATOR IS `checked`, WHICH THE ROW ALREADY CARRIES — "Questions
-    checked that day, so a rate can be computed honestly". Not promptsTracked:
-    the watch list and the questions actually put to the engines can differ, and
-    a partial run checks fewer. Dividing by what was watched rather than what was
-    asked would quietly understate every bar.
+    ⚠️ TWO NUMBERS, AND THEY USED TO BE ONE — WHICH IS THE BUG THIS REPLACES.
+
+    A single `max` was serving as both the line chart's axis ceiling and the
+    bars' denominator, and it was computed from `d.checked`. Those are three
+    different quantities and conflating them was wrong twice over.
+
+    lib/dashboard/store.ts counts the rollup like this:
+
+        day.checked += 1                      on EVERY question × engine row
+        day.byEngine[engine] += 1             one engine, cited only
+
+    So `checked` is checks (27 questions × 3 engines = 81) while every series
+    plots cited questions for ONE engine (0-3). The axis came out at 0/41/81 with
+    all three lines flat on the floor, and the bars read "3 of 81" at 4% width
+    when the truth was "3 of 27" at 11%.
+
+    Keep them apart. An axis ceiling and a denominator answer different
+    questions and there is no number that is honestly both.
   */
-  const max = Math.max(1, ...daily.map((d) => d.checked));
+
+  /*
+    The line chart's ceiling: the highest point any series actually reaches,
+    never below 5.
+
+    ⚠️ IT FITS THE DATA RATHER THAN THE OPPORTUNITY, DELIBERATELY. Scaling to
+    "questions we could have been cited on" is the more informative axis and it
+    is unreadable: 3 against 27 sits in the bottom ninth of the panel and every
+    week-to-week difference — the entire point of a trend line — disappears into
+    the floor. The tick labels still print the real numbers, so the size is never
+    overstated; what changes is only whether the shape can be seen.
+
+    ⚠️ THE FLOOR OF 5 IS WHAT KEEPS IT HONEST AT THE BOTTOM. Fitting a single
+    citation to a 0-1 axis draws a vertical takeoff out of one data point.
+
+    ⚠️ NO HEADROOM ON TOP OF THE PEAK. `peak + 1` turns a max of 12 into 13 and
+    the middle tick into 7; the floor already supplies breathing room where the
+    data is small, and a point resting on the top gridline reads fine.
+  */
+  const peak = Math.max(0, ...daily.flatMap((d) => ENGINES.map((e) => d.byEngine[e] ?? 0)));
+  const axisMax = Math.max(5, peak);
+
+  /*
+    The bars' denominator: how many questions each engine was actually asked.
+
+    ⚠️ DIVIDED BY THE ENGINE COUNT, because `checked` counts every question ×
+    engine pair and a bar compares ONE engine's citations against the questions
+    THAT engine saw.
+
+    ⚠️ AN APPROXIMATION, AND IT ERRS IN THE FLATTERING DIRECTION — WHICH IS THE
+    part to know. It is exact when all three engines answered. When one fails
+    outright the day holds 2 rows per question instead of 3, so dividing by 3
+    UNDERSTATES the denominator: 27 questions checked by two engines gives 18,
+    and a bar then reads "3 of 18" where the honest figure is "3 of 27". Measured,
+    not assumed — the fixture for a 429'd engine returns exactly that.
+
+    It cannot be computed better from what the rollup stores: `byEngine` counts
+    citations, not checks, so there is no per-engine denominator in the data. The
+    exact fix is a `questions` field on CitationDay — a store change through the
+    type, the rollup and the seed. Worth doing if this number is ever quoted at
+    somebody rather than drawn as a bar.
+  */
+
   const stepX = daily.length > 1 ? PLOT_W / (daily.length - 1) : 0;
 
   const x = (i: number) => PAD.left + i * stepX;
-  const y = (value: number) => PAD.top + PLOT_H - (value / max) * PLOT_H;
-  const ticks = axisTicks(max);
+  const y = (value: number) => PAD.top + PLOT_H - (value / axisMax) * PLOT_H;
+  const ticks = axisTicks(axisMax);
 
   const last = daily[daily.length - 1];
+
+  const askedPerEngine = Math.max(1, Math.ceil((last?.checked ?? 0) / ENGINES.length));
 
   /*
     ⚠️ NO END LABELS ANY MORE, AND WITH THEM WENT dodge(), THE LEADER LINES AND
@@ -218,7 +321,7 @@ export function CitationChart({
               describes a window, and one scan is a moment. */}
           <p className="text-slate mt-1 text-sm">
             {single
-              ? `Questions each AI linked you on, out of ${max} checked.`
+              ? `Questions each AI linked you on, out of ${askedPerEngine} checked.`
               : `How many questions each AI linked you on, ${span}.`}
           </p>
           {/* ⚠️ ONLY IN THE SINGLE-SCAN STATE. On a trend the same fact is
@@ -255,18 +358,57 @@ export function CitationChart({
           Swatch first, mark second, name last — the larger, more saturated
           shape is what the eye lands on, so the series colour stays the primary
           read and the mark is recognition after it. */}
+      {/*
+        ⚠️ BUTTONS OVER THE CHART, PLAIN SPANS OVER THE TABLE. Clicking engines
+        picks which lines stay at full strength, and the table is deliberately
+        never filtered — see the note on it below — so above the table these
+        would be controls that do nothing, which is worse than no controls.
+
+        ⚠️ A REAL <button>, NOT A <span> WITH AN onClick. The legend is one of the
+        three non-colour encodings this file's header depends on; making it the
+        chart's only filter and then leaving it unreachable by keyboard, or
+        silent about its state, would take that away from exactly the readers it
+        was put there for. aria-pressed is what carries "picked" to anyone who
+        cannot see the dimming.
+
+        ⚠️ aria-pressed IS false ON EVERY ENTRY WHEN NOTHING IS PICKED, even
+        though all three lines are drawn. "Pressed" reports the state of the
+        control, not the visibility of the line — marking all three pressed by
+        default would leave a screen reader unable to tell the default apart from
+        a reader who had deliberately picked all three back.
+      */}
       <div className="mt-4 flex flex-wrap items-center gap-5">
-        {ENGINES.map((engine) => (
-          <span key={engine} className="text-slate flex items-center gap-2 text-sm">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: SERIES[engine] }}
-              aria-hidden="true"
-            />
-            <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
-            {engine}
-          </span>
-        ))}
+        {ENGINES.map((engine) =>
+          showTable ? (
+            <span key={engine} className="text-slate flex items-center gap-2 text-sm">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: SERIES[engine] }}
+                aria-hidden="true"
+              />
+              <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
+              {engine}
+            </span>
+          ) : (
+            <button
+              key={engine}
+              type="button"
+              aria-pressed={isFocused(engine)}
+              onClick={() => toggleEngine(engine)}
+              className={`flex items-center gap-2 rounded-input px-1.5 py-1 text-sm transition-opacity duration-150 ${
+                seriesOpacity(engine) === 1 ? 'text-navy' : 'text-slate opacity-45'
+              }`}
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{ backgroundColor: SERIES[engine] }}
+                aria-hidden="true"
+              />
+              <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
+              {engine}
+            </button>
+          ),
+        )}
       </div>
 
       {single && !showTable ? (
@@ -285,7 +427,14 @@ export function CitationChart({
           {ENGINES.map((engine) => {
             const value = last?.byEngine[engine] ?? 0;
             return (
-              <li key={engine}>
+              /* Same focus rule as the line chart: the legend sits above both
+                 views, so a toggle that moved only the SVG would look broken on
+                 a single-scan account. */
+              <li
+                key={engine}
+                style={{ opacity: seriesOpacity(engine) }}
+                className="transition-opacity duration-200"
+              >
                 <div className="text-navy flex items-baseline justify-between gap-3 text-sm">
                   <span className="flex items-center gap-2">
                     <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
@@ -293,7 +442,7 @@ export function CitationChart({
                   </span>
                   <span className="tabular-nums">
                     {value}
-                    <span className="text-slate"> of {max}</span>
+                    <span className="text-slate"> of {askedPerEngine}</span>
                   </span>
                 </div>
                 {/* aria-hidden: the numbers above already say it, and a bar with
@@ -305,7 +454,7 @@ export function CitationChart({
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: `${(value / max) * 100}%`,
+                      width: `${(value / askedPerEngine) * 100}%`,
                       backgroundColor: SERIES[engine],
                     }}
                   />
@@ -349,7 +498,15 @@ export function CitationChart({
           viewBox={`0 0 ${W} ${H}`}
           className="mt-4 w-full"
           role="img"
-          aria-label={`Citations per engine ${span}`}
+          /* ⚠️ IT NAMES THE PICKED ENGINES. With the rest faded to 12% the plain
+             label described a chart nobody is being shown — and this is the
+             element's only accessible name. Listed in ENGINES order rather than
+             click order, so the same pair always reads the same way. */
+          aria-label={
+            anyDimmed
+              ? `Citations for ${listNames(shown)} ${span}, with the other engines dimmed`
+              : `Citations per engine ${span}`
+          }
         >
           {ticks.map((t) => (
             <g key={t}>
@@ -379,7 +536,10 @@ export function CitationChart({
             const endX = x(daily.length - 1);
             const endY = y(last?.byEngine[engine] ?? 0);
             return (
-              <g key={engine}>
+              /* The whole series dims together — line, dots and end marker —
+                 so a faded engine reads as one receding object rather than
+                 three unrelated things losing contrast at once. */
+              <g key={engine} opacity={seriesOpacity(engine)} className="transition-opacity duration-200">
                 <polyline
                   points={points.join(' ')}
                   fill="none"
