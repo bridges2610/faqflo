@@ -18,6 +18,7 @@ import * as redditWins from '@/content/posts/reddit-beats-your-website-in-ai-ans
 import * as blockCrawlers from '@/content/posts/should-you-block-ai-crawlers-the-case-for-and-against.mdx';
 import * as roofersAeo from '@/content/posts/aeo-for-roofers-how-to-get-more-work-from-ai.mdx';
 import * as aeoVsSocial from '@/content/posts/why-aeo-beats-keeping-up-with-social-media.mdx';
+import * as faqQuestions from '@/content/posts/what-questions-should-be-on-your-faq-page.mdx';
 
 /*
   The post registry.
@@ -71,6 +72,9 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  /* ⚠️ TWO POSTS SHARE 2026-09-05 NOW, so this order decides which leads the
+     archive — the sort below is stable and same-day posts keep the order here. */
+  faqQuestions,
   aeoVsSocial,
   roofersAeo,
   /* ⚠️ THREE POSTS SHARE 2026-09-03, SO THIS ORDER IS WHAT DECIDES. Per the
