@@ -1,0 +1,219 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: 'should-i-include-faqs-on-blog-posts',
+  title: 'Should I Include FAQs on Blog Posts?',
+  date: '2026-09-05',
+  excerpt:
+    'Yes — with about four conditions. Ignore them and you’ve added filler that makes the post worse.',
+  image: '/blog/should-i-include-faqs-on-blog-posts.png',
+  // Describes the illustration rather than repeating the headline, which is
+  // already the page's h1 immediately below it.
+  imageAlt:
+    'A blue card headed “FAQs on blog posts”, with large type reading “Yes. Five of them.” and underneath “Real questions only. The invented ones cost you.” Beside it, a mock blog post whose body is grey placeholder lines, ending in a highlighted “Frequently Asked Questions” block tagged “Quotable” that lists “What does it cost?”, “How long does it take?” and “Does it work for me?”. A footer line reads “The article makes the case. The block gets lifted.”',
+};
+
+Yes — with about four conditions. Ignore them and you’ve added filler that makes the post worse.
+
+<PostTldr>
+The reason to add FAQs changed. The old payoff is gone and a better one replaced it.
+
+- **Google retired the FAQ rich results** most people were doing this for. If that was your
+  reason, it is no longer a reason.
+- **Answer engines lift clean, self-contained chunks**, and a question with a short direct
+  answer is close to the ideal shape.
+- **Four conditions**: real questions, not a rehash of the article, actual answers, and
+  readable without JavaScript.
+- **Five is a good number**, at the end, specific to that post — never the same block pasted
+  across twenty articles.
+- **Sometimes the answer is no.** A Q&A post, a news post, or five questions you had to invent.
+
+</PostTldr>
+
+The short answer is yes, and it’s one of the easiest improvements available to most blogs. But
+the reason to do it has changed, and a lot of the advice floating around is still arguing for a
+payoff that no longer exists.
+
+So let’s be specific about why, when, and how many — and about when the answer is actually no.
+
+## The reason people used to do it
+
+For years, the pitch was Google’s FAQ rich results: those expandable question-and-answer
+dropdowns that appeared under your listing, taking up more space and pushing competitors down the
+page.
+
+Google retired those for the overwhelming majority of sites. If that was your reason, your reason
+is gone, and no amount of markup brings it back.
+
+Plenty of blogs stopped adding FAQs at that point, which was a reasonable response to the
+information available. It also happened to be exactly the wrong moment to stop.
+
+## The better reason to do it now
+
+Answer engines — ChatGPT, Perplexity, Google’s AI Overviews — build responses by pulling clean,
+self-contained chunks of text out of pages. A question with a direct two-to-three sentence answer
+underneath is close to the ideal shape for that. It’s unambiguous, it’s short enough to lift
+whole, and it announces what it’s about in its own first line.
+
+Most blog posts are the opposite shape. They’re an argument that unfolds over 1,200 words, where
+the useful answer is embedded in paragraph nine and depends on paragraphs one through eight for
+context. That’s good writing. It’s also hard to extract cleanly.
+
+An FAQ block at the end of a post gives you both: the piece for the reader who wants the whole
+argument, and the extractable chunks for the reader — human or machine — who wants the answer.
+
+There’s a second, less discussed benefit. Writing the FAQ forces you to notice what your post
+didn’t answer. If you can’t write five real questions your article addresses, the article is
+probably vaguer than you thought.
+
+## The four conditions
+
+Here’s where most FAQ blocks go wrong.
+
+**1. They have to be real questions.**
+
+“What makes our approach unique?” is not a question. Nobody typed it. It’s a marketing prompt
+wearing a question mark, and it makes the whole block read as filler.
+
+Real questions come from real places: what people ask you in email, what shows up in your support
+inbox, what related searches Google suggests, what an AI gives you if you ask “what do people
+usually ask about [topic].” If you wouldn’t hear it out loud from a customer, cut it.
+
+**2. They can’t just repeat the article.**
+
+If your FAQ answer is a compressed version of a paragraph the reader just read, you’ve added
+length without adding value. The best FAQ questions are adjacent — the natural follow-ups. The
+post explains what something is; the FAQs handle “how much does it cost,” “how long does it
+take,” “does it work for my situation,” “what’s the difference between this and that.”
+
+Think of it as the conversation that would happen right after someone finished reading.
+
+**3. The answers have to be answers.**
+
+Two to three sentences. Direct in the first one. Specific.
+
+“It depends on a number of factors” is not an answer, and it’s the single most common thing that
+ruins an otherwise good FAQ block. If it depends, say what it depends on and give the range.
+
+**4. It has to be readable by machines.**
+
+This is the one that quietly undoes everything else, and it catches a lot of people who did the
+first three properly.
+
+Most FAQ plugins and accordion widgets build their content with JavaScript after the page loads.
+AI crawlers generally don’t run JavaScript — they fetch the raw HTML and move on. So the block
+looks perfect to your readers and does not exist for the engines you added it for.
+
+Check it in twenty seconds: open the live post, right-click, choose View Page Source, then press
+Ctrl+F and search for a phrase from one of your answers. If it’s not in there, it’s not in the
+page.
+
+⚠️ Use View Page Source, not Inspect Element. Inspect shows you the page after scripts have run,
+which is what a person sees rather than what a crawler gets.
+
+If your FAQs fail that check, the fix is putting them in as plain HTML rather than through a
+widget. Every major builder has a native code or HTML block — we walked through all four
+[step by step here](/blog/how-to-add-html-to-wordpress-squarespace-webflow-or-wix). On Wix, use
+native text elements, since its embed tool wraps content in an iframe that crawlers treat as a
+separate document.
+
+## How many, and where
+
+**Five is a good number.** Enough to cover the real follow-ups, few enough that you’re not
+padding. If you can only think of three genuine ones, publish three.
+
+**Put them at the end.** After the article, before any final call to action. The reader who wanted
+the argument has finished it; the reader who scrolled straight down gets the quick answers.
+
+**Use a real heading**, like “Frequently Asked Questions,” with each question as a subheading and
+the answer as plain text underneath. Simple structure is easier for everything to parse —
+including a person skimming on a phone.
+
+**Don’t reuse the same block across posts.** A boilerplate FAQ pasted onto twenty articles is
+duplicate content, adds nothing to any of them, and signals low effort. Each post gets questions
+specific to that post.
+
+## When the answer is no
+
+Skip the FAQ block if:
+
+- **The post is already a Q&A.** A post structured entirely as questions doesn’t need a second
+  set at the bottom.
+- **You can’t think of five real questions.** Three good ones beat five with two inventions. Zero
+  good ones means the block shouldn’t be there.
+- **It’s a personal, narrative, or news post.** An announcement or a story doesn’t have follow-up
+  questions in this sense, and bolting some on reads as strange.
+- **You’d only be doing it for rich results.** That reason is gone. Doing it for extractable
+  answers is a good reason; doing it out of habit isn’t.
+
+## What about schema?
+
+Add it if it’s easy, and don’t overthink it.
+
+FAQPage markup, rendered server-side into the page source rather than injected by a script, makes
+it unambiguous which text answers which question. That’s genuinely useful for machine parsing.
+
+What it won’t do is cause AI citations. No answer engine has published a rule that rewards FAQ
+markup, and anyone telling you it’s the switch that turns on AI visibility is overselling it.
+Schema is a label on a box — useful when there’s something in the box, useless when there isn’t.
+
+One rule that still matters: don’t mark up content that isn’t visible on the page. Schema
+describing hidden answers is against Google’s guidelines and can earn a manual penalty. The
+markup describes the page; it doesn’t replace it.
+
+## A note on how we do it
+
+Nearly every article on this blog ends with five FAQs, two to three sentences each, specific to
+that post. That isn’t a coincidence, and it isn’t a template we apply mechanically — it’s the
+format we’d recommend, applied to our own content, which seems like the minimum bar for writing
+about it.
+
+The exceptions are the ones this post would predict. A couple of the oldest explainers run to
+seven or nine, from before we settled on five. And two posts have none at all, because they’re
+the case where the honest answer is to skip the block rather than invent questions to fill it.
+
+If you go back through your own archive, retrofitting the good posts is usually a couple of hours
+of work for a meaningful improvement. Start with your highest-traffic posts and the ones closest
+to a purchase decision.
+
+And none of this is a departure from ordinary SEO. A well-structured page that clearly answers
+real questions has been good practice for as long as there’s been search. Answer Engine
+Optimization is the floor above that foundation: writing those answers so they can be lifted
+cleanly into somebody else’s answer, and making sure they’re actually there to be read when an
+engine arrives.
+
+## Where FaqFlo comes in
+
+FaqFlo finds the questions people are actually asking AI about topics and businesses like yours,
+drafts answers in the direct, specific style engines quote, and gives you a crawlable HTML block
+to drop into your post — with a check afterward confirming the text really landed in the page
+source.
+
+Which is the part most people skip, and the part that decides whether any of the rest of it
+counted.
+
+<PostFaq
+  items={[
+    {
+      q: 'How many FAQs should a blog post have?',
+      a: 'Five is a good target — enough to cover the genuine follow-up questions without padding. If you can only come up with three real ones, publish three, because invented questions make the whole block read as filler.',
+    },
+    {
+      q: 'Should FAQs go at the top or bottom of a blog post?',
+      a: 'The bottom, after the article and before any final call to action. Readers who wanted the full argument have finished it, and readers who scrolled straight down still get quick, direct answers.',
+    },
+    {
+      q: 'Do FAQs on blog posts still help with SEO?',
+      a: 'They help, though not the way they used to. Google retired the FAQ rich results that were most people’s motivation, but a clear question-and-answer section still matches how people search and gives answer engines clean chunks they can quote.',
+    },
+    {
+      q: 'Can I use the same FAQ section on every blog post?',
+      a: 'No — that’s duplicate content that adds nothing to any individual post and signals low effort. Each post should have questions specific to what that post is about.',
+    },
+    {
+      q: 'Do I need FAQ schema on my blog posts?',
+      a: 'It’s worth adding if it’s easy, rendered into your page source rather than injected by JavaScript, since it makes the structure unambiguous to machines. It won’t cause AI citations on its own, and it should never describe answers that aren’t visible on the page.',
+    },
+  ]}
+/>

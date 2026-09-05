@@ -19,6 +19,7 @@ import * as blockCrawlers from '@/content/posts/should-you-block-ai-crawlers-the
 import * as roofersAeo from '@/content/posts/aeo-for-roofers-how-to-get-more-work-from-ai.mdx';
 import * as aeoVsSocial from '@/content/posts/why-aeo-beats-keeping-up-with-social-media.mdx';
 import * as faqQuestions from '@/content/posts/what-questions-should-be-on-your-faq-page.mdx';
+import * as faqsOnPosts from '@/content/posts/should-i-include-faqs-on-blog-posts.mdx';
 
 /*
   The post registry.
@@ -72,8 +73,9 @@ export const AUTHOR_BIO =
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
-  /* ⚠️ TWO POSTS SHARE 2026-09-05 NOW, so this order decides which leads the
+  /* ⚠️ THREE POSTS SHARE 2026-09-05, so this order decides which leads the
      archive — the sort below is stable and same-day posts keep the order here. */
+  faqsOnPosts,
   faqQuestions,
   aeoVsSocial,
   roofersAeo,
