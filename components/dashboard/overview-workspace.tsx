@@ -240,6 +240,10 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
           <CitationChart
             daily={daily}
             span={unscheduled ? 'from your checks so far' : 'over the last 30 days'}
+            /* Facts, not prose — the chart builds the sentence, so the two
+               callers cannot word it differently. See its prop's note. */
+            unscheduled={unscheduled}
+            nextCheckAt={tracking?.nextCheckAt ?? null}
           />
           <HomeRivals />
         </div>

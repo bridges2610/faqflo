@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { EngineMark } from '@/components/ui/ai-marks';
 import { Card } from '@/components/ui/card';
+import { timeUntil } from '@/lib/dashboard/format';
 import { ENGINES, type CitationDay, type Engine } from '@/lib/dashboard/types';
 import { ChartIcon } from './nav-icons';
 import { SectionTitle } from './section-title';
@@ -21,8 +22,20 @@ import { SectionTitle } from './section-title';
   engine, never by rank, so a busy week can't repaint the chart.
 
   Blue↔teal separate at ΔE 6.7 under tritanopia, which is the band that's only
-  legal alongside a second, non-colour encoding — hence the direct labels at the
-  end of each line, the always-present legend, and the table view.
+  legal alongside a second, non-colour encoding — hence the always-present
+  legend, the dashed strokes below, and the table view.
+
+  ⚠️ THAT LIST USED TO NAME "the direct labels at the end of each line", AND THE
+  LABELS ARE GONE. They were removed because the legend already names every
+  engine and the labels repeated it on every render. The requirement they were
+  serving did not go with them: three encodings still carry identity without
+  colour, and the dash patterns — added later, with a note saying "Now the stroke
+  carries it too" — are on the line itself, which is more than the end labels
+  managed. Anything that removes the legend, the dashes or the table has to put
+  a fourth encoding back.
+
+  FIRST-SCAN FORM: bars, not a line. One measurement is not a trend, and three
+  dots on an empty grid answer a question nobody asked. See the bars branch.
 */
 
 /*
@@ -61,9 +74,6 @@ const DASH: Record<Engine, string | undefined> = {
   Gemini: '2 3',
 };
 
-/** Smallest gap that keeps two 11px labels from touching. */
-const LABEL_PITCH = 13;
-
 /**
  * Below this many days, show a marker on every point.
  *
@@ -75,48 +85,38 @@ const DOT_EVERY_POINT_UNTIL = 10;
 
 const W = 720;
 const H = 240;
-const PAD = { top: 14, right: 92, bottom: 24, left: 34 };
+
+/*
+  ⚠️ PAD.right WAS 92, AND THE 92 WAS THE END LABELS' GUTTER. Each line used to
+  carry its engine name past the last point, so the plot stopped well short of
+  the panel edge to leave room. The labels are gone — the legend names them —
+  and holding the gutter open would leave a third of the card empty for nothing.
+  20 is the breathing room the final dot needs and no more.
+*/
+const PAD = { top: 14, right: 20, bottom: 24, left: 34 };
 const PLOT_W = W - PAD.left - PAD.right;
 const PLOT_H = H - PAD.top - PAD.bottom;
 
 /**
- * Push overlapping end labels apart, without moving the data.
+ * Whole-number y-axis ticks, ending exactly on the questions checked.
  *
- * ⚠️ THE DOTS DO NOT MOVE — only the text does. Nudging a series so it clears
- * another one would draw a value nobody measured, which is the one thing this
- * codebase will not do. So a label may end up off its own line, and when it
- * does the caller draws a leader back to the real point.
+ * ⚠️ THIS REPLACED niceMax(), WHICH ROUNDED THE CEILING UP TO A "NICE" NUMBER
+ * AND THEN HALVED IT. On an axis counting questions that produced two lies at
+ * once: a top gridline above anything that could be measured, and a middle tick
+ * reading 2.5 whenever the max was odd. There is no such thing as half a
+ * question linked.
  *
- * Greedy downward sweep: sort by true position, then any label closer than
- * LABEL_PITCH to the one above gets pushed down. With three series the
- * arithmetic is trivial; it is a function because the "all three equal" case
- * has to stay legible and that is easy to break by hand.
+ * The ceiling is the count of questions actually checked, so the top of the
+ * panel is what a perfect score would look like and the bars beneath it are
+ * legible as a proportion rather than as a number floating in space.
+ *
+ * ⚠️ DE-DUPLICATED, because at max 1 the midpoint IS the ceiling. Three ticks
+ * where two are the same value draws the same gridline twice and labels it
+ * twice.
  */
-function dodge(entries: { engine: Engine; y: number }[]): { engine: Engine; y: number; at: number }[] {
-  const sorted = [...entries].sort((a, b) => a.y - b.y);
-  let previous = -Infinity;
-
-  const placed = sorted.map(({ engine, y }) => {
-    const at = Math.max(y, previous + LABEL_PITCH);
-    previous = at;
-    return { engine, y, at };
-  });
-
-  /*
-    Pull the stack back inside the panel if the sweep ran past the bottom.
-    Without this, three series all sitting at zero would put the last label
-    below the x-axis, on top of the date row.
-  */
-  const overflow = (placed.at(-1)?.at ?? 0) - (H - 6);
-  if (overflow > 0) for (const p of placed) p.at -= overflow;
-
-  return placed;
-}
-
-function niceMax(value: number): number {
-  if (value <= 5) return 5;
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  return Math.ceil(value / (magnitude / 2)) * (magnitude / 2);
+function axisTicks(max: number): number[] {
+  const mid = Math.round(max / 2);
+  return [...new Set([0, mid, max])].sort((a, b) => a - b);
 }
 
 /**
@@ -145,55 +145,63 @@ export function CitationChart({
    * described as "the last 5 days".
    */
   span = 'over the last 30 days',
+  /**
+   * No automatic re-check on this plan — free.
+   *
+   * ⚠️ TWO FACTS RATHER THAN A FINISHED SENTENCE, AND `span` ABOVE IS WHY. That
+   * one is prose, and the overview caller carries a note conceding it is
+   * "copied from the AI Mentions page rather than written again" — two callers,
+   * two copies, one drift waiting to happen. Passing the plan and the date keeps
+   * the wording in one place.
+   */
+  unscheduled = false,
+  /** When the next automatic check lands, for the plans that get one. */
+  nextCheckAt = null,
 }: {
   daily: CitationDay[];
   span?: string;
+  unscheduled?: boolean;
+  nextCheckAt?: string | null;
 }) {
   const [showTable, setShowTable] = useState(false);
 
-  const max = niceMax(
-    Math.max(1, ...daily.flatMap((d) => ENGINES.map((e) => d.byEngine[e] ?? 0))),
-  );
-  const stepX = daily.length > 1 ? PLOT_W / (daily.length - 1) : 0;
+  /*
+    ⚠️ ONE SCAN IS NOT A TREND, AND THIS IS THE BRANCH THAT ADMITS IT. The code
+    used to centre the lone point so the first run "does not render as a chart
+    that looked broken" — which fixed the look and left the shape wrong. A line
+    chart of one measurement plots three dots on an empty grid and invites the
+    reader to find a slope in it. Bars answer what one check can actually
+    answer: where you stand, out of how many.
+  */
+  const single = daily.length === 1;
 
   /*
-    ⚠️ ONE DAY IS NOT ZERO DAYS. With a single point stepX is 0, so the old
-    scale put it hard against the left axis — the first run a customer ever
-    does rendered as a chart that looked broken. Centre it instead: there is no
-    line to draw, but three dots in the middle of the panel say "we measured
-    once" rather than "something failed".
+    ⚠️ THE DENOMINATOR IS `checked`, WHICH THE ROW ALREADY CARRIES — "Questions
+    checked that day, so a rate can be computed honestly". Not promptsTracked:
+    the watch list and the questions actually put to the engines can differ, and
+    a partial run checks fewer. Dividing by what was watched rather than what was
+    asked would quietly understate every bar.
   */
-  const lone = daily.length === 1;
-  const x = (i: number) => (lone ? PAD.left + PLOT_W / 2 : PAD.left + i * stepX);
+  const max = Math.max(1, ...daily.map((d) => d.checked));
+  const stepX = daily.length > 1 ? PLOT_W / (daily.length - 1) : 0;
+
+  const x = (i: number) => PAD.left + i * stepX;
   const y = (value: number) => PAD.top + PLOT_H - (value / max) * PLOT_H;
-  const ticks = [0, max / 2, max];
+  const ticks = axisTicks(max);
 
   const last = daily[daily.length - 1];
 
   /*
-    ⚠️ WHEN EVERY SERIES ENDS ON ONE VALUE THEY SHARE ONE DOT, AND THREE LABELS
-    POINTING AT IT IS THE BUG. dodge() below anticipated this — "the 'all three
-    equal' case has to stay legible" — and made it legible rather than right: at
-    zero the three stacked into 26px above the date row, each with a leader line
-    converging on the same point, which reads as a fault.
+    ⚠️ NO END LABELS ANY MORE, AND WITH THEM WENT dodge(), THE LEADER LINES AND
+    THE SHARED-VALUE MARKS ROW. Every one of those existed to name a series at
+    the end of its line, which the legend three inches above already does on
+    every render. The header records what that costs and why it is still safe:
+    the legend, the dashes and the table are three non-colour encodings, and the
+    dashes sit on the line itself.
 
-    One label is what is actually true there. It is also the only version that
-    fits: PAD.right is 92px, and joining the names ("Perplexity · Gemini" alone
-    measures about 106px at this size) would run off the panel.
-
-    ⚠️ ONLY WHEN ALL OF THEM AGREE. Two coincident series still dodge, because
-    two labels 13px apart are readable and naming them individually keeps the
-    per-series encoding the header argues for. This collapses the one case where
-    there is nothing left to tell apart.
+    The end DOTS stay. A marker is not a label — it is where the last
+    measurement is, which nothing else says.
   */
-  const endValue = (engine: Engine) => last?.byEngine[engine] ?? 0;
-  const allShareEnd = ENGINES.every((e) => endValue(e) === endValue(ENGINES[0]));
-  // +4 puts the text baseline level with the dot's centre; dodging works in
-  // baseline space so the result can be handed straight to <text y>.
-  const endLabels = dodge(
-    ENGINES.map((engine) => ({ engine, y: y(last?.byEngine[engine] ?? 0) + 4 })),
-  );
-  const labelAt = new Map(endLabels.map((l) => [l.engine, l.at]));
   const showEveryDot = daily.length <= DOT_EVERY_POINT_UNTIL;
 
   return (
@@ -201,11 +209,31 @@ export function CitationChart({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <SectionTitle icon={<ChartIcon className="h-4 w-4" />} tint="bg-primary-soft text-primary">
-            Is it getting better?
+            {single ? 'Where you stand today' : 'Is it getting better?'}
           </SectionTitle>
+          {/* ⚠️ THE HEADING AND THE SUBTITLE BOTH FOLLOW THE DATA. "Is it getting
+              better?" over a single measurement asks a question the card cannot
+              answer; "out of N checked" is the reading one scan genuinely
+              supports. The `span` prose belongs to the trend state only — it
+              describes a window, and one scan is a moment. */}
           <p className="text-slate mt-1 text-sm">
-            How many questions each AI linked you on, {span}.
+            {single
+              ? `Questions each AI linked you on, out of ${max} checked.`
+              : `How many questions each AI linked you on, ${span}.`}
           </p>
+          {/* ⚠️ ONLY IN THE SINGLE-SCAN STATE. On a trend the same fact is
+              already on the page — AI Mentions prints the next check under the
+              chart — and the reader of a one-scan card is the one who needs to
+              know whether a second is coming at all. */}
+          {single && (
+            <p className="text-slate mt-1 text-sm">
+              {unscheduled
+                ? 'This is your one check. Pro re-checks every week, so the numbers can move.'
+                : nextCheckAt
+                  ? `Next check ${timeUntil(nextCheckAt)}.`
+                  : 'We check again every week.'}
+            </p>
+          )}
         </div>
         <button
           onClick={() => setShowTable((v) => !v)}
@@ -241,7 +269,52 @@ export function CitationChart({
         ))}
       </div>
 
-      {showTable ? (
+      {single && !showTable ? (
+        /*
+          ⚠️ HTML, NOT SVG. One bar per engine needs no axis, no viewBox and no
+          coordinate system — a div scales itself, and the label stays real text
+          that wraps and is selectable. The SVG below earns its complexity by
+          drawing a line across time; this does not.
+
+          ⚠️ WIDTH IS THE SHARE OF QUESTIONS CHECKED, WHICH IS WHY A ZERO STILL
+          DRAWS ITS ROW. An engine that linked nothing is a measurement, not an
+          absence — the row, the name and the 0 all render, and only the fill has
+          no width. Dropping the row would read as "we did not ask".
+        */
+        <ul className="mt-5 space-y-3">
+          {ENGINES.map((engine) => {
+            const value = last?.byEngine[engine] ?? 0;
+            return (
+              <li key={engine}>
+                <div className="text-navy flex items-baseline justify-between gap-3 text-sm">
+                  <span className="flex items-center gap-2">
+                    <EngineMark engine={engine} className="h-3.5 w-3.5 shrink-0" />
+                    {engine}
+                  </span>
+                  <span className="tabular-nums">
+                    {value}
+                    <span className="text-slate"> of {max}</span>
+                  </span>
+                </div>
+                {/* aria-hidden: the numbers above already say it, and a bar with
+                    its own announcement would read the same fact twice. */}
+                <div
+                  aria-hidden="true"
+                  className="bg-cloud mt-1.5 h-2.5 w-full overflow-hidden rounded-full"
+                >
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${(value / max) * 100}%`,
+                      backgroundColor: SERIES[engine],
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      ) : showTable ? (
         <div className="mt-4 max-h-80 overflow-auto">
           <table className="w-full text-sm">
             <caption className="sr-only">Daily citations per engine</caption>
@@ -305,7 +378,6 @@ export function CitationChart({
             const points = daily.map((d, i) => `${x(i)},${y(d.byEngine[engine] ?? 0)}`);
             const endX = x(daily.length - 1);
             const endY = y(last?.byEngine[engine] ?? 0);
-            const textY = labelAt.get(engine) ?? endY + 4;
             return (
               <g key={engine}>
                 <polyline
@@ -336,8 +408,9 @@ export function CitationChart({
                     />
                   ))}
 
-                {/* End marker plus a direct label: identity never rests on
-                    colour alone, which the tritan separation makes mandatory. */}
+                {/* The last measurement's marker. No label beside it — the
+                    legend names every series, and repeating it here on every
+                    render is what this removal was for. */}
                 <circle
                   cx={endX}
                   cy={endY}
@@ -346,79 +419,9 @@ export function CitationChart({
                   stroke="var(--color-surface)"
                   strokeWidth="2"
                 />
-
-                {/* Drawn only when the label was actually moved. A leader to a
-                    label already sitting on its own line is noise.
-
-                    ⚠️ AND NEVER WHEN THE LABELS HAVE COLLAPSED INTO ONE. Three
-                    leaders to a single shared label is the converging-lines
-                    picture this change exists to remove. */}
-                {!allShareEnd && Math.abs(textY - (endY + 4)) > 1 && (
-                  <line
-                    x1={endX + 5}
-                    y1={endY}
-                    x2={endX + 9}
-                    y2={textY - 4}
-                    stroke={SERIES[engine]}
-                    strokeWidth="1"
-                    opacity="0.5"
-                  />
-                )}
-
-                {/* Coloured, not grey. Once a label can sit off its own line,
-                    colour is what ties it back to the series. */}
-                {!allShareEnd && (
-                  <text x={endX + 10} y={textY} fontSize="11" fill={SERIES[engine]}>
-                    {engine}
-                  </text>
-                )}
               </g>
             );
           })}
-
-          {/*
-            The three marks, in a row, where three stacked labels used to be.
-
-            ⚠️ THE MARKS ARE THE LABEL HERE, WHICH IS THE ONE PLACE THAT IS
-            HONEST. Everywhere else in this product a glyph is decoration beside
-            a word — the legend above pairs each mark with its engine's name for
-            exactly that reason. This row is different because the three series
-            are on one point: there is nothing to tell apart, so the row is
-            saying "all of these", and the names are already in the legend a few
-            pixels up.
-
-            ⚠️ WHICH IS WHY THE GROUP CARRIES AN accessible NAME. The marks are
-            each aria-hidden by their own definition, so without this the whole
-            row is silent — and the file's header counts these end labels as one
-            of the three non-colour encodings that make blue and teal legal
-            together. role="img" plus aria-label is what keeps that true.
-
-            ⚠️ THE SIZE COMES FROM svg ATTRIBUTES, NOT FROM TAILWIND, AND THE
-            FIRST ATTEMPT GOT THIS WRONG. Each mark is an <svg> with a viewBox
-            and no width/height of its own, which per spec defaults to 100% of
-            its viewport — so a `h-3 w-3` class did nothing useful and all three
-            marks painted at full chart size, clipped, in the corner. Wrapping
-            each in a nested <svg> that carries real x/y/width/height gives the
-            mark a 12-unit viewport to fill, in the chart's own coordinate
-            system, so it scales with the panel.
-
-            ⚠️ ABOVE THE POINT, for the reason the text was: a shared value is
-            usually zero, and zero is a gridline. Sitting on it drew the rule
-            straight through the marks.
-          */}
-          {allShareEnd && (
-            <g
-              role="img"
-              aria-label={`All ${ENGINES.length} engines: ${endValue(ENGINES[0])}`}
-              transform={`translate(${x(daily.length - 1) + 10}, ${y(endValue(ENGINES[0])) - 18})`}
-            >
-              {ENGINES.map((engine, i) => (
-                <svg key={engine} x={i * 16} y={0} width={12} height={12}>
-                  <EngineMark engine={engine} className="" />
-                </svg>
-              ))}
-            </g>
-          )}
 
           <line
             x1={PAD.left}
