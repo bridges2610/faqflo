@@ -32,9 +32,17 @@
 import { EFFORT_COST } from '@/lib/audit/actions';
 import type { ActionItem, AuditReport } from '@/lib/audit/types';
 import { publishState } from './export';
-import { isPro, PRO_PRICE } from './plans';
+import { isPro, PRO_PRICE, trackingPlanFor } from './plans';
 import { isOpenQuestion } from './questions';
-import type { DiscoveredQuestion, FaqEntry, FaqGroup, Site, User } from './types';
+import type {
+  Article,
+  ContentPlan,
+  DiscoveredQuestion,
+  FaqEntry,
+  FaqGroup,
+  Site,
+  User,
+} from './types';
 
 export type Task = {
   id: string;
@@ -64,6 +72,22 @@ export type WorklistInput = {
   groups: FaqGroup[];
   faqs: FaqEntry[];
   questions: DiscoveredQuestion[];
+  /**
+   * The topics the onboarding scan wrote for this site.
+   *
+   * ⚠️ NEEDED BECAUSE THE SCAN NOW PRODUCES ONE FOR EVERY ACCOUNT. Topics used
+   * to arrive only when somebody pressed a button on the Content screen, so
+   * Home had nothing to point at; they are generated during onboarding now and
+   * a customer can finish a scan with ten of them and never learn they exist.
+   */
+  contentPlan: ContentPlan | null;
+  /**
+   * ⚠️ HERE SO THE TASK CAN BE FINISHED. contentPlan alone says the topics
+   * exist; only this says whether anything was done about them. Without it the
+   * row would never clear, and a task that cannot be completed is worse than a
+   * task that was never shown.
+   */
+  articles: Article[];
 };
 
 /** Same scale the audit plan uses: value per unit of the customer's time. */
@@ -113,7 +137,7 @@ function pageName(name: string): string {
 }
 
 function productTasks(input: WorklistInput): Task[] {
-  const { groups, faqs, questions, site, user } = input;
+  const { groups, faqs, questions, site, user, contentPlan, articles } = input;
   const tasks: Task[] = [];
 
   const published = faqs.filter((f) => f.status === 'published');
@@ -192,6 +216,15 @@ function productTasks(input: WorklistInput): Task[] {
     });
   }
 
+  /*
+    ⚠️ RARELY REACHED NOW, AND KEPT ANYWAY. seedFirstGroup() in lib/scan/run.ts
+    creates a "Home page" group from the crawled page during the audit stage, so
+    any account scanned since then has one and this never fires. What is left is
+    the account that deleted every group, which is exactly when somebody needs
+    telling that answers belong to a page. A safety net that rarely fires is not
+    the same thing as dead code — do not remove it because the seed made it
+    quiet.
+  */
   if (groups.length === 0 && site) {
     tasks.push({
       id: 'first-group',
@@ -200,6 +233,59 @@ function productTasks(input: WorklistInput): Task[] {
       impact: null,
       effort: '2 minutes',
       action: { kind: 'link', label: 'Add a group', href: '/dashboard/faqs?tab=answers' },
+    });
+  }
+
+  /*
+    ⚠️ TWO TASKS FOR TWO CAPABILITIES THE PRODUCT GAINED AND NEVER SURFACED.
+    Both are product tasks in the sense this file's header defines: states the
+    crawl cannot observe, so both carry impact: null and rank on effort alone.
+    Attaching a number to either would be inventing one.
+  */
+
+  /*
+    A question of the customer's own.
+
+    Free only just gained this — one question, asked the moment it is entered —
+    and Pro has had ten all along with nothing on Home mentioning it. Gated on
+    the plan's own manualCap rather than on isPro, so a plan that allows none
+    never renders the row.
+
+    Held back until there IS a watch list: on an account with no questions yet
+    the thing to do is finish the scan, not hand-write a prompt.
+  */
+  const manualCap = trackingPlanFor(user).manualCap;
+  const ownQuestions = questions.filter((q) => q.source === 'manual');
+
+  if (manualCap > 0 && ownQuestions.length === 0 && questions.length > 0) {
+    tasks.push({
+      id: 'own-question',
+      what: 'Add a question of your own to the watch list',
+      why: 'The model writes good questions about your trade; it cannot know the one customers actually ring you about.',
+      impact: null,
+      effort: '2 minutes',
+      action: { kind: 'link', label: 'Add a question', href: '/dashboard/tracking' },
+    });
+  }
+
+  /*
+    The first article from the topics the scan already wrote.
+
+    ⚠️ IT CLEARS ON THE FIRST ARTICLE, NOT ON ALL OF THEM. Ten topics is a
+    standing supply, not a checklist — a row that stayed until every one was
+    written would be permanent on most accounts, which is how a worklist stops
+    being read at all.
+  */
+  const topics = contentPlan?.topics ?? [];
+
+  if (topics.length > 0 && articles.length === 0) {
+    tasks.push({
+      id: 'write-article',
+      what: `Write the first of your ${topics.length} article ${topics.length === 1 ? 'topic' : 'topics'}`,
+      why: 'These were chosen from your own pages and the questions people ask about your trade. An article answering one is a page an assistant can quote.',
+      impact: null,
+      effort: '15 minutes',
+      action: { kind: 'link', label: 'See the topics', href: '/dashboard/content' },
     });
   }
 

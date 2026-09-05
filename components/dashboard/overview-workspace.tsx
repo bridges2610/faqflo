@@ -79,7 +79,8 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
   /* ⚠️ NO runAudit/auditBusy/auditError — this screen starts no crawl. They are
      still on the provider and still read by audit-workspace.tsx, which is the
      only place a check is started from now. */
-  const { site, sites, groups, faqs, questions, tracking, data, user } = useDashboard();
+  const { site, sites, groups, faqs, questions, tracking, data, user, contentPlan, articles } =
+    useDashboard();
 
   /*
     ⚠️ THE PAST-RUNS FETCH HAS GONE WITH THE THINGS THAT READ IT.
@@ -97,7 +98,9 @@ export function OverviewWorkspace({ posts = [] }: { posts?: PostMeta[] }) {
   */
 
   const report = site?.lastAudit ?? null;
-  const input = { report, site: site ?? null, user, groups, faqs, questions };
+  /* contentPlan and articles feed the two newest worklist tasks — see their
+     notes in lib/dashboard/worklist.ts for why both are needed. */
+  const input = { report, site: site ?? null, user, groups, faqs, questions, contentPlan, articles };
   const steps = setupSteps({ ...input, siteCount: sites.length });
   const firstName = data?.user.name.split(' ')[0] ?? '';
   const hello = greeting();

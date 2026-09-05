@@ -134,26 +134,6 @@ const RECIPES: Recipe[] = [
     }),
   },
   {
-    id: 'titles',
-    fixes: ['title', 'title-unique', 'title-length'],
-    when: (m) => failing(m.get('title')) || failing(m.get('title-unique')),
-    what: (m) => {
-      const missing = m.get('title');
-      const urls = missing?.evidence ?? [];
-      return urls.length === 1
-        ? `Add a title tag to ${path(urls[0])}`
-        : 'Give every page its own title tag';
-    },
-    why: 'The title is the strongest single statement of what a page is about, for search and assistants alike.',
-    effort: '15 minutes',
-    action: () => ({
-      kind: 'copy',
-      label: 'Copy the tag',
-      snippet: '<title>Your page topic — Your business name</title>',
-      where: 'Inside the <head> of each page, one unique title per page.',
-    }),
-  },
-  {
     id: 'answer-first',
     fixes: ['answer-first', 'paragraphs'],
     when: (m) => failing(m.get('answer-first')) || failing(m.get('paragraphs')),
@@ -162,20 +142,22 @@ const RECIPES: Recipe[] = [
     effort: '15 minutes',
     action: (_m, ctx) => ({ kind: 'link', label: 'Review your answers', href: ctx.faqsHref }),
   },
-  {
-    id: 'meta-descriptions',
-    fixes: ['meta-description', 'meta-length'],
-    when: (m) => failing(m.get('meta-description')),
-    what: () => 'Write meta descriptions for the pages missing one',
-    why: 'Without one, engines invent a summary from whatever text they hit first — usually your navigation.',
-    effort: '15 minutes',
-    action: () => ({
-      kind: 'copy',
-      label: 'Copy the tag',
-      snippet: '<meta name="description" content="One sentence saying what this page answers, 70-160 characters." />',
-      where: 'Inside the <head> of each page.',
-    }),
-  },
+  /*
+    ⚠️ 'titles' AND 'meta-descriptions' WERE HERE AND WERE REMOVED ON PURPOSE.
+    They read "Give every page its own title tag" and "Write meta descriptions
+    for the pages missing one" — the two entries in this list that belonged to a
+    general SEO tool rather than to a product about being quoted by assistants.
+    A plan capped at five items should not spend two of them on <head> hygiene.
+
+    ⚠️ THE CHECKS THEY CAME FROM ARE STILL RUNNING. lib/audit/checks/seo.ts still
+    tests both and both still score, so the audit detail reports them and the
+    number is unchanged. Deleting the checks instead would move the denominator
+    and shift the score of every account already stored, without a single
+    website having changed. What went is the advice, not the measurement.
+
+    Do not helpfully re-add them: two gaps in an otherwise complete SEO list is
+    what this note exists to explain.
+  */
   {
     id: 'llms-txt',
     fixes: ['llms-txt'],

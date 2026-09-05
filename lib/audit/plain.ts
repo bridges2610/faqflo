@@ -321,23 +321,15 @@ const PLAIN_ACTIONS: Record<
     why: 'Without it an assistant can repeat your answer word for word and never once mention your name.',
     label: 'Get the code to paste',
   },
-  titles: {
-    what: 'Give every page a proper title',
-    why: 'The title is how a search engine decides what a page is about. Some of yours are missing or repeated.',
-    label: 'Copy this',
-    where:
-      'This goes near the top of each page, in the part visitors don’t see. One per page, and each one different.',
-  },
+  /* ⚠️ NO 'titles' OR 'meta-descriptions' ENTRIES HERE, AND THAT IS NOT AN
+     OVERSIGHT. PLAIN_ACTIONS is keyed by ACTION id, and both recipes were
+     removed from lib/audit/actions.ts — see the note there for why. A plain-
+     English rewrite of an action that can no longer be produced is a lookup
+     that never fires. The audit CHECKS for both still run and still score; it
+     is the advice that went, not the measurement. */
   'answer-first': {
     what: 'Say the answer in the first two sentences',
     why: 'Assistants quote the opening of a section. If yours opens with a warm-up, that’s what gets quoted — or nothing does.',
-  },
-  'meta-descriptions': {
-    what: 'Write the one-line summary that shows under your search result',
-    why: 'Without one, search engines write their own summary from whatever text they hit first, which is usually your menu.',
-    label: 'Copy this',
-    where:
-      'This goes near the top of each page, in the part visitors don’t see. Write a fresh sentence for each page.',
   },
   'llms-txt': {
     what: 'Add the small summary file AI assistants look for',
