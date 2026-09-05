@@ -175,7 +175,7 @@ export const CONTACT_RATE_LIMIT = 5;
  * Map. It is a speed bump, and the honeypot in the route is the other half of
  * the answer.
  *
- * Three, not five. Nobody enquires about a $497 engagement four times in a day,
+ * Three, not five. Nobody enquires about a retainer four times in a day,
  * and unlike the support form there is no legitimate "actually, one more
  * thing" — the reply is a conversation by email from that point on.
  */

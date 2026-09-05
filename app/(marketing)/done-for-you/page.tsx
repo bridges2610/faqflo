@@ -4,7 +4,16 @@ import { DoneForYouForm } from '@/components/marketing/done-for-you-form';
 import { Check } from '@/components/ui/check';
 import { AUTHOR, AUTHOR_AVATAR } from '@/lib/blog/posts';
 import { PLAN_COPY } from '@/lib/dashboard/plans';
-import { DFY_PRICE, DFY_PRICE_USD, DFY_SITE_SCOPE, DFY_TURNAROUND } from '@/lib/done-for-you';
+import {
+  DFY_ARTICLES_PER_MONTH,
+  DFY_MONTHLY,
+  DFY_MONTHLY_USD,
+  DFY_SETUP,
+  DFY_SETUP_USD,
+  DFY_SITE_SCOPE,
+  DFY_TERM,
+  DFY_TURNAROUND,
+} from '@/lib/done-for-you';
 import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
 
 /*
@@ -62,8 +71,19 @@ import { SITE_NAME, SITE_URL, jsonLd } from '@/lib/site';
 
 export const metadata: Metadata = {
   title: 'Done for you',
+  /*
+    ⚠️ "THE SOFTWARE WRITES, I EDIT" — NOT "written by hand". This said I wrote
+    everything myself, which is not what happens: FaqFlo drafts the articles and
+    my part is editing them into the customer's voice and getting them published.
+    On a page selling the service that is not a nuance, it is the difference
+    between an accurate description and one somebody could hold against us.
+
+    ⚠️ AND IT CARRIED $497 AND "90 days of tracking" LONG AFTER BOTH CHANGED.
+    Metadata is the copy nobody re-reads — it is what search results and shared
+    links show, so a stale price here is quoted further than one on the page.
+  */
   description:
-    'I set the whole thing up for you by hand — your site audited and fixed, answers written in your voice and published live, plus 90 days of tracking. $497, live in two weeks.',
+    'FaqFlo writes the articles, I edit them into your voice and publish them to your site — ten a month, with FAQs, images and tracking. $250 to set up, then $399 a month.',
   alternates: { canonical: '/done-for-you' },
 };
 
@@ -78,13 +98,27 @@ export const metadata: Metadata = {
   "your site audited and the blockers fixed", not "I read the 44-check audit
   and work the ranked list". The reader is buying the outcome.
 */
+/*
+  ⚠️ ONE LIST, WITH THE SETUP AS ITS FIRST LINE — NOT TWO LISTS. There are two
+  charges now, so a matching pair of lists is the obvious move and it is the
+  "five-step breakdown" this file's header names as the creep to resist. The
+  price block carries the split; this stays a single answer to "what do I get".
+
+  ⚠️ AND IT IS NO LONGER A LIST THAT ENDS. Under the one-off it finished with
+  "90 days of tracking" and "one report at the end", which described a job with
+  a last day. A retainer has no last day, so every line reads as a standing
+  arrangement.
+*/
 const INCLUDED = [
-  'Your site audited, and the things blocking AI from reading it fixed',
-  'The questions people actually ask AI about businesses like yours',
-  'Every answer written and edited by hand, in your voice',
+  'Setup, once: your site audited and the things blocking AI from reading it fixed',
+  /* ⚠️ WHO WRITES IT IS STATED, NOT BLURRED. The software drafts; the editing
+     into their voice is the human part. Claiming these were written by hand
+     would be selling a different service from the one delivered. */
+  `${DFY_ARTICLES_PER_MONTH} articles a month — drafted by FaqFlo, edited into your voice by me, and written for the search engines that rank you as well as the assistants that quote you`,
+  'FAQs and a featured image with every one, marked up so AI can lift the answer',
   'Published live on your own site — by me, not handed to you as homework',
-  '90 days of citation tracking across ChatGPT, Perplexity and Gemini — checked five times, on a schedule',
-  'One plain-English report at the end: who’s being cited, and what I’d do next',
+  'Citation tracking across ChatGPT, Perplexity and Gemini for as long as you stay',
+  `Your ${PLAN_COPY.pro.label} subscription included — not billed on top`,
 ];
 
 /*
@@ -104,9 +138,21 @@ const NOT_INCLUDED = [
     label: 'A guarantee that AI will cite you.',
     body: 'Nobody controls what ChatGPT quotes, and be careful with anyone who says they do. I can make you readable, quotable and worth quoting — then show you honestly whether it worked.',
   },
+  /*
+    ⚠️ THIS REPLACED "A replacement for your subscription", WHICH WENT FROM TRUE
+    TO FALSE TWICE OVER: the work is not done "once" any more, and the monthly
+    fee now INCLUDES Pro rather than sitting on top of it.
+
+    It is replaced rather than dropped because the list's note above is right —
+    at a price with a scope attached, this is what stands between an assumption
+    and a chargeback — and because a monthly fee you can cancel monthly creates
+    an expectation a one-off never did. Somebody who pays once and waits is
+    patient; somebody billed again in thirty days wants to know why. Saying so
+    here is cheaper than saying it in a refund thread.
+  */
   {
-    label: 'A replacement for your subscription.',
-    body: `This is the setup work done by hand, once. The weekly checking, the fresh answers and the ready-to-paste code are what ${PLAN_COPY.pro.label} keeps running, at ${PLAN_COPY.pro.price}.`,
+    label: 'Results in the first month.',
+    body: 'Answers have to be published, found and then trusted before an assistant will repeat them, and that runs in months rather than weeks. You can stop whenever you like — I would just rather you knew what you were waiting for before you start.',
   },
 ];
 
@@ -124,8 +170,8 @@ const NOT_INCLUDED = [
 */
 const FAQS = [
   {
-    q: 'What if I don’t like the answers you write?',
-    a: 'You see all of them before anything goes live. I send you the full set, you tell me what is wrong — a price, a policy, a sentence that just is not how you would say it — and I fix it. That round is part of the two weeks, not an extra.',
+    q: 'What if I don’t like what you publish?',
+    a: 'You see all of them before anything goes live. I send you the full set, you tell me what is wrong — a price, a policy, a sentence that just is not how you would say it — and I fix it. That round is part of the month, not an extra.',
   },
   {
     q: 'What if I can’t give you a login to my site?',
@@ -148,8 +194,8 @@ export default function DoneForYou() {
           Service alongside FAQPage. The Offer makes this page machine-readable
           as a purchasable thing at a stated price — exactly the markup this
           business sells to other people, so the page had better carry it.
-          `price` is derived from DFY_PRICE_USD, never typed, so it cannot
-          disagree with the number printed below it.
+          Both amounts are derived from the constants, never typed, so they
+          cannot disagree with the numbers printed below.
         */}
         <script
           type="application/ld+json"
@@ -160,13 +206,41 @@ export default function DoneForYou() {
               name: 'FaqFlo Done For You',
               serviceType: 'Answer engine optimisation setup',
               url: `${SITE_URL}/done-for-you`,
-              description:
-                'A hands-on setup service: your site audited and fixed, the right questions chosen, answers written by hand and published to your own site, plus 90 days of citation tracking reported back to you.',
+              description: `A hands-on retainer: your site audited and fixed once, then ${DFY_ARTICLES_PER_MONTH} articles a month drafted by the software, edited by hand and published to your own site, each with FAQs and a featured image, plus citation tracking reported back to you.`,
               provider: { '@type': 'Organization', name: SITE_NAME, url: SITE_URL },
               offers: {
                 '@type': 'Offer',
-                price: String(DFY_PRICE_USD),
-                priceCurrency: 'USD',
+                /*
+                  ⚠️ TWO priceSpecification ENTRIES, AND NO BARE `price`. A single
+                  `price` field cannot say "this much once, then this much a
+                  month" — it would publish one of the two numbers as the whole
+                  cost, which is precisely the failure lib/done-for-you.ts names:
+                  a page telling search engines one price and customers another,
+                  on a site whose product is getting structured data right.
+
+                  Plain PriceSpecification rather than UnitPriceSpecification
+                  with a billing period: the richer type expresses the recurrence
+                  properly, and I am not confident enough of that vocabulary to
+                  emit it. Two named amounts are unambiguously valid and neither
+                  one claims to be the total.
+
+                  Both derived from the USD constants, never typed, so they
+                  cannot disagree with the figures printed below.
+                */
+                priceSpecification: [
+                  {
+                    '@type': 'PriceSpecification',
+                    name: 'Setup',
+                    price: String(DFY_SETUP_USD),
+                    priceCurrency: 'USD',
+                  },
+                  {
+                    '@type': 'PriceSpecification',
+                    name: 'Monthly',
+                    price: String(DFY_MONTHLY_USD),
+                    priceCurrency: 'USD',
+                  },
+                ],
                 url: `${SITE_URL}/done-for-you#start`,
                 availability: 'https://schema.org/LimitedAvailability',
               },
@@ -232,9 +306,16 @@ export default function DoneForYou() {
             don&rsquo;t want that for you. I built this thing, and I&rsquo;d rather it actually
             worked for you than sat in a dashboard looking impressive.
           </P>
+          {/* ⚠️ "I take it the rest of the way", NOT "all of it, by hand". The
+              paragraph above is the setup — most software hands you output and
+              stops — and the honest completion of it is that this software still
+              writes the words; what you are buying is somebody carrying them to
+              your website every month. Saying "by hand" claimed the writing too,
+              which is the one part that is not true. */}
           <P>
-            So let me just do it. All of it, by hand, and you&rsquo;ll be live in{' '}
-            {DFY_TURNAROUND}.
+            So let me just take it the rest of the way. FaqFlo writes them, I edit them until they
+            sound like you, and I put them live — starting within {DFY_TURNAROUND}, then every
+            month after that.
           </P>
         </div>
 
@@ -253,17 +334,34 @@ export default function DoneForYou() {
           {/* Heading weight, not a 48px price display. The number matters; a
               billboard treatment of it belongs on a pricing table. */}
           <p className="font-display text-navy text-[1.75rem] leading-none font-extrabold">
-            {DFY_PRICE} once
+            {DFY_SETUP} to set up, then {DFY_MONTHLY}/mo
           </p>
 
-          {/* ⚠️ The second charge, stated immediately under the number rather
-              than in small print. This sentence is the one thing on the page
-              that cannot be cut for length. */}
-          {/* No mention of the subscription price — see the note at the top of
-              this file. Everyone who reaches this page is already paying it. */}
+          {/*
+            ⚠️ BOTH CHARGES ON ONE LINE, AND THE SUBSCRIPTION NAMED AS INCLUDED.
+            This is the sentence that cannot be cut for length.
+
+            The note at the top of this file used to explain why Pro's price was
+            deliberately absent — everyone here already pays it, so the ordering
+            was friction. That reasoning inverts once the monthly fee CONTAINS
+            the subscription: silence would now read as a charge on top, and
+            overstate the cost by $39 a month. Saying "included" removes a
+            second charge rather than introducing one.
+
+            ⚠️ THE PER-ARTICLE LINE IS ARITHMETIC, NOT A CLAIM. $399 against
+            Pro's $39 is a ten-fold jump and the honest answer to it is what the
+            money buys, divided. Derived from the constants so it cannot drift
+            from the two numbers above it.
+
+            ⚠️ "the setup" NOT "the work". DFY_TURNAROUND describes the setup
+            only now — see its note — and a two-week promise sitting next to a
+            monthly fee otherwise reads as a deadline for the articles.
+          */}
           <P>
-            {DFY_SITE_SCOPE}. Live within {DFY_TURNAROUND} of me getting access, and nothing to pay
-            until we&rsquo;ve agreed the scope.
+            {DFY_SITE_SCOPE} — about ${Math.round(DFY_MONTHLY_USD / DFY_ARTICLES_PER_MONTH)} an
+            article, with your {PLAN_COPY.pro.label} subscription included rather than billed on
+            top. {DFY_TERM}. The setup is live within {DFY_TURNAROUND} of me getting access, and
+            nothing is due until we&rsquo;ve agreed the scope.
           </P>
           <P>
             I take on a handful of these a month, because I do the work myself. If I&rsquo;m full

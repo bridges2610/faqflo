@@ -939,7 +939,10 @@ export function HelpWorkspace({
               <div className="mt-5">
                 <DoneForYouCard
                   title="Or don’t do any of it"
-                  body="Don’t fancy working an audit and pasting HTML into your CMS? Completely fair. I’ll do the whole thing by hand instead."
+                  /* "I'll run it for you", not "by hand" — FaqFlo writes the
+                     articles and the human part is editing and publishing them.
+                     See the note on DoneForYouCard's default body. */
+                  body="Don’t fancy working an audit and pasting HTML into your CMS? Completely fair. I’ll run the whole thing for you instead."
                 />
               </div>
             )}

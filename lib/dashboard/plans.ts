@@ -832,11 +832,11 @@ export const PLAN_FEATURES: PlanFeature[] = [
 
       ⚠️ NO PRICE AND NO LINK, EITHER, and that is what makes the row safe on a
       page free accounts read. canOfferDoneForYou() exists because /done-for-you
-      quotes $497 without mentioning the subscription it sits on top of — it
       opens by telling the reader "You've got Pro running", which is false for
-      anyone who has not paid. A cell stating that a paid extra exists sends
-      nobody there and quotes nothing, so none of that applies. Add a price or a
-      link and all of it does.
+      anyone who has not paid, and quotes a retainer — a setup fee and a monthly
+      fee — that only makes sense to somebody already inside the product. A cell
+      stating that a paid extra exists sends nobody there and quotes nothing, so
+      none of that applies. Add a price or a link and all of it does.
     */
   },
 ];
@@ -975,12 +975,18 @@ export function canWatchCompetitors(user: User | null): boolean {
  * DoneForYouCard is an advert, and hiding an advert takes nothing away.
  *
  * It is named rather than written as bare isPro() at four call sites because
- * the reason lives in another file entirely. /done-for-you quotes $497 and
- * deliberately does not mention the Pro subscription on top, on the stated
- * grounds that every reader already pays — and calls that assumption
- * load-bearing, because a stranger reads "$497 once" as all-in and the second
- * charge becomes a refund. This function is that assumption. Loosen it and the
- * order has to go back into that page's copy in the same commit.
+ * the reason lives in another file entirely. /done-for-you is written for a
+ * reader who is already inside the product — it opens by telling them their
+ * plan is running, and prices a retainer against work the dashboard is already
+ * doing for them. A stranger arriving cold reads all of that as an offer to
+ * somebody else.
+ *
+ * ⚠️ THE OLD VERSION OF THIS NOTE DESCRIBED A DIFFERENT RISK, AND IT IS WORTH
+ * KNOWING THE RISK MOVED. It said the page quoted "$497 once" while silently
+ * assuming a $39/mo subscription underneath, so a cold reader would meet a
+ * second charge and ask for a refund. The monthly fee INCLUDES Pro now and the
+ * page says so, which closes that particular hole — this function survives on
+ * the audience argument alone.
  *
  * ⚠️ NOT AN EntitlementId. See the header of
  * components/dashboard/done-for-you-card.tsx: the service never touches Stripe,

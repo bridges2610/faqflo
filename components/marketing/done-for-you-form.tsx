@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import {
   DFY_PLAN_STATES,
   DFY_PLATFORMS,
-  DFY_PRICE,
+  DFY_MONTHLY,
+  DFY_SETUP,
   DFY_TURNAROUND,
 } from '@/lib/done-for-you';
 import { SUPPORT_EMAIL } from '@/lib/support';
@@ -75,7 +76,7 @@ export function DoneForYouForm() {
         The route uses sendEmail rather than trySendEmail so this branch can
         exist. A swallowed send would show the success card below for an
         enquiry nobody received, and the first anyone would know is a week of
-        silence on a $497 decision.
+        silence on a decision worth a setup fee and a monthly one.
       */
       if (!res.ok || !payload.ok) {
         setError(payload.error ?? `Something went wrong. Email ${SUPPORT_EMAIL} directly.`);
@@ -241,8 +242,13 @@ export function DoneForYouForm() {
           <Button type="submit" size="lg" disabled={busy} arrow={!busy}>
             {busy ? 'Sending…' : 'Send this to Beau'}
           </Button>
+          {/* ⚠️ BOTH NUMBERS, because one of them alone reads as the whole
+              cost — the same rule the price block up the page follows. The
+              turnaround is labelled as the setup's: DFY_TURNAROUND stopped
+              describing the whole job when this became a retainer. */}
           <p className="text-slate text-sm">
-            {DFY_PRICE} · {DFY_TURNAROUND} · no payment until we&rsquo;ve agreed the scope
+            {DFY_SETUP} to set up, then {DFY_MONTHLY}/mo · live in {DFY_TURNAROUND} · no payment
+            until we&rsquo;ve agreed the scope
           </p>
         </div>
 

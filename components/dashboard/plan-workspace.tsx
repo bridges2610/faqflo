@@ -37,9 +37,10 @@ import { ENGINES } from '@/lib/dashboard/types';
   line on annual only.
 
   ⚠️ NO DONE-FOR-YOU PITCH. canOfferDoneForYou() is isPro() because
-  /done-for-you opens by telling the reader "You've got Pro running" and quotes
-  $497 without the subscription under it — false and expensive for every free
-  reader of this page. No card, no price, no link.
+  /done-for-you opens by telling the reader "You've got Pro running" and prices
+  a retainer against work the dashboard is already doing for them — false, and
+  the wrong offer, for every free reader of this page. No card, no price, no
+  link.
 */
 
 /** Whole dollars when exact, cents when not — $390/12 is $32.50, not $32. */

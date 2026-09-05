@@ -12,7 +12,9 @@ import { SectionTitle } from './section-title';
 
   It used to carry "Done for you · $497 once" plus the turnaround and the
   payment terms, which made it a small pricing table sitting inside a tool
-  somebody was trying to use. The number belongs on the landing page, where
+  somebody was trying to use. (That price is itself long gone — the service is
+  a setup fee plus a monthly now, which is more than a card could hold even if
+  it should.) The number belongs on the landing page, where
   there is room to say what it covers and what it does not. Here the card only
   has to make one point — a person will do this for you — and hand over.
 
@@ -44,7 +46,11 @@ import { SectionTitle } from './section-title';
 */
 export function DoneForYouCard({
   title = 'Want me to just do it?',
-  body = 'I’ll set the whole thing up by hand and get it live on your site. You give me a login and half an hour.',
+  /* ⚠️ "I run it for you" RATHER THAN "by hand". The writing is FaqFlo's — my
+     part is the setup, the editing and getting it published every month. This
+     read "I'll set the whole thing up by hand", which claimed the writing too
+     and described a one-off besides. Still no price: see the note above. */
+  body = 'I’ll set it up, then run it for you every month — the articles edited into your voice and published to your site. You give me a login and half an hour.',
   tone = 'cloud',
   compact = false,
 }: {

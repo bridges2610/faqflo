@@ -220,7 +220,7 @@ export function BusyButton() {
                 'We check what AI can actually read on your site',
                 'We write your answers in the shape it likes to quote',
                 /* ⚠️ "OR HAVE US DO IT" IS A REAL OFFER, NOT A FIGURE OF SPEECH
-                   — /done-for-you is $497 for one site, two weeks. It is worded
+                   — /done-for-you is a monthly retainer for one site. It is worded
                    as an alternative rather than an inclusion for exactly that
                    reason: every other bullet here describes what the product
                    does, so "we can do it" sitting among them would read as

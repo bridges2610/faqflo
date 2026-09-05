@@ -11,12 +11,20 @@ const COLUMNS = [
       { href: '/#pricing', label: 'Pricing' },
       /*
         ⚠️ NO "Done for you" LINK HERE, AND IT WAS REMOVED RATHER THAN NEVER
-        ADDED. That service is only offered to people who already pay for Get
-        Cited — its page opens by assuming the reader has it and never
-        mentions the $129 — so surfacing it in a footer that renders on every
-        marketing page puts it in front of exactly the audience it is not
-        written for. It lives in the dashboard instead. See the note at the
-        top of app/(marketing)/done-for-you/page.tsx.
+        ADDED. That service is offered to people already inside the product —
+        its page opens by assuming the reader's plan is running, and prices a
+        retainer against work the dashboard is already doing for them. Surfacing
+        it in a footer that renders on every marketing page puts it in front of
+        exactly the audience it is not written for. It lives in the dashboard
+        instead. See the note at the top of
+        app/(marketing)/done-for-you/page.tsx.
+
+        ⚠️ THIS NOTE WAS TWICE STALE BEFORE IT WAS FIXED, WHICH IS THE ARGUMENT
+        FOR KEEPING IT VAGUE ABOUT MONEY. It cited "Get Cited", a plan retired
+        some time ago, and a $129 price the service never charges — while the
+        page itself went $997 → $497 → a setup fee plus a monthly. A comment in
+        an unrelated file cannot track that. lib/done-for-you.ts holds the
+        numbers; this says why there is no link.
       */
     ],
   },
