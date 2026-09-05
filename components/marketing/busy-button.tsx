@@ -6,7 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
 import { ClockIcon } from '@/components/ui/icons';
 import { Overlay } from '@/components/ui/overlay';
-import { AUTHOR, AUTHOR_AVATAR } from '@/lib/blog/posts';
+import { AUTHOR, AUTHOR_AVATAR } from '@/lib/blog/author';
 
 /*
   The twenty-second answer to "what is this?", for somebody who does not have
@@ -156,8 +156,12 @@ export function BusyButton() {
               as somebody talking rather than a product tour, and it costs a
               line. Do not grow it into an About paragraph.
 
-              ⚠️ AUTHOR AND AUTHOR_AVATAR FROM lib/blog/posts.ts, NOT A PASTED
-              PATH. The byline, the avatar and the BlogPosting schema all read
+              ⚠️ AUTHOR AND AUTHOR_AVATAR FROM lib/blog/author.ts, NOT A PASTED
+              PATH — AND NOT FROM posts.ts, WHICH IS WHERE THEY USED TO COME
+              FROM. This component is a client component on every marketing
+              page, and posts.ts imports all 22 MDX posts, so that import put
+              261KB of post prose into the bundle for pages that render none of
+              it. Measured on a production build. Same single source, no corpus. The byline, the avatar and the BlogPosting schema all read
               those two constants so "the visible bio and the structured data can
               never describe different people" — a fourth copy of the filename
               here would be the first thing to go stale when the photo changes.

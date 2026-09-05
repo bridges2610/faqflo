@@ -3,6 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { FeaturedImage } from '@/components/blog/featured-image';
+import { PostSearchForm } from '@/components/blog/post-search-form';
 import { AuthorBio } from '@/components/marketing/author-bio';
 import { FinalCta } from '@/components/marketing/final-cta';
 import { Badge } from '@/components/ui/badge';
@@ -120,7 +121,12 @@ export default async function Post({ params }: Params) {
             <Body />
           </div>
 
+          {/* ⚠️ AFTER THE BIO, NOT BEFORE IT. The bio closes the article; this
+              opens the next move. Putting a search box between the prose and
+              the byline would interrupt the piece to sell navigation. */}
           <AuthorBio />
+
+          <PostSearchForm />
 
           {/* The page argues for machine-readable content, so it carries the
               markup for its own. Hand-serialised, matching site-faq.tsx.
