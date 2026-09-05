@@ -2,7 +2,7 @@
 /**
  * Regenerate the dashboard screenshots used on the home page.
  *
- * Captures app/(dev)/shots — four real workspaces rendered from the fixture in
+ * Captures app/(dev)/shots — five real workspaces rendered from the fixture in
  * lib/dashboard/seed.ts — and writes one PNG per panel into public/screenshots.
  *
  * Run it whenever a dashboard screen changes shape. The whole point of the
@@ -19,7 +19,7 @@
  * instead.
  *
  * ⚠️ DEV ONLY, BECAUSE THE ROUTE IS. app/(dev)/shots calls notFound() outside
- * development, so pointing this at a production build gets four 404s.
+ * development, so pointing this at a production build gets five 404s.
  *
  * Playwright is a devDependency and never ships. It is the first tool of its
  * kind in a repo that keeps its dependency list short on purpose — the trade is
@@ -38,7 +38,7 @@ const OUT = 'public/screenshots';
  * in app/(dev)/shots/page.tsx, and the imports in
  * components/marketing/product-shots.tsx. Renaming one means renaming three.
  */
-const PANELS = ['audit', 'answers', 'results', 'overview'];
+const PANELS = ['audit', 'answers', 'results', 'overview', 'competitors'];
 
 /**
  * Retina. The panels are 1200 CSS px, so this writes 2400px files — the width
@@ -89,7 +89,7 @@ async function main() {
 
       addStyleTag rather than `devIndicators: false` in next.config.ts: the
       overlay is genuinely useful while developing, and turning it off for the
-      whole project to fix four screenshots is the wrong trade. This is scoped
+      whole project to fix five screenshots is the wrong trade. This is scoped
       to the page this script drives.
     */
     await page.addStyleTag({

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { notFound } from 'next/navigation';
 import { AuditWorkspace } from '@/components/dashboard/audit-workspace';
+import { CompetitorsWorkspace } from '@/components/dashboard/competitors-workspace';
 import { GroupWorkspace } from '@/components/dashboard/group-workspace';
 import { OverviewWorkspace } from '@/components/dashboard/overview-workspace';
 import { FreeHome } from '@/components/dashboard/free-home';
@@ -14,7 +15,7 @@ import type { DashboardData, Site, SiteTracking, User } from '@/lib/dashboard/ty
 /*
   The set the marketing screenshots are captured from.
 
-  ⚠️ DEVELOPMENT ONLY. It renders four signed-in dashboard screens to somebody
+  ⚠️ DEVELOPMENT ONLY. It renders five signed-in dashboard screens to somebody
   who is not signed in, which is exactly as alarming as it sounds — so read how
   it is contained before changing anything here:
 
@@ -34,8 +35,8 @@ import type { DashboardData, Site, SiteTracking, User } from '@/lib/dashboard/ty
 
   WHY IT EXISTS. The homepage needed screenshots of the product, and taking
   them by hand meant signing in, clicking a button that writes fixture rows
-  into the live database, and framing four captures identically by eye. This
-  renders the same four screens deterministically at a fixed width with a
+  into the live database, and framing five captures identically by eye. This
+  renders the same five screens deterministically at a fixed width with a
   stable hook per panel, so scripts/shots.mjs can regenerate every image after
   a UI change with one command.
 
@@ -185,7 +186,7 @@ export default function Shots() {
 
     So each panel is a fixed 1200x860 window onto its screen, and `offset`
     scrolls the content inside that window to whatever part of it is worth
-    showing. Three of the four want the top. Answers is the exception: its top
+    showing. Four of the five want the top. Answers is the exception: its top
     is the Generate form, which in a still is an empty textarea — the answers
     themselves are a thousand pixels further down, and they are the thing the
     home page is claiming to show.
@@ -193,7 +194,7 @@ export default function Shots() {
     ⚠️ The offsets are measured against the CURRENT layout of these screens. If
     a workspace grows or loses a card near its top, its shot silently re-frames
     onto the wrong thing. Re-run `npm run shots` after any dashboard layout
-    change and LOOK at the four files — that is the whole reason this is a
+    change and LOOK at the five files — that is the whole reason this is a
     script and not a folder of hand-taken captures.
   */
   const panels = [
@@ -208,19 +209,57 @@ export default function Shots() {
        20px gap, then the whole answers card (796→1534). 102 + 20 + 738 = 860,
        so it fills exactly. Re-measure rather than nudge if this drifts again. */
     { key: 'answers', offset: 674, node: <GroupWorkspace groupId={liveGroup.id} /> },
-    { key: 'results', offset: 0, node: <TrackingWorkspace /> },
+    /*
+      ⚠️ 850 IS A CARD BOUNDARY, NOT A ROUND NUMBER. Measured on the current
+      layout: the chart card runs 443→850, the questions card 914→1698, and the
+      next card ("How each AI did") starts at 1722. The whole screen is 2312.
+
+      850 opens exactly where the chart card ends — so no sliver of it is left
+      in frame, which is the cut-mid-card failure the answers note records — and
+      closes at 1710, twelve pixels short of the next card. The questions table
+      is 784px against an 860 window, so it lands whole with clean margin either
+      side. It is the only offset that does all three.
+
+      ⚠️ AND THE FRAME IS THE POINT OF THIS PANEL NOW. The top of this screen is
+      a score card and a line chart; the thing worth showing is the grid — the
+      customer's own questions down the left, the three assistants across the
+      top, and what each one said in every cell. Re-measure rather than nudge if
+      this screen grows a card above the table.
+    */
+    { key: 'results', offset: 850, node: <TrackingWorkspace /> },
+    /*
+      ⚠️ 0 IS MEASURED, NOT ASSUMED — AND IT IS THE ONLY FRAMING AVAILABLE.
+
+      Measured at the current layout: the workspace is 1084 CSS px tall against
+      an 860 window, so 224 is the furthest this can scroll. The headings sit at
+      32 (page title), 208 (How the citations split), 534 (Competitors you
+      watch) and 736 (Who the AI reads instead).
+
+      Scrolling to reach that last list would need 500-odd and cannot; and the
+      one offset that is available, 224, starts INSIDE the citations-split card
+      — the cut-mid-card failure the note above records for answers. So the top
+      it is, which is what three of the other four panels also want.
+
+      What that frames: the page title, the measured citations split, and the
+      watch-list card. The fixture leaves the watch list EMPTY on purpose —
+      seed.ts calls seeding it something that "would blur exactly the
+      distinction the Competitors page exists to draw" — so what shows there is
+      its add form, not rows. The caption on the marketing page is written to
+      the measured half above it rather than to that.
+    */
+    { key: 'competitors', offset: 0, node: <CompetitorsWorkspace /> },
     { key: 'overview', offset: 0, node: <OverviewWorkspace /> },
     /*
       ⚠️ NOT A MARKETING SHOT, AND DELIBERATELY NOT IN scripts/shots.mjs.
 
-      PANELS there is a fixed list of four, so this renders here and is never
+      PANELS there is a fixed list of five, so this renders here and is never
       captured — which is the intent. The home page sells Pro; a screenshot of
       the free report on it would advertise the tier with the lock in it.
 
       It is here because the free report is otherwise only reachable by signing
       in as an account whose profile row says 'free', which means editing the
       database to look at your own UI. This gives it the same deterministic
-      fixture the other four get. If it ever should be captured, adding the key
+      fixture the other five get. If it ever should be captured, adding the key
       to PANELS is the whole change.
     */
     { key: 'freehome', offset: 0, node: <FreeHome /> },
