@@ -205,7 +205,7 @@ export function ProductShots() {
         tabIndex={0}
         role="region"
         aria-label="Screens from inside FaqFlo"
-        className="mt-14 snap-x snap-mandatory overflow-x-auto pb-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/25 hover:scrollbar-thumb-white/40 motion-safe:scroll-smooth sm:mt-16 [mask-image:linear-gradient(to_right,transparent,black_1.25rem,black_calc(100%-1.25rem),transparent)]"
+        className="mt-14 snap-x snap-mandatory overflow-x-auto pb-4 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/25 hover:scrollbar-thumb-white/40 motion-safe:scroll-smooth sm:mt-16 mask-[linear-gradient(to_right,transparent,black_1.25rem,black_calc(100%-1.25rem),transparent)]"
       >
         <div className="flex w-max gap-6 px-5 sm:px-8">
           {SHOTS.map((shot) => (
@@ -215,7 +215,7 @@ export function ProductShots() {
                  the same left edge the heading uses, and the peek is always on
                  the right where the next card is. Centring would leave the first
                  and last cards floating against uneven gutters. */
-              className="w-[86vw] shrink-0 snap-start sm:w-[68vw] lg:w-[56rem]"
+              className="w-[86vw] shrink-0 snap-start sm:w-[68vw] lg:w-4xl"
             >
               {/*
                 A plain framed panel, deliberately not the navy traffic-light

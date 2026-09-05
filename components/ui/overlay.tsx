@@ -26,7 +26,7 @@ import { createPortal } from 'react-dom';
   Escaping to <body> is what makes a full-viewport overlay possible at all, and
   it is immune to whichever ancestor grows a filter next.
 
-  ⚠️ z-[55], AND THE LAYERS EITHER SIDE ARE THE REASON. The dashboard stacks
+  ⚠️ z-55, AND THE LAYERS EITHER SIDE ARE THE REASON. The dashboard stacks
   z-30 for the sticky publish bar, z-40 for the sticky header and the audit
   toast, z-50 for the mobile drawer and the account menu. This has to clear all
   of them or the header sits on top of a modal.
@@ -99,7 +99,7 @@ export function Overlay({
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[55] flex items-center justify-center p-4 print:hidden">
+    <div className="fixed inset-0 z-55 flex items-center justify-center p-4 print:hidden">
       {/* Clickable only when there is somewhere to dismiss to; otherwise it is
           decoration and must not look like an exit. */}
       {onClose ? (

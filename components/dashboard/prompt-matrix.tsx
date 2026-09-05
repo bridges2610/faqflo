@@ -86,18 +86,24 @@ export function PromptMatrix({
       The scroll box is this div, not the page.
 
       Card carries no overflow-hidden, so a wide table inside one would push the
-      whole dashboard sideways. min-w-144 is what forces the columns to keep
+      whole dashboard sideways. min-w-xl is what forces the columns to keep
       their width and this wrapper to scroll instead — the same shape
       prompt-ranking.tsx uses for the free report's narrower version of this
       table. The -mx-1/px-1 pair keeps the focus ring on a row button from being
       clipped by the scroll edge.
 
-      ⚠️ 144 (576px) IS MEASURED AGAINST THE NARROWEST COLUMN THIS CARD GETS,
-      NOT PICKED FOR LOOKS. Results puts this card in the left cell of a
+      ⚠️ 576px IS MEASURED AGAINST THE NARROWEST COLUMN THIS CARD GETS, NOT
+      PICKED FOR LOOKS. Results puts this card in the left cell of a
       `lg:grid-cols-[minmax(0,1fr)_20rem]` beside a 20rem rail, so on a 1280px
-      laptop the card is 632px wide and 576px inside its p-7. At min-w-160 the
-      table was 64px too wide there and scrolled on the most common laptop size.
-      Widen this and re-measure at 1280 before assuming it still fits.
+      laptop the card is 632px wide and 576px inside its p-7. At 640px (min-w-160
+      as it was then written) the table was 64px too wide there and scrolled on
+      the most common laptop size. Widen this and re-measure at 1280 before
+      assuming it still fits.
+
+      ⚠️ THE CLASS IS min-w-xl AND IT USED TO BE min-w-144 — the same 36rem by
+      two names, one off the container scale and one off the spacing scale. The
+      measurement above is in pixels precisely so a canonical-class rename
+      cannot make the reasoning unreadable.
     */
     <div className="-mx-1 overflow-x-auto px-1">
       {/*
@@ -111,11 +117,11 @@ export function PromptMatrix({
         narrowest things on the row.
 
         Fixed percentages give the comparison the room and leave the question
-        enough to read on two lines. min-w-144 still governs the floor — see
-        the note below on where 144 came from — so this changes how the spare
+        enough to read on two lines. min-w-xl still governs the floor — see
+        the note below on where 576px came from — so this changes how the spare
         width is shared, not when the table starts scrolling.
       */}
-      <table className="w-full min-w-144 table-fixed border-collapse text-left">
+      <table className="w-full min-w-xl table-fixed border-collapse text-left">
         <thead>
           {/*
             ⚠️ SENTENCE CASE AND NO MONO, WHICH BREAKS THE HOUSE <th> STYLE ON

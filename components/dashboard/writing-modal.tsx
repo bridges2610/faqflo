@@ -23,7 +23,7 @@ import type { ArticleStreamPhase } from '@/lib/article';
   makes the scrim a real button and binds Escape only when a handler is given,
   so adding one here would hand this modal all three exits at once.
 
-  The portal, the scroll lock and the z-[55] layer live in components/ui/overlay
+  The portal, the scroll lock and the z-55 layer live in components/ui/overlay
   now, along with the backdrop-filter containing-block trap they exist to dodge.
 */
 export function WritingModal({
