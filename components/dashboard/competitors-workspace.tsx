@@ -46,7 +46,11 @@ const SHARE_ROWS = 10;
 
 /** What each refusal from addCompetitor means, in the customer's words. */
 const ADD_ERROR: Record<string, string> = {
-  'bad-domain': 'That doesn’t look like a website address. Try something like summitroofing.com.',
+  /* ⚠️ example.com, NOT A REAL TRADE. This read "like summitroofing.com",
+     which tells a soccer academy the product was built for roofers. The
+     job of the example is the FORMAT — bare domain, no scheme, no path —
+     and example.com is reserved for exactly this (RFC 2606). */
+  'bad-domain': 'That doesn’t look like a website address. Try just the domain, like example.com.',
   duplicate: 'You’re already watching that website.',
   'own-domain': 'That’s your own website. It’s already in the list below.',
   cap: `You can watch ${COMPETITOR_CAP} competitors. Remove one to add another.`,
@@ -317,7 +321,7 @@ export function CompetitorsWorkspace() {
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Summit Roofing"
+                  placeholder="A competitor's name"
                   className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150"
                 />
               </label>
@@ -326,7 +330,7 @@ export function CompetitorsWorkspace() {
                 <input
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
-                  placeholder="summitroofing.com"
+                  placeholder="Their website"
                   className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150"
                 />
               </label>

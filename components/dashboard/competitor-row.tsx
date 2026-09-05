@@ -91,7 +91,7 @@ export function CompetitorRow({
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Summit Roofing"
+                  placeholder="A competitor's name"
                   className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-sm font-semibold outline-none transition-colors duration-150"
                 />
               </label>
@@ -100,7 +100,7 @@ export function CompetitorRow({
                 <input
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
-                  placeholder="summitroofing.com"
+                  placeholder="Their website"
                   className="border-line bg-cloud text-slate focus:border-primary w-full rounded-input border px-3 py-2 font-mono text-sm outline-none transition-colors duration-150"
                 />
               </label>

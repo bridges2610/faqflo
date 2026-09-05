@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { exampleQuestion } from '@/lib/dashboard/questions';
 import { FaqCapReached } from '@/lib/dashboard/store';
 
 /** Blank row for writing one by hand — not everything comes from the model. */
 export function ManualForm({ groupId, onDone }: { groupId: string; onDone: () => void }) {
-  const { addFaqs } = useDashboard();
+  const { addFaqs, questions, site } = useDashboard();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [saving, setSaving] = useState(false);
@@ -43,7 +44,14 @@ export function ManualForm({ groupId, onDone }: { groupId: string; onDone: () =>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Do you offer weekend appointments?"
+          /* One of the questions found for this business, rather than an
+             example from a trade they are not in — see exampleQuestion. */
+          placeholder={exampleQuestion(
+            questions,
+            site?.id ?? null,
+            'A question your customers ask',
+            64,
+          )}
           className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-[0.9375rem] outline-none transition-colors duration-150"
         />
       </label>

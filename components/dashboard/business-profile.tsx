@@ -66,7 +66,7 @@ export function BusinessProfile({
               className={field}
               value={nextIndustry}
               onChange={(e) => setNextIndustry(e.target.value)}
-              placeholder="Roofing contractor"
+              placeholder="Your trade or industry"
             />
           </label>
           <label className="block">
@@ -77,7 +77,7 @@ export function BusinessProfile({
               className={field}
               value={nextLocation}
               onChange={(e) => setNextLocation(e.target.value)}
-              placeholder="Franklin, TN"
+              placeholder="The area you serve"
             />
           </label>
         </div>

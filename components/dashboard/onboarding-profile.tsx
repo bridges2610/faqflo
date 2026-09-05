@@ -242,7 +242,7 @@ export function OnboardingProfile({ onResolved }: { onResolved?: () => void } = 
             className={field}
             value={name}
             onChange={(e) => setEdited((prev) => ({ ...prev, name: e.target.value }))}
-            placeholder="Summit Roofing"
+            placeholder="Your business name"
             autoComplete="organization"
           />
         </label>
@@ -252,7 +252,7 @@ export function OnboardingProfile({ onResolved }: { onResolved?: () => void } = 
             className={field}
             value={industry}
             onChange={(e) => setEdited((prev) => ({ ...prev, industry: e.target.value }))}
-            placeholder="Roofing contractor"
+            placeholder="Your trade or industry"
           />
         </label>
         <label className="block">
@@ -261,7 +261,7 @@ export function OnboardingProfile({ onResolved }: { onResolved?: () => void } = 
             className={field}
             value={location}
             onChange={(e) => setEdited((prev) => ({ ...prev, location: e.target.value }))}
-            placeholder="Rockland County, NY"
+            placeholder="The area you serve"
           />
         </label>
 

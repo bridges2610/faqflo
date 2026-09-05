@@ -19,6 +19,7 @@ import { formatNumber, formatShortDate, timeAgo, timeUntil } from '@/lib/dashboa
 import { ENGINES, type SiteTracking } from '@/lib/dashboard/types';
 import {
   checksByEngine,
+  exampleQuestion,
   groupByQuestion,
   insteadFor,
   pickWatchList,
@@ -900,6 +901,26 @@ export function TrackingWorkspace() {
   */
   const watched = new Set(pickWatchList(ordered, caps));
 
+  /* ⚠️ ONE OF THEIR OWN QUESTIONS, NOT "Who is the best roofer in Nyack?". A
+     trade-specific example reads as a product built for somebody else to every
+     customer who is not in that trade — see the note on exampleQuestion. The
+     fallback describes the field rather than swapping in a different trade. */
+  /* ⚠️ CAPPED, BECAUSE THIS FIELD IS IN THE 20rem RAIL. A whole discovered
+     question is a sentence and the input clips it mid-word with nothing to
+     signal the cut — it read as a rendering fault rather than an example. 36 is
+     roughly what fits at text-sm once the card and input padding are taken off
+     320px; clip() backs up to a word boundary from there, so most land shorter.
+
+     ⚠️ AND THE FALLBACK IS SHORT ENOUGH TO SURVIVE IT. "A question a customer
+     would ask an assistant" is 43 characters, so the no-questions case was
+     about to be truncated too — the cap applies to whatever is returned. */
+  const examplePrompt = exampleQuestion(
+    questions,
+    site?.id ?? null,
+    'A question customers ask',
+    36,
+  );
+
   const filtered =
     filter === 'all' ? groups : groups.filter((g) => g.checks.some((c) => c.outcome === filter));
 
@@ -1386,7 +1407,7 @@ export function TrackingWorkspace() {
                         if (manual.error) manual.clearError();
                         if (justAdded) setJustAdded(false);
                       }}
-                      placeholder="Who is the best roofer in Nyack?"
+                      placeholder={examplePrompt}
                       aria-label="Add your own question to the watch list"
                       className="border-line focus:border-primary text-navy placeholder:text-slate/70 w-full rounded-lg border bg-surface px-3 py-2 text-sm outline-none"
                     />

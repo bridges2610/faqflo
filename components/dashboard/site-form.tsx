@@ -88,7 +88,7 @@ export function SiteForm({ onDone }: { onDone?: () => void }) {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Summit Roofing"
+            placeholder="Your business name"
             className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150"
           />
         </label>
@@ -100,7 +100,7 @@ export function SiteForm({ onDone }: { onDone?: () => void }) {
           <input
             value={domain}
             onChange={(e) => setDomain(e.target.value)}
-            placeholder="summitroofing.com"
+            placeholder="Your website"
             className="border-line text-navy focus:border-primary mt-1.5 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150"
           />
         </label>

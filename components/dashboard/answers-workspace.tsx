@@ -6,6 +6,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { MAX_ARTICLE_WORDS } from '@/lib/article';
 import { useDashboard } from '@/lib/dashboard/provider';
+import { exampleQuestion } from '@/lib/dashboard/questions';
 import { FaqCapReached } from '@/lib/dashboard/store';
 import type { Faq } from '@/lib/faq';
 import type { FaqEntry, FaqGroup, Site } from '@/lib/dashboard/types';
@@ -397,7 +398,16 @@ export function AnswersWorkspace({ tab }: { tab: AnswersTab }) {
                   <input
                     value={draftQ}
                     onChange={(e) => setDraftQ(e.target.value)}
-                    placeholder="How much does a new roof cost?"
+                    /* One of the questions the scan found for THIS business —
+                       and here it is not only an example but a good thing to
+                       type, since answering a discovered question is the whole
+                       job of this composer. See exampleQuestion. */
+                    placeholder={exampleQuestion(
+                      questions,
+                      site?.id ?? null,
+                      'A question your customers ask',
+                      64,
+                    )}
                     className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-[0.9375rem] font-semibold outline-none transition-colors duration-150"
                   />
                 </label>

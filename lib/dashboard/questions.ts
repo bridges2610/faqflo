@@ -267,3 +267,87 @@ export function pickWatchList(
 
   return [...manual, ...discovered];
 }
+
+/* ----------------------------------------------------- example questions --- */
+
+/**
+ * A question this customer would actually ask, for use as placeholder text.
+ *
+ * ⚠️ THEIR OWN QUESTION, NOT AN INVENTED ONE, AND THAT IS THE WHOLE POINT. Every
+ * question-shaped field in the dashboard used to suggest "Who is the best roofer
+ * in Nyack?". Read by anyone who is not a roofer — a soccer academy, a dental
+ * practice — that is a product built for somebody else, and no single trade we
+ * pick instead fixes it for the next reader.
+ *
+ * The scan already writes ~15 questions FOR THIS BUSINESS. Borrowing one is
+ * better than any template: always on-topic, always grammatical, and it invents
+ * nothing. A templated "Who is the best {industry} in {location}?" reads as "Who
+ * is the best College soccer recruiting in ?" the moment either field is odd or
+ * missing.
+ *
+ * ⚠️ THE FALLBACK MUST DESCRIBE THE FIELD, NOT SUBSTITUTE A DIFFERENT TRADE. It
+ * is used before a scan has produced anything, and answering "no example yet"
+ * with a plumber merely moves the problem.
+ *
+ * ⚠️ DISCOVERED BEFORE TYPED. A typed question is one the customer already wrote,
+ * so offering it back as an example of what to write is a small insult; the
+ * model's are the ones they have not seen in a box yet. Falls through to a typed
+ * one rather than to nothing when that is all there is.
+ */
+export function exampleQuestion(
+  questions: Pick<DiscoveredQuestion, 'question' | 'siteId' | 'position' | 'source'>[],
+  siteId: string | null,
+  fallback: string,
+  /**
+   * Shorten to this many characters, ellipsis included.
+   *
+   * ⚠️ PLACEHOLDER TEXT DOES NOT WRAP AND DOES NOT ELLIPSIS ITSELF — it is simply
+   * clipped at the edge of the input, mid-word, with nothing to say it was cut.
+   * A real discovered question is a whole sentence, and the "Add your own
+   * question" field lives in a 20rem rail, so the example arrived looking like a
+   * rendering fault rather than an example.
+   *
+   * Omit it where the field is full width and nothing needs cutting.
+   */
+  maxChars?: number,
+): string {
+  const shorten = (text: string) => (maxChars ? clip(text, maxChars) : text);
+
+  if (!siteId) return shorten(fallback);
+
+  const mine = questions
+    .filter((q) => q.siteId === siteId && q.question.trim())
+    .sort((a, b) => a.position - b.position);
+
+  const pick = mine.find((q) => q.source !== 'manual') ?? mine[0];
+
+  return shorten(pick?.question ?? fallback);
+}
+
+/**
+ * Cut on a word boundary, with an ellipsis.
+ *
+ * ⚠️ THE SAME READING AS excerptOf IN lib/tracking/classify.ts, WRITTEN OUT
+ * AGAIN RATHER THAN IMPORTED. That module is `server-only` and this one is
+ * rendered in the browser, so sharing it is not available. The two caps are also
+ * answering different questions — one is how much answer a column stores, this
+ * is how much text an input can show — so they should be free to move apart.
+ *
+ * Its reasoning holds either way: a bare slice stops mid-word and reads as a
+ * broken string, and backing up to the last space costs a few characters to make
+ * the shortening legible. The `> max / 2` guard is the same one, for the same
+ * case — a long run with no space in it is not prose, so keep the hard cut
+ * rather than throw the whole example away chasing a boundary.
+ *
+ * ⚠️ Never longer than `max`: the ellipsis replaces text rather than extending
+ * past the width the field was sized for.
+ */
+function clip(text: string, max: number): string {
+  if (text.length <= max) return text;
+
+  const cut = text.slice(0, max - 1);
+  const lastSpace = cut.lastIndexOf(' ');
+  const body = lastSpace > max / 2 ? cut.slice(0, lastSpace) : cut;
+
+  return `${body.trimEnd()}…`;
+}

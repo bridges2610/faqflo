@@ -9,7 +9,12 @@ import { generateContentPlan } from '@/lib/dashboard/content-plan';
 import { formatPlainDate } from '@/lib/dashboard/format';
 import { ARTICLE_CAP, articleAllowance, canContent, isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { groupByQuestion, isOpenQuestion, namedIn } from '@/lib/dashboard/questions';
+import {
+  exampleQuestion,
+  groupByQuestion,
+  isOpenQuestion,
+  namedIn,
+} from '@/lib/dashboard/questions';
 import { questionKey } from '@/lib/questions';
 import type { ArticleSection, ArticleTopic, DiscoveredQuestion } from '@/lib/dashboard/types';
 import { LockIcon, SearchIcon } from './nav-icons';
@@ -540,7 +545,17 @@ export function WritePanel() {
               <input
                 value={brief}
                 onChange={(e) => setBrief(e.target.value.slice(0, MAX_BRIEF_CHARS))}
-                placeholder="Why our quotes include a full tear-off"
+                /* One of their own questions rather than a roofing example —
+                   see exampleQuestion. A question makes a perfectly good brief:
+                   the article that answers it is the article worth writing. */
+                placeholder={exampleQuestion(
+                  questions,
+                  site?.id ?? null,
+                  'Something your customers keep asking about',
+                  /* Shares its row with the Generate button, so it is narrower
+                     than the card it sits in. */
+                  56,
+                )}
                 className="border-line bg-cloud text-navy focus:border-primary min-h-11 min-w-0 flex-1 rounded-input border px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
               />
               <Button
