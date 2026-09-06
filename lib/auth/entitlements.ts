@@ -143,11 +143,12 @@ export function canOfferDoneForYou(user: ProfileRow | null): boolean {
 /**
  * May a check run for this account at all — by anyone, including the scheduler?
  *
- * ⚠️ TRUE ON FREE, AND ONLY BECAUSE OF THE METER. Free buys three runs: three
- * questions across three engines, three times, counted against the plan's
- * checksPerPeriod over a period that never resets (see trackingPeriod in
- * plans.ts). The ceiling is enforced in app/api/dashboard/tracking/route.ts
- * and in lib/scan/run.ts.
+ * ⚠️ TRUE ON FREE, AND ONLY BECAUSE OF THE METER. Free buys one run: three
+ * questions across three engines, counted against the plan's checksPerPeriod
+ * over a period that never resets (see trackingPeriod in plans.ts). The
+ * onboarding scan spends it, so in practice the meter refuses every later free
+ * check — the ceiling is what enforces "free is one check", not this predicate.
+ * It is enforced in app/api/dashboard/tracking/route.ts and lib/scan/run.ts.
  *
  * ⚠️ IF THAT ENFORCEMENT IS EVER REMOVED, THIS MUST GO BACK TO isPro. The two
  * changed together and only make sense together; an unmetered free tier is an

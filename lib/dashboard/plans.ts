@@ -302,24 +302,29 @@ export type TrackingPlan = {
  * What each plan's tracking actually buys.
  *
  * ⚠️ FREE SPENDS REAL MONEY, WHICH IS WHY IT HAS A PLAN ENTRY AT ALL. Three
- * questions against three search-backed engines, three times over, is
- * twenty-seven billable calls per free signup. It is bounded by being counted
- * over a period that never resets — see trackingPeriod() — so
- * `checksPerPeriod` is a LIFETIME ceiling on free and a monthly one on Pro.
- * Same field, same enforcement, different window.
+ * questions against three search-backed engines is nine billable calls per free
+ * signup, and up to twelve on an account that adds a question of its own. It is
+ * bounded by being counted over a period that never resets — see
+ * trackingPeriod() — so `checksPerPeriod` is a LIFETIME ceiling on free and a
+ * monthly one on Pro. Same field, same enforcement, different window.
  *
- * ⚠️ FREE WAS 5 PROMPTS ONCE, AND IS NOW 3 PROMPTS THREE TIMES. The old shape
- * gave a wider first look at a report nobody could change; the report shows a
- * ranking table with a button under it now, so what free needs is the ability
- * to fix something and look again. Fewer prompts pays for the re-runs: the two
- * shapes are 15 calls and 27, and the second one is the one that can show a
- * number moving.
+ * ⚠️ FREE IS ONE CHECK, AND IT WAS THREE FOR A WHILE. The three-run shape was
+ * built so somebody could fix a thing and look again, and it left the product
+ * saying two different numbers in two places — the chart told a free reader
+ * "this is your one check" while the plan table sold three. One check is the
+ * decision; re-checking is what Pro is for, which is also what the chart, the
+ * scan route's refusal and the welcome email all already said.
  *
- * ⚠️ THE 27 ABOVE IS HISTORY, NOT THE CURRENT CEILING. It compares the two old
- * shapes and is still the right comparison for why free re-runs. What free
- * actually spends now is 27 on an account that only watches what the model
- * found, and up to 36 on one that adds a question of its own — see the manualCap
- * note below.
+ * ⚠️ THE SPEND FELL WITH IT, AND lib/scan/enqueue.ts CARRIES THE ARITHMETIC. A
+ * free signup was up to 27 engine calls and is now 9 — re-derive there rather
+ * than here if the number matters.
+ *
+ * ⚠️ promptCap STAYED AT 4 RATHER THAN GOING BACK UP. Free was 5 prompts once
+ * before it was 3 prompts three times, and "fewer prompts pays for the re-runs"
+ * was the trade that bought them. The re-runs are gone and that trade is no
+ * longer being paid for, so a wider first look is affordable again — 5 prompts
+ * once is 15 calls against today's 9. Deliberately NOT done here: it is a
+ * product decision about what free shows, not a consequence of this one.
  *
  * ⚠️ FREE'S manualCap IS 1, AND IT WAS 0 UNTIL THE WATCH LIST COULD HONOUR ONE.
  * The old note here said a field that accepts a typed question and then never
@@ -335,17 +340,17 @@ export type TrackingPlan = {
  * ASKED, the other counts what may be FOUND.
  *
  * ⚠️ AND THE CEILING ONLY RISES FOR ACCOUNTS THAT USE IT. checksPerPeriod is
- * 4 × 3 × 3 = 36, but pickWatchList() in lib/scan/run.ts caps the discovered
+ * 4 × 3 × 1 = 12, but pickWatchList() in lib/scan/run.ts caps the discovered
  * take at discoveredCap, so an account that never types a question watches three
- * prompts and spends the same 27 it always did. Take that cap out and every free
- * signup quietly starts billing for a fourth prompt nobody asked for.
+ * prompts and spends 9. Take that cap out and every free signup quietly starts
+ * billing for a fourth prompt nobody asked for.
  *
- * ⚠️ FREE'S schedule STAYS 'once'. It describes the SCHEDULER, not the button:
- * free still gets no automatic weekly re-check, which is most of what Pro
- * sells, and flipping this would put free sites into the cron sweep in
- * app/api/cron/tracking/route.ts. Whether a person may press Run is
- * canRunCheckNow(), which is a different question and now has a different
- * answer.
+ * ⚠️ FREE'S schedule STAYS 'once', AND NOW THE ALLOWANCE AGREES WITH IT. It
+ * describes the SCHEDULER — flipping it would put free sites into the cron
+ * sweep in app/api/cron/tracking/route.ts — and with runs at 1 the onboarding
+ * scan spends the whole budget, so the meter refuses a second run as well.
+ * canRunCheckNow() is still a separate question and still returns true; what
+ * stops a free re-check is the ceiling, not the predicate.
  *
  * ⚠️ PRO'S runsPerPeriod IS 5, NOT 4. A calendar month holds five weekly checks
  * often enough to matter, and a budget of four would refuse the fifth — a check
@@ -354,7 +359,7 @@ export type TrackingPlan = {
  * fifth run was the day-0 scan.
  */
 export const TRACKING_PLANS: Record<PlanId, TrackingPlan> = {
-  free: build('free', { promptCap: 4, manualCap: 1, runs: 3, schedule: 'once' }),
+  free: build('free', { promptCap: 4, manualCap: 1, runs: 1, schedule: 'once' }),
   pro: build('pro', { promptCap: 25, manualCap: 10, runs: 5, schedule: 'weekly' }),
 };
 
@@ -537,7 +542,7 @@ export const PLAN_COPY: Record<
     price: '$0',
     tagline: 'See how AI answers about your business today.',
     blurb:
-      'Where you stand right now: your AI-visibility score, whether AI can read your site and get in, and three real questions put to ChatGPT, Perplexity and Google’s Gemini — with who they named instead of you. Run it three times as you fix things.',
+      'Where you stand right now: your AI-visibility score, whether AI can read your site and get in, and three real questions put to ChatGPT, Perplexity and Google’s Gemini — with who they named instead of you.',
   },
   pro: {
     label: 'Pro',
@@ -786,12 +791,17 @@ export const PLAN_FEATURES: PlanFeature[] = [
   },
   {
     label: 'How often it is checked',
-    /* ⚠️ Free CAN press the button — canRunCheckNow() is true for both plans.
-       What free does not get is the automatic weekly run, and that distinction
-       is most of what Pro sells. Do not write this row as "Pro can re-check". */
-    free: `${TRACKING_PLANS.free.runsPerPeriod} times, whenever you like`,
+    /* ⚠️ THIS ROW SOLD THREE RE-CHECKS AND FREE NOW GETS ONE. It read
+       "${runsPerPeriod} times, whenever you like", which interpolated to "1
+       times" the moment the allowance changed — a row that breaks its own
+       grammar when a number moves is a row that will ship broken. Written out
+       rather than derived, because "once" is a word and not a count.
+
+       Re-checking is the offer on the Pro side now, which is what the chart,
+       the scan route's refusal and the welcome email all say too. */
+    free: 'Once',
     pro: 'Every week automatically, plus any time you press the button',
-    proseFree: `Check again ${TRACKING_PLANS.free.runsPerPeriod} times as you fix things`,
+    proseFree: 'Your first check, free',
     /* Absorbed by the questions line above. */
   },
   {

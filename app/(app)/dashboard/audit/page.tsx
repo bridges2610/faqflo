@@ -40,7 +40,7 @@ export default async function AuditPage({
     AUDIT. The two screens had grown to say nearly the same thing to a free
     account: one page crawled, a score, and what to do about it. FreeHome is the
     one written for that reader — free-home.tsx calls itself "a conversion page:
-    somebody who has had one check so far, can run three, and is deciding
+    somebody who has had their one check and is deciding
     whether any of this is real" — so it takes the slot rather than being
     reachable only from Home.
 

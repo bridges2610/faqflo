@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { scoreBand } from '@/lib/audit/score';
+import { PRO_PRICE, TRACKING_PLANS } from '@/lib/dashboard/plans';
+import type { PlanId } from '@/lib/dashboard/types';
 import { SITE_URL } from '@/lib/site';
 
 /**
@@ -60,10 +62,21 @@ export type Rendered = { subject: string; html: string; text: string };
 
 const SIGN_OFF = 'Beau, FaqFlo';
 
+/*
+  ⚠️ line-height 1.45, NOT 1.6, AND paragraphs SIT CLOSER TOO. At 1.6 with 14px
+  gaps this read as a document rather than a note from a person — the airiness
+  that suits a long article works against a short message somebody skims on a
+  phone. Tightening the leading without also tightening the paragraph margins
+  does not land: the gaps between blocks were doing most of the sprawling.
+
+  ⚠️ INLINE STYLES, AND NOT A STYLESHEET. Gmail strips <style> blocks in some
+  configurations, so anything not inlined is a rule that works in testing and
+  not in an inbox.
+*/
 function wrap(body: string): string {
-  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;color:#0f172a;max-width:480px">
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.45;color:#0f172a;max-width:480px">
 ${body}
-<p style="color:#64748b;font-size:13px;margin-top:28px">${SIGN_OFF}</p>
+<p style="color:#64748b;font-size:13px;margin-top:20px">${SIGN_OFF}</p>
 </div>`;
 }
 
@@ -122,6 +135,15 @@ export function welcomeEmail(
   siteName: string,
   findings: ScanFindings = {},
   topFix: TopFix | null = null,
+  /*
+    ⚠️ THE PLAN IS READ, NOT ASSUMED, AND THE LAST LINE IS WHY. This email goes
+    out when the first scan lands, and somebody can sign up and buy Pro inside
+    the same two minutes — the note at the top of this file counts exactly that
+    sequence. Pitching Pro to a customer who has just paid for it is the kind of
+    mistake that gets a refund request rather than a correction, so the closing
+    line is omitted entirely for them.
+  */
+  plan: PlanId = 'free',
 ): Rendered {
   const who = escape(firstName(name));
   const site = escape(siteName);
@@ -151,46 +173,113 @@ export function welcomeEmail(
   if (asked) lines.push('Asked ChatGPT, Perplexity and Gemini about them, and saved every answer.');
 
   const htmlList = lines.length
-    ? `<ul style="padding-left:18px;margin:14px 0">${lines
-        .map((l) => `<li style="margin-bottom:6px">${escape(l)}</li>`)
+    ? `<ul style="padding-left:18px;margin:10px 0">${lines
+        .map((l) => `<li style="margin-bottom:3px">${escape(l)}</li>`)
         .join('')}</ul>`
     : '';
   const textList = lines.length ? `\n${lines.map((l) => `- ${l}`).join('\n')}\n` : '';
 
   const verdictHtml = band
-    ? `<p style="margin:14px 0"><strong>${escape(band.label)}</strong> — ${score} out of 100.<br />${escape(band.summary)}</p>`
+    ? `<p style="margin:10px 0"><strong>${escape(band.label)}</strong> — ${score} out of 100.<br />${escape(band.summary)}</p>`
     : '';
   const verdictText = band ? `\n${band.label} - ${score} out of 100.\n${band.summary}\n` : '';
 
   /* The solution, named rather than gestured at. Omitted entirely when the
      audit ranked nothing, which is the same rule the figures follow. */
   const fixHtml = topFix
-    ? `<p style="margin:14px 0"><strong>Worth doing first:</strong> ${escape(topFix.what)}<br />${escape(topFix.why)} About ${escape(topFix.effort)}.</p>`
+    ? `<p style="margin:10px 0"><strong>Worth doing first:</strong> ${escape(topFix.what)}<br />${escape(topFix.why)} About ${escape(topFix.effort)}.</p>`
     : '';
   const fixText = topFix
     ? `\nWorth doing first: ${topFix.what}\n${topFix.why} About ${topFix.effort}.\n`
     : '';
 
+  /*
+    The one sales line in the whole message, and it comes last on purpose.
+
+    ⚠️ EVERY CLAIM IN IT IS READ FROM THE PLAN TABLE, NOT TYPED HERE. The price
+    and the watched-question count are what lib/dashboard/plans.ts sells on the
+    pricing page, and this file's header rule — that a template must not outlive
+    a pricing change — is exactly how the old setUpEmail ended up offering "90
+    days of full access" for a product that no longer existed.
+  */
+  /*
+    ⚠️ THE CADENCE CLAIM IS PER PLAN, AND IT USED TO BE A PROMISE WE BROKE. This
+    read "We'll look again every week. Nothing for you to press." for everybody —
+    true for Pro, false for the free accounts who are most of the recipients.
+    TRACKING_PLANS.free is `schedule: 'once'`, and startWeeklySchedule() only
+    ever runs on subscription, so a free site keeps next_check_at null and the
+    cron never sweeps it. The last thing they read before the sign-off was an
+    appointment nobody was going to keep.
+
+    ⚠️ AND THE FREE HALF MUST NOT INVITE A RE-RUN EITHER, WHICH THE FIRST FIX
+    GOT WRONG. It read "Changed something? Run the check again" — and the scan
+    this email is announcing is the one thing a free account cannot repeat:
+    /api/scan/start refuses a second one outright, and its own comment says the
+    UI shows an upgrade card where the button would be.
+
+    The confusion is real rather than careless. Two different things are called
+    a check: the SCAN (audit, questions, tracking — free gets one, ever) and a
+    TRACKING RUN, which re-asks the watched questions and which free can press.
+    This email opens with "Your first check just finished", meaning the scan, so
+    any invitation here points at the refusal. Drawing the distinction in the
+    paragraph before a sign-off would cost more than it buys, so this claims
+    nothing about running anything, and the Pro line below answers "can I do
+    this again?" where the answer is yes.
+  */
+  const cadence =
+    plan === 'pro'
+      ? "We'll take another look every week, so there's nothing for you to press."
+      : "It's all saved in your dashboard, so you can pick it up whenever suits you.";
+
+  const proCount = TRACKING_PLANS.pro.promptCap;
+  const proHtml =
+    plan === 'free'
+      ? `<p style="margin:10px 0">And whenever you're ready, Pro re-checks your site every week — and whenever you ask — writes the answers for you, and hands you the code to paste. ${proCount} questions watched, $${PRO_PRICE.monthly}/month. No rush. What you've got is yours either way.</p>`
+      : '';
+  const proText =
+    plan === 'free'
+      ? `\nAnd whenever you're ready, Pro re-checks your site every week - and whenever you ask - writes the answers for you, and hands you the code to paste. ${proCount} questions watched, $${PRO_PRICE.monthly}/month. No rush. What you've got is yours either way.\n`
+      : '';
+
+  /*
+    ⚠️ THE SUBJECT USES THE RAW NAME, NOT `who`. `who` has been through escape(),
+    which is right for markup and wrong here — a subject line is plain text, so
+    an O'Brien or a Smith & Sons would arrive with an HTML entity sitting in
+    their own name at the top of the inbox.
+
+    ⚠️ AND IT DROPS THE NAME RATHER THAN GUESSING ONE. firstName() falls back to
+    "there", which reads fine mid-sentence ("Hi there") and badly in a greeting
+    ("Welcome, there"). No name means no comma clause.
+  */
+  const greetName = (name ?? '').trim().split(/\s+/)[0] || null;
+
   return {
-    subject: `What AI can read on ${siteName}`,
+    /* ⚠️ THE WAVE REPLACES A DASH, SO "Here's" IS CAPITALISED. An em dash joins
+       two halves of one sentence; an emoji ends the greeting and lets the next
+       clause start fresh. Left lowercase it reads like a typo rather than a
+       pause. */
+    subject: greetName
+      ? `Welcome, ${greetName} 👋 Here's what AI can read on ${siteName}`
+      : `Welcome 👋 Here's what AI can read on ${siteName}`,
     html: wrap(
-      `<p>Hi ${who},</p>
-<p>We've read <strong>${site}</strong> the same way ChatGPT and Gemini do — because that is where more and more of your customers are asking.</p>
+      `<p>Hey ${who},</p>
+<p>Glad you're here. Your first check just finished — we read <strong>${site}</strong> the same way ChatGPT, Perplexity and Gemini do, because that's where more and more of your customers are asking.</p>
 ${verdictHtml}${htmlList}${fixHtml}
 <p><a href="${url}" style="color:#2563eb">Open your dashboard</a></p>
-<p>${topFix ? 'The rest is' : 'What to change is'} listed there, in the order worth doing. Work through them and the engines have your real answers to hand out — instead of guessing, or naming somebody else.</p>
-<p>We'll look again every week. Nothing for you to press. If anything looks wrong, just reply to this — it comes to me.</p>`,
+<p>${topFix ? 'Everything else is' : 'What to change is'} in there too, in the order worth doing. Work through it and the engines have your actual answers to hand out — instead of guessing, or naming somebody else.</p>
+<p>${cadence} And if something looks off, or you just want to ask me something, hit reply — it comes straight to me.</p>
+${proHtml}`,
     ),
-    text: `Hi ${firstName(name)},
+    text: `Hey ${firstName(name)},
 
-We've read ${siteName} the same way ChatGPT and Gemini do - because that is where more and more of your customers are asking.
+Glad you're here. Your first check just finished - we read ${siteName} the same way ChatGPT, Perplexity and Gemini do, because that's where more and more of your customers are asking.
 ${verdictText}${textList}${fixText}
 Open your dashboard: ${url}
 
-${topFix ? 'The rest is' : 'What to change is'} listed there, in the order worth doing. Work through them and the engines have your real answers to hand out - instead of guessing, or naming somebody else.
+${topFix ? 'Everything else is' : 'What to change is'} in there too, in the order worth doing. Work through it and the engines have your actual answers to hand out - instead of guessing, or naming somebody else.
 
-We'll look again every week. Nothing for you to press. If anything looks wrong, just reply to this - it comes to me.
-
+${cadence} And if something looks off, or you just want to ask me something, hit reply - it comes straight to me.
+${proText}
 ${SIGN_OFF}`,
   };
 }

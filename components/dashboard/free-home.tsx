@@ -23,8 +23,7 @@ import { UpgradeCard } from './upgrade-card';
   ⚠️ A SEPARATE COMPOSITION, NOT A GATED OverviewWorkspace, AND THE TWO PAGES
   HAVE DIFFERENT JOBS. Pro's Home is where a weekly email lands — somebody who
   already pays, arriving to see what moved. This is a conversion page: somebody
-  who has had one check so far, can run three, and is deciding whether any of
-  this is real.
+  who has had their one check and is deciding whether any of this is real.
   Gating one screen into serving both would have meant every block carrying a
   branch, and the honest version of each is a different block.
 

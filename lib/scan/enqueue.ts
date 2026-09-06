@@ -26,27 +26,32 @@ import { createAdminClient } from '@/lib/supabase/admin';
   Most of it is the per-search fee on each engine call ($8–$14 per thousand),
   not tokens; search costs 10–30x what the tokens do. The one item that can
   swing is the Opus call, because max_tokens caps thinking and text together at
-  12k — three cents of output typically, thirty at the ceiling. An account that
-  comes back and spends its other two runs reaches 27 engine calls, or roughly
-  $0.55 all in.
+  12k — three cents of output typically, thirty at the ceiling.
+
+  ⚠️ THE SCAN IS NOW THE WHOLE TRACKING SPEND, AND IT DID NOT USED TO BE. Free
+  bought three runs, so an account that came back reached 27 engine calls and
+  roughly $0.55. Free is one check now — TRACKING_PLANS.free has runs: 1 — so
+  the nine calls above are the ceiling, twelve if they add a question of their
+  own.
 
   ⚠️ AND THE SCAN IS NO LONGER ALL A FREE ACCOUNT CAN SPEND. This note once
   described the whole free tier, because free could not write anything. It can
   now, so the lifetime bill has three parts and the scan is only the first:
 
-    - the scan above — crawl, Opus discovery, 27 engine calls at the ceiling;
+    - the scan above — crawl, Opus discovery, 9 engine calls, 12 at the ceiling;
     - FREE_GENERATED_FAQ_SET_CAP sets on Haiku 4.5, max_tokens 8192 each;
     - FREE_ARTICLE_CAP article on Sonnet 5, max_tokens 8192.
 
   Both writing caps live in lib/dashboard/plans.ts. The six writing calls are
   small beside the search fees — output ceilings, and real responses land well
-  under them — but they are not nothing, and they are not in the $0.55 above:
-  call the lifetime ceiling roughly $0.65–$0.90 rather than $0.55.
+  under them — but they are not nothing: call the lifetime ceiling roughly
+  $0.35–$0.60, down from the $0.65–$0.90 it was when free bought three runs.
 
   ⚠️ THE NOTE HERE USED TO SAY $0.50–$1.00 FOR A SIGNUP, AND IT WAS RIGHT WHEN
-  WRITTEN. Two things moved under it: Opus went from $15/$75 per Mtok to $5/$25,
-  and free went from asking five questions once to asking three, three times. So
-  a signup got cheaper while the lifetime ceiling went up. Prices move again —
+  WRITTEN. Three things moved under it: Opus went from $15/$75 per Mtok to
+  $5/$25, free went from asking five questions once to asking three three times,
+  and then back to asking three once. So a signup got cheaper, the lifetime
+  ceiling went up, and then it came back down. Prices move again —
   Gemini's grounded rate is promotional until 1 Jan 2027 — so re-derive rather
   than trusting this line if the number matters.
 

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
 import { trySendEmail } from './client';
+import type { PlanId } from '@/lib/dashboard/types';
 import { welcomeEmail, type ScanFindings, type TopFix } from './templates';
 
 /**
@@ -42,7 +43,10 @@ export async function welcomeOnce(
     .update({ welcomed_at: new Date().toISOString() })
     .eq('id', userId)
     .is('welcomed_at', null)
-    .select('email, name');
+    /* ⚠️ `plan` COMES BACK TOO, so the template can decide whether to mention
+       Pro. Somebody who bought before the first scan finished must not be sold
+       the thing they already own — see the note on welcomeEmail's `plan`. */
+    .select('email, name, plan');
 
   if (error) {
     // Including "column welcomed_at does not exist" if 0004 has not been run.
@@ -54,10 +58,12 @@ export async function welcomeOnce(
 
   // No row: already welcomed, or another request won the race. Either way,
   // not ours to send.
-  const profile = data?.[0] as { email: string; name: string | null } | undefined;
+  const profile = data?.[0] as
+    | { email: string; name: string | null; plan: PlanId }
+    | undefined;
   if (!profile) return;
 
-  const mail = welcomeEmail(profile.name, siteName, findings, topFix);
+  const mail = welcomeEmail(profile.name, siteName, findings, topFix, profile.plan);
   await trySendEmail(
     {
       to: profile.email,

@@ -202,8 +202,10 @@ export function PromptRanking({ tracking }: { tracking: SiteTracking | null }) {
  *
  * ⚠️ TWO LIMITS, NOT ONE, AND BOTH HAVE TO BE SAID OUT LOUD.
  *
- * `runsLeft` is the allowance — three per account, derived from rows rather
- * than stored. `ranToday` is the other one: the tracking route skips any
+ * `runsLeft` is the allowance — one per free account, derived from rows rather
+ * than stored, which means a free reader sees this branch from the moment the
+ * onboarding scan finishes. That is the intended shape: free is one check, and
+ * this is where the offer to re-check lives. `ranToday` is the other one: the tracking route skips any
  * question/engine pair it already holds from today, because "re-asking the same
  * question twice in one day tells you nothing new and bills twice for it". So a
  * second press on the same day returns `{checked: 0, done: true}` and changes
@@ -260,7 +262,7 @@ function RunControl({
               about fifteen words the grade level climbs on sentence length
               alone, whatever the vocabulary is doing. */}
           <p className="text-slate text-sm leading-relaxed">
-            That’s all three of your checks. With Pro you write your own questions —{' '}
+            That’s your free check. With Pro you write your own questions —{' '}
             <span className="text-navy font-semibold">{PRO.manualCap} of them</span>, alongside the{' '}
             {PRO.discoveredCap} we find. Every one is re-checked each week.
           </p>
