@@ -9,9 +9,11 @@ import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { formatShortDate } from '@/lib/dashboard/format';
 import { isPro, nextCheckDate, PRO_PRICE } from '@/lib/dashboard/plans';
+import type { PlanId } from '@/lib/dashboard/types';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
 import { AuditNotice } from './audit-notice';
+import { HelpBubble } from './help-bubble';
 import { RunNotice } from './run-notice';
 import { ScanNotice } from './scan-notice';
 import { SiteSwitcher } from './site-switcher';
@@ -389,7 +391,24 @@ function HelpLink({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({
+  children,
+  plan,
+  summariesLeft,
+  userId,
+}: {
+  children: React.ReactNode;
+  /* ⚠️ THE PLAN ARRIVES AS A PROP FROM THE LAYOUT, WHICH HAS ALREADY AWAITED
+     THE PROFILE ROW. useDashboard()'s user is null on the first frame, so
+     anything branching on it flashes the free state at a paying customer —
+     the trap app/(app)/dashboard/page.tsx documents. Only HelpBubble needs it
+     so far; the nav below still branches on the loaded user because its two
+     versions differ by a label rather than by an entitlement. */
+  plan: PlanId;
+  summariesLeft: number | null;
+  /* Scopes the help button's "hide until next sign-in" to this account. */
+  userId: string;
+}) {
   const { loading, loadError, retryLoad } = useDashboard();
   // Data is present and usable — the only state in which the header's
   // data-reading children are safe to mount.
@@ -563,6 +582,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           here it is positioned against the viewport. Rendered by the shell
           rather than by a page, so it follows across navigations. */}
       <AuditNotice />
+
+      {/* Same reasoning as the toast above: mounted by the shell so it follows
+          across navigations, and outside <main> so it is positioned against the
+          viewport rather than boxed in by the content column. */}
+      <HelpBubble plan={plan} summariesLeft={summariesLeft} userId={userId} />
     </div>
   );
 }

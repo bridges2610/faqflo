@@ -226,6 +226,19 @@ export const DONE_FOR_YOU_RATE_LIMIT = 3;
  */
 export const TRACKING_RATE_LIMIT = 60;
 
+/**
+ * Page summaries per day, per account.
+ *
+ * ⚠️ WELL ABOVE WHAT EITHER PLAN CAN SPEND, WHICH IS THE POINT. ARTICLE_RATE_
+ * LIMIT's note states the rule: the plan cap is what the customer bought, the
+ * daily limit is the abuse guard underneath it, and it must never be the thing
+ * that lands first in normal use. Free's ceiling is three for the life of the
+ * account, so this can only ever fire for Pro — which has five screens, each
+ * rewritten only when its numbers move. Anyone reaching 30 in a day is looping
+ * a script, not reading.
+ */
+export const SUMMARY_RATE_LIMIT = 30;
+
 type Entry = { count: number; resetAt: number };
 const hits = new Map<string, Entry>();
 

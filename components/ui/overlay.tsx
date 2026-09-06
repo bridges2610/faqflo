@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { prefersReducedMotion } from '@/lib/motion';
 
 /*
   A full-viewport modal shell. The scrim, the portal, the scroll lock, the layer.
@@ -96,6 +97,46 @@ export function Overlay({
      both passes instead of throwing during SSR. */
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+
+  /*
+    The dialog arriving, rather than being found already there.
+
+    ⚠️ A SECOND FLAG, AND IT IS WHAT LETS THIS BE A TRANSITION INSTEAD OF A
+    KEYFRAME. app/globals.css reserves @keyframes for "an element animating on
+    first paint, with no previous state to move from" — and this is precisely
+    that case until there is a flag to move from. One boolean supplies the
+    "before" state, so the motion is an ordinary transition on a value change,
+    which is what the rest of this codebase uses.
+
+    That also means reduced motion needs nothing here: the block in globals.css
+    clamps transition-duration to 0.01ms on *, so a reader who asked for less
+    motion gets the panel at once — the honest end state, as meter-fill says of
+    itself.
+
+    ⚠️ INSIDE requestAnimationFrame, NOT A BARE setShown(true). React batches a
+    state update made directly in a mount effect into the same paint, so the
+    element never renders in its `opacity-0` state and the browser has nothing
+    to interpolate from — the transition is skipped and the panel snaps, which
+    is the bug this exists to fix. The frame callback runs after that paint.
+  */
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (!mounted) return;
+
+    /* ⚠️ NO WAITING FRAME FOR SOMEBODY WHO ASKED FOR NO MOTION. The transition
+       is already clamped to 0.01ms for them by globals.css, so the rAF below
+       would buy nothing and cost a frame with the dialog rendered invisible —
+       measured in dev, where the panel sat at opacity 0 for over 50ms. Straight
+       to the end state is what "reduce" means. */
+    if (prefersReducedMotion()) {
+      setShown(true);
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => setShown(true));
+    return () => cancelAnimationFrame(frame);
+  }, [mounted]);
+
   if (!mounted) return null;
 
   return createPortal(
@@ -107,10 +148,17 @@ export function Overlay({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="bg-scrim/40 absolute inset-0 backdrop-blur-sm"
+          className={`bg-scrim/40 absolute inset-0 backdrop-blur-sm transition-opacity duration-200 ${
+            shown ? 'opacity-100' : 'opacity-0'
+          }`}
         />
       ) : (
-        <div className="bg-scrim/40 absolute inset-0 backdrop-blur-sm" aria-hidden="true" />
+        <div
+          className={`bg-scrim/40 absolute inset-0 backdrop-blur-sm transition-opacity duration-200 ${
+            shown ? 'opacity-100' : 'opacity-0'
+          }`}
+          aria-hidden="true"
+        />
       )}
 
       {/*
@@ -131,7 +179,12 @@ export function Overlay({
           whichever the class attribute lists last. So the radius is a property
           of the shell, and changing it changes every modal.
         */
-        className={`shadow-lift relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl bg-surface p-6 ${className}`}
+        /* ⚠️ translate, NOT top or margin: it composites on the GPU and cannot
+           reflow the panel's own contents mid-animation — the reasoning the
+           `rise` keyframe in globals.css records for the same choice. */
+        className={`shadow-lift relative max-h-[calc(100dvh-2rem)] w-full overflow-y-auto rounded-2xl bg-surface p-6 transition-[opacity,translate] duration-200 ${
+          shown ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'
+        } ${className}`}
       >
         {children}
       </div>

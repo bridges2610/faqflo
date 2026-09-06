@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 
-type Variant = 'primary' | 'ghost' | 'dark' | 'light';
+type Variant = 'primary' | 'ghost' | 'dark' | 'light' | 'muted';
 type Size = 'sm' | 'md' | 'lg';
 type Shape = 'soft' | 'pill';
 
@@ -90,6 +90,35 @@ const VARIANTS: Record<Variant, string> = {
   primary: 'bg-primary text-on-primary shadow-card hover:bg-primary-hover hover:shadow-lift',
   ghost: 'bg-surface text-navy border border-line shadow-soft hover:border-primary hover:text-primary',
   dark: 'bg-ink text-white shadow-card hover:bg-ink/90 hover:shadow-lift',
+  /*
+    A light grey chip — a solid control that recedes.
+
+    ⚠️ A VARIANT RATHER THAN `dark` PLUS A className. Two background utilities
+    land at equal specificity and the winner is whichever Tailwind emits later,
+    not whichever the class attribute lists last — the coin flip the `light`
+    note below this one records, and the one components/ui/overlay.tsx hit with
+    rounded-2xl. A caller cannot lighten `dark` from outside; it has to be its
+    own row.
+  */
+  /*
+    ⚠️ THE BORDER IS NOT TRIM, IT IS HOW THIS STAYS A BUTTON. The fill separates
+    from the page by 1.09:1 in light mode — all but nothing — so the edge and
+    the label are what identify the control, not the shape. `line-strong` is the
+    token that exists for "the boundary of something you can click"; without it
+    this is a smudge with words on it.
+
+    Measured, light / dark:
+      label   text-slate on bg-chip   6.56:1 / 4.92:1   (AA needs 4.5)
+      hover   text-navy on bg-chip   14.75:1 / 9.79:1
+      border  line-strong vs page     1.40:1 / 3.87:1
+
+    ⚠️ THE DARK FIGURE IS THE ONE WITH NO ROOM IN IT. 4.92:1 clears AA by less
+    than half a point, so anything that lightens `--color-chip` in dark mode, or
+    dims `--color-slate`, fails this before it looks any different. Re-measure
+    rather than eyeball it.
+  */
+  muted:
+    'bg-chip text-slate border border-line-strong shadow-soft hover:text-navy hover:border-primary hover:shadow-card',
   // For dark or gradient backgrounds. Exists as its own variant because
   // overriding `primary`'s colours through className is a coin-flip — both land
   // at the same specificity and whichever Tailwind emits last wins.

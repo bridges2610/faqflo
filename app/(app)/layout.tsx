@@ -3,6 +3,7 @@ import { AppShell } from '@/components/dashboard/app-shell';
 import { ThemeProvider } from '@/components/dashboard/theme';
 import { requireUser, sitesForUser } from '@/lib/auth/dal';
 import { DashboardProvider } from '@/lib/dashboard/provider';
+import { FREE_SUMMARY_CAP } from '@/lib/dashboard/plans';
 import { toSite } from '@/lib/dashboard/store';
 
 /*
@@ -77,7 +78,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           ⚠️ ThemeScript IS NOT HERE. A nested layout renders on the client, and
           a script tag is inert when it does; it lives in app/layout.tsx. */}
       <ThemeProvider>
-        <AppShell>{children}</AppShell>
+        {/* ⚠️ THE PLAN IS HANDED DOWN RATHER THAN READ FROM THE PROVIDER.
+            requireUser() has already resolved the profile row here, whereas the
+            provider's user is null until the snapshot loads — and HelpBubble
+            branches on the plan, so reading it there would show every Pro
+            customer a locked panel for the first frame. */}
+        <AppShell
+          userId={user.id}
+          plan={user.plan}
+          summariesLeft={
+            user.plan === 'pro'
+              ? null
+              : Math.max(0, FREE_SUMMARY_CAP - (user.free_summaries_used ?? 0))
+          }
+        >
+          {children}
+        </AppShell>
       </ThemeProvider>
     </DashboardProvider>
   );

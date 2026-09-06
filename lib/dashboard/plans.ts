@@ -123,6 +123,21 @@ export const ARTICLE_CAP = 10;
 export const FREE_ARTICLE_CAP = 1;
 export const FREE_GENERATED_FAQ_SET_CAP = 5;
 
+/**
+ * Page summaries the help panel will write for a FREE account, ever.
+ *
+ * ⚠️ EVER, for the reason the note above gives: free's period never ends, so a
+ * per-period count would be lifetime while implying a refill that never comes.
+ * Counted in profiles.free_summaries_used (migration 0023).
+ *
+ * ⚠️ REPLAYING A STORED SUMMARY DOES NOT SPEND ONE. page_summaries keeps the
+ * last summary per page with a hash of the numbers it described; reopening the
+ * panel on unchanged data returns that row and never reaches the model. What
+ * this caps is how many times new numbers get explained — otherwise a free
+ * account would exhaust three summaries by closing the panel twice.
+ */
+export const FREE_SUMMARY_CAP = 3;
+
 /** What this account may still have written. Pro's article budget is monthly and
  *  counted from rows; free's is a lifetime counter it cannot reach. */
 export function articleCapFor(user: User | null): number {
@@ -816,6 +831,24 @@ export const PLAN_FEATURES: PlanFeature[] = [
     prosePro: 'Unlimited re-checks and rewrites',
   },
   {
+    /*
+      ⚠️ THE FREE CELL STATES BOTH LIMITS, because the feature has two and
+      naming only one is how a support ticket starts. Free is scoped to Home AND
+      capped at three writes; a cell reading "3 summaries" would promise them
+      anywhere, and one reading "On your home screen" would imply unlimited.
+
+      Counted in profiles.free_summaries_used (0023) and enforced by
+      summaryPagesFor() plus claimFreeGeneration(). Re-reading a summary already
+      written does not spend one, which is why this says "written" rather than
+      "viewed" — see FREE_SUMMARY_CAP.
+    */
+    label: 'Plain-English summary of any screen',
+    free: `${FREE_SUMMARY_CAP} on your home screen`,
+    pro: 'Every screen, rewritten as your numbers move',
+    proseFree: 'Your home screen explained in plain English',
+    prosePro: 'Any screen explained in plain English, whenever the numbers move',
+  },
+  {
     label: 'Want it done for you',
     free: null,
     pro: 'Available as a paid extra',
@@ -939,6 +972,33 @@ export function canGenerate(_user: User | null): boolean {
 /** The content plan: which pages the site is missing, and what to write next. */
 export function canContent(user: User | null): boolean {
   return isPro(user);
+}
+
+/**
+ * Which screens the help panel will explain for this account.
+ *
+ * Free gets Home and nothing else — one screen, three writes, enough to show
+ * what the thing does. Pro gets every screen the panel knows about.
+ *
+ * ⚠️ THIS RETURNS THE PAGES, NOT A BOOLEAN, because "can they use it" is the
+ * wrong question on a feature that is scoped by screen rather than switched off.
+ * A boolean here would have every call site re-deriving "…but only on Home",
+ * which is how two copies of one rule start — see the pickWatchList note in
+ * lib/scan/run.ts for what that costs.
+ *
+ * ⚠️ IT DOES NOT CONSIDER THE ALLOWANCE. Scope and spend are different refusals
+ * with different sentences: "that's a Pro screen" and "that's your third" must
+ * never be answered with the same message. The allowance is claimed server-side
+ * by lib/auth/free-allowance.ts.
+ *
+ * ⚠️ KEYED ON THE PlanId, NOT ON A User, WHICH IS WHY THIS IS THE ONE COPY.
+ * Every other capability here takes a User and has a ProfileRow twin in
+ * lib/auth/entitlements.ts — two implementations that have to be kept saying
+ * the same thing. This takes the one value both shapes can produce, so the
+ * server twin is an adapter over this rather than a second version of it.
+ */
+export function summaryPagesFor(plan: PlanId): 'all' | 'home' {
+  return plan === 'pro' ? 'all' : 'home';
 }
 
 /**

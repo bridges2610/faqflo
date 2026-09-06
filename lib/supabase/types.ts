@@ -59,6 +59,9 @@ export type ProfileRow = {
   free_articles_used: number;
   /** Generation RUNS spent in the Answers tab, not answers. See 0021. */
   free_faq_sets_used: number;
+  /** Page summaries the help panel has written for a free account. See 0023.
+   *  Replays of a stored summary are not counted — only real model calls. */
+  free_summaries_used: number;
   created_at: string;
 };
 

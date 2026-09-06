@@ -1,7 +1,11 @@
 import 'server-only';
 
 import { createAdminClient } from '@/lib/supabase/admin';
-import { FREE_ARTICLE_CAP, FREE_GENERATED_FAQ_SET_CAP } from '@/lib/dashboard/plans';
+import {
+  FREE_ARTICLE_CAP,
+  FREE_GENERATED_FAQ_SET_CAP,
+  FREE_SUMMARY_CAP,
+} from '@/lib/dashboard/plans';
 
 /*
   Spending a free account's writing allowance.
@@ -29,7 +33,7 @@ import { FREE_ARTICLE_CAP, FREE_GENERATED_FAQ_SET_CAP } from '@/lib/dashboard/pl
   moving the claim after it.
 */
 
-type Kind = 'article' | 'faq_set';
+type Kind = 'article' | 'faq_set' | 'summary';
 
 /* The column each kind spends is chosen inside claim_free_generation() (0021)
    rather than here — a column name crossing the wire would be one more thing a
@@ -38,6 +42,10 @@ type Kind = 'article' | 'faq_set';
 export const FREE_CAP: Record<Kind, number> = {
   article: FREE_ARTICLE_CAP,
   faq_set: FREE_GENERATED_FAQ_SET_CAP,
+  /* ⚠️ ONLY A REAL MODEL CALL SPENDS ONE. The summary route replays a stored
+     summary when the numbers behind it have not moved, and never reaches here
+     when it does — see FREE_SUMMARY_CAP. */
+  summary: FREE_SUMMARY_CAP,
 };
 
 /**

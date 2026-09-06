@@ -84,6 +84,32 @@
   --color-ink: #0b1b3a;
 
   /*
+    A light grey chip — a control that reads as a control without competing with
+    the page it floats over.
+
+    ⚠️ IT EXISTS BECAUSE NOTHING IN THE PALETTE SAT WHERE THIS HAD TO. The help
+    button went ink (too heavy), then `--color-surface` white (too light), then
+    slate-600 (too heavy again). `--color-cloud` is what <body> already paints,
+    so a cloud pill is invisible, and `--color-line` is a hairline rather than a
+    fill. This is the fill between them.
+
+    ⚠️ IT PAIRS WITH `text-navy`, NOT WITH white, AND THAT IS WHAT MAKES IT WORK
+    IN BOTH THEMES. Both sides flip together — a light grey chip with near-black
+    text in light, a raised navy panel with near-white text in dark — so the
+    relationship survives inversion on its own. That is the same reasoning the
+    `bg-navy/8` note above gives for leaving those chips alone. A white-text
+    fill would have needed this token to stay dark in light mode, which is the
+    thing it exists to stop being.
+
+    ⚠️ IT CARRIES `text-slate`, NOT `text-navy`. Dark grey rather than
+    near-black is what keeps a pale chip from reading as a heavyweight control;
+    both tokens still flip together, so the pairing survives inversion.
+    Measured below — see the note on the `muted` variant in
+    components/ui/button.tsx for the numbers.
+  */
+  --color-chip: #eaeff6;
+
+  /*
     What goes ON a primary fill — and the third token born from the same trap.
 
     ⚠️ `--color-primary` IS A LINK COLOUR ~200 TIMES AND A BUTTON FILL ~25, and
@@ -261,6 +287,12 @@ html[data-theme='dark'] {
     11.42:1.
   */
   --color-ink: #233a5e;
+  /* ⚠️ A RAISED PANEL, NOT A LIGHT GREY, AND THE INVERSION IS THE POINT. In
+     light this token is a pale chip carrying dark text; the honest dark-mode
+     equivalent is a lifted navy carrying pale text, which is exactly what
+     --color-ink already is out here. Two names, one value, because only the
+     light theme needs them apart. */
+  --color-chip: #233a5e;
   --color-mark-openai: #ffffff; /* #000 is 1.25:1 here — see the token definition */
   /* Near-black, NOT --color-ink: the scrim must darken the page, and ink is a
      raised panel out here. Measured over the page at 55%: rgb(7,13,24). */
@@ -607,6 +639,7 @@ html[data-theme='dark'] {
     --color-line: #e2e8f0;
     --color-line-strong: #cbd5e1;
     --color-ink: #0b1b3a;
+    --color-chip: #eaeff6;
     --color-mark-openai: #000000;
     --color-scrim: #0b1b3a;
     --color-primary: #2563eb;

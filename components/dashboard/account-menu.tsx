@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/auth/actions';
+import { clearHelpDismissed } from '@/lib/dashboard/help-visibility';
 import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { PlanBadge } from './plan-badge';
@@ -211,7 +212,24 @@ export function AccountMenu() {
             </div>
           )}
 
-          <form action={signOut} className="border-line mt-3 border-t pt-3">
+          {/*
+            ⚠️ THE onSubmit IS NOT COSMETIC — IT IS HALF OF "until you sign in
+            again". The help button's dismissal lives in sessionStorage, which
+            survives a sign-out because the tab never closed. Without this,
+            signing out and back in on the same machine lands on a dashboard
+            with the button still hidden, in a session the reader plainly
+            considers new.
+
+            It runs alongside the server action rather than instead of it:
+            onSubmit does not cancel the form, so the sign-out itself is
+            untouched, and clearing a key we are about to stop being able to
+            scope is safe even if the sign-out then fails.
+          */}
+          <form
+            action={signOut}
+            onSubmit={() => clearHelpDismissed()}
+            className="border-line mt-3 border-t pt-3"
+          >
             <button
               type="submit"
               role="menuitem"

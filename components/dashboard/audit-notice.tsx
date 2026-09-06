@@ -70,10 +70,24 @@ export function AuditNotice() {
 
       Full width with margins on a phone, a fixed card at the bottom right from
       sm up, where it sits clear of the content column.
+
+      ⚠️ RAISED TO CLEAR THE HELP BUTTON, NOT NUDGED FOR LOOKS.
+      components/dashboard/help-bubble.tsx is fixed to this same corner at this
+      same z-40, so before this the two overlapped and DOM order alone decided
+      which one could be pressed. Room is reserved here rather than the button
+      being shrunk or moved, the way components/marketing/site-footer.tsx
+      reserves padding for the floating busy button: the button is a 44px touch
+      target and this is a toast that comes and goes.
+
+      4.75rem is the button's own inset (1rem) plus its tallest height (44px on
+      a phone) plus a 1rem gap. One value at both widths rather than two:
+      SIZES in components/ui/button.tsx steps `sm` down to 36px from sm: up, so
+      desktop simply gets 8px more air — which is invisible, where a second
+      breakpoint here would be one more thing to keep in step with that file.
     */
     <div
       role="status"
-      className="fixed inset-x-4 bottom-4 z-40 sm:inset-x-auto sm:right-6 sm:bottom-6 sm:w-80 print:hidden"
+      className="fixed inset-x-4 bottom-19 z-40 sm:inset-x-auto sm:right-6 sm:w-80 print:hidden"
     >
       {/*
         ⚠️ NAVY WITH WHITE TEXT, WHICH IS ONE OF THE TWO SANCTIONED WHITE-ON-FILL

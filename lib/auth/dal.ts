@@ -109,6 +109,7 @@ function fromClaims(claims: Record<string, unknown>): ProfileRow {
        used means the UI offers the control; the server still decides. */
     free_articles_used: 0,
     free_faq_sets_used: 0,
+    free_summaries_used: 0,
     /* Null, not a date: this account has no profile row, so no welcome email
        has been sent for it. Claiming otherwise here would let the guarded
        update in 0004 think the job was done. */

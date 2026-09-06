@@ -1,6 +1,11 @@
 import 'server-only';
 
-import { PAGE_BUDGET, TRACKING_PLANS, type TrackingPlan } from '@/lib/dashboard/plans';
+import {
+  PAGE_BUDGET,
+  TRACKING_PLANS,
+  summaryPagesFor as summaryPagesForPlan,
+  type TrackingPlan,
+} from '@/lib/dashboard/plans';
 import type { PlanId } from '@/lib/dashboard/types';
 import type { ProfileRow } from '@/lib/supabase/types';
 
@@ -90,6 +95,21 @@ export function canDiscover(user: ProfileRow | null): boolean {
  */
 export function canGenerate(_user: ProfileRow | null): boolean {
   return true;
+}
+
+/**
+ * Which screens the help panel will explain for this account.
+ *
+ * An ADAPTER over summaryPagesFor() in lib/dashboard/plans.ts, not a second
+ * copy of it: that one is keyed on the PlanId, which both a ProfileRow and a
+ * client User can produce, so there is exactly one place the rule lives.
+ *
+ * ⚠️ SCOPE ONLY. It says nothing about how many summaries are left; that is a
+ * counter, and a predicate cannot enforce a quantity — the same warning
+ * canGenerate() above carries.
+ */
+export function summaryPagesFor(user: ProfileRow | null): 'all' | 'home' {
+  return summaryPagesForPlan(planOf(user));
 }
 
 /**
