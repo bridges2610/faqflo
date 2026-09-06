@@ -18,11 +18,24 @@ const inter = Inter({
   display: 'swap',
 });
 
+/*
+  ⚠️ NOT PRELOADED, AND IT IS THE ONLY ONE OF THE THREE THAT ISN'T. Three
+  families preload four files — 118KB measured over the wire — into the window
+  that decides when the hero paints. The mono face is the one the page can
+  afford to wait for: its only above-the-fold use is the source chip in
+  components/marketing/hero.tsx, which is `blur-[3px]` and decorative, so the
+  `display: swap` below lands on text nobody can read anyway.
+
+  ⚠️ preload: false IS NOT "do not load". The file is still fetched the moment
+  something needs it; it just stops competing with the two faces the LCP text
+  actually renders in. Do not "fix" this by removing the line.
+*/
 const jetbrains = JetBrains_Mono({
   subsets: ['latin'],
   weight: ['400', '500'],
   variable: '--font-jetbrains',
   display: 'swap',
+  preload: false,
 });
 
 const GA_ID = 'G-7JX690DTV7';
@@ -131,11 +144,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         */}
         <ThemeScript />
         {children}
+        {/*
+          ⚠️ lazyOnload, NOT afterInteractive, AND IT IS THE BIGGEST THING ON THE
+          PAGE. Measured on production under mobile emulation (Moto G4, 4x CPU,
+          ~1.6Mbps): gtag is 170KB of a 588KB page — 29% of everything
+          transferred, and 2.4x the next-heaviest file. afterInteractive starts
+          it as hydration begins, which is exactly the window that decides when
+          the hero paints, and the LCP element here is text with no image ahead
+          of it. Idle-after-load is where a third-party tag belongs.
+
+          ⚠️ THE TRADE IS REAL AND WAS ACCEPTED: somebody who bounces inside the
+          first second or so may go uncounted, so reported traffic can dip. That
+          is a change to measurement, not to the site.
+
+          ⚠️ BOTH TAGS MOVE TOGETHER OR NEITHER DOES. The init script below
+          calls gtag('config'); leaving it afterInteractive while the library
+          goes lazy would run it before gtag exists.
+
+          ⚠️ NOT strategy="worker". next/dist/docs is explicit that Partytown
+          "is not yet stable and does not yet work with the App Router".
+        */}
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=${GA_ID}`}
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="ga-init" strategy="afterInteractive">
+        <Script id="ga-init" strategy="lazyOnload">
           {`window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
 gtag('js', new Date());
