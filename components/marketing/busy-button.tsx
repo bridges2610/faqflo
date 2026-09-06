@@ -4,9 +4,17 @@ import Image from 'next/image';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Check } from '@/components/ui/check';
-import { ClockIcon } from '@/components/ui/icons';
+import { ClockIcon, CloseIcon } from '@/components/ui/icons';
 import { Overlay } from '@/components/ui/overlay';
 import { AUTHOR, AUTHOR_AVATAR } from '@/lib/blog/author';
+import {
+  BUSY_REVEAL_DELAY_MS,
+  BUSY_SCOPE,
+  dismissFloating,
+  hasSeenFloating,
+  isFloatingDismissed,
+  markFloatingSeen,
+} from '@/lib/floating-visibility';
 
 /*
   The twenty-second answer to "what is this?", for somebody who does not have
@@ -34,6 +42,41 @@ const TRIGGER_ID = 'busy-trigger';
 export function BusyButton() {
   const [open, setOpen] = useState(false);
   const everOpened = useRef(false);
+
+  /*
+    ⚠️ IT ARRIVES AFTER THE READER DOES, AND null IS "NOT ASKED YET". Storage
+    cannot be read while rendering — these pages are prerendered, and a server
+    pass that cannot see sessionStorage would disagree with the client's, which
+    is a hydration mismatch. So the answer lands an effect later, and until then
+    nothing renders rather than something appearing and being taken away.
+  */
+  const [dismissed, setDismissed] = useState<boolean | null>(null);
+  useEffect(() => setDismissed(isFloatingDismissed(BUSY_SCOPE)), []);
+
+  /*
+    The pitch holds back for five seconds after somebody lands.
+
+    ⚠️ ONCE PER VISIT, NOT PER PAGE. This component is mounted by the marketing
+    layout, so a client-side move from the home page to a blog post never
+    unmounts it and a bare timer would already survive that — the stored flag is
+    what covers a full reload, which would otherwise restart the wait every time
+    and, for a reader who browses in fresh tabs, mean the button is never seen.
+
+    ⚠️ THE TIMER IS CLEARED ON UNMOUNT. It sets state when it fires, and a timer
+    outliving its component sets state on something React has discarded.
+  */
+  const [revealed, setRevealed] = useState(false);
+  useEffect(() => {
+    if (hasSeenFloating(BUSY_SCOPE)) {
+      setRevealed(true);
+      return;
+    }
+    const timer = setTimeout(() => {
+      markFloatingSeen(BUSY_SCOPE);
+      setRevealed(true);
+    }, BUSY_REVEAL_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   /*
     ⚠️ Overlay DOES NOT MOVE FOCUS, SO THIS DOES. It portals, locks scroll,
@@ -73,6 +116,10 @@ export function BusyButton() {
     }
   }, [open]);
 
+  /* Put away for this visit, or not yet known to be otherwise, or still inside
+     the opening five seconds. */
+  if (dismissed !== false || !revealed) return null;
+
   return (
     <>
       {/*
@@ -105,28 +152,62 @@ export function BusyButton() {
         different colour entirely, so it reads as a utility chip — and white on
         ink is 17.04:1, one of the two sanctioned white-on-fill pairs.
       */}
-      <Button
-        id={TRIGGER_ID}
-        variant="dark"
-        shape="pill"
-        size="sm"
-        onClick={() => setOpen(true)}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        className="fixed right-4 z-40 print:hidden"
+      {/* ⚠️ motion-rise, NOT A BARE APPEARANCE. This arrives five seconds into
+          somebody's reading, and a control that materialises with no transition
+          in the corner of a page being read is startling in a way the same
+          control easing in is not. globals.css clamps the animation for anyone
+          who asked for less motion, which leaves it simply present. */}
+      <div
+        className="motion-rise fixed right-4 z-40 flex items-center gap-1.5 print:hidden"
         style={{ bottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
       >
-        <ClockIcon className="h-4 w-4 shrink-0" />
-        {/* The short label on a phone, the whole question from sm: up — so on
-            most screens the button states its purpose rather than leaving the
-            reader to guess from two words and a clock. */}
-        <span>
-          I&rsquo;m busy<span className="hidden sm:inline"> — what is this?</span>
-        </span>
-        {/* The accessible name is always the full sentence, whatever is
-            visible. */}
-        <span className="sr-only">— what is FaqFlo?</span>
-      </Button>
+        <Button
+          id={TRIGGER_ID}
+          variant="dark"
+          shape="pill"
+          size="sm"
+          onClick={() => setOpen(true)}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+        >
+          <ClockIcon className="h-4 w-4 shrink-0" />
+          {/* The short label on a phone, the whole question from sm: up — so on
+              most screens the button states its purpose rather than leaving the
+              reader to guess from two words and a clock. */}
+          <span>
+            I&rsquo;m busy<span className="hidden sm:inline"> — what is this?</span>
+          </span>
+          {/* The accessible name is always the full sentence, whatever is
+              visible. */}
+          <span className="sr-only">— what is FaqFlo?</span>
+        </Button>
+
+        {/*
+          ⚠️ A SIBLING OF THE PILL, NEVER A CHILD OF IT. A button inside a button
+          is invalid HTML and browsers recover from it however they like — the
+          inner one commonly stops receiving clicks at all.
+
+          ⚠️ ALWAYS VISIBLE, NOT ON HOVER. There is no hover on a phone, and a
+          dismiss control that cannot be reached on the device most likely to
+          feel crowded is not a dismiss control.
+
+          ⚠️ AND IT SAYS "for now". The dismissal lasts the visit — see
+          lib/floating-visibility.ts — so a name promising it is gone for good
+          would be a promise this does not keep.
+        */}
+        <button
+          type="button"
+          onClick={() => {
+            dismissFloating(BUSY_SCOPE);
+            setDismissed(true);
+            setOpen(false);
+          }}
+          aria-label="Hide this for now"
+          className="border-line bg-surface text-slate hover:text-navy hover:border-primary shadow-soft flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-colors duration-150"
+        >
+          <CloseIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
       {open && (
         <Overlay labelledBy={TITLE_ID} onClose={() => setOpen(false)} className="max-w-lg">

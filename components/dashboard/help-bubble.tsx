@@ -10,11 +10,12 @@ import { UpgradeCard } from '@/components/dashboard/upgrade-card';
 import { LockIcon } from './nav-icons';
 import {
   HELP_REVEAL_DELAY_MS,
-  dismissHelp,
-  hasSeenHelp,
-  isHelpDismissed,
-  markHelpSeen,
-} from '@/lib/dashboard/help-visibility';
+  dismissFloating,
+  hasSeenFloating,
+  helpScope,
+  isFloatingDismissed,
+  markFloatingSeen,
+} from '@/lib/floating-visibility';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { FREE_SUMMARY_CAP, summaryPagesFor } from '@/lib/dashboard/plans';
 import { buildFacts, summaryPageFor } from '@/lib/dashboard/summary';
@@ -93,7 +94,7 @@ export function HelpBubble({
     vanishing in front of somebody who already dismissed it.
   */
   const [dismissed, setDismissed] = useState<boolean | null>(null);
-  useEffect(() => setDismissed(isHelpDismissed(userId)), [userId]);
+  useEffect(() => setDismissed(isFloatingDismissed(helpScope(userId))), [userId]);
 
   /*
     The button holds back for ten seconds on the reader's first screen.
@@ -109,12 +110,12 @@ export function HelpBubble({
   */
   const [revealed, setRevealed] = useState(false);
   useEffect(() => {
-    if (hasSeenHelp(userId)) {
+    if (hasSeenFloating(helpScope(userId))) {
       setRevealed(true);
       return;
     }
     const timer = setTimeout(() => {
-      markHelpSeen(userId);
+      markFloatingSeen(helpScope(userId));
       setRevealed(true);
     }, HELP_REVEAL_DELAY_MS);
     return () => clearTimeout(timer);
@@ -488,7 +489,7 @@ export function HelpBubble({
         <button
           type="button"
           onClick={() => {
-            dismissHelp(userId);
+            dismissFloating(helpScope(userId));
             setDismissed(true);
             setOpen(false);
           }}

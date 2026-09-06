@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/auth/actions';
-import { clearHelpDismissed } from '@/lib/dashboard/help-visibility';
+import { HELP_SCOPE_PREFIX, clearFloating } from '@/lib/floating-visibility';
 import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { PlanBadge } from './plan-badge';
@@ -227,7 +227,7 @@ export function AccountMenu() {
           */}
           <form
             action={signOut}
-            onSubmit={() => clearHelpDismissed()}
+            onSubmit={() => clearFloating(HELP_SCOPE_PREFIX)}
             className="border-line mt-3 border-t pt-3"
           >
             <button

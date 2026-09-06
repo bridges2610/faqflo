@@ -1,122 +1,144 @@
 /*
-  When the help button is allowed on screen, and whether it has been put away.
+  When a floating button is allowed on screen, and whether it has been put away.
 
-  ⚠️ sessionStorage, NOT localStorage, AND THE DIFFERENCE IS THE WHOLE PROMISE.
-  The control says "hide until you sign in again". localStorage would hide it
-  until somebody cleared their browser data — which, from the reader's side, is
-  indistinguishable from the feature having been removed. sessionStorage keeps
-  it hidden across reloads, because a reload is not a sign-in, and lets it go
-  when the tab closes.
+  Two of them use this: the dashboard help panel's trigger
+  (components/dashboard/help-bubble.tsx) and the public "I'm busy" pitch
+  (components/marketing/busy-button.tsx). Both hold back for a moment after
+  somebody arrives, both can be dismissed, and both forget the dismissal when
+  the visit ends. One module rather than two copies — lib/scan/run.ts:508-515
+  records what the copy cost the last time a rule lived in two places and the
+  two stopped agreeing.
 
-  ⚠️ IT LIVES IN ITS OWN MODULE BECAUSE TWO FILES HAVE TO AGREE ON THE KEY.
-  components/dashboard/help-bubble.tsx writes it and
-  components/dashboard/account-menu.tsx clears it on sign-out; a key spelled out
-  in both is a key that will be renamed in one.
+  ⚠️ sessionStorage, NOT localStorage, AND THE DIFFERENCE IS THE PROMISE. These
+  controls go away for the visit, not for good. localStorage would hide them
+  until somebody cleared their browser data, which from the reader's side is
+  indistinguishable from the feature having been removed — and on the marketing
+  side it would retire the pitch permanently for anyone who ever pressed ×.
+  sessionStorage survives reloads, because a reload is not a new visit, and
+  clears when the tab closes.
+
+  ⚠️ THIS MODULE MUST KEEP ZERO IMPORTS. It is pulled into a client component
+  mounted on every marketing page, which is the exact position lib/blog/author.ts
+  holds — and that file exists because importing the author from posts.ts put a
+  measured 261KB of blog prose into the shared marketing bundle. Nothing here
+  may reach for anything.
 
   ⚠️ EVERY CALL IS WRAPPED. Storage access THROWS rather than returning null in
-  Safari with cookies blocked and in some embedded webviews — reading a
-  preference is not worth taking the dashboard shell down with it, so a broken
-  store reads as "not dismissed" and a failed write simply does not persist.
+  Safari with cookies blocked and in some embedded webviews. Reading a
+  preference is not worth taking a page down with it, so a broken store reads as
+  "not dismissed, not yet seen" and a failed write simply does not persist.
 */
 
-const KEY_PREFIX = 'faqflo:help-dismissed:';
-const SEEN_PREFIX = 'faqflo:help-seen:';
-
 /**
- * How long a new arrival gets before the button appears.
+ * How long a signed-in reader gets before the help button appears.
  *
  * ⚠️ IT WAITS BECAUSE THE FIRST TEN SECONDS BELONG TO THE PAGE. Somebody who
  * has just landed is reading their own numbers, and a floating control sliding
  * into the corner during that is an interruption competing with the thing it
- * offers to explain. Arriving afterwards, it reads as an offer rather than a
- * greeting.
+ * offers to explain. Arriving afterwards, it reads as an offer.
  */
 export const HELP_REVEAL_DELAY_MS = 10_000;
 
-/* ⚠️ PER USER. Two accounts on one machine — which is every machine a founder
-   tests on — must not inherit each other's decision. */
-const keyFor = (userId: string) => `${KEY_PREFIX}${userId}`;
-const seenKeyFor = (userId: string) => `${SEEN_PREFIX}${userId}`;
-
 /**
- * Has the button already appeared once in this session?
+ * How long a visitor gets before the "I'm busy" pitch appears.
  *
- * ⚠️ THE WAIT IS PAID ONCE, ON THE FIRST PAGE, NOT ON EVERY PAGE. Without this
- * the delay would restart on each navigation and each reload, so somebody
- * moving briskly between screens would never see the button at all — a control
- * that is permanently ten seconds away is a control that does not exist.
+ * ⚠️ HALF THE DASHBOARD'S WAIT, AND THE TWO SIT TOGETHER SO THE GAP IS VISIBLE.
+ * A marketing visitor decides whether to stay in a few seconds, so ten would
+ * miss most of them; a customer reading their own dashboard is not going
+ * anywhere, so ten costs nothing there. Two numbers in two files would drift
+ * into being the same number by accident.
  */
-export function hasSeenHelp(userId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.sessionStorage.getItem(seenKeyFor(userId)) === '1';
-  } catch {
-    return false;
-  }
-}
+export const BUSY_REVEAL_DELAY_MS = 5_000;
 
-/** Remember that the wait has been served. */
-export function markHelpSeen(userId: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(seenKeyFor(userId), '1');
-  } catch {
-    /* The button is on screen either way; the only cost is waiting again after
-       a reload. Not worth a thrown error inside the dashboard shell. */
-  }
-}
+/*
+  Scopes. `help:<userId>` per account — two people on one machine must not
+  inherit each other's decision — and a bare `busy` for the public button, whose
+  audience is by definition anonymous.
+*/
+export const HELP_SCOPE_PREFIX = 'help:';
+export const helpScope = (userId: string) => `${HELP_SCOPE_PREFIX}${userId}`;
+export const BUSY_SCOPE = 'busy';
 
-/** Has this user put the button away in this session? */
-export function isHelpDismissed(userId: string): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.sessionStorage.getItem(keyFor(userId)) === '1';
-  } catch {
-    return false;
-  }
-}
+const DISMISSED = 'faqflo:floating-dismissed:';
+const SEEN = 'faqflo:floating-seen:';
 
-/** Put it away until the next sign-in. */
-export function dismissHelp(userId: string): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.sessionStorage.setItem(keyFor(userId), '1');
-  } catch {
-    /* Nothing to do and nothing worth saying: the button stays hidden for as
-       long as this component is mounted either way, and it comes back on the
-       next load rather than never. */
-  }
+/** Has this button already served its wait in this session? */
+export function hasSeenFloating(scope: string): boolean {
+  return read(`${SEEN}${scope}`);
 }
 
 /**
- * Forget every dismissal, and the fact that the button was ever shown.
+ * Remember that the wait has been served.
  *
- * ⚠️ CALLED ON SIGN-OUT, AND WITHOUT IT THE PROMISE BREAKS IN THE ONE CASE
- * SOMEBODY WILL ACTUALLY TEST. sessionStorage survives a sign-out — the tab
- * never closed — so signing out and back in would land on a dashboard with the
- * button still hidden, in a session the reader considers new.
- *
- * It clears every user's key rather than the current one because sign-out is
- * the moment we stop knowing who is asking, and a stale key belonging to
- * somebody who is no longer signed in has no reason to survive.
+ * ⚠️ THE WAIT IS PAID ONCE PER VISIT, NOT PER PAGE. Without this the delay
+ * would restart on every navigation and every reload, so somebody moving
+ * briskly between screens would never see the button at all — a control that is
+ * permanently five seconds away is a control that does not exist.
  */
-export function clearHelpDismissed(): void {
+export function markFloatingSeen(scope: string): void {
+  write(`${SEEN}${scope}`);
+}
+
+/** Has this button been put away for the rest of the visit? */
+export function isFloatingDismissed(scope: string): boolean {
+  return read(`${DISMISSED}${scope}`);
+}
+
+/** Put it away until the visit ends. */
+export function dismissFloating(scope: string): void {
+  write(`${DISMISSED}${scope}`);
+}
+
+/**
+ * Forget both flags for every scope starting with `prefix`.
+ *
+ * ⚠️ BY PREFIX, NOT WHOLESALE, AND SIGN-OUT IS WHY. The dashboard clears its own
+ * scopes when somebody signs out, because signing back in is a new arrival that
+ * is owed the wait again. It has nothing to say about whether a visitor
+ * dismissed the public pitch, and re-showing that to somebody who has just left
+ * the product would be a strange parting gesture.
+ *
+ * ⚠️ AND BOTH PREFIXES GO. Clearing the dismissal but leaving "seen" behind
+ * would hand the next session an instant button and quietly retire the delay.
+ */
+export function clearFloating(prefix: string): void {
   if (typeof window === 'undefined') return;
   try {
     const store = window.sessionStorage;
-    const keys: string[] = [];
+    const doomed: string[] = [];
     for (let i = 0; i < store.length; i += 1) {
       const key = store.key(i);
-      /* ⚠️ BOTH PREFIXES. Signing in again is a new arrival, so the ten-second
-         wait is owed again — leaving the "seen" flag behind would hand the next
-         session an instant button and quietly retire the delay. */
-      if (key?.startsWith(KEY_PREFIX) || key?.startsWith(SEEN_PREFIX)) keys.push(key);
+      if (!key) continue;
+      const scope =
+        key.startsWith(DISMISSED) ? key.slice(DISMISSED.length)
+        : key.startsWith(SEEN) ? key.slice(SEEN.length)
+        : null;
+      if (scope !== null && scope.startsWith(prefix)) doomed.push(key);
     }
     /* Collected first, removed after: removing during the walk shifts every
        later index down and skips half of them. */
-    for (const key of keys) store.removeItem(key);
+    for (const key of doomed) store.removeItem(key);
   } catch {
     /* See the note at the top — a store that throws is not worth a broken
        sign-out. */
+  }
+}
+
+function read(key: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.sessionStorage.getItem(key) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function write(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(key, '1');
+  } catch {
+    /* The button behaves correctly for as long as it stays mounted either way;
+       the only cost is waiting again after a reload. */
   }
 }
