@@ -22,6 +22,7 @@ import * as faqQuestions from '@/content/posts/what-questions-should-be-on-your-
 import * as faqsOnPosts from '@/content/posts/should-i-include-faqs-on-blog-posts.mdx';
 import * as beyondYourSite from '@/content/posts/what-else-influences-companies-being-mentioned-in-ai.mdx';
 import * as vsSemrush from '@/content/posts/faqflo-vs-semrush-which-one-is-built-for-you.mdx';
+import * as dentists from '@/content/posts/how-dentists-can-win-with-ai.mdx';
 
 /*
   The post registry.
@@ -75,7 +76,9 @@ export { AUTHOR, AUTHOR_AVATAR, AUTHOR_BIO } from './author';
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
-  /* Newest on its own date, so nothing below it competes for the lead slot. */
+  /* ⚠️ TWO POSTS SHARE 2026-09-06, so this order decides which leads the
+     archive — the sort below is stable and same-day posts keep the order here. */
+  dentists,
   vsSemrush,
   /* ⚠️ FOUR POSTS SHARE 2026-09-05, so this order decides which leads the
      archive — the sort below is stable and same-day posts keep the order here. */
