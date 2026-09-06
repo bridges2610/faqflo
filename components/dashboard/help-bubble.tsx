@@ -97,13 +97,13 @@ export function HelpBubble({
   useEffect(() => setDismissed(isFloatingDismissed(helpScope(userId))), [userId]);
 
   /*
-    The button holds back for ten seconds on the reader's first screen.
+    The button holds back for HELP_REVEAL_DELAY_MS on the reader's first screen.
 
     ⚠️ ONCE PER SESSION, NOT PER PAGE — hasSeenHelp() is what makes the wait a
     greeting rather than a tax. AppShell keeps this component mounted across
     client navigations, so a bare timer would already survive those; the stored
-    flag is what covers a full reload, which otherwise restarts the ten seconds
-    every time somebody refreshes.
+    flag is what covers a full reload, which otherwise restarts the wait every
+    time somebody refreshes.
 
     ⚠️ THE TIMER IS CLEARED ON UNMOUNT. It sets state when it fires, and a
     timer outliving its component sets state on something React has discarded.
@@ -384,7 +384,7 @@ export function HelpBubble({
   /* Put away for this session, or not yet known to be otherwise. */
   if (dismissed !== false) return null;
 
-  /* Still inside the opening ten seconds. */
+  /* Still inside the opening wait. */
   if (!revealed) return null;
 
   const writing = status === 'writing';
@@ -404,7 +404,7 @@ export function HelpBubble({
         That toast is pinned to this same corner at this same layer, where DOM
         order alone would have decided which one you could press.
       */}
-      {/* ⚠️ motion-rise, NOT A BARE APPEARANCE. This arrives ten seconds into
+      {/* ⚠️ motion-rise, NOT A BARE APPEARANCE. This arrives partway into
           somebody's reading, and a control that materialises with no transition
           in the corner of a page being read is startling in a way the same
           control easing in is not. globals.css clamps the animation for anyone

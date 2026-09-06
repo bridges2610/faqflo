@@ -32,21 +32,21 @@
 /**
  * How long a signed-in reader gets before the help button appears.
  *
- * ⚠️ IT WAITS BECAUSE THE FIRST TEN SECONDS BELONG TO THE PAGE. Somebody who
- * has just landed is reading their own numbers, and a floating control sliding
- * into the corner during that is an interruption competing with the thing it
- * offers to explain. Arriving afterwards, it reads as an offer.
+ * ⚠️ IT WAITS BECAUSE THE OPENING MOMENTS BELONG TO THE PAGE. Somebody who has
+ * just landed is reading their own numbers, and a floating control sliding into
+ * the corner during that is an interruption competing with the thing it offers
+ * to explain. Arriving afterwards, it reads as an offer.
  */
-export const HELP_REVEAL_DELAY_MS = 10_000;
+export const HELP_REVEAL_DELAY_MS = 15_000;
 
 /**
  * How long a visitor gets before the "I'm busy" pitch appears.
  *
- * ⚠️ HALF THE DASHBOARD'S WAIT, AND THE TWO SIT TOGETHER SO THE GAP IS VISIBLE.
- * A marketing visitor decides whether to stay in a few seconds, so ten would
- * miss most of them; a customer reading their own dashboard is not going
- * anywhere, so ten costs nothing there. Two numbers in two files would drift
- * into being the same number by accident.
+ * ⚠️ A THIRD OF THE DASHBOARD'S WAIT, AND THE TWO SIT TOGETHER SO THE GAP IS
+ * VISIBLE. A marketing visitor decides whether to stay in a few seconds, so
+ * fifteen would miss most of them; a customer reading their own dashboard is
+ * not going anywhere, so a longer wait costs nothing there. Two numbers in two
+ * files would drift into being the same number by accident.
  */
 export const BUSY_REVEAL_DELAY_MS = 5_000;
 
