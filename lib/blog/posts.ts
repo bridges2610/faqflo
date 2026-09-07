@@ -24,6 +24,7 @@ import * as beyondYourSite from '@/content/posts/what-else-influences-companies-
 import * as vsSemrush from '@/content/posts/faqflo-vs-semrush-which-one-is-built-for-you.mdx';
 import * as dentists from '@/content/posts/how-dentists-can-win-with-ai.mdx';
 import * as citedVsNamed from '@/content/posts/what-it-means-to-be-cited-versus-named-in-ai.mdx';
+import * as dentistPrompts from '@/content/posts/25-ai-prompts-dentists-should-try-to-answer.mdx';
 
 /*
   The post registry.
@@ -77,7 +78,9 @@ export { AUTHOR, AUTHOR_AVATAR, AUTHOR_BIO } from './author';
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
-  /* Newest on its own date, so nothing below competes for the lead slot. */
+  /* ⚠️ TWO POSTS SHARE 2026-09-07, so this order decides which leads the
+     archive — the sort below is stable and same-day posts keep the order here. */
+  dentistPrompts,
   citedVsNamed,
   /* ⚠️ TWO POSTS SHARE 2026-09-06, so this order decides which leads the
      archive — the sort below is stable and same-day posts keep the order here. */

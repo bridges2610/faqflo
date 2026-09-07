@@ -1,0 +1,241 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: '25-ai-prompts-dentists-should-try-to-answer',
+  title: '25 AI Prompts Dentists Should Try to Answer',
+  date: '2026-09-07',
+  excerpt:
+    'Your next new patient is typing one of these into ChatGPT right now. Go find out whose name comes back.',
+  image: '/blog/25-ai-prompts-dentists-should-try-to-answer.png',
+  // Describes the card rather than repeating the headline, which is already the
+  // page's h1 immediately below it.
+  imageAlt:
+    'A chat card reading “Who can see me today for a broken tooth?” The answer highlights the practice name Cedar Ridge Dental and says it keeps same-day emergency slots open and typically sees urgent cases within two hours. Along the bottom: “source: their own website” beside a green “Cited” tag.',
+};
+
+Your next new patient is typing one of these into ChatGPT right now. Go find out whose name comes
+back.
+
+<PostTldr>
+AI can only recommend you if it can read plain answers about you — hours, prices, insurance, service
+area.
+
+- Patients are asking AI which dentist to call, not just where to find a list.
+- Run these 25 prompts with your own city added and write down who gets named.
+- If a directory or a competitor comes back instead of you, that’s your gap.
+- Most dental FAQ pages are built with JavaScript, which AI crawlers don’t run, so those answers
+  don’t count.
+
+</PostTldr>
+
+A patient with a broken tooth used to Google “emergency dentist near me” and start calling down the
+list. Now a lot of them open ChatGPT and just ask. They get two or three practice names, a sentence
+about each, and a reason to pick one. Then they call that one.
+
+You never see this happen. There’s no click in your analytics, no search term in your reports.
+Either your name came up or it didn’t.
+
+The good news is you can check. Below are 25 prompts real patients use before they choose a dentist.
+Run them yourself, see who gets named, then make sure your website actually answers each one.
+
+## How to use this list
+
+Open ChatGPT, Perplexity and Google. Paste in each prompt and swap `[city]` for your town or
+neighborhood. Don’t sign in as yourself if you can help it — you want the answer a stranger gets,
+not one shaped by your history.
+
+Keep a simple sheet as you go. Three columns is enough:
+
+<div className="mt-6 -mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
+  <table className="w-full min-w-xl border-collapse text-left text-[0.9375rem]">
+    <thead>
+      <tr className="border-line border-b">
+        <th className="text-navy w-1/2 py-3 pr-4 font-semibold">Prompt</th>
+        <th className="text-navy py-3 pr-4 font-semibold">Who got named</th>
+        <th className="text-navy py-3 font-semibold">Were you?</th>
+      </tr>
+    </thead>
+    <tbody className="[&_td]:text-slate [&_td]:py-3 [&_td]:leading-relaxed [&_tr]:border-line [&_tr]:border-b">
+      <tr>
+        <td className="pr-4">“Which dentist near me can see me today for a broken tooth?”</td>
+        <td className="pr-4">Healthgrades, two competitors</td>
+        <td className="text-navy font-semibold">No</td>
+      </tr>
+      <tr>
+        <td className="pr-4">“How much does a dental crown cost in [city]?”</td>
+        <td className="pr-4">A “best dentists” listicle</td>
+        <td className="text-navy font-semibold">No</td>
+      </tr>
+      <tr>
+        <td className="pr-4">“Which dentists near me take my insurance?”</td>
+        <td className="pr-4">Your practice, one competitor</td>
+        <td className="text-navy font-semibold">Yes</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+Twenty minutes of this will tell you more than any report.
+
+## Emergency and urgent care
+
+These are the highest-intent prompts there are. Nobody asks them casually, and the person asking will
+call somebody within the hour.
+
+- “Which dentist near me can see me today for a broken tooth?”
+- “Who does emergency dental work on weekends in [city]?”
+- “I chipped a tooth — is that an emergency?”
+- “My crown fell out. What do I do until I can get to a dentist?”
+- “How fast can I get seen for bad tooth pain in [city]?”
+
+**To be the answer here**, your site needs to say in plain text whether you hold same-day slots, what
+your after-hours number is, and how quickly you typically see emergencies. “Call us” is not an
+answer an AI can quote.
+
+## Cost and insurance
+
+Money questions are where most practices go quiet, and silence is exactly why the AI names somebody
+else.
+
+- “How much does a dental crown cost in [city]?”
+- “Which dentists near me take my insurance?”
+- “What does a cleaning cost without insurance?”
+- “Are there dentists in [city] with payment plans?”
+- “Do any dentists near me have a new patient special?”
+
+**To be the answer here**, put real numbers or real ranges on the page, name the plans you accept,
+and describe your membership or financing option in a sentence. A range like “$1,100–$1,600
+depending on material” is quotable. “Contact us for pricing” is not.
+
+## Choosing a practice
+
+This is the recommendation moment — the one that used to come from a neighbor.
+
+- “Best family dentist in [city]”
+- “Who’s a good dentist near me that’s taking new patients?”
+- “What’s a good dentist in [city] for someone with dental anxiety?”
+- “Are there dentists near me open early or on Saturdays?”
+- “Which dentist near me is closest to [neighborhood]?”
+
+**To be the answer here**, be specific about who you’re for and where you are. “Accepting new
+patients”, “7am appointments Monday through Thursday”, and the neighborhoods you actually serve are
+the details that get lifted straight into an answer.
+
+## Specific procedures
+
+Procedure prompts bring in the highest-value cases, and they’re the ones patients research hardest.
+
+- “Who does Invisalign in [city] and what does it cost?”
+- “Where can I get dental implants near me?”
+- “Which dentists in [city] do same-day crowns?”
+- “Do I need a root canal, or can it just be filled?”
+- “Which dentists near me do teeth whitening that actually works?”
+
+**To be the answer here**, name the procedures and the technology by name. If you have a milling unit
+for same-day crowns, say so in words a patient understands, and say roughly what it costs and how
+long it takes.
+
+## Kids, fear and comfort
+
+Soft questions with hard consequences. A parent who trusts your answer books the whole family.
+
+- “At what age should my child first see a dentist?”
+- “Which dentists near me are good with kids?”
+- “Do any dentists in [city] offer sedation?”
+- “Can my whole family get seen on the same day somewhere near me?”
+- “Is it worth switching dentists if mine stopped taking my insurance?”
+
+**To be the answer here**, answer the general question honestly first, then say what you do about it.
+AI engines quote practices that teach before they sell.
+
+## What you’ll probably find
+
+Most dentists who run this exercise see one of three things.
+
+**A directory got named instead of you.** Yelp, Healthgrades, or a “best dentists in [city]”
+listicle. The AI had to recommend something, and a directory was the readable option.
+
+**A competitor got named.** Usually not the best practice in town — the one with the clearest, most
+specific content about hours, pricing and services.
+
+**Nobody local got named at all.** You get generic advice about what to do for a broken tooth and no
+names. That’s an open field, and whoever fills it first wins it.
+
+None of these mean you’re a worse dentist. They mean the engine couldn’t find anything solid to say
+about you.
+
+While you’re looking, check the source links under the answer as well as the names in it. Those are
+[two different wins](/blog/what-it-means-to-be-cited-versus-named-in-ai), and being named without
+being linked means the AI is describing your practice from somebody else’s page.
+
+## Why your FAQ page probably isn’t helping
+
+Here’s the part that catches almost everyone.
+
+Most dental websites have an FAQ section, and most of them are built with
+[a plugin or an accordion widget](/blog/why-faq-plugins-arent-a-good-idea) that loads its answers
+with JavaScript. A patient taps a question, it expands, the answer appears. Looks great.
+
+AI crawlers generally don’t run JavaScript. They read the raw HTML of your page and move on. So the
+answers you already wrote — the ones that would have won you the citation — aren’t in the version
+the crawler sees. Your FAQ page is invisible to the exact engines you’re trying to reach.
+
+Your answers have to exist as real, crawlable HTML on your own domain. Same words, different
+plumbing, completely different result. There’s a
+[fuller walkthrough for dental practices here](/blog/how-dentists-can-win-with-ai).
+
+## What a quotable answer looks like
+
+Take the crown cost question.
+
+**Not quotable:** “We offer high-quality crowns using the latest technology. Our team is committed to
+beautiful, lasting results. Contact us today for a consultation.”
+
+**Quotable:** “A dental crown at our Boise office runs $1,150 to $1,500 depending on the material.
+Same-day porcelain crowns are milled in-house and usually done in one two-hour visit. Most PPO plans
+cover 40 to 50 percent.”
+
+The second one has a price, a place, a timeframe and an insurance detail. An answer engine can lift a
+sentence of that straight into a response and cite you. The first one has nothing to grab.
+
+Answer-first, factual, specific. That’s the whole formula.
+
+## Where FaqFlo comes in
+
+Running 25 prompts by hand once is useful. Doing it every week across three engines is a job.
+
+FaqFlo does the loop for you. It checks whether AI crawlers can read your site at all, finds the
+questions patients actually put to AI about dentists in your area, writes answer-first responses
+built to be quoted, and hands you clean crawlable HTML to paste on your own website — so the credit
+and the phone call come to you, not to a directory. Then it puts those questions to ChatGPT,
+Perplexity and Gemini every week, records whether you were linked, named without a link, or missed
+entirely, and tells you which domain took the click when it wasn’t you.
+
+[Start with the free check.](/free-report) About ten seconds tells you whether AI can see your
+practice today.
+
+<PostFaq
+  items={[
+    {
+      q: 'How do I know if AI is recommending my dental practice?',
+      a: 'Ask it. Type a few of the prompts above into ChatGPT, Perplexity and Gemini with your city added, and note whose names come back. For an ongoing picture, track the same questions over time, since answers shift as content and competitors change.',
+    },
+    {
+      q: 'Why does AI recommend a directory site instead of my practice?',
+      a: 'Because directories publish clear, structured, crawlable information about dentists and most practice websites don’t. The engine picks the source it can read and trust. When your own site answers the same questions in plain text, you become a citable option too.',
+    },
+    {
+      q: 'Does my dental website need to list prices to get cited by AI?',
+      a: 'It helps a lot. Cost is one of the most common things patients ask AI about, and a specific range gets quoted while "contact us for pricing" gets skipped. A range with context — material, insurance coverage, visit length — is enough; you don’t need a fixed price list.',
+    },
+    {
+      q: 'Will an FAQ plugin on my dental site fix this?',
+      a: 'Usually not. Most plugins render their answers with JavaScript, and AI crawlers generally don’t run JavaScript, so those answers never reach the engine. The content needs to be real HTML in your page source on your own domain.',
+    },
+    {
+      q: 'Is this the same as SEO for dentists?',
+      a: 'It’s the next layer on top of it. SEO gets your pages ranked and found; AEO makes your answers quotable so an AI names your practice inside its response. A healthy site helps both, and neither one replaces the other.',
+    },
+  ]}
+/>
