@@ -101,7 +101,29 @@ export function StartForm({
           modifier to sm keeps the grow where the main axis is horizontal and it
           means something, and leaves h-13 in charge when the two are stacked.
         */
-        className="border-line focus:border-primary text-navy shadow-soft h-13 min-w-0 rounded-input border bg-white px-4 text-[0.9375rem] outline-none transition-colors duration-150 sm:flex-1"
+        /*
+          ⚠️ border-slate/70, NOT border-line, AND THE OLD ONE WAS BARELY THERE.
+          `border-line` is a hairline — 1.16:1 against the page it sits on — so
+          the field read as a white shape on a near-white ground rather than as
+          something you type into. Measured after the change: 3.1:1, which is
+          also the bar WCAG 1.4.11 sets for the boundary of a control you are
+          expected to find.
+
+          ⚠️ NOT `border-line-strong`, DESPITE ITS NAME AND ITS COMMENT. That
+          token's definition in globals.css says "inputs, focus rings, WCAG
+          1.4.11" — but in LIGHT mode it is #cbd5e1, which is 1.40:1 and misses
+          that bar by a wide margin. It is used in exactly one place today (the
+          muted button variant) and no inputs, so the name is aspirational
+          rather than descriptive. Left alone rather than redefined here: moving
+          a shared token to fix one field is a change with a much wider reach
+          than this one.
+
+          ⚠️ AND THIS CHANGES /free-report TOO, which shares this component.
+          That is the point of it being one form — both pages take an address
+          the same way, and a field that is easier to see is not a hero-only
+          improvement.
+        */
+        className="border-slate/70 focus:border-primary text-navy shadow-soft h-13 min-w-0 rounded-input border bg-white px-4 text-[0.9375rem] outline-none transition-colors duration-150 sm:flex-1"
       />
       {/*
         ⚠️ NOT "Check my site" — that is the nav, the mobile drawer and the

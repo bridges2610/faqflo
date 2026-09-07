@@ -88,10 +88,20 @@ export function Hero() {
             </span>
           </h1>
 
-          <p className="text-slate mt-8 max-w-lg text-lg leading-relaxed">
-            Find out whether ChatGPT, Perplexity and Google&rsquo;s AI answers can even read your
-            site — then turn what you know into answers they can quote, published on your own
-            domain.
+          {/* ⚠️ max-w-xl SO THIS SETS IN TWO LINES, NOT THREE. At max-w-lg the
+              measure was 512px and the sentence broke onto a third line on
+              every desktop width. The grid column is 557px at 1280 and 1440, so
+              xl is really "take the column" — measured, it and max-w-none give
+              the identical 557px and the same two lines. Kept as a cap rather
+              than removed: if that column ever widens, a 700px measure of 18px
+              text is past what anybody reads comfortably.
+
+              Below lg the column is 459px and this is three lines whatever the
+              cap says. That is the column, not this class — shortening the
+              sentence is the only lever there. */}
+          <p className="text-slate mt-8 max-w-xl text-lg leading-relaxed">
+            See whether ChatGPT, Perplexity and Google&rsquo;s AI can read your site — then turn what
+            you know into answers they can quote.
           </p>
 
           {/* ⚠️ THE FORM IS SHARED WITH /free-report NOW — see
@@ -101,6 +111,33 @@ export function Hero() {
               gradient. Both pages start a check the same way, so there is one
               form rather than two that agree today. */}
           <StartForm id="hero-domain" className="mt-9" />
+
+          {/* ⚠️ HERE RATHER THAN INSIDE StartForm, WHICH IS SHARED WITH
+              /free-report. That page is already headed by an explanation of
+              what the check costs, so the same line there would be the second
+              time a reader is told in one screen. The form stays about the
+              form.
+
+              It is a claim, not decoration: free really does need no card, and
+              PLAN_COPY.free in lib/dashboard/plans.ts is what it has to keep
+              agreeing with. */}
+          {/*
+            ⚠️ THIS SITS BELOW THE AA CONTRAST BAR, DELIBERATELY AND ON REQUEST.
+            Measured on the hero's own ground: 3.5:1 in light, 4.3:1 in dark,
+            against the 4.5:1 that WCAG AA asks for text under 18.66px. It was
+            /85 (4.9:1, passing) and was asked to go lighter twice.
+
+            ⚠️ SO IT MUST STAY A REASSURANCE AND NEVER CARRY A FACT NOBODY ELSE
+            STATES. Nothing here is load-bearing: the price is on the pricing
+            card, the plan table and /dashboard/plan, all at full contrast. If
+            this line ever becomes the only place something is said, it needs to
+            go back to /85 first.
+
+            The AA-passing route to a lighter LOOK, if it is ever wanted back:
+            18.66px or larger drops the bar to 3:1, at which point this passes
+            as written.
+          */}
+          <p className="text-slate/70 mt-3 text-sm">Completely free to start.</p>
         </div>
 
         <AnswerCard />
