@@ -164,7 +164,17 @@ type Ctx = {
   addCompetitor: (siteId: string, input: store.NewCompetitor) => Promise<store.AddCompetitorResult>;
   editCompetitor: (id: string, patch: Partial<store.NewCompetitor>) => Promise<void>;
   removeCompetitor: (id: string) => Promise<void>;
-  moveCompetitor: (id: string, direction: 'up' | 'down') => Promise<void>;
+  /**
+   * Mark a watched competitor as a priority, or unmark one.
+   *
+   * ⚠️ THIS REPLACED moveCompetitor ON THIS SURFACE. The watch list is ordered
+   * by star, then by measured mentions — see compareWatched() — so a hand-set
+   * position had nothing left to decide, and a control that appears to do
+   * nothing is worse than no control. store.moveCompetitor and the `position`
+   * column both survive, unexposed, so restoring a manual order later needs no
+   * migration.
+   */
+  starCompetitor: (id: string, starred: boolean) => Promise<void>;
 
   /* ⚠️ TAKES THE REPORT'S TIMESTAMP, DELIBERATELY. A tick belongs to the audit
      that raised it; passing the stamp is what lets a newer scan clear the
@@ -898,7 +908,7 @@ export function DashboardProvider({
     },
     editCompetitor: (id, patch) => apply(() => store.updateCompetitor(id, patch)),
     removeCompetitor: (id) => apply(() => store.deleteCompetitor(id)),
-    moveCompetitor: (id, direction) => apply(() => store.moveCompetitor(id, direction)),
+    starCompetitor: (id, starred) => apply(() => store.starCompetitor(id, starred)),
     toggleAction: (siteId, actionId, at) =>
       apply(() => store.toggleActionTick(siteId, actionId, at)),
     markPublished: (id) => apply(() => store.markGroupPublished(id)),

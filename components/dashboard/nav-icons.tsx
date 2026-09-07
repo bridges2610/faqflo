@@ -215,6 +215,31 @@ export function ChevronIcon({ className = '' }: IconProps) {
   );
 }
 
+/**
+ * A star, filled when it is on.
+ *
+ * ⚠️ THE FILL IS THE ONLY DIFFERENCE, AND IT IS NEVER THE ONLY SIGNAL. An
+ * outline and a solid at 16px are hard to tell apart at a glance and impossible
+ * to hear, so the button that renders this carries aria-pressed and an
+ * accessible name that says which way round it is — the rule status-icon.tsx
+ * sets for every mark in this product.
+ */
+export function StarIcon({ className = '', filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className={className}
+      fill={filled ? 'currentColor' : 'none'}
+      stroke="currentColor"
+      strokeWidth={filled ? 0 : 1.8}
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3.6l2.6 5.27 5.82.85-4.21 4.1.99 5.79L12 16.87l-5.2 2.74.99-5.79-4.21-4.1 5.82-.85z" />
+    </svg>
+  );
+}
+
 export function LockIcon({ className = '' }: IconProps) {
   return (
     <svg {...BASE} className={className}>

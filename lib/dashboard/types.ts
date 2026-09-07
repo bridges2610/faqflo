@@ -365,8 +365,21 @@ export type Competitor = {
   name: string;
   /** Bare host, no scheme and no trailing slash. */
   domain: string;
-  /** Ordering on the Competitors page. */
+  /**
+   * Ordering on the Competitors page.
+   *
+   * ⚠️ NOT WHAT ORDERS THE PAGE ANY MORE — see compareWatched(). Kept because
+   * the column is kept; restoring a hand-set order should not need a migration.
+   */
   position: number;
+  /**
+   * A priority the owner set, which sorts above the measured ranking.
+   *
+   * ⚠️ THE ONE FIELD ON THIS ROW THE OWNER DECIDES. `name` and `domain` are
+   * theirs too, but the mention count beside it is measured and has no input
+   * anywhere on the page. A star is an opinion; the number is a reading.
+   */
+  starred: boolean;
   createdAt: string;
 };
 

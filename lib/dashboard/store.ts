@@ -415,6 +415,17 @@ function questionToRow(q: DiscoveredQuestion, userId: string) {
   often AI cited a domain lives in the checks; the Competitors page joins the
   two by `domain` when it renders. See the note on Competitor in types.ts.
 */
+/*
+  ⚠️ `starred` MUST BE IN HERE OR STARS SILENTLY DO NOT SAVE. The diff upstream
+  spots the change on the client object and sends the row; a field missing from
+  this mapper is a field the upsert never carries, so the star would survive
+  until the next load and then vanish with no error anywhere.
+
+  ⚠️ AND THAT MAKES 0024 A HARD PREREQUISITE FOR EVERY COMPETITOR WRITE, not
+  just for starring. Once this ships, an upsert against a database without the
+  column is rejected outright — so adding, renaming and deleting a watched rival
+  all fail until the migration is applied, not merely the star.
+*/
 function competitorToRow(c: Competitor, userId: string) {
   return {
     id: c.id,
@@ -423,6 +434,7 @@ function competitorToRow(c: Competitor, userId: string) {
     name: c.name,
     domain: c.domain,
     position: c.position,
+    starred: c.starred,
     created_at: c.createdAt,
   };
 }
@@ -460,6 +472,11 @@ function rowToCompetitor(r: CompetitorRow): Competitor {
     name: r.name,
     domain: r.domain,
     position: r.position ?? 0,
+    /* ⚠️ ?? false BECAUSE THE COLUMN MAY NOT EXIST YET. This selects '*', so
+       between deploying and applying 0024 the field is simply absent, and
+       `undefined` would sort unpredictably against real booleans. Same defence
+       free_summaries_used needed in 0023. */
+    starred: r.starred ?? false,
     createdAt: r.created_at,
   };
 }
@@ -1433,10 +1450,37 @@ export async function addCompetitor(
     name: input.name.trim() || domain,
     domain,
     position: mine.length,
+    /* Unstarred: a priority is something the owner marks afterwards, and every
+       new row arriving pre-pinned would make the star mean nothing. */
+    starred: false,
     createdAt: now(),
   };
 
   return { ok: true, data: await write({ ...data, competitors: [...data.competitors, created] }) };
+}
+
+/**
+ * Mark a watched competitor as a priority, or unmark one.
+ *
+ * ⚠️ ITS OWN FUNCTION RATHER THAN A FIELD ON updateCompetitor's PATCH.
+ * NewCompetitor is "what a customer types when adding one" — a name and a
+ * domain — and widening it would put `starred` on the add form's type as well,
+ * where it means nothing. This writes one boolean and touches nothing else.
+ *
+ * ⚠️ THE COLUMN IS WRITABLE BY THE OWNER, WHICH IS NOT TRUE OF EVERY COLUMN
+ * THIS APP WRITES. public.competitors has no column allow-list and its RLS
+ * policies cover update — see 0024 for why that is right for a star and wrong
+ * for a spend counter.
+ */
+export async function starCompetitor(id: string, starred: boolean): Promise<DashboardData> {
+  const data = requireData('starCompetitor');
+  const target = data.competitors.find((c) => c.id === id);
+  if (!target) return data;
+
+  return write({
+    ...data,
+    competitors: data.competitors.map((c) => (c.id === id ? { ...c, starred } : c)),
+  });
 }
 
 export async function updateCompetitor(

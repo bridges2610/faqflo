@@ -10,6 +10,7 @@ import { formatNumber } from '@/lib/dashboard/format';
 import { canWatchCompetitors, isPro, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { COMPETITOR_CAP } from '@/lib/dashboard/store';
+import { sortWatched } from '@/lib/dashboard/competitors';
 import { CompetitorRow } from './competitor-row';
 import { CompetitorSummary } from './competitor-summary';
 import { EmptyState } from './empty-state';
@@ -108,6 +109,16 @@ export function CompetitorsWorkspace() {
      which is `undefined` here and renders as "no trend yet" rather than as a
      flat line: nothing to compare is not the same as no change. */
   const trendByDomain = new Map(measured.map((c) => [c.domain, c.trend]));
+
+  /* ⚠️ SORTED FOR DISPLAY, JOINED FIRST. The order depends on the measured
+     count, so it cannot be applied until the join above has run — which is why
+     this sits here rather than in the store's read. See compareWatched. */
+  const ordered = sortWatched(watched, (c) => mentionsByDomain.get(c.domain) ?? 0);
+
+  /* The bar on each row is drawn against the busiest watched rival, the same
+     basis SourceRow uses in the measured list below — so the two halves of this
+     page finally scale their bars the same way. */
+  const topMentions = Math.max(1, ...ordered.map((c) => mentionsByDomain.get(c.domain) ?? 0));
 
   /*
     Where this page's numbers come from, said on the page itself.
@@ -292,12 +303,13 @@ export function CompetitorsWorkspace() {
           </Badge>
         </div>
         <p className="text-slate mt-1 text-sm">
-          Name the businesses you compete with. We count how often AI mentions them.
+          Name the businesses you compete with. We count how often AI mentions them — most
+          mentioned first, and starred ones stay on top.
         </p>
 
         {watched.length > 0 && (
           <ul className="divide-line mt-4 divide-y">
-            {watched.map((c, i) => (
+            {ordered.map((c) => (
               <CompetitorRow
                 key={c.id}
                 competitor={c}
@@ -305,9 +317,8 @@ export function CompetitorsWorkspace() {
                    measured zero, and that zero is the answer the owner asked
                    for by adding them. */
                 mentions={mentionsByDomain.get(c.domain) ?? 0}
+                topMentions={topMentions}
                 trend={trendByDomain.get(c.domain) ?? null}
-                isFirst={i === 0}
-                isLast={i === watched.length - 1}
               />
             ))}
           </ul>

@@ -198,8 +198,17 @@ export type CompetitorRow = {
   name: string;
   /** Bare host. "summit.com", never "https://summit.com/". */
   domain: string;
-  /** Ordering on the Competitors page. See faqs.position. */
+  /**
+   * Ordering on the Competitors page. See faqs.position.
+   *
+   * ⚠️ NO LONGER READ BY THE UI, AND KEPT ANYWAY. The page sorts by `starred`
+   * then by measured mentions now, so nothing sets or reads this — but
+   * migrations here are additive, and keeping the column means restoring a
+   * hand-set order later needs no migration. See 0024.
+   */
   position: number;
+  /** Owner-set priority. Sorts to the top of the watch list. See 0024. */
+  starred: boolean;
   created_at: string;
 };
 

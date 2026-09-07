@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/lib/dashboard/provider';
 import type { Competitor, CompetitorShare } from '@/lib/dashboard/types';
 import { TrendMark } from './source-row';
-import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './nav-icons';
+import { StarIcon, TrashIcon } from './nav-icons';
+import { Meter } from './meter';
 
 /**
  * One watched rival: what you call them, their website, and how often AI named
@@ -23,12 +24,18 @@ import { ArrowDownIcon, ArrowUpIcon, TrashIcon } from './nav-icons';
 export function CompetitorRow({
   competitor,
   mentions,
+  topMentions,
   trend,
-  isFirst,
-  isLast,
 }: {
   competitor: Competitor;
   mentions: number;
+  /**
+   * The busiest watched rival's count, so every bar on the list shares a scale.
+   *
+   * ⚠️ THE SAME BASIS SourceRow USES in the measured list below — a bar drawn
+   * against its own row would make every rival look equally cited.
+   */
+  topMentions: number;
   /**
    * How their citations moved between the last two runs.
    *
@@ -37,10 +44,8 @@ export function CompetitorRow({
    * one run — both render as words rather than as a flat arrow.
    */
   trend: CompetitorShare['trend'];
-  isFirst: boolean;
-  isLast: boolean;
 }) {
-  const { editCompetitor, removeCompetitor, moveCompetitor } = useDashboard();
+  const { editCompetitor, removeCompetitor, starCompetitor } = useDashboard();
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(competitor.name);
   const [domain, setDomain] = useState(competitor.domain);
@@ -61,27 +66,43 @@ export function CompetitorRow({
   return (
     <li className="py-3 first:pt-0 last:pb-0">
       <div className="flex items-start gap-3">
-        {/* Reorder, in the same place and the same shape as the answers list —
-            a second arrangement of the same two arrows would be one to learn
-            twice. See faq-row.tsx. */}
-        <div className="flex shrink-0 flex-col gap-0.5 pt-0.5">
-          <button
-            onClick={() => moveCompetitor(competitor.id, 'up')}
-            disabled={isFirst}
-            aria-label={`Move ${competitor.name} up`}
-            className="text-slate hover:text-primary hover:bg-cloud rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            <ArrowUpIcon className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() => moveCompetitor(competitor.id, 'down')}
-            disabled={isLast}
-            aria-label={`Move ${competitor.name} down`}
-            className="text-slate hover:text-primary hover:bg-cloud rounded-md p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30"
-          >
-            <ArrowDownIcon className="h-3.5 w-3.5" />
-          </button>
-        </div>
+        {/*
+          ⚠️ THIS REPLACED THE UP/DOWN ARROWS, AND THE NOTE THEY CARRIED IS GONE
+          WITH THEM. They said reorder belonged here "in the same place and the
+          same shape as the answers list". True while a hand-set position was
+          what ordered this list — it is not any more. The order is star, then
+          measured mentions (see compareWatched), and a third rule would have
+          left the arrows appearing to do nothing on most presses.
+
+          ⚠️ aria-pressed AND A NAME THAT SAYS WHICH WAY ROUND. A filled star and
+          an outlined one are the same smudge at 16px and silent to a screen
+          reader; the state has to be in words. Same rule as every other mark in
+          this product.
+        */}
+        <button
+          onClick={() => starCompetitor(competitor.id, !competitor.starred)}
+          aria-pressed={competitor.starred}
+          aria-label={
+            competitor.starred
+              ? `Remove ${competitor.name} from priorities`
+              : `Make ${competitor.name} a priority`
+          }
+          /* ⚠️ text-warn, NOT text-warn-ink, AND THE TOKENS SAY SO. globals.css
+             sets the convention on this pair: "the mid value is for fills and
+             icons, the ink for type". The star was on warn-ink #c2410c, which
+             is orange-700 — correct for a word, and it reads brown-orange as a
+             shape. --color-warn #f59e0b is the amber this is meant to be.
+
+             ⚠️ THE HUE IS NOT WHAT CARRIES THE STATE, which is why a 2.15:1
+             icon colour is acceptable here and would not be on type. Filled
+             versus outlined is a second encoding independent of colour, and the
+             button's aria-pressed and label say it in words. */
+          className={`hover:bg-cloud shrink-0 rounded-md p-1 transition-colors duration-150 ${
+            competitor.starred ? 'text-warn' : 'text-slate/50 hover:text-slate'
+          }`}
+        >
+          <StarIcon filled={competitor.starred} className="h-4.5 w-4.5" />
+        </button>
 
         <div className="min-w-0 flex-1">
           {editing ? (
@@ -121,6 +142,30 @@ export function CompetitorRow({
                     is the address you would copy, and it is the value the
                     measured list is matched on. */}
                 <p className="text-slate truncate font-mono text-xs">{competitor.domain}</p>
+
+                {/*
+                  ⚠️ THE BAR IS A SECOND ENCODING, AND THE COUNT BESIDE IT STAYS.
+                  meter.tsx makes that a rule about the caller: it is always
+                  aria-hidden, so the figure has to be readable as text — which
+                  it is, to the right of this. It is here to make the ranking
+                  visible without reading four numbers, the same job it does in
+                  the measured list below.
+
+                  ⚠️ AND ZERO DRAWS AN EMPTY TRACK RATHER THAN NOTHING. A rival
+                  AI has never cited is the finding the owner asked for; a
+                  missing bar would read as a missing measurement.
+                */}
+                {/* ⚠️ ONE TONE FOR EVERY BAR, AND IT WAS BRIEFLY TWO. Tinting
+                    the starred row differently double-encodes a fact the star
+                    already carries, and the `line` tone used for the rest was
+                    very nearly the colour of the track behind it — a rival on
+                    two mentions with a full bar looked identical to one on
+                    zero. The bar means mentions; the star means priority. */}
+                <Meter
+                  className="mt-2 max-w-40"
+                  value={(mentions / topMentions) * 100}
+                  tone="primary"
+                />
               </div>
 
               <div className="flex shrink-0 items-center gap-3">
