@@ -36,7 +36,22 @@ import { usePathname } from 'next/navigation';
   its keep: the field and the lit segment share one silhouette, which is what
   makes it read as one control with a position rather than three buttons.
 */
-export type WorkspaceTab = { href: string; label: string };
+export type WorkspaceTab = {
+  href: string;
+  label: string;
+  /**
+   * How many things are behind this tab, shown after the label.
+   *
+   * ⚠️ OPTIONAL BECAUSE THREE TAB SETS SHARE THIS TYPE. ANSWER_TABS,
+   * OPPORTUNITY_TABS and AUDIT_TABS all use it, and only Answers has anything
+   * to count — the other two must keep rendering exactly as they did.
+   *
+   * ⚠️ AND IT COMES FROM THE CALLER, NOT THE CONSTANT. The tab arrays are
+   * module-level and cannot know how many articles an account has; the
+   * workspace maps the numbers on at render.
+   */
+  count?: number;
+};
 
 export function WorkspaceTabs({
   tabs,
@@ -78,6 +93,18 @@ export function WorkspaceTabs({
                 }`}
               >
                 {tab.label}
+                {/* ⚠️ ZERO RENDERS NOTHING, RATHER THAN "0". A nought beside
+                    Articles on a new account reads as a broken badge; absence
+                    reads as "nothing yet", which is what is true. */}
+                {tab.count ? (
+                  <span
+                    className={`ml-2 text-xs tabular-nums ${
+                      active ? 'text-on-primary/70' : 'text-slate/70'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

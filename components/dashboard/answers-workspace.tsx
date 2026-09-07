@@ -14,6 +14,7 @@ import { ArticleCard } from './article-card';
 import { WritePanel } from './write-panel';
 import { DraftReview } from './draft-review';
 import { EmptyState } from './empty-state';
+import { Meter } from './meter';
 import { FaqRow } from './faq-row';
 import { ChevronIcon } from './nav-icons';
 import { GeneratorPanel, type GenerationMeta } from './generator-panel';
@@ -233,10 +234,22 @@ export function AnswersWorkspace({ tab }: { tab: AnswersTab }) {
     setMeta(null);
   }
 
+  /* ⚠️ MAPPED HERE RATHER THAN STORED IN ANSWER_TABS, which is a module-level
+     constant in lib/dashboard/answers-tabs.ts and cannot know what this account
+     has. "Write about" gets no count on purpose: it is a place to start
+     something, not a pile of things. */
+  const tabsWithCounts = ANSWER_TABS.map((t) =>
+    t.href === answersTabHref('articles')
+      ? { ...t, count: articles.length }
+      : t.href === answersTabHref('answers')
+        ? { ...t, count: mine.length }
+        : t,
+  );
+
   const header = (
     <>
       <PageHeader className="mb-4" title="Content" description={description} />
-      <WorkspaceTabs tabs={ANSWER_TABS} activeHref={answersTabHref(tab)} label="Content sections" />
+      <WorkspaceTabs tabs={tabsWithCounts} activeHref={answersTabHref(tab)} label="Content sections" />
     </>
   );
 
@@ -508,13 +521,35 @@ function TopicGroup({
 }) {
   const [open, setOpen] = useState(false);
   const live = bucket.faqs.filter((f) => f.status === 'published').length;
+  /* ⚠️ NOT `total` — that prop is already the count of every answer on the
+     SITE, which FaqRow needs to know which arrow to disable. Two different
+     totals in one component is exactly how the wrong one gets used. */
+  const setSize = bucket.faqs.length;
+
+  /*
+    How much of this set is actually on the customer's site.
+
+    ⚠️ THE BAR IS A SECOND ENCODING, NEVER THE ONLY ONE. Three sets reading
+    "2 answers · none live", "4 answers · 4 live" and "2 answers · 1 live" in
+    identical grey is the state this fixes: the most useful fact on the screen
+    was also the quietest thing on it. The count stays written out beside the
+    bar — components/dashboard/meter.tsx's own header makes that a rule about
+    the caller, because Meter is always aria-hidden.
+  */
+  const pct = setSize > 0 ? (live / setSize) * 100 : 0;
+  const tone = setSize > 0 && live === setSize ? 'success' : 'primary';
 
   return (
     <li>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="group/row flex min-h-11 w-full items-center gap-2.5 py-3 text-left"
+        /* ⚠️ hover:bg-cloud IS THE HOUSE HOVER GROUND, not a new colour — see
+           faq-row.tsx and password-field.tsx. The negative margin lets the tint
+           sit slightly wider than the text without moving anything, and the
+           row keeps the global :focus-visible outline from globals.css rather
+           than growing a bespoke ring. */
+        className="group/row -mx-2 flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-3 text-left transition-colors duration-150 hover:bg-cloud"
       >
         <ChevronIcon
           aria-hidden="true"
@@ -525,9 +560,19 @@ function TopicGroup({
         <span className="text-navy group-hover/row:text-primary min-w-0 flex-1 text-sm font-medium transition-colors duration-150">
           {bucket.label}
         </span>
-        <span className="text-slate shrink-0 text-xs">
-          {bucket.faqs.length} {bucket.faqs.length === 1 ? 'answer' : 'answers'} ·{' '}
-          {live > 0 ? `${live} live` : 'none live'}
+        {/* ⚠️ HIDDEN BELOW sm, AND THAT IS THE SIMPLE CHOICE. At 390px the row
+            is chevron, label, bar and count in one line, and the bar is what
+            squeezes the label into wrapping. The sentence beside it carries the
+            same fact at every width. */}
+        <span className="hidden w-16 shrink-0 sm:block">
+          <Meter value={pct} tone={tone} />
+        </span>
+        {/* ⚠️ "0 of 2 live", NOT "2 answers · none live". The old string said
+            the total once and the live count as a word, which left an empty bar
+            beside a sentence containing no number. One phrase now carries both,
+            and it says nought as a digit. */}
+        <span className="text-slate shrink-0 text-xs tabular-nums">
+          {live} of {setSize} live
         </span>
       </button>
 

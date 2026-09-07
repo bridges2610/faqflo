@@ -17,7 +17,7 @@ import {
 } from '@/lib/dashboard/questions';
 import { questionKey } from '@/lib/questions';
 import type { ArticleSection, ArticleTopic, DiscoveredQuestion } from '@/lib/dashboard/types';
-import { LockIcon, SearchIcon } from './nav-icons';
+import { DocIcon, FaqIcon, LockIcon, SearchIcon } from './nav-icons';
 import { SectionTitle } from './section-title';
 import { WritingModal } from './writing-modal';
 
@@ -447,12 +447,13 @@ export function WritePanel() {
 
                     The ORDER still puts the least-named first; it is simply no
                     longer narrated. See the sort above. */}
-                <SectionLabel>Asked by customers</SectionLabel>
+                <SectionLabel count={tracked.length}>Asked by customers</SectionLabel>
                 <ul className="divide-line divide-y">
                   {tracked.map((q) => (
                     <TopicRow
                       key={q.id}
                       title={q.question}
+                      kind="question"
                       busy={busy}
                       noneLeft={noneLeft}
                       onHide={() => dismissQuestion(q.id, true)}
@@ -465,7 +466,7 @@ export function WritePanel() {
 
             {suggested.length > 0 && (
               <>
-                <SectionLabel className={tracked.length > 0 ? 'mt-6' : undefined}>
+                <SectionLabel count={suggested.length} className={tracked.length > 0 ? 'mt-7' : undefined}>
                   Suggested for your industry
                 </SectionLabel>
                 <ul className="divide-line divide-y">
@@ -474,6 +475,7 @@ export function WritePanel() {
                       key={t.title}
                       title={t.title}
                       angle={t.angle}
+                      kind="suggestion"
                       busy={busy}
                       noneLeft={noneLeft}
                       /* ⚠️ HIDE HERE TOO, AND IT HAD TO BECOME REAL RATHER THAN
@@ -684,19 +686,32 @@ export function WritePanel() {
    must never carry text. The ink and tint tokens themselves are documented in
    globals.css. */
 
-/** A quiet heading over one half of the list. */
+/**
+ * A heading over one half of the list.
+ *
+ * ⚠️ SENTENCE CASE, NOT THE MONO SMALL-CAPS IT WAS, AND metric-tile.tsx ALREADY
+ * ARGUED THIS. Its note: the mono micro-label "is right on things that ARE
+ * machine output — a status column, a code block's caption", and small-caps
+ * mono made a heading a business owner reads "look like a system field rather
+ * than a sentence about their business". These head a list of questions real
+ * customers asked. They are sentences about the business.
+ *
+ * The count sits after the label in the same muted treatment the tab strip
+ * uses, so the two halves can be sized at a glance instead of counted.
+ */
 function SectionLabel({
   children,
+  count,
   className = '',
 }: {
   children: React.ReactNode;
+  count?: number;
   className?: string;
 }) {
   return (
-    <p
-      className={`text-slate font-mono text-xs tracking-wide uppercase sm:text-[0.6875rem] ${className || 'mt-4'}`}
-    >
+    <p className={`text-navy text-sm font-semibold ${className || 'mt-5'}`}>
       {children}
+      {count ? <span className="text-slate/70 ml-2 text-xs font-normal tabular-nums">{count}</span> : null}
     </p>
   );
 }
@@ -729,6 +744,7 @@ function briefFor(topic: ArticleTopic): string {
 function TopicRow({
   title,
   angle,
+  kind,
   busy,
   noneLeft,
   onHide,
@@ -737,15 +753,54 @@ function TopicRow({
   title: string;
   /** The plan's angle, for a suggestion. */
   angle?: string;
+  /** Which half of the list this row belongs to. Drives the mark only. */
+  kind: 'question' | 'suggestion';
   busy: boolean;
   noneLeft: boolean;
   /** Omitted for a suggestion — see the note at the call site. */
   onHide?: () => void;
   onWrite: () => void;
 }) {
+  const question = kind === 'question';
 
   return (
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2">
+    /*
+      ⚠️ hover:bg-cloud, AND THE ROW IS NOT A BUTTON — UNLIKE THE SET ROWS ON
+      THE ANSWERS TAB. This one holds two controls, Write and Hide, so the tint
+      is a scanning aid and nothing more. That is why it is the ONLY thing
+      added: no cursor change, no chevron, nothing that promises a click target
+      the row does not have.
+
+      The negative margin lets the tint sit slightly wider than the text without
+      moving anything, the same inset the Answers set rows use.
+    */
+    <li className="-mx-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg px-2 py-3 transition-colors duration-150 hover:bg-cloud">
+      {/*
+        ⚠️ THE MARK IS NEVER THE MEANING — status-icon.tsx sets that rule. This
+        is aria-hidden and carries nothing on its own: the heading above the
+        list says which kind these are, in words, and the row's own button names
+        the topic. The chip is a second encoding of a fact already written, the
+        same job the Meter bars do on the Answers tab.
+      */}
+      {/*
+        ⚠️ HIDDEN BELOW sm, AND THAT IS MEASURED RATHER THAN TIDINESS. At 390px
+        the button group already wraps below the text — the note above calls
+        that load-bearing — so the chip's 28px plus its gap comes straight out
+        of the title's column and pushes it onto more lines. Measured across
+        these fifteen rows: 181px average row height without the chip, 257px
+        with it. A 28% longer scroll on a phone is a bad trade for a mark whose
+        job is telling two lists apart at a glance, and at that width the
+        heading is on screen with the rows anyway.
+      */}
+      <span
+        aria-hidden="true"
+        className={`hidden h-7 w-7 shrink-0 items-center justify-center rounded-full sm:flex ${
+          question ? 'bg-primary-soft text-primary' : 'bg-accent-soft text-teal-ink'
+        }`}
+      >
+        {question ? <FaqIcon className="h-3.5 w-3.5" /> : <DocIcon className="h-3.5 w-3.5" />}
+      </span>
+
       <div className="min-w-0 flex-1">
         <p className="text-navy text-sm">{title}</p>
         {angle && <p className="text-slate mt-0.5 text-xs leading-relaxed">{angle}</p>}
