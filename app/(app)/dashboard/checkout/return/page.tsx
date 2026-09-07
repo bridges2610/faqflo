@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { ButtonLink } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { PageHeader } from '@/components/dashboard/page-header';
+import { UpgradeCelebration } from '@/components/dashboard/upgrade-celebration';
 import { fulfilCheckoutSession } from '@/lib/stripe/fulfil';
 
 export const metadata: Metadata = { title: 'Thank you' };
@@ -40,33 +40,40 @@ export default async function CheckoutReturnPage({
     : { status: 'ignored' as const, reason: 'no session_id' };
 
   /*
-    Granted means done — so don't make them read about it.
+    Granted means done — and it is worth a beat.
 
-    This page used to be the destination: a thank-you card with a link onward.
-    But nobody buys an audit in order to arrive at a receipt, and a page whose
-    only purpose is a button is a page that gets closed. On success we send
-    them into the thing they just paid for, and the confirmation rides along as
-    ?purchased=1 for the workspace to acknowledge in a line.
+    ⚠️ THIS USED TO REDIRECT STRAIGHT THROUGH, AND THE ARGUMENT FOR THAT IS
+    RECORDED HERE BECAUSE IT IS STILL HALF RIGHT. It read: "nobody buys an audit
+    in order to arrive at a receipt, and a page whose only purpose is a button
+    is a page that gets closed." Both true — which is why what replaced it is
+    not a receipt with a button, but a moment that leaves on its own after five
+    seconds. Upgrading is the one thing in this product worth marking; being
+    parked on a page to admire it is not.
 
-    The redirect is deliberately AFTER fulfilment above: redirect() throws to
-    unwind, so putting it earlier would skip the grant it is confirming.
+    ⚠️ AND IT IS ONLY REACHED WHEN FULFILMENT GRANTED ON THIS REQUEST. The
+    branches below — a debit still settling, a return with no session — get
+    their sentence and no confetti. Congratulating somebody whose payment has
+    not cleared is a promise this page cannot keep.
+
+    ⚠️ THE CELEBRATION RENDERS AFTER fulfilCheckoutSession() ABOVE, for the same
+    reason the redirect did: it is confirming the grant, so it must not run
+    before it.
   */
   if (result.status === 'granted') {
     /*
-      ⚠️ STRAIGHT TO THE THING THEY JUST UNLOCKED, not to a receipt.
+      ⚠️ HOME, NOT THE AUDIT PAGE, AND THAT IS WHERE UpgradeCelebration SENDS
+      THEM. The previous destination was /dashboard/audit?upgraded=pro, chosen
+      because a new subscriber's score came from one page and Pro reads the
+      whole site. Home is the screen with the headline numbers and the worklist,
+      which reads as "here is everything now" — and the celebration has already
+      said what changed, so the audit banner is no longer carrying that job.
 
-      A new Pro subscriber already has a dashboard — the free onboarding scan
-      filled it in when they signed up — so there is nothing to watch and no
-      reason to stop. The audit page is where the difference is most immediately
-      visible: their score was built from one page an hour ago and Pro reads the
-      whole site.
-
-      ⚠️ The webhook, not this page, is what actually writes `plan = 'pro'`, and
-      it may not have landed yet. `?upgraded=pro` is what lets the destination
-      say "your upgrade is going through" instead of showing a lock to somebody
-      who has just paid.
+      ⚠️ THE ?upgraded=pro BANNER IN audit-workspace.tsx STILL EXISTS and is
+      still correct for anyone who reaches that URL; it is simply no longer on
+      this path. Its note has been corrected to stop claiming subscribers land
+      there.
     */
-    redirect('/dashboard/audit?upgraded=pro');
+    return <UpgradeCelebration />;
   }
 
   /*

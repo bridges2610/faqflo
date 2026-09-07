@@ -134,9 +134,14 @@ export function AuditWorkspace({
     /dashboard/start to watch the scan through.
 
     The banner below reads `?upgraded=pro` and does nothing but congratulate.
-    ⚠️ It must stay that way: a new subscriber DOES land here now (see the
-    redirect in /dashboard/checkout/return), so anything automatic added to this
-    effect would fire on every upgrade.
+    ⚠️ IT MUST STAY THAT WAY, AND THE REASON HAS CHANGED RATHER THAN GONE. This
+    said "a new subscriber DOES land here now" — they no longer do:
+    /dashboard/checkout/return shows UpgradeCelebration and sends them to Home.
+    The URL is still reachable directly, so the banner is still correct, and
+    anything automatic added to this effect would still be a full audit fired by
+    a query parameter. The old sentence is corrected rather than deleted because
+    a stale claim about a flow is how somebody "restores" behaviour on evidence
+    that is no longer true.
   */
 
   if (!site || !data) {

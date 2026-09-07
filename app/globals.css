@@ -525,6 +525,54 @@ html[data-theme='dark'] {
   }
 
   /*
+    Confetti, bursting from the middle of the screen, for the one moment in
+    this product worth marking.
+
+    ⚠️ THE THIRD KEYFRAME, AND IT PASSES THE TEST THE FIRST TWO SET. The rule at
+    meter-fill: a keyframe is for "an element animating on first paint, with no
+    previous state to move from". Thirty pieces that exist only in order to fall
+    are exactly that, and there is no value for a transition to run from.
+
+    ⚠️ ONE KEYFRAME FOR EIGHTY DIFFERENT PATHS. Each piece passes its own
+    vector, spin, delay and duration as custom properties, so the variety is
+    per-element inline style rather than eighty rules — which is what keeps this
+    from being the moment the stylesheet starts growing a section.
+
+    ⚠️ IT IS NOT GUARDED BY THE REDUCED-MOTION BLOCK ABOVE, AND MUST NOT RELY ON
+    IT. That block clamps animation-duration to 0.01ms, which for a bar means
+    "arrive at the honest end state instantly" and for confetti means eighty
+    squares flashing in the middle of the screen and vanishing — a glitch rather
+    than a quieter celebration. components/ui/confetti.tsx checks the preference
+    in JS and renders nothing at all instead.
+  */
+  @keyframes confetti-burst {
+    0% {
+      opacity: 1;
+      transform: translate3d(0, 0, 0) rotate(0deg) scale(0.4);
+    }
+    /* ⚠️ THE MIDPOINT IS WHAT MAKES IT A BURST RATHER THAN A DRIFT. Most of the
+       outward distance is covered in the first quarter of the animation, so the
+       pieces leave the middle fast and then slow into the fall — which is what
+       an explosion looks like. Two keyframes with a linear path between them
+       reads as thirty things politely sliding apart. */
+    25% {
+      opacity: 1;
+      transform: translate3d(calc(var(--dx) * 0.72), calc(var(--dy) * 0.72), 0)
+        rotate(calc(var(--rot) * 0.4)) scale(1);
+    }
+    100% {
+      opacity: 0;
+      /* Gravity: every piece ends lower than it was thrown, whichever way it
+         went out. */
+      transform: translate3d(var(--dx), calc(var(--dy) + 46vh), 0) rotate(var(--rot)) scale(1);
+    }
+  }
+
+  .motion-confetti {
+    animation: confetti-burst var(--dur) cubic-bezier(0.16, 0.84, 0.44, 1) var(--delay) both;
+  }
+
+  /*
     Fine film grain. Perfectly smooth gradients are one of the clearest signs a
     page was generated rather than made — real printed and photographed colour
     always has some noise in it. This is subtle by design: you shouldn't be able
