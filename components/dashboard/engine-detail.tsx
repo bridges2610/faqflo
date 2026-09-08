@@ -2,6 +2,7 @@ import { EngineMark } from '@/components/ui/ai-marks';
 import { checksByEngine, type QuestionGroup } from '@/lib/dashboard/questions';
 import { MAX_EXCERPT_CHARS, type CitationCheck, type Engine } from '@/lib/dashboard/types';
 import { AnswerText } from './answer-text';
+import { ChevronIcon } from './nav-icons';
 
 /*
   What the engines actually said about one question — the evidence itself.
@@ -174,23 +175,48 @@ export function OutcomeChip({
  */
 export function EngineDetailList({ group }: { group: QuestionGroup }) {
   return (
-    <div className="divide-line divide-y">
+    /*
+      ⚠️ SEPARATE CARDS, NOT `divide-y` INSIDE ONE PANEL, AND THE BLOCK HEIGHT
+      IS WHY. These were three sections of a single slab split by a hairline.
+      That is enough when the sections are a line or two; each of these is a
+      paragraph of prose, a callout and a source list, and at that height a 1px
+      rule stops registering as a boundary — the ChatGPT answer and the
+      Perplexity answer below it read as one continuous block of text.
+    */
+    <div className="space-y-3">
       {checksByEngine(group).map(({ engine, check }) => (
-        <div key={engine} className="py-4 first:pt-0 last:pb-0">
+        /*
+          ⚠️ THE BORDER DOES THE SEPARATING, NOT THE FILL, BECAUSE THIS BLOCK
+          LANDS ON TWO DIFFERENT GROUNDS. prompt-matrix.tsx drops it into a
+          `bg-cloud` tray; tracking-workspace.tsx's QuestionRow drops it onto
+          the card's plain white. A card defined by its fill would be invisible
+          on the second. Bordered white reads as a card in the tray and as an
+          outline on white, so one treatment covers both — which is the whole
+          point of this file being one copy.
+        */
+        <div key={engine} className="border-line rounded-xl border bg-white p-4">
           {/* The engine, and what it did — one line, and the only place the
               engine is named. The chip carries the verdict alone because this
-              heading has already said whose verdict it is. */}
-          <p className="text-navy flex items-center gap-2 text-sm font-semibold">
+              heading has already said whose verdict it is.
+
+              ⚠️ THE CHIP IS PUSHED RIGHT, AND THAT IS WHAT MAKES THE VERDICTS
+              SCANNABLE. Inline after the name, the three chips landed at three
+              different x-positions — "ChatGPT", "Perplexity" and "Gemini" are
+              different lengths — so comparing the three answers meant hunting
+              for each one. Against the right edge they stack into a column. */}
+          <p className="border-line text-navy flex items-center gap-2 border-b pb-2.5 text-sm font-semibold">
             <EngineMark engine={engine} className="h-4 w-4 shrink-0" />
             {engine}
-            <OutcomeChip check={check} />
+            <span className="ml-auto">
+              <OutcomeChip check={check} />
+            </span>
           </p>
 
           {!check ? (
             /* ⚠️ A gap, not a zero. An engine can fail on its own — a 429
                during the run — and saying "not named" here would claim a
                measurement we never took. */
-            <p className="text-slate mt-2 text-sm">
+            <p className="text-slate mt-3 text-sm">
               We don’t have an answer from {engine} for this one yet.
             </p>
           ) : (
@@ -199,7 +225,16 @@ export function EngineDetailList({ group }: { group: QuestionGroup }) {
                   because it is the answer to the only question this panel
                   really gets asked: why wasn’t I in there? */}
               {check.excerpt ? (
-                <div className="mt-2.5">
+                /*
+                  ⚠️ max-w-[68ch] IS THE SINGLE BIGGEST LEGIBILITY FIX HERE, AND
+                  IT IS A MEASURE, NOT A LOOK. The expanded row spans the prompt
+                  column plus all three engine columns, so on a wide window this
+                  prose ran about 140 characters a line — roughly double what
+                  anybody reads without losing their place on the return sweep.
+                  The card, the matrix and the mobile list all keep their widths;
+                  only the text stops using all of it.
+                */
+                <div className="mt-3 max-w-[68ch]">
                   <AnswerText text={check.excerpt} />
                   {looksTruncated(check.excerpt) && (
                     <p className="text-slate/70 mt-2 text-xs">
@@ -208,22 +243,29 @@ export function EngineDetailList({ group }: { group: QuestionGroup }) {
                   )}
                 </div>
               ) : (
-                <p className="text-slate mt-2 text-sm">
+                <p className="text-slate mt-3 text-sm">
                   We didn’t keep a copy of what {engine} said this time.
                 </p>
               )}
 
               {/* Who it pointed at instead, in words rather than beside a
                   count. It is the second thing a customer looks for and it was
-                  previously a fragment on the end of a row of metadata. */}
+                  previously a fragment on the end of a row of metadata.
+
+                  ⚠️ A TINTED STRIP, AND DELIBERATELY NOT AN ALARM COLOUR. This
+                  is the actionable finding in the block and it was reading as
+                  one more grey paragraph among several, so it gets a ground of
+                  its own. OUTCOME_FILL records why the colour is neutral:
+                  being left out is the majority state for a site that has just
+                  started, and painting it red is a verdict rather than a
+                  reading. The same accent tint `mentioned` already carries. */}
               {check.outcome !== 'cited' && check.citedInstead && (
-                <p className="text-slate mt-2.5 text-sm">
+                <p className="bg-accent-soft text-navy mt-3 rounded-lg px-3 py-2 text-sm">
                   It sent people to{' '}
                   {/* Not mono. This is a name being read in a sentence, not a
                       URL anyone will copy — the source list below keeps mono
                       for exactly that reason. */}
-                  <span className="text-navy font-semibold">{check.citedInstead}</span>{' '}
-                  instead of you.
+                  <span className="font-semibold">{check.citedInstead}</span> instead of you.
                 </p>
               )}
 
@@ -247,39 +289,86 @@ export function EngineDetailList({ group }: { group: QuestionGroup }) {
  */
 const SOURCE_CAP = 7;
 
-/** Where one answer got its information, most relevant first. */
+/**
+ * One source link.
+ *
+ * ⚠️ Display is cleaned; the href is the stored URL, untouched.
+ * `?utm_source=openai` is the engine tagging its own referral and makes two
+ * links to one page look like two — but the source list is evidence, so what we
+ * LINK to stays exactly what was recorded.
+ */
+function SourceLink({ url }: { url: string }) {
+  return (
+    <li className="min-w-0 truncate">
+      <a
+        href={url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-slate hover:text-primary font-mono text-[0.8125rem] underline-offset-2 hover:underline"
+      >
+        {displayUrl(url)}
+      </a>
+    </li>
+  );
+}
+
+/**
+ * Where one answer got its information, most relevant first.
+ *
+ * ⚠️ TWO COLUMNS, BECAUSE THIS WAS THE TALLEST THING IN THE BLOCK AND THE LEAST
+ * IMPORTANT. Seven stacked domains of near-identical grey mono ran longer than
+ * the answer above them and pushed the next engine off the screen. The links are
+ * unchanged; they just stop being a column.
+ */
 function SourceList({ sources }: { sources: string[] }) {
   const shown = sources.slice(0, SOURCE_CAP);
-  const hidden = sources.length - shown.length;
+  const hidden = sources.slice(SOURCE_CAP);
 
   return (
-    <div className="mt-3">
+    <div className="mt-4">
       <p className="text-slate text-xs font-semibold">
         {sources.length === 1 ? 'The website it used' : 'The websites it used'}
       </p>
-      <ul className="mt-1.5 space-y-1">
+
+      <ul className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
         {shown.map((url) => (
-          <li key={url} className="min-w-0 truncate">
-            {/* Display is cleaned; the href is the stored URL, untouched.
-                `?utm_source=openai` is the engine tagging its own referral and
-                makes two links to one page look like two — but the source list
-                is evidence, so what we LINK to stays exactly what was
-                recorded. */}
-            <a
-              href={url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-slate hover:text-primary font-mono text-[0.8125rem] underline-offset-2 hover:underline"
-            >
-              {displayUrl(url)}
-            </a>
-          </li>
+          <SourceLink key={url} url={url} />
         ))}
       </ul>
-      {hidden > 0 && (
-        <p className="text-slate/70 mt-1.5 text-xs">
-          and {hidden} more {hidden === 1 ? 'website' : 'websites'}
-        </p>
+
+      {hidden.length > 0 && (
+        /*
+          ⚠️ A DISCLOSURE RATHER THAN THE DEAD-END LINE IT REPLACES, AND IT
+          SATISFIES SOURCE_CAP'S RULE RATHER THAN BYPASSING IT. That rule is
+          that the rest are counted, never dropped silently — "and 7 more
+          websites" said the number and then offered nothing to do about it.
+          Naming the count and then showing them on request is strictly more
+          honest, and the cap still protects the default view.
+
+          ⚠️ <details>, NOT useState, AND THAT IS THE POINT. This file has no
+          'use client' and audit-extras.tsx imports OutcomeBar from it — state
+          here would drag a client boundary through a third file for one toggle.
+          The mobile QuestionRow already opens its evidence with <details>.
+        */
+        <details className="group mt-2">
+          <summary className="text-slate/80 hover:text-primary marker:content-none inline-flex cursor-pointer list-none items-center gap-1 text-xs">
+            <ChevronIcon className="h-3 w-3 transition-transform group-open:rotate-90" />
+            {/* Both states say the number: a reader who has opened it should
+                still be able to see how many the cap was hiding. */}
+            <span className="group-open:hidden">
+              Show {hidden.length} more {hidden.length === 1 ? 'website' : 'websites'}
+            </span>
+            <span className="hidden group-open:inline">
+              Hide {hidden.length} more {hidden.length === 1 ? 'website' : 'websites'}
+            </span>
+          </summary>
+
+          <ul className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+            {hidden.map((url) => (
+              <SourceLink key={url} url={url} />
+            ))}
+          </ul>
+        </details>
       )}
     </div>
   );
@@ -290,12 +379,20 @@ function SourceList({ sources }: { sources: string[] }) {
  *
  * ⚠️ BUILT FROM OUTCOME_STYLE AND NOT_CHECKED, NEVER FROM A SECOND LIST. The
  * word and its tint are one decision — see the note on OUTCOME_STYLE — and a
- * legend that hardcoded either would be free to drift from the cells it
- * explains, which is the one failure a legend must not have.
+ * gloss that hardcoded either would be free to drift from the cells it
+ * explains, which is the one failure an explanation must not have.
  *
- * It replaces two paragraphs: a 22-word blurb under the heading and a 43-word
- * note at the foot of the card. Four chips beside four glosses says the same
- * thing without a sentence in it.
+ * ⚠️ THIS IS DATA NOW, NOT A RENDERED ROW, AND THE COMPONENT THAT DREW IT IS
+ * GONE. It used to render as a four-chip legend above the filters, which put
+ * the same four words on screen twice within about 40px: once as a key and
+ * again as the filter buttons directly beneath, in a different visual
+ * treatment. Results filters now carry the tint themselves and gloss whichever
+ * one is active, reading these strings — so the explanation survives, and the
+ * duplication does not.
+ *
+ * `notAsked` has no filter of its own because it is not an outcome — it is the
+ * absence of one. It stays in this list so the two near-rhymes remain written
+ * down together, which is where the rule that they must not be merged lives.
  */
 export const OUTCOME_LEGEND: { key: string; label: string; className: string; gloss: string }[] = [
   { key: 'cited', ...OUTCOME_STYLE.cited, gloss: 'named you and linked to your site' },
@@ -303,24 +400,6 @@ export const OUTCOME_LEGEND: { key: string; label: string; className: string; gl
   { key: 'absent', ...OUTCOME_STYLE.absent, gloss: 'you were not in the answer' },
   { key: 'notAsked', ...NOT_CHECKED, gloss: 'no answer came back that time' },
 ];
-
-/** The legend as a row — one line on a laptop, a stack on a phone. */
-export function OutcomeLegend({ className = '' }: { className?: string }) {
-  return (
-    <ul className={`flex flex-wrap gap-x-5 gap-y-2 ${className}`}>
-      {OUTCOME_LEGEND.map((item) => (
-        <li key={item.key} className="flex items-center gap-1.5">
-          <span
-            className={`rounded-pill inline-flex items-center px-1.5 py-0.5 text-[0.625rem] leading-none font-medium whitespace-nowrap ${item.className}`}
-          >
-            {item.label}
-          </span>
-          <span className="text-slate text-xs">{item.gloss}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 /*
   Every answer we checked, split three ways.
@@ -339,7 +418,7 @@ export function OutcomeLegend({ className = '' }: { className?: string }) {
   who learns "green is linked" from a matrix cell must not meet a different
   green up here.
 */
-const OUTCOME_FILL: Record<CitationCheck['outcome'], string> = {
+export const OUTCOME_FILL: Record<CitationCheck['outcome'], string> = {
   cited: 'bg-success',
   mentioned: 'bg-accent',
   /* Not bg-line. The segments always cover the whole track, so `absent` never

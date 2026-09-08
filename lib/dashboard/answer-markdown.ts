@@ -125,35 +125,140 @@ export function parseInline(text: string, depth = 0): Token[] {
 }
 
 /**
- * A whole answer: paragraphs of lines of tokens.
+ * A bullet line, and what it says without its marker.
  *
- * Blank lines separate paragraphs; single newlines stay as line breaks, which is
- * what keeps a list of businesses reading as a list. Bullet characters are left
- * as the engine typed them rather than rebuilt into a `<ul>` — the job is to
- * show the answer, not to reformat it into something it never was.
+ * ⚠️ THE MARKER MUST BE FOLLOWED BY A SPACE, WHICH IS WHAT KEEPS PROSE OUT.
+ * Answers are full of hyphens that begin no list — a line wrapping onto
+ * "-year-old" or an em-dash at the start of a clause — and treating those as
+ * bullets would shred a paragraph into list items. A marker, then whitespace,
+ * then content is the shape engines actually emit.
+ *
+ * `*` is included because engines mix it with `-` freely. It cannot collide
+ * with bold: `**bold**` has no space after the marker, and a lone `*` opening a
+ * line of italics would need its closing partner, which parseInline still finds
+ * in the content this returns.
  */
-export function parseAnswer(text: string): Token[][][] {
-  return (
-    text
-      .split(/\n{2,}/)
-      .map((paragraph) => paragraph.trim())
-      .filter(Boolean)
-      .map((paragraph) =>
-        paragraph
-          .split('\n')
-          /* Alignment rows first: they carry nothing, so they never reach the
-             flattener and never become an empty line to clean up after. */
-          .filter((line) => !isTableRule(line))
-          .map((line) => flattenTableRow(line))
-          /* A row of empty cells — `| | |` — flattens to nothing. Dropped here
-             rather than rendered as a blank line inside the answer. */
-          .filter((line) => line.trim().length > 0)
-          .map((line) => parseInline(line)),
-      )
-      /* A paragraph that was ONLY an alignment row is now empty. Without this it
-         would render as an empty <p> and space the answer out for no reason. */
-      .filter((lines) => lines.length > 0)
-  );
+const BULLET = /^\s*[-*•]\s+/;
+
+/**
+ * A marker with nothing after it but the ellipsis that replaced the rest.
+ *
+ * ⚠️ IT NEEDS ITS OWN PATTERN BECAUSE BULLET CANNOT MATCH IT. `excerptOf` cuts
+ * at a word boundary, calls `trimEnd()` and appends `…`, so a list severed
+ * right after its last marker is stored as exactly `-…` — no space, which is
+ * the one thing BULLET insists on. Testing "is it a bullet, and is it empty"
+ * would therefore never fire, and this is the line a customer actually sees at
+ * the bottom of a cut-off answer.
+ *
+ * ⚠️ IT MUST NOT SWALLOW `---`. A horizontal rule is content people write, and
+ * the header of this file leaves the unrecognised as text. Dashes are not in
+ * the trailing character class, so `---` falls through to prose — the same
+ * conservative edge isTableRule keeps.
+ *
+ * Dropping it removes no word an engine wrote: there are no words in it. And
+ * the cut is still announced — engine-detail.tsx's looksTruncated prints "This
+ * is the first 600 characters of the answer" directly underneath, so the
+ * truncation stays visible in words rather than as a malformed row.
+ */
+const SEVERED_BULLET = /^\s*[-*•][\s.…]*$/;
+
+/**
+ * Is this line one an engine meant as a bullet?
+ *
+ * ⚠️ A LINE THAT CAME FROM A TABLE IS NEVER A BULLET, AND CHECKING THE TEXT
+ * ALONE GETS THIS WRONG. `flattenTableRow` turns `| - | 2 |` into `- · 2`,
+ * which is indistinguishable from a bullet by the time it is a string — the
+ * table's own cell content becomes the marker. So the caller passes whether the
+ * raw line was a table row, and those are excluded outright.
+ */
+function isBullet(line: string, wasTableRow: boolean): boolean {
+  return !wasTableRow && BULLET.test(line);
+}
+
+/**
+ * One piece of an answer: a run of prose, or a run of bullets.
+ *
+ * ⚠️ A TAGGED UNION RATHER THAN MORE NESTING. This used to be `Token[][][]` —
+ * paragraphs of lines of tokens — and a list does not fit that shape without
+ * one of the levels quietly meaning two things depending on what is in it.
+ * There is one renderer, so the compiler finding every caller is cheap.
+ */
+export type Block =
+  | { type: 'paragraph'; lines: Token[][] }
+  | { type: 'list'; items: Token[][] };
+
+/**
+ * A whole answer, as blocks.
+ *
+ * Blank lines separate paragraphs; single newlines inside one stay as line
+ * breaks.
+ *
+ * ⚠️ BULLETS ARE REBUILT INTO A LIST, AND THIS REVERSES WHAT THIS FILE USED TO
+ * SAY. The rule here was "the job is to show the answer, not to reformat it
+ * into something it never was", and bullets were left as the characters the
+ * engine typed. In practice that rendered as a column of hanging dashes with a
+ * severed `-…` at the end, which read as a rendering fault rather than as a
+ * list — so the old rule was protecting the marker at the expense of the shape
+ * it stood for.
+ *
+ * It sits on the same side of the line as the table pass above: a bullet marker
+ * is syntax, exactly like a pipe, and every word after it survives. **No word
+ * an engine wrote is removed** — still the rule, and still true.
+ *
+ * ⚠️ A RUN OF BULLETS SURVIVES THE BLANK LINES BETWEEN THEM. Engines emit
+ * bullets blank-line separated at least as often as not, so grouping within a
+ * paragraph would turn one list of three businesses into three lists of one.
+ * Lines are classified first and grouped second, across the whole answer.
+ */
+export function parseAnswer(text: string): Block[] {
+  /* Paragraph boundaries are kept as a flag on each line rather than as
+     structure, because a bullet run has to cross them and prose must not.
+     `wasTableRow` rides along for the same reason: flattening destroys the
+     evidence that a line was ever a table, and isBullet needs it. */
+  const lines: { text: string; startsParagraph: boolean; wasTableRow: boolean }[] = [];
+
+  for (const paragraph of text.split(/\n{2,}/)) {
+    const cleaned = paragraph
+      .trim()
+      .split('\n')
+      /* Alignment rows first: they carry nothing, so they never reach the
+         flattener and never become an empty line to clean up after. */
+      .filter((line) => !isTableRule(line))
+      .map((line) => ({
+        text: flattenTableRow(line),
+        wasTableRow: line.trim().startsWith('|'),
+      }))
+      /* A row of empty cells — `| | |` — flattens to nothing. Dropped here
+         rather than rendered as a blank line inside the answer. */
+      .filter((line) => line.text.trim().length > 0);
+
+    cleaned.forEach((line, i) => lines.push({ ...line, startsParagraph: i === 0 }));
+  }
+
+  const blocks: Block[] = [];
+
+  for (const line of lines) {
+    /* Checked before anything else: a severed marker is not a bullet with
+       empty content, it is a line with no content at all. */
+    if (!line.wasTableRow && SEVERED_BULLET.test(line.text)) continue;
+
+    if (isBullet(line.text, line.wasTableRow)) {
+      const item = parseInline(line.text.replace(BULLET, ''));
+
+      const last = blocks[blocks.length - 1];
+      if (last?.type === 'list') last.items.push(item);
+      else blocks.push({ type: 'list', items: [item] });
+      continue;
+    }
+
+    const last = blocks[blocks.length - 1];
+    /* A new paragraph, or the first prose after a list, opens a block. Lines
+       inside one paragraph join the block above them as line breaks. */
+    if (last?.type === 'paragraph' && !line.startsParagraph) last.lines.push(parseInline(line.text));
+    else blocks.push({ type: 'paragraph', lines: [parseInline(line.text)] });
+  }
+
+  return blocks;
 }
 
 /**

@@ -97,20 +97,40 @@ export function AnswerText({
    */
   highlightLink?: (href: string) => boolean;
 }) {
-  const paragraphs = parseAnswer(text);
+  const blocks = parseAnswer(text);
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {paragraphs.map((lines, p) => (
-        <p key={p} className="text-slate text-sm leading-relaxed">
-          {lines.map((line, l) => (
-            <Fragment key={l}>
-              {l > 0 && <br />}
-              {render(line, `${p}.${l}.`, highlightLink)}
-            </Fragment>
-          ))}
-        </p>
-      ))}
+    <div className={`space-y-2.5 ${className}`}>
+      {blocks.map((block, b) =>
+        block.type === 'list' ? (
+          /*
+            ⚠️ list-outside, SO THE SECOND LINE OF AN ITEM LINES UP UNDER THE
+            FIRST. These items are a business name and a sentence about it, so
+            most of them wrap; with the marker inside the box the wrapped text
+            slides back under the bullet and the list stops looking like one.
+            pl-5 is what leaves the marker somewhere to sit.
+
+            Tighter than the prose around it (space-y-1 against space-y-2.5): a
+            list of businesses is one answer, not five paragraphs.
+          */
+          <ul key={b} className="list-disc space-y-1 pl-5 marker:text-slate/40">
+            {block.items.map((item, i) => (
+              <li key={i} className="text-slate text-sm leading-relaxed">
+                {render(item, `${b}.${i}.`, highlightLink)}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p key={b} className="text-slate text-sm leading-relaxed">
+            {block.lines.map((line, l) => (
+              <Fragment key={l}>
+                {l > 0 && <br />}
+                {render(line, `${b}.${l}.`, highlightLink)}
+              </Fragment>
+            ))}
+          </p>
+        ),
+      )}
     </div>
   );
 }

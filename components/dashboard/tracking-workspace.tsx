@@ -30,8 +30,9 @@ import { DraftIntoGroup } from './draft-into-group';
 import {
   EngineDetailList,
   EnginePill,
+  OUTCOME_FILL,
+  OUTCOME_LEGEND,
   OutcomeBar,
-  OutcomeLegend,
   type OutcomeSplit,
 } from './engine-detail';
 import { PromptMatrix } from './prompt-matrix';
@@ -248,6 +249,23 @@ const FILTERS: { id: OutcomeFilter; label: string }[] = [
   { id: 'mentioned', label: 'Named only' },
   { id: 'absent', label: 'Not named' },
 ];
+
+/**
+ * What the selected filter means, in the words the cells are glossed with.
+ *
+ * ⚠️ LOOKED UP IN OUTCOME_LEGEND RATHER THAN RETYPED HERE. That list is built
+ * from OUTCOME_STYLE, so a label or a gloss can only be changed in one place. A
+ * second copy of these sentences beside the filters is exactly the drift the
+ * legend's own note warns about.
+ */
+function glossFor(id: OutcomeFilter): string {
+  /* `all` is not an outcome, so it has no gloss to look up — it gets the one
+     instruction the table needs, which used to trail the sentence above. */
+  if (id === 'all') return 'Click any row to see what each AI said.';
+
+  const gloss = OUTCOME_LEGEND.find((item) => item.key === id)?.gloss;
+  return gloss ? `${gloss[0].toUpperCase()}${gloss.slice(1)}.` : '';
+}
 
 /** Rows per page. Forty answers at once is a data dump, not a report. */
 const PAGE = 10;
@@ -859,6 +877,21 @@ export function TrackingWorkspace() {
     const questions = new Set(checks.map((c) => c.question)).size;
     return { checks: checks.length, questions };
   };
+
+  /**
+   * How many rows a filter actually renders.
+   *
+   * ⚠️ IT MIRRORS `filtered` BELOW AND MUST KEEP MIRRORING IT. The number on a
+   * filter button is a promise about what pressing it shows, so it has to be
+   * counted the same way the list is built — over `groups`, not over `latest`.
+   * countFor works on checks, which is right for the answer total in the
+   * sentence above and wrong here: a watched question nothing has asked yet is
+   * a row with no checks, so `all` renders it and countFor cannot see it.
+   */
+  const rowsFor = (id: OutcomeFilter) =>
+    id === 'all'
+      ? groups.length
+      : groups.filter((g) => g.checks.some((c) => c.outcome === id)).length;
 
   /*
     Filtering finds the QUESTION; the expansion still shows every engine.
@@ -1475,42 +1508,78 @@ export function TrackingWorkspace() {
         <SectionTitle icon={<FaqIcon className="h-4 w-4" />} tint="bg-primary-soft text-primary">
           Which questions name you
         </SectionTitle>
-        {/* ⚠️ BOTH NUMBERS ARE COUNTED, NOT CLAIMED — one prompt per row we
-            are about to render, and the engines we actually ask. This
-            replaced a cyan Badge saying the same question count a second
-            time, one line above the sentence that says it in words. */}
+        {/* ⚠️ BOTH UNITS ARE STATED HERE, ONCE, AND THAT IS WHAT LETS THE
+            BUTTONS BELOW CARRY ONE NUMBER EACH. countFor's note is that
+            printing one number and letting the reader assume the other is how
+            "these don't add up" starts — so questions and answers are both
+            named in this sentence, and the pills are then free to count the
+            only thing a filter can mean: how many rows it shows.
+
+            ⚠️ "Best results first" WAS HERE AND IS NOT COMING BACK. It described
+            sortByCitations, which this page removed when the owner gained a
+            reorder control — see the note above `ordered`. The rows come in the
+            owner's own order, so the sentence was telling the reader something
+            the page had stopped doing. */}
         <p className="text-slate mt-1 text-sm">
           {formatNumber(groups.length)} {groups.length === 1 ? 'question' : 'questions'}, asked of{' '}
-          {ENGINES.length} AI tools. Best results first. Click a row to see the answer.
+          {ENGINES.length} AI tools · {formatNumber(countFor('all').checks)} answers
         </p>
 
-        {/* ⚠️ THE KEY, NOT A PARAGRAPH ABOUT THE KEY. Four chips beside four
-            short glosses replaced 65 words of prose — a 22-word blurb here and
-            a 43-word note at the foot of the card. It is built from the same
-            constants the cells are, so it cannot drift from them. */}
-        <OutcomeLegend className="mt-3" />
-
+        {/*
+          ⚠️ THE FILTERS ARE THE KEY NOW, AND A FOUR-CHIP LEGEND ABOVE THEM IS
+          GONE. That legend glossed `linked` / `named` / `not named` / `not
+          asked`; these buttons are labelled with three of the same four words.
+          The reader met the same vocabulary twice within about 40px in two
+          different visual treatments, which is most of what made this card feel
+          busy. The dot carries the tint the cells already use, so the buttons
+          explain themselves, and the line underneath glosses whichever one is
+          active.
+        */}
         <div className="mt-4 flex flex-wrap gap-2">
           {FILTERS.map((f) => {
-            const { checks, questions } = countFor(f.id);
+            const active = filter === f.id;
             return (
               <button
                 key={f.id}
                 type="button"
                 onClick={() => setFilter(f.id)}
-                aria-pressed={filter === f.id}
-                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                  filter === f.id
+                aria-pressed={active}
+                className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5 ${
+                  active
                     ? 'border-primary bg-primary-soft text-primary'
                     : 'border-line text-slate hover:text-navy'
                 }`}
               >
-                {f.label} · {questions} {questions === 1 ? 'question' : 'questions'},{' '}
-                {checks} {checks === 1 ? 'answer' : 'answers'}
+                {/* Decoration only — the word beside it is the label, the same
+                    pairing OUTCOME_STYLE requires of every chip on this page.
+                    `all` has no outcome and so has no dot. */}
+                {f.id !== 'all' && (
+                  <span
+                    aria-hidden="true"
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${OUTCOME_FILL[f.id]}`}
+                  />
+                )}
+                {f.label}
+                {/* ⚠️ ROWS THIS FILTER SHOWS, WHICH IS NOT WHAT countFor
+                    COUNTED. countFor('all').questions counts the questions that
+                    have at least one check — 5 of 8 on a fresh account — while
+                    `all` renders all 8 rows, unasked ones included. The old
+                    button therefore said "5 questions" one line under a
+                    sentence saying 8. rowsFor mirrors `filtered` exactly, so
+                    the number on the button is the number of rows you get. */}
+                <span className={`tabular-nums ${active ? '' : 'text-slate/60'}`}>
+                  {formatNumber(rowsFor(f.id))}
+                </span>
               </button>
             );
           })}
         </div>
+
+        {/* ⚠️ DERIVED FROM OUTCOME_LEGEND, NEVER RETYPED. Those strings are
+            built from OUTCOME_STYLE, which is what stops a gloss here from
+            drifting away from the cells it explains — the same reason the
+            legend it replaces was built that way. */}
+        <p className="text-slate mt-2.5 text-xs">{glossFor(filter)}</p>
 
         {visible.length === 0 ? (
           <p className="text-slate mt-4 text-sm">
