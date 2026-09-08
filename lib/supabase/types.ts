@@ -285,6 +285,8 @@ export type CitationCheckRow = {
    *  and always null for Gemini, which cannot be targeted. */
   country: string | null;
   checked_at: string;
+  /** The sweep that wrote this check; null for an ad-hoc top-up. See 0025. */
+  run_id: string | null;
 };
 
 /*

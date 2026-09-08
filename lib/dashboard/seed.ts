@@ -304,6 +304,26 @@ function seedChecks(siteId: string): CitationCheck[] {
   const questions = SEED_QUESTIONS.slice(0, 5);
   const checks: CitationCheck[] = [];
 
+  /*
+    One run per day the fixture spreads its checks over, so the seeded account
+    reads as a site that has been swept a few times rather than one that was
+    swept once and topped up.
+
+    ⚠️ KEYED ON THE DAY BECAUSE `checkedAt` BELOW IS. The rollup groups by run
+    and dates a run by its first check, so handing every check the same id would
+    collapse this fixture to a single point and the seeded chart would show bars
+    where it has always shown a trend.
+  */
+  const runForDay = new Map<number, string>();
+  const runId = (day: number) => {
+    let id = runForDay.get(day);
+    if (!id) {
+      id = crypto.randomUUID();
+      runForDay.set(day, id);
+    }
+    return id;
+  };
+
   questions.forEach((q, qi) => {
     ENGINES.forEach((engine, ei) => {
       // Covered questions get cited more often than uncovered ones — the whole
@@ -331,6 +351,7 @@ function seedChecks(siteId: string): CitationCheck[] {
             ? ['https://example.com/', 'https://competitor.example/guide']
             : ['https://competitor.example/guide'],
         checkedAt: daysAgo(qi % 4),
+        runId: runId(qi % 4),
       });
     });
   });

@@ -113,6 +113,39 @@ export function formatShortDate(date: Date | null): string {
   return date && !Number.isNaN(date.getTime()) ? SHORT_DATE.format(date) : 'unknown';
 }
 
+/**
+ * The calendar day a moment fell on, in the READER'S zone — "2026-09-07".
+ *
+ * ⚠️ THE ONE FUNCTION IN THIS FILE THAT IS NOT UTC-PINNED, AND THE EXCEPTION IS
+ * THE WHOLE REASON IT EXISTS. Its neighbours pin UTC because a date rendered in
+ * the browser's zone can disagree with one rendered on the server, and a
+ * scheduled date that reads differently in two places is a promise we appear to
+ * break. That argument is about dates the SERVER renders.
+ *
+ * This one answers "which day did this measurement happen on" for the person
+ * who ran it. `checked_at.slice(0, 10)` was doing that job and taking the UTC
+ * day: a check run at 20:41 EDT is 00:41 UTC the next day, so the trend filed
+ * an evening check under tomorrow and the axis printed a date that had not
+ * happened yet. For a measurement, the reader's own day is the true answer.
+ *
+ * ⚠️ SAFE BECAUSE NOTHING RENDERS THIS ON THE SERVER. Tracking is read through
+ * the browser Supabase client (see assertClient in store.ts) and drawn by a
+ * client component, so there is no server-rendered copy to disagree with. Move
+ * that read to the server and this becomes a hydration mismatch — the reason is
+ * written down here so the constraint travels with the function.
+ *
+ * Zero-padded YYYY-MM-DD, because trackingFromDb's contract requires it: the
+ * chart splits the string and keys its rows on it.
+ */
+export function localDay(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 /** Thousands separators, so 12480 doesn't read as 1248 at a glance. */
 export function formatNumber(n: number): string {
   return n.toLocaleString();

@@ -523,6 +523,28 @@ export async function runTopicsStage(db: Db, job: ScanJob): Promise<SliceResult>
  * That has already cost this project an afternoon once. Same call, and the same
  * reasoning, as the tracking route and lib/dashboard/store.ts.
  */
+/**
+ * The run id for a scan job — one sweep, however many ticks it takes.
+ *
+ * ⚠️ DERIVED FROM THE JOB, NOT MINTED PER TICK. This function processes
+ * PROMPTS_PER_RUN questions and is called again for the rest, so a fresh id
+ * each time would file one weekly sweep as several points on the trend — the
+ * exact fault migration 0025 exists to remove. The job is the run, and its id
+ * is already stable and unique.
+ *
+ * ⚠️ scan_jobs.id IS `text`, citation_checks.run_id IS `uuid`. Job ids are
+ * minted as `scan_<uuid>` (see enqueue.ts), so the uuid is extracted rather
+ * than the whole string being passed to a column that would reject it. A job id
+ * in any other shape yields null — which folds its checks into the previous
+ * point instead of failing the insert and losing the evidence outright.
+ */
+function runIdForJob(jobId: string): string | null {
+  const match = jobId.match(
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i,
+  );
+  return match ? match[0] : null;
+}
+
 function pairKey(question: string, engine: Engine): string {
   return `${question}\u0000${engine}`;
 }
@@ -694,6 +716,10 @@ export async function runTrackingStage(db: Db, job: ScanJob): Promise<SliceResul
         cited_instead: o.citedInstead,
         sources: o.sources,
         answer_excerpt: o.excerpt,
+        /* The sweep this check belongs to — see migration 0025. This path is
+           always a full run (onboarding, or the weekly cron's 'tracking' job),
+           so it always stamps one. */
+        run_id: runIdForJob(job.id),
         // Null for Gemini always: it rejects a location parameter, so stamping
         // it would record a targeting that did not happen.
         country: o.engine === 'Gemini' ? null : site.country,

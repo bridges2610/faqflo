@@ -571,6 +571,21 @@ export function DashboardProvider({
 
     if (!startedSite || asked.length === 0) return;
 
+    /*
+      ⚠️ ONE ID FOR THE WHOLE RUN, MINTED HERE RATHER THAN PER REQUEST. The loop
+      below makes up to twelve POSTs for one logical run — each pass asks
+      whatever is still pending — and the trend draws one point per run. An id
+      generated inside the loop would turn a single sweep into twelve points,
+      which is a worse version of the bug this exists to fix.
+
+      ⚠️ IT DOES NOT DECIDE WHETHER A RUN COUNTS. The route stores it only when
+      the ask covers the whole watch list; a top-up sends an id and gets null
+      written. So the client chooses how its own passes group and cannot
+      manufacture a scan that never happened — citation_checks is evidence, and
+      the browser has never been able to write it.
+    */
+    const runId = crypto.randomUUID();
+
     running.current = true;
     setTrackingRun({
       busy: true,
@@ -589,7 +604,7 @@ export function DashboardProvider({
         const res = await fetch('/api/dashboard/tracking', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ siteId: startedSite.id, questions: asked }),
+          body: JSON.stringify({ siteId: startedSite.id, questions: asked, runId }),
         });
 
         const payload = (await res.json()) as {

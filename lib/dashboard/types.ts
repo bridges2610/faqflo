@@ -310,6 +310,20 @@ export type CitationCheck = {
   /** Every source that answer cited, in the engine's own ranking. */
   sources: string[];
   checkedAt: string;
+  /**
+   * The sweep this check came from, or null for an ad-hoc top-up.
+   *
+   * ⚠️ NULL IS A MEANING, NOT A GAP. A run of the whole watch list gets an id
+   * shared by every check it writes; asking one newly added question on its own
+   * does not. The trend plots one point per run and folds the null ones into
+   * the run they follow, which is what stops "I added a question" from drawing
+   * a two-point trend out of a single answer.
+   *
+   * Also null on rows written before migration 0025 that the backfill did not
+   * reach. Readers must keep working when it is null — see the rollup in
+   * trackingFromDb.
+   */
+  runId: string | null;
 };
 
 /**

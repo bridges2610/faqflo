@@ -46,6 +46,9 @@ function fail(message: string, status = 400) {
  * non-text and silently invisible to `grep`. Same call, and the same reasoning,
  * as lib/dashboard/store.ts.
  */
+/** Same shape store.ts validates a site id with. A `uuid` column rejects the rest. */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function pairKey(question: string, engine: Engine): string {
   return `${question}\u0000${engine}`;
 }
@@ -68,8 +71,25 @@ export async function POST(request: Request) {
     return fail('Invalid request body.');
   }
 
-  const { siteId, questions } = (body ?? {}) as Record<string, unknown>;
+  const { siteId, questions, runId } = (body ?? {}) as Record<string, unknown>;
   if (typeof siteId !== 'string' || !siteId) return fail('A site is required.');
+
+  /*
+    The run this pass belongs to, if the caller named one.
+
+    ⚠️ ACCEPTED, BUT NOT BELIEVED — see `sweep` below. The client mints one id
+    per runTracking() call and repeats it across the passes of that run, which
+    is the only thing it is trusted for: grouping its own requests. Whether the
+    id is ever WRITTEN is decided here, from the stored watch list. That keeps
+    the route's own rule intact — the body may not decide which site, how many
+    prompts, or whether the customer is allowed — and adds nothing it could lie
+    about, because a fabricated id on a narrow ask is simply discarded.
+
+    Validated as a uuid rather than passed through: the column is `uuid`, so a
+    junk string would fail the insert and lose a whole pass of paid-for
+    evidence over a field that is only ever decoration on a chart.
+  */
+  const askedRunId = typeof runId === 'string' && UUID.test(runId) ? runId : null;
 
   const site = await siteForUser(siteId, user.id);
   // 404 rather than 403: confirming an id exists but belongs to someone else
@@ -146,6 +166,48 @@ export async function POST(request: Request) {
     console.error('Could not save tracked prompts:', upsertError);
     return fail('Could not save your tracked questions. Please try again.', 502);
   }
+
+  /*
+    Is this a sweep of the whole watch list, or a top-up of part of it?
+
+    ⚠️ DERIVED HERE, NOT TAKEN FROM THE BODY, AND THAT IS THE POINT OF THE
+    WHOLE FEATURE. The trend draws one point per run, so "this was a run" is a
+    claim about evidence — and citation_checks grants the browser select and
+    nothing else precisely so the browser cannot author its own history. A flag
+    in the request would hand that back. Comparing what was asked against what
+    is stored cannot be gamed: a caller who really does ask for every watched
+    question HAS run a sweep, whatever it calls itself.
+
+    ⚠️ READ AFTER THE UPSERT ABOVE, DELIBERATELY. `wanted` has just been written
+    into tracked_prompts, so adding one question and asking only that question
+    compares 1 against a list that now includes it — a top-up, correctly. Read
+    before the upsert, a first-ever question would compare 1 against 0 stored
+    and count as a sweep.
+
+    ⚠️ AND `>= size` RATHER THAN `=== size`, because promptCap slices `wanted`
+    above. A watch list somehow longer than the cap would make a full ask
+    impossible and every run a top-up, so the trend would silently stop gaining
+    points. Covering everything stored is the test; asking for more than exists
+    is still covering it.
+  */
+  const { data: watchedRows, error: watchedError } = await db
+    .from('tracked_prompts')
+    .select('question')
+    .eq('site_id', site.id);
+
+  if (watchedError) {
+    console.error('Could not read the watch list:', watchedError);
+    return fail('Could not read your tracked questions. Please try again.', 502);
+  }
+
+  const asked = new Set(wanted);
+  const watched = (watchedRows ?? []).map((r) => r.question as string);
+  const sweep = watched.length > 0 && watched.every((question) => asked.has(question));
+
+  /* Null unless this is a sweep AND the caller grouped its passes. A sweep with
+     no id — an older client, or a direct call — writes null and folds into the
+     previous point rather than inventing one. */
+  const runIdForInsert = sweep ? askedRunId : null;
 
   /*
     What still needs asking today.
@@ -329,6 +391,10 @@ export async function POST(request: Request) {
       cited_instead: o.citedInstead,
       sources: o.sources,
       answer_excerpt: o.excerpt,
+      /* The run this pass belongs to, or null when it was a top-up — see the
+         `sweep` note above. Every pass of one sweep repeats the same id, so a
+         twelve-pass run is one point on the trend rather than twelve. */
+      run_id: runIdForInsert,
       /*
         ⚠️ WHAT THIS CHECK WAS ACTUALLY ASKED AS — null for Gemini, always.
 

@@ -37,6 +37,7 @@ import type {
   SiteRow,
 } from '@/lib/supabase/types';
 import { normalizeDomain, sourceHost } from './domain';
+import { rollUpRuns } from './trend';
 import { sourceKind } from './platforms';
 import { contentHash, normalizePath } from './export';
 import type { TrackingPeriod } from './plans';
@@ -1914,7 +1915,7 @@ export async function trackingFromDb(
       // built from it. Without it the ranking falls back to one domain per
       // check — 45 data points where 296 were collected.
       .select(
-        'id, site_id, question, engine, outcome, cited_instead, sources, answer_excerpt, checked_at',
+        'id, site_id, question, engine, outcome, cited_instead, sources, answer_excerpt, checked_at, run_id',
       )
       .eq('site_id', siteId)
       .gte('checked_at', since.toISOString())
@@ -1949,6 +1950,7 @@ export async function trackingFromDb(
     | 'sources'
     | 'answer_excerpt'
     | 'checked_at'
+    | 'run_id'
   >[];
 
   if (rows.length === 0) return null;
@@ -1974,6 +1976,7 @@ export async function trackingFromDb(
     // jsonb, so the shape is not guaranteed by the type — filter rather than cast.
     sources: Array.isArray(r.sources) ? (r.sources as unknown[]).filter((s) => typeof s === 'string') : [],
     checkedAt: r.checked_at,
+    runId: r.run_id ?? null,
   }));
 
   /*
@@ -2007,37 +2010,22 @@ export async function trackingFromDb(
   }
 
   /*
-    Daily rollup: one row per day that actually has checks.
+    The trend: one row per SCAN, not per calendar day.
 
-    ⚠️ BUILT FROM `all`, NOT `latest`, AND THAT IS NOT INTERCHANGEABLE. The
-    chart is a history — what each day's run found. Deduping first keeps only
-    each pair's most recent result, so a question checked on the 1st and again
-    on the 8th would contribute to the 8th only, and the 1st would silently
-    lose its point. The trend would then always slope up towards today
-    regardless of what actually happened.
+    ⚠️ EXTRACTED TO lib/dashboard/trend.ts, WHICH IS WHERE THE REASONING NOW
+    LIVES. It was a loop here, inside a function that needs a browser Supabase
+    client and a session — so the rules it encodes (a top-up joins the run it
+    follows; a run is dated by its first check; unstamped legacy rows keep
+    their own day) could only be exercised by clicking through the app. They
+    are the part that has to be right, so they are testable now.
 
-    Days with no run are omitted rather than zero-filled. The chart is
-    index-based, so a gap compresses the axis rather than showing a drop to
-    zero — and a zero would claim we asked and found nothing, which is not what
-    happened on a day nobody ran anything.
+    ⚠️ `all`, NOT `latest`. The chart is a history of what each run found;
+    handing it the deduped view would keep only each pair's most recent
+    result and the trend would always slope up towards today. rollUpRuns
+    states this too — it is repeated here because this is the call site that
+    could get it wrong.
   */
-  const byDate = new Map<string, CitationDay>();
-  for (const check of all) {
-    const date = check.checkedAt.slice(0, 10); // ISO is already YYYY-MM-DD
-    let day = byDate.get(date);
-    if (!day) {
-      day = { date, byEngine: blankEngines(), checked: 0, cited: 0, mentioned: 0 };
-      byDate.set(date, day);
-    }
-    day.checked += 1;
-    if (check.outcome === 'cited') {
-      day.byEngine[check.engine] += 1;
-      day.cited += 1;
-    }
-    if (check.outcome === 'mentioned') day.mentioned += 1;
-  }
-
-  const daily = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const daily = rollUpRuns(all);
 
   /*
     Share of voice, from EVERY source in every answer.
