@@ -310,7 +310,7 @@ export default function SeoGuide() {
                 internet declared search engine optimisation dead.
               </P>
               <P>
-                It isn&rsquo;t. Answer engines — ChatGPT, Perplexity, Google&rsquo;s AI Overviews —
+                It isn&rsquo;t. Answer engines — ChatGPT, Perplexity, Gemini —
                 are reading the same open web that Google crawls. Several of them run a live search
                 behind the scenes and summarise what comes back. If your page is invisible to a
                 search crawler, it is invisible to them too.

@@ -109,7 +109,7 @@ export default function Terms() {
             Depending on your plan, FaqFlo lets you audit a website for AI visibility, discover
             questions people ask AI engines, generate FAQ content, export publish-ready crawlable
             HTML and schema for your own website, and track whether your business is cited across AI
-            answer engines such as ChatGPT, Perplexity, and Google&rsquo;s AI Overviews.
+            answer engines such as ChatGPT, Perplexity, and Gemini.
           </P>
           <P>
             <strong className="text-navy">You publish on your own domain.</strong> We provide

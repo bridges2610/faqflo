@@ -89,7 +89,7 @@ export default function Privacy() {
             FaqFlo is an Answer Engine Optimization (AEO) service. It audits websites for AI
             visibility, generates FAQ content, produces publish-ready HTML for you to place on your
             own website, and tracks whether your business is cited by AI answer engines such as
-            ChatGPT, Perplexity, and Google&rsquo;s AI Overviews.
+            ChatGPT, Perplexity, and Gemini.
           </P>
           <P>
             By using the Services, you agree to this Privacy Policy. If you are in the EEA, UK, or

@@ -116,7 +116,12 @@ export function buildQuestionsPrompt(opts: {
     .filter(Boolean)
     .join('\n');
 
-  return `You are advising a small business on the questions real people put to AI assistants — ChatGPT, Perplexity, Google's AI Overviews — when they are looking for a business like this one.
+  /* ⚠️ THE THREE WE ACTUALLY ASK, AND THIS SAID "Google's AI Overviews". Not
+     user-facing, but it is what the model is told the questions are for — and
+     naming a surface we never query here is the same error the marketing pages
+     carried. lib/tracking/gemini.ts is the authority: Overviews has no API and
+     is not one of ours. */
+  return `You are advising a small business on the questions real people put to AI assistants — ChatGPT, Perplexity, Gemini — when they are looking for a business like this one.
 
 Website: ${domain}
 ${known || 'The industry and service area are not yet known — work them out from the pages below.'}
