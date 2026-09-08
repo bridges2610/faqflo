@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { signOut } from '@/lib/auth/actions';
-import { HELP_SCOPE_PREFIX, clearFloating } from '@/lib/floating-visibility';
+import { HELP_SCOPE_PREFIX, UPGRADE_SCOPE_PREFIX, clearFloating } from '@/lib/floating-visibility';
 import { isPro } from '@/lib/dashboard/plans';
 import { useDashboard } from '@/lib/dashboard/provider';
 import { PlanBadge } from './plan-badge';
@@ -227,7 +227,15 @@ export function AccountMenu() {
           */}
           <form
             action={signOut}
-            onSubmit={() => clearFloating(HELP_SCOPE_PREFIX)}
+            /* ⚠️ BOTH SCOPES, AND THE SECOND IS WHAT MAKES "back when you sign
+               in again" TRUE. The upgrade bar's × promises exactly that in its
+               accessible name; without this line the promise only held for
+               somebody who closed the tab, since sessionStorage survives a
+               sign-out in the same one. */
+            onSubmit={() => {
+              clearFloating(HELP_SCOPE_PREFIX);
+              clearFloating(UPGRADE_SCOPE_PREFIX);
+            }}
             className="border-line mt-3 border-t pt-3"
           >
             <button

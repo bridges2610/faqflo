@@ -59,6 +59,25 @@ export const HELP_SCOPE_PREFIX = 'help:';
 export const helpScope = (userId: string) => `${HELP_SCOPE_PREFIX}${userId}`;
 export const BUSY_SCOPE = 'busy';
 
+/*
+  The free account's upgrade bar (components/dashboard/upgrade-bar.tsx).
+
+  ⚠️ ONLY THE DISMISS HALF OF THIS MODULE APPLIES TO IT. The two controls above
+  are floating things that hold back before sliding over the page, which is what
+  HELP_REVEAL_DELAY_MS and the seen/markSeen pair exist for. The bar is chrome:
+  it is simply part of the header from the first frame the account is known, so
+  it has no wait to serve and never calls markFloatingSeen.
+
+  ⚠️ ITS OWN PREFIX, NOT A REUSE OF `help:`. Putting away an offer and putting
+  away the help panel are different decisions, and sharing a scope would make
+  either × close both.
+
+  Per account, for the reason helpScope is: two people on one machine must not
+  inherit each other's decision — and here the decision is about money.
+*/
+export const UPGRADE_SCOPE_PREFIX = 'upgrade:';
+export const upgradeScope = (userId: string) => `${UPGRADE_SCOPE_PREFIX}${userId}`;
+
 const DISMISSED = 'faqflo:floating-dismissed:';
 const SEEN = 'faqflo:floating-seen:';
 

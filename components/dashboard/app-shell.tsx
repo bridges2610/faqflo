@@ -16,6 +16,7 @@ import { AuditNotice } from './audit-notice';
 import { HelpBubble } from './help-bubble';
 import { RunNotice } from './run-notice';
 import { ScanNotice } from './scan-notice';
+import { UpgradeBar } from './upgrade-bar';
 import { SiteSwitcher } from './site-switcher';
 
 type NavItem = {
@@ -539,6 +540,26 @@ export function AppShell({
 
             <div className="flex items-center gap-3">{ready && <AccountMenu />}</div>
           </div>
+
+          {/*
+            ⚠️ INSIDE THIS <header>, NOT A SIBLING BELOW IT, AND THAT IS
+            STRUCTURAL. The header is `sticky top-0`; a second sticky element
+            underneath would need `top-16` to clear it and a lower z-index to
+            stack under it — which would make the 64px in `h-16` above
+            load-bearing from another file. Change the header's height then and
+            the bar either detaches or overlaps, silently. One sticky container
+            has no offset to keep in step.
+
+            ⚠️ THE `plan` PROP, NEVER isPro(user), AND THIS IS THE SECOND
+            CONSUMER OF THE REASON IT EXISTS. The prop's own note above says
+            useDashboard()'s user is null on the first frame, so anything
+            branching on it flashes the free state at a paying customer. An
+            upgrade advert is the worst thing that flash could produce. `plan`
+            has already been awaited from the profile row by the layout, so it
+            is right on the very first frame — which also means this needs no
+            `ready` gate and no wait: an entitlement, not loaded data.
+          */}
+          {plan !== 'pro' && <UpgradeBar userId={userId} />}
         </header>
 
         {/* ⚠️ THE SIDE PADDING GREW WITH THE WIDE ROUTES. At max-w-5xl the
