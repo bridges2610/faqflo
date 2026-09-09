@@ -196,7 +196,7 @@ export function GeneratorPanel({
                 setMode(m);
                 setError(null);
               }}
-              className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
+              className={`flex min-h-10 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
                 mode === m
                   ? 'text-navy shadow-soft bg-surface font-semibold'
                   : 'text-slate hover:text-navy'
@@ -220,7 +220,7 @@ export function GeneratorPanel({
               onChange={(e) => setText(e.target.value)}
               rows={6}
               placeholder="Describe what you do, or paste the page you want FAQs for — an about page, a service page, a product description…"
-              className="border-line bg-cloud text-navy focus:border-primary w-full resize-y rounded-input border p-4 text-[0.9375rem] leading-relaxed outline-none transition-colors duration-150"
+              className="border-line bg-cloud text-navy focus:border-primary w-full resize-y rounded-input border p-4 text-base leading-relaxed outline-none sm:text-[0.9375rem] transition-colors duration-150"
             />
             <p className="text-slate mt-2 text-xs">Around 200 words or more works best.</p>
           </>
@@ -235,7 +235,7 @@ export function GeneratorPanel({
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               placeholder="https://yoursite.com/services"
-              className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border p-4 text-[0.9375rem] outline-none transition-colors duration-150"
+              className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border p-4 text-base outline-none sm:text-[0.9375rem] transition-colors duration-150"
             />
             <p className="text-slate mt-2 text-xs">
               We&rsquo;ll read the page and write questions from what&rsquo;s on it.
@@ -265,7 +265,7 @@ export function GeneratorPanel({
           <select
             value={count}
             onChange={(e) => setCount(Number(e.target.value))}
-            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-10 w-full rounded-input border bg-surface px-3 py-2 text-base sm:text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {counts.map((n) => (
               <option key={n} value={n}>
@@ -282,7 +282,7 @@ export function GeneratorPanel({
           <select
             value={tone}
             onChange={(e) => setTone(e.target.value as Tone)}
-            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-10 w-full rounded-input border bg-surface px-3 py-2 text-base sm:text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {TONES.map((t) => (
               <option key={t} value={t}>
@@ -299,7 +299,7 @@ export function GeneratorPanel({
           <select
             value={language}
             onChange={(e) => setLanguage(e.target.value as Language)}
-            className="border-line text-navy focus:border-primary mt-1.5 min-h-11 w-full rounded-input border bg-surface px-3 py-2 text-sm outline-none transition-colors duration-150 sm:min-h-0"
+            className="border-line text-navy focus:border-primary mt-1.5 min-h-10 w-full rounded-input border bg-surface px-3 py-2 text-base sm:text-sm outline-none transition-colors duration-150 sm:min-h-0"
           >
             {LANGUAGES.map((l) => (
               <option key={l} value={l}>

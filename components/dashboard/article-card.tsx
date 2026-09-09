@@ -121,7 +121,7 @@ export function ArticleCard({ article }: { article: Article }) {
              row wraps, and an auto-margin then pushes Delete alone to the far
              right of its own line — a destructive control given the most
              prominent spot on the card by accident. */
-          className="text-slate hover:text-error-ink rounded-md inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:ml-auto sm:min-h-0 sm:min-w-0"
+          className="text-slate hover:text-error-ink rounded-md inline-flex min-h-10 min-w-10 items-center justify-center p-1.5 transition-colors duration-150 sm:ml-auto sm:min-h-0 sm:min-w-0"
         >
           <TrashIcon className="h-4 w-4" />
         </button>

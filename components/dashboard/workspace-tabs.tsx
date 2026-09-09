@@ -86,7 +86,7 @@ export function WorkspaceTabs({
               <Link
                 href={tab.href}
                 aria-current={active ? 'page' : undefined}
-                className={`flex min-h-11 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
+                className={`flex min-h-10 items-center rounded-full px-4 py-1.5 text-sm transition-all duration-200 sm:min-h-0 ${
                   active
                     ? 'bg-primary shadow-soft font-semibold text-on-primary'
                     : 'text-slate hover:text-navy'

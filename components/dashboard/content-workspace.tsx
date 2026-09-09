@@ -44,10 +44,29 @@ function RoleRow({ result }: { result: MustHaveResult }) {
       : { tone: 'cyan' as const, word: 'No answers' };
 
   return (
-    <li className="border-line flex flex-col gap-1.5 border-b py-4 last:border-b-0 sm:flex-row sm:items-start sm:gap-4">
-      <div className="sm:w-44 sm:shrink-0">
+    /*
+      ⚠️ gap-2.5 BELOW sm, AND IT WAS gap-1.5. Six pixels separated the
+      label-and-badge block from the url-and-explanation block, which is the
+      same distance as the gaps INSIDE each of them — so the four lines read as
+      one undifferentiated stack rather than two groups. The sm:gap-4 row
+      layout never had the problem, because there the two blocks sit
+      side by side.
+    */
+    <li className="border-line flex flex-col gap-2.5 border-b py-4 last:border-b-0 sm:flex-row sm:items-start sm:gap-4">
+      {/*
+        ⚠️ THE BADGE SITS BESIDE THE LABEL ON A PHONE, NOT UNDER IT. Stacked, it
+        gave every row a third line and left a short word alone on it — six rows
+        of that is most of what made this list feel like a wall. It stays
+        stacked from sm up, where the block is a fixed 44-wide column and an
+        inline badge would be what forces the wrap instead.
+
+        flex-wrap, not nowrap: "Storm & hail damage" plus its badge fits the
+        measured width, but a longer role from another trade must be allowed to
+        drop the badge to its own line rather than overflow.
+      */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:block sm:w-44 sm:shrink-0">
         <p className="text-navy text-[0.9375rem] font-semibold">{result.label}</p>
-        <Badge tone={state.tone} className="mt-1.5">
+        <Badge tone={state.tone} className="sm:mt-1.5">
           {state.word}
         </Badge>
       </div>
@@ -101,24 +120,42 @@ function TopicCard({ topic }: { topic: ArticleTopic }) {
   }
 
   return (
-    <Card as="li" className="flex flex-col gap-3 p-5">
+    /*
+      ⚠️ p-4 BELOW sm, BECAUSE THIS CARD IS INSIDE ANOTHER ONE. On a 390px phone
+      the chain is <main> px-6, then the section Card, then this — measured at
+      p-5 throughout it left 262px for the text, so every title and every angle
+      broke into short ragged lines and the whole page read as cramped. Trimming
+      the two nested paddings on mobile only gives that column back about 32px.
+      Desktop is untouched: there the width was never the constraint.
+    */
+    <Card as="li" className="flex flex-col gap-3.5 p-4 sm:gap-3 sm:p-5">
       <div>
         <h3 className="text-navy text-[0.9375rem] leading-snug font-semibold">{topic.title}</h3>
         <p className="text-slate mt-1.5 text-sm leading-relaxed">{topic.angle}</p>
       </div>
 
-      <dl className="text-sm">
-        <div className="flex gap-2">
-          <dt className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Asked</dt>
-          <dd className="text-navy min-w-0 flex-1">{topic.aeoQuestion}</dd>
-        </div>
-        <div className="mt-1.5 flex gap-2">
-          <dt className="text-slate font-mono text-[0.6875rem] tracking-wide uppercase">Search</dt>
-          <dd className="text-slate min-w-0 flex-1">{topic.primaryKeyword}</dd>
-        </div>
+      {/*
+        ⚠️ A GRID, BECAUSE TWO FLEX ROWS COULD NOT AGREE ON A LEFT EDGE. "Asked"
+        and "Search" are different lengths — measured 34px and 41px — so with
+        `flex gap-2` each value started at its own x, 7px apart, and the pair
+        read as two unrelated lines rather than one small table. One shared
+        column fixes the alignment without hard-coding a width that a longer
+        label would break.
+      */}
+      <dl className="grid grid-cols-[auto_1fr] gap-x-2.5 gap-y-2 text-sm">
+        <dt className="text-slate pt-0.5 font-mono text-[0.6875rem] tracking-wide uppercase">
+          Asked
+        </dt>
+        <dd className="text-navy min-w-0">{topic.aeoQuestion}</dd>
+        <dt className="text-slate pt-0.5 font-mono text-[0.6875rem] tracking-wide uppercase">
+          Search
+        </dt>
+        <dd className="text-slate min-w-0">{topic.primaryKeyword}</dd>
       </dl>
 
-      <p className="text-slate border-line border-t pt-3 text-sm leading-relaxed">{topic.why}</p>
+      <p className="text-slate border-line border-t pt-3.5 text-sm leading-relaxed sm:pt-3">
+        {topic.why}
+      </p>
 
       <div>
         <Button size="sm" variant="ghost" onClick={copy}>
@@ -289,7 +326,7 @@ export function ContentWorkspace() {
           had not examined was in perfect shape.
         */}
         {contentPlan.mustHave.length === 0 ? (
-          <Card className="p-5 sm:p-7">
+          <Card className="p-4 sm:p-7">
             <SectionTitle>The pages your industry expects</SectionTitle>
             <p className="text-slate mt-1 text-sm leading-relaxed">
               We haven&apos;t checked this yet. Working out which pages you&apos;re missing means
@@ -332,7 +369,7 @@ export function ContentWorkspace() {
           />
         </Card>
 
-        <Card className="p-5 sm:p-7">
+        <Card className="p-4 sm:p-7">
           <SectionTitle>The pages your industry expects</SectionTitle>
           <p className="text-slate mt-1 text-sm leading-relaxed">
             Matched against the pages we read. A page with no answers on it still can&apos;t be
@@ -347,7 +384,7 @@ export function ContentWorkspace() {
           </>
         )}
 
-        <Card className="p-5 sm:p-7">
+        <Card className="p-4 sm:p-7">
           <SectionTitle>Worth writing next</SectionTitle>
           <p className="text-slate mt-1 text-sm leading-relaxed">
             Ten articles aimed at what people ask about{' '}

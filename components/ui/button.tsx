@@ -128,16 +128,30 @@ const VARIANTS: Record<Variant, string> = {
 /*
   ⚠️ `sm` IS TALLER ON A PHONE THAN ON A DESKTOP, AND THAT IS THE WHOLE POINT.
   It was a flat h-9 — 36px — which is the size nearly every action on the
-  dashboard uses, and 36px is a poor thumb target. h-11 is 44px.
+  dashboard uses, and 36px is a poor thumb target.
 
-  Released at `sm:` rather than raised everywhere: adding 8px to every button at
-  every width would push already-long lists further down the page on the screens
-  that are hardest to scroll. Desktop keeps its density; a phone gets a target.
+  Released at `sm:` rather than raised everywhere: adding height to every button
+  at every width would push already-long lists further down the page on the
+  screens that are hardest to scroll. Desktop keeps its density; a phone gets a
+  target.
 
-  md and lg were already 44px or more and need nothing.
+  ⚠️ 40px, AND IT WAS 44px. Two reasons it came back down. It looked heavy — a
+  phone was the one place a "small" button was the largest it ever got — and at
+  44px `sm` and `md` were the SAME HEIGHT below the breakpoint, so the size
+  scale collapsed and choosing between them changed nothing a reader could see.
+  40px restores a visible step under md and still clears WCAG 2.5.8 (AA), which
+  asks 24×24; 44px is the AAA figure from 2.5.5, not the requirement.
+
+  ⚠️ THE FLOOR IS NOT ARBITRARY AND MUST NOT DRIFT BACK TO h-9 ON MOBILE. The
+  bare text controls across the dashboard — Edit, Publish, Move to…, and the
+  Yes/No that deletes an answer — are pinned to `min-h-10 sm:min-h-0` to match
+  this number. Change one and the other stops agreeing.
+
+  md and lg are unchanged: both are still 44px or more, which is right for the
+  buttons that carry a page's main action.
 */
 const SIZES: Record<Size, string> = {
-  sm: 'h-11 sm:h-9 px-4 text-sm',
+  sm: 'h-10 sm:h-9 px-4 text-sm',
   md: 'h-11 px-6 text-[0.9375rem]',
   lg: 'h-13 px-8 text-base',
 };

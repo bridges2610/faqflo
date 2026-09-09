@@ -128,7 +128,7 @@ export function ArticleWorkspace({ articleId }: { articleId: string }) {
                 <button
                   onClick={() => setConfirming(true)}
                   aria-label={`Delete ${article.title}`}
-                  className="text-slate hover:text-error-ink rounded-input inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
+                  className="text-slate hover:text-error-ink rounded-input inline-flex min-h-10 min-w-10 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
                 >
                   <TrashIcon className="h-4 w-4" />
                 </button>
@@ -484,7 +484,7 @@ function ArticleEditor({
               <button
                 onClick={() => setSections((prev) => prev.filter((_, j) => j !== i))}
                 aria-label={`Remove section ${i + 1}`}
-                className="text-slate hover:text-error-ink rounded-input mt-6 inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
+                className="text-slate hover:text-error-ink rounded-input mt-6 inline-flex min-h-10 min-w-10 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
               >
                 <TrashIcon className="h-4 w-4" />
               </button>
@@ -536,7 +536,7 @@ function ArticleEditor({
                   <button
                     onClick={() => setFaqs((prev) => prev.filter((_, j) => j !== i))}
                     aria-label={`Remove question ${i + 1}`}
-                    className="text-slate hover:text-error-ink rounded-input mt-1 inline-flex min-h-11 min-w-11 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
+                    className="text-slate hover:text-error-ink rounded-input mt-1 inline-flex min-h-10 min-w-10 items-center justify-center p-1.5 transition-colors duration-150 sm:min-h-0 sm:min-w-0"
                   >
                     <TrashIcon className="h-4 w-4" />
                   </button>

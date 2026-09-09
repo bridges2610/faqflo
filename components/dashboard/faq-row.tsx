@@ -65,12 +65,21 @@ export function FaqRow({
       <div className="flex items-start gap-3">
         {/* Reorder — position decides the order in the exported HTML and in the
             schema, so it's worth having where the eye already is. */}
-        <div className="flex shrink-0 flex-col gap-0.5 pt-0.5">
+        {/*
+          ⚠️ gap-1.5 ON A PHONE, AND IT WAS gap-0.5. Both buttons already met
+          the touch-target floor, which is why the measurement pass did not flag
+          them — but they sat 2px apart with 14px arrows inside, so the two
+          targets effectively formed one tall block with an invisible seam. A mis-tap
+          moves the answer the wrong way, and putting it back needs another
+          correct tap in the same place. Back to the tight stack from sm up,
+          where the pointer is precise and the vertical space is worth more.
+        */}
+        <div className="flex shrink-0 flex-col gap-1.5 pt-0.5 sm:gap-0.5">
           <button
             onClick={() => moveFaq(faq.id, 'up')}
             disabled={isFirst}
             aria-label="Move up"
-            className="text-slate hover:text-primary hover:bg-cloud rounded-md inline-flex min-h-11 min-w-11 items-center justify-center p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-0 sm:min-w-0"
+            className="text-slate hover:text-primary hover:bg-cloud rounded-md inline-flex min-h-10 min-w-10 items-center justify-center p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-0 sm:min-w-0"
           >
             <ArrowUpIcon className="h-3.5 w-3.5" />
           </button>
@@ -78,7 +87,7 @@ export function FaqRow({
             onClick={() => moveFaq(faq.id, 'down')}
             disabled={isLast}
             aria-label="Move down"
-            className="text-slate hover:text-primary hover:bg-cloud rounded-md inline-flex min-h-11 min-w-11 items-center justify-center p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-0 sm:min-w-0"
+            className="text-slate hover:text-primary hover:bg-cloud rounded-md inline-flex min-h-10 min-w-10 items-center justify-center p-1 transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-30 sm:min-h-0 sm:min-w-0"
           >
             <ArrowDownIcon className="h-3.5 w-3.5" />
           </button>
@@ -92,7 +101,7 @@ export function FaqRow({
                 <input
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
-                  className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-[0.9375rem] font-semibold outline-none transition-colors duration-150"
+                  className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-base font-semibold outline-none sm:text-[0.9375rem] transition-colors duration-150"
                 />
               </label>
               <label className="block">
@@ -101,7 +110,7 @@ export function FaqRow({
                   value={answer}
                   onChange={(e) => setAnswer(e.target.value)}
                   rows={4}
-                  className="border-line bg-cloud text-navy focus:border-primary w-full resize-y rounded-input border px-3 py-2 text-sm leading-relaxed outline-none transition-colors duration-150"
+                  className="border-line bg-cloud text-navy focus:border-primary w-full resize-y rounded-input border px-3 py-2 text-base sm:text-sm leading-relaxed outline-none transition-colors duration-150"
                 />
               </label>
               <div className="flex items-center gap-2">
@@ -144,13 +153,13 @@ export function FaqRow({
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
               <button
                 onClick={startEdit}
-                className="text-primary hover:text-primary-hover inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm font-medium transition-colors duration-150"
+                className="text-primary hover:text-primary-hover inline-flex min-h-10 min-w-10 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm font-medium transition-colors duration-150"
               >
                 Edit
               </button>
               <button
                 onClick={() => editFaq(faq.id, { status: published ? 'draft' : 'published' })}
-                className="text-slate hover:text-navy inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm transition-colors duration-150"
+                className="text-slate hover:text-navy inline-flex min-h-10 min-w-10 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm transition-colors duration-150"
               >
                 {published ? 'Unpublish' : 'Publish'}
               </button>
@@ -171,7 +180,7 @@ export function FaqRow({
                         if (e.target.value) moveFaqToGroup(faq.id, e.target.value);
                         setMoving(false);
                       }}
-                      className="border-line text-navy focus:border-primary min-h-11 rounded-input border bg-surface px-2 py-1 text-sm outline-none sm:min-h-0"
+                      className="border-line text-navy focus:border-primary min-h-10 rounded-input border bg-surface px-2 py-1 text-base sm:text-sm outline-none sm:min-h-0"
                     >
                       <option value="" disabled>
                         Move to…
@@ -182,33 +191,55 @@ export function FaqRow({
                         </option>
                       ))}
                     </select>
-                    <button onClick={() => setMoving(false)} className="text-slate inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm">
+                    <button onClick={() => setMoving(false)} className="text-slate inline-flex min-h-10 min-w-10 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm">
                       Cancel
                     </button>
                   </span>
                 ) : (
                   <button
                     onClick={() => setMoving(true)}
-                    className="text-slate hover:text-navy inline-flex min-h-11 min-w-11 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm transition-colors duration-150"
+                    className="text-slate hover:text-navy inline-flex min-h-10 min-w-10 items-center justify-center sm:min-h-0 sm:min-w-0 text-sm transition-colors duration-150"
                   >
                     Move to…
                   </button>
                 ))}
 
               {confirmDelete ? (
-                <span className="flex items-center gap-2 text-sm">
+                /*
+                  ⚠️ THESE TWO WERE THE ONLY CONTROLS ON THE PAGE WITHOUT A
+                  THUMB TARGET, AND ONE OF THEM DELETES. Measured at 390px
+                  across all 134 controls on this screen: every other one met
+                  the floor, while "Yes" was 25×20 and "No" 19×20 —
+                  two three-letter words 8px apart, the smaller pair doing the
+                  irreversible thing. They now take the same
+                  `min-h-10 … sm:min-h-0` floor every sibling in this row already had.
+
+                  ⚠️ AND THEY ARE NOT SPACED AS A MATCHED PAIR. gap-4 on a
+                  phone, not gap-2: these are opposites, not peers, and a thumb
+                  that lands between them must not find the destructive one.
+                  Back to gap-2 from sm up, where a pointer is precise.
+                */
+                <span className="flex items-center gap-4 text-sm sm:gap-2">
                   <span className="text-slate">Delete?</span>
-                  <button onClick={() => removeFaq(faq.id)} className="text-error-ink font-semibold">
+                  <button
+                    onClick={() => removeFaq(faq.id)}
+                    className="text-error-ink inline-flex min-h-10 min-w-10 items-center justify-center font-semibold sm:min-h-0 sm:min-w-0"
+                  >
                     Yes
+                    <span className="sr-only"> — delete this answer</span>
                   </button>
-                  <button onClick={() => setConfirmDelete(false)} className="text-slate">
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="text-slate inline-flex min-h-10 min-w-10 items-center justify-center sm:min-h-0 sm:min-w-0"
+                  >
                     No
+                    <span className="sr-only"> — keep this answer</span>
                   </button>
                 </span>
               ) : (
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="text-slate hover:text-error-ink inline-flex min-h-11 items-center gap-1.5 text-sm transition-colors duration-150 sm:min-h-0"
+                  className="text-slate hover:text-error-ink inline-flex min-h-10 items-center gap-1.5 text-sm transition-colors duration-150 sm:min-h-0"
                 >
                   <TrashIcon className="h-3.5 w-3.5" />
                   Delete

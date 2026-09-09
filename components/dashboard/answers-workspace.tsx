@@ -421,7 +421,7 @@ export function AnswersWorkspace({ tab }: { tab: AnswersTab }) {
                       'A question your customers ask',
                       64,
                     )}
-                    className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-[0.9375rem] font-semibold outline-none transition-colors duration-150"
+                    className="border-line bg-cloud text-navy focus:border-primary w-full rounded-input border px-3 py-2 text-base font-semibold outline-none sm:text-[0.9375rem] transition-colors duration-150"
                   />
                 </label>
                 <label className="block">
@@ -431,7 +431,7 @@ export function AnswersWorkspace({ tab }: { tab: AnswersTab }) {
                     onChange={(e) => setDraftA(e.target.value)}
                     rows={4}
                     placeholder="Answer it the way you would on the phone. Plain and specific."
-                    className="border-line bg-cloud text-navy focus:border-primary w-full resize-y rounded-input border px-3 py-2 text-sm leading-relaxed outline-none transition-colors duration-150"
+                    className="border-line bg-cloud text-navy focus:border-primary w-full resize-y rounded-input border px-3 py-2 text-base sm:text-sm leading-relaxed outline-none transition-colors duration-150"
                   />
                 </label>
                 <div className="flex items-center gap-2">
@@ -549,7 +549,7 @@ function TopicGroup({
            sit slightly wider than the text without moving anything, and the
            row keeps the global :focus-visible outline from globals.css rather
            than growing a bespoke ring. */
-        className="group/row -mx-2 flex min-h-11 w-full items-center gap-2.5 rounded-lg px-2 py-3 text-left transition-colors duration-150 hover:bg-cloud"
+        className="group/row -mx-2 flex min-h-10 w-full items-center gap-2.5 rounded-lg px-2 py-3 text-left transition-colors duration-150 hover:bg-cloud"
       >
         <ChevronIcon
           aria-hidden="true"
