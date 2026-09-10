@@ -219,11 +219,15 @@ function QuestionRow({
  * Removing it leaves one question worth answering in that corner — when does the
  * next one happen — and this answers it.
  *
- * ⚠️ NEVER PRINT A DATE IN THE PAST. app-shell.tsx states the rule this copies:
- * "a date in the past is not [reassuring]. Saying a check was due yesterday
- * invites the question of where it is, and the answer is tonight." A cursor sits
- * in the past for the hours between falling due and the 03:00 UTC sweep
- * collecting it, which is a normal state rather than a fault.
+ * ⚠️ NEVER PRINT A DATE IN THE PAST, AND NEVER NAME AN HOUR. A cursor sits in
+ * the past between falling due and the next sweep collecting it, which is a
+ * normal state rather than a fault — nextCheckLabel() answers it with "within a
+ * day".
+ *
+ * This note used to quote app-shell.tsx's "the answer is tonight". Both files
+ * have stopped saying that: it rested on `vercel.json`'s 03:00 UTC, which Vercel
+ * does not promise to the hour and which one observed run missed by six and a
+ * half. See the note on nextCheckLabel for what replaced it.
  */
 function NextCheck({ due, running }: { due: Date | null; running: boolean }) {
   /*
@@ -233,10 +237,9 @@ function NextCheck({ due, running }: { due: Date | null; running: boolean }) {
     because the chart handed the cursor to timeUntil(). One function now answers
     the question for both.
 
-    It also fixes something this version had wrong on its own: the else branch
-    printed the CURSOR's date, but the sweep collects it at the next 03:00 UTC,
-    which can be the following day. It could name a day a check would not
-    happen on.
+    It also fixed something this version had wrong on its own: the else branch
+    printed a date built from an assumed sweep hour, so it could name a day no
+    check would happen on.
   */
   return <p className="text-slate text-sm sm:text-right">{nextCheckLabel(due, running)}</p>;
 }

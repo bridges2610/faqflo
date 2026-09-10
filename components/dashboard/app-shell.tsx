@@ -7,8 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Wordmark } from '@/components/ui/wordmark';
 import { CloseIcon, MenuIcon } from '@/components/ui/icons';
 import { useDashboard } from '@/lib/dashboard/provider';
-import { formatShortDate } from '@/lib/dashboard/format';
-import { isPro, nextCheckDate, PRO_PRICE } from '@/lib/dashboard/plans';
+import { isPro, nextCheckDate, nextCheckWhen, PRO_PRICE } from '@/lib/dashboard/plans';
 import type { PlanId } from '@/lib/dashboard/types';
 import { AeoIcon, ChartIcon, DocIcon, FaqIcon, HomeIcon, SearchIcon } from './nav-icons';
 import { AccountMenu } from './account-menu';
@@ -301,16 +300,23 @@ function PlanFooter() {
     for accounts without a date would be a worse regression than the space this
     reclaimed.
 
-    Due already, or overdue: the sweep runs nightly, so "tonight" is honest and
-    a date in the past is not. Saying a check was due yesterday invites the
-    question of where it is, and the answer is tonight.
+    ⚠️ THE "when" COMES FROM nextCheckWhen(), AND THIS LINE USED TO SAY
+    "next one tonight". It was the fourth surface answering this question and the
+    last one still naming an hour, on every dashboard page — after the AI
+    Mentions header, its chart and its weekly-cadence line had all been moved
+    onto one rule. Its old note argued "tonight" was honest because the sweep
+    runs nightly; that turned out to rest on `vercel.json`'s 03:00 UTC, which
+    Vercel does not promise to the hour and which one observed run missed by six
+    and a half. See the note on nextCheckLabel.
+
+    ⚠️ AND IT TAKES THE "when" RATHER THAN PATCHING THE FULL LABEL. This sentence
+    is shaped differently — "Checked every week — next one X" against "Next check
+    X" — so it needs the fragment, not a string replace on somebody else's copy.
   */
   const due = pro ? nextCheckDate(site) : null;
   const proLine = !due
     ? 'Checked automatically every week'
-    : due.getTime() <= Date.now()
-      ? 'Checked every week — next one tonight'
-      : `Checked every week — next one ${formatShortDate(due)}`;
+    : `Checked every week — next one ${nextCheckWhen(due)}`;
 
   /*
     ⚠️ NO FILL, AND IT HAD ONE. This was `bg-cloud`, from when the sidebar was
