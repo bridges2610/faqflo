@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { EngineMark } from '@/components/ui/ai-marks';
 import { Card } from '@/components/ui/card';
-import { timeUntil } from '@/lib/dashboard/format';
+import { nextCheckLabel } from '@/lib/dashboard/plans';
 import { ENGINES, type CitationDay, type Engine } from '@/lib/dashboard/types';
 import { ChartIcon } from './nav-icons';
 import { SectionTitle } from './section-title';
@@ -330,10 +330,27 @@ export function CitationChart({
               know whether a second is coming at all. */}
           {single && (
             <p className="text-slate mt-1 text-sm">
+              {/*
+                ⚠️ nextCheckLabel, AND IT USED TO BE `timeUntil(nextCheckAt)`.
+                That printed a countdown to the CURSOR — but the cursor is not
+                an appointment, it is a flag the 03:00 UTC sweep looks for, so
+                "in 2 hours" passed with nothing happening and then the
+                countdown stuck on the literal word "now". Worse, the header
+                above already knew better, so one site read "Next check tonight"
+                at the top and "Next check now" here in the same render.
+
+                ⚠️ `false` FOR running IS DELIBERATE, NOT AN OVERSIGHT. This
+                component is presentational — it takes `daily`, `span`,
+                `unscheduled` and `nextCheckAt` and reads no context — and the
+                header is the surface that owns "a run is happening". This
+                sentence answers a different question: is another check coming
+                at all. Threading a run flag through two call sites to say
+                "Checking now…" twice would buy nothing.
+              */}
               {unscheduled
                 ? 'This is your one check. Pro re-checks every week, so the numbers can move.'
                 : nextCheckAt
-                  ? `Next check ${timeUntil(nextCheckAt)}.`
+                  ? `${nextCheckLabel(new Date(nextCheckAt), false)}.`
                   : 'We check again every week.'}
             </p>
           )}

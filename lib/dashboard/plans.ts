@@ -22,6 +22,7 @@
  * getting them wrong in that direction is a chargeback.
  */
 
+import { formatShortDate } from './format';
 import { ENGINES, type DashboardData, type PlanId, type Site, type User } from './types';
 
 /* --------------------------------------------------------------- prices --- */
@@ -495,6 +496,94 @@ export function nextCheckDate(site: Site | null): Date | null {
   const due = new Date(site.nextCheckAt);
   return Number.isNaN(due.getTime()) ? null : due;
 }
+
+/**
+ * The hour the sweep runs, in UTC.
+ *
+ * ⚠️ THIS NUMBER ALSO LIVES IN `vercel.json` AS `"schedule": "0 3 * * *"`, AND
+ * THE TWO MUST MOVE TOGETHER. Until now the hour existed only in that JSON and
+ * nothing read it; the moment the UI does arithmetic on it to say when a check
+ * will happen, a mismatch becomes a promise the scheduler does not keep.
+ */
+export const SWEEP_HOUR_UTC = 3;
+
+/**
+ * When the sweep will actually collect a cursor.
+ *
+ * ⚠️ THE CURSOR IS NOT THE APPOINTMENT, AND THAT IS THE WHOLE POINT OF THIS
+ * FUNCTION. /api/cron/tracking says it plainly — "due-ness is
+ * `next_check_at <= now()`, so this is a sweep rather than an alarm clock" — so
+ * a cursor falling due at 2pm is collected at the next 03:00 UTC, not at 2pm.
+ * The UI used to count down to the cursor, which meant it promised a moment
+ * nothing was listening for: "in 2 hours" came and went with nothing happening,
+ * then the countdown hit zero and sat there saying "now".
+ *
+ * ⚠️ CLAMPED TO now(), BECAUSE A CURSOR IN THE PAST IS NORMAL. It sits there
+ * for the hours between falling due and the sweep collecting it. The answer is
+ * still a future sweep, never a past date and never "now".
+ */
+export function nextSweepAfter(due: Date, now: Date = new Date()): Date {
+  const from = Math.max(due.getTime(), now.getTime());
+  const sweep = new Date(from);
+
+  sweep.setUTCHours(SWEEP_HOUR_UTC, 0, 0, 0);
+  /* setUTCHours can land before `from` when the hour has already passed today;
+     one day forward is then the first sweep at or after it. */
+  if (sweep.getTime() < from) sweep.setUTCDate(sweep.getUTCDate() + 1);
+
+  return sweep;
+}
+
+/**
+ * What to tell somebody about their next check — one sentence, one rule.
+ *
+ * ⚠️ ONE FUNCTION BECAUSE TWO SURFACES DISAGREED IN FRONT OF A CUSTOMER. AI
+ * Mentions printed "Next check tonight" at the top and "Next check now" under
+ * the chart, for the same site, in the same render. The header branched on the
+ * cursor; the chart handed the cursor to timeUntil(), which returns the literal
+ * string "now" once it passes. Now both ask this.
+ *
+ * ⚠️ "tonight" IS DERIVED FROM THE READER'S CLOCK, NOT ASSUMED. 03:00 UTC is
+ * 11pm the previous evening in New York and midday in Tokyo — the old string
+ * was true for one customer and wrong for another. The sweep is a real instant;
+ * the wording comes from comparing it to the reader's own day, which is the
+ * same reasoning localDay() in format.ts was added for.
+ */
+export function nextCheckLabel(
+  due: Date | null,
+  running: boolean,
+  /* Injectable so the rule can be tested against fixed instants in a fixed
+     zone — the only way to prove "tonight" is right in New York and wrong in
+     Tokyo without waiting for the evening. */
+  now: Date = new Date(),
+): string {
+  /* A run in flight outranks the schedule: the answer to "when is the next
+     check" is "it is happening" while it is happening. */
+  if (running) return 'Checking now…';
+  if (!due) return 'Checked automatically every week';
+
+  const sweep = nextSweepAfter(due, now);
+
+  /* Whole days apart on the READER'S calendar, not 24-hour blocks: a sweep
+     eight hours away can still be "tomorrow" if it crosses local midnight. */
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((startOfDay(sweep) - startOfDay(now)) / 86_400_000);
+
+  if (days <= 0) {
+    /* Same local day. "tonight" only if it really is the evening where they
+       are — otherwise it is a check happening in a few hours this morning. */
+    return sweep.getHours() >= 18 ? 'Next check tonight' : 'Next check later today';
+  }
+  if (days === 1) return 'Next check tomorrow';
+  /* Inside the week a weekday is easier to hold than a date; past that the
+     date is the only thing that stays unambiguous. */
+  if (days < 7) return `Next check ${WEEKDAY.format(sweep)}`;
+
+  return `Next check ${formatShortDate(sweep)}`;
+}
+
+/** Local, unlike the UTC-pinned formatters — see the note on nextCheckLabel. */
+const WEEKDAY = new Intl.DateTimeFormat('en-US', { weekday: 'long' });
 
 /* --------------------------------------------------------------- offers --- */
 

@@ -14,8 +14,8 @@ import type { CheckStatus } from '@/lib/audit/types';
 import { visibilityFindings } from '@/lib/dashboard/audit-context';
 import { useDashboard, type TrackingRun } from '@/lib/dashboard/provider';
 import { discoverQuestions } from '@/lib/dashboard/discover';
-import { isPro, nextCheckDate, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
-import { formatNumber, formatShortDate, timeAgo, timeUntil } from '@/lib/dashboard/format';
+import { isPro, nextCheckDate, nextCheckLabel, trackingPlanFor, TRACKING_PLANS } from '@/lib/dashboard/plans';
+import { formatNumber, timeAgo, timeUntil } from '@/lib/dashboard/format';
 import { ENGINES, type SiteTracking } from '@/lib/dashboard/types';
 import {
   checksByEngine,
@@ -226,17 +226,19 @@ function QuestionRow({
  * collecting it, which is a normal state rather than a fault.
  */
 function NextCheck({ due, running }: { due: Date | null; running: boolean }) {
-  /* A run in flight outranks the schedule: the answer to "when is the next
-     check" is "it is happening" while it is happening. */
-  const text = running
-    ? 'Checking now…'
-    : !due
-      ? 'Checked automatically every week'
-      : due.getTime() <= Date.now()
-        ? 'Next check tonight'
-        : `Next check ${formatShortDate(due)}`;
+  /*
+    ⚠️ THE BRANCHES MOVED TO nextCheckLabel() AND MUST NOT COME BACK. This held
+    the right rule and the chart under it held a different one — the same site
+    read "Next check tonight" here and "Next check now" there, in one render,
+    because the chart handed the cursor to timeUntil(). One function now answers
+    the question for both.
 
-  return <p className="text-slate text-sm sm:text-right">{text}</p>;
+    It also fixes something this version had wrong on its own: the else branch
+    printed the CURSOR's date, but the sweep collects it at the next 03:00 UTC,
+    which can be the following day. It could name a day a check would not
+    happen on.
+  */
+  return <p className="text-slate text-sm sm:text-right">{nextCheckLabel(due, running)}</p>;
 }
 
 type OutcomeFilter = 'all' | 'cited' | 'mentioned' | 'absent';
@@ -1258,9 +1260,21 @@ export function TrackingWorkspace() {
             weekly cadence has no such list to keep score against: what ran is
             the chart above, and what is coming is one date.
           */}
+          {/* ⚠️ THE THIRD SURFACE THAT ANSWERED THIS QUESTION, AND THE LAST ONE
+              STILL COUNTING DOWN TO THE CURSOR. It read "Next automatic check in
+              5 days" via timeUntil(), which becomes "now" the moment the cursor
+              passes and then stays there — the cursor is a flag the 03:00 UTC
+              sweep looks for, not an appointment. Same helper as the header and
+              the chart, so all three now say one thing. */}
           {!unscheduled && tracking?.nextCheckAt && (
             <p className="text-slate text-sm">
-              Next automatic check {timeUntil(tracking.nextCheckAt)}. We ask every week without you
+              {/* The label is used whole rather than patched into a longer
+                  phrase: rewriting "Next check" into "Next automatic check"
+                  here would be string surgery on another module's copy, and it
+                  would silently stop matching the day that copy changes.
+                  "Automatic" also earns less than it did — the manual button
+                  this section replaced is gone, so every check here is one. */}
+              {nextCheckLabel(new Date(tracking.nextCheckAt), false)}. We ask every week without you
               having to do anything.
             </p>
           )}
