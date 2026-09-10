@@ -1,6 +1,7 @@
 import * as industries from '@/content/posts/20-industries-affected-by-aeo-in-a-good-way.mdx';
 import * as redditDrop from '@/content/posts/chatgpt-dropped-reddit-citations-is-that-an-opportunity-for-you.mdx';
 import * as vsAhrefs from '@/content/posts/faqflo-vs-ahrefs-which-one-is-built-for-you.mdx';
+import * as websiteMatters from '@/content/posts/does-a-website-matter-anymore-in-2026.mdx';
 import * as officeManager from '@/content/posts/even-your-office-manager-can-use-faqflo.mdx';
 import * as pickupTime from '@/content/posts/how-long-does-it-take-for-ai-search-to-pick-up-your-content.mdx';
 import * as blockingChatgpt from '@/content/posts/is-my-site-blocking-chatgpt.mdx';
@@ -82,6 +83,7 @@ export { AUTHOR, AUTHOR_AVATAR, AUTHOR_BIO } from './author';
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  websiteMatters,
   /* ⚠️ THREE POSTS SHARE 2026-09-09, so this order decides which leads the
      archive — the sort below is stable and same-day posts keep the order here. */
   vsAhrefs,
