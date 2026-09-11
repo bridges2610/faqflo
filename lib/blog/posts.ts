@@ -4,6 +4,7 @@ import * as vsAhrefs from '@/content/posts/faqflo-vs-ahrefs-which-one-is-built-f
 import * as websiteMatters from '@/content/posts/does-a-website-matter-anymore-in-2026.mdx';
 import * as kidsAskAi from '@/content/posts/kids-are-asking-ai-now-adapt-or-miss-them-later.mdx';
 import * as marketing2027 from '@/content/posts/what-does-marketing-look-like-in-2027-and-beyond.mdx';
+import * as notShowingUp from '@/content/posts/top-10-reasons-youre-not-showing-up-in-ai-search.mdx';
 import * as officeManager from '@/content/posts/even-your-office-manager-can-use-faqflo.mdx';
 import * as pickupTime from '@/content/posts/how-long-does-it-take-for-ai-search-to-pick-up-your-content.mdx';
 import * as blockingChatgpt from '@/content/posts/is-my-site-blocking-chatgpt.mdx';
@@ -85,8 +86,9 @@ export { AUTHOR, AUTHOR_AVATAR, AUTHOR_BIO } from './author';
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
-  /* ⚠️ TWO POSTS SHARE 2026-09-11, so this order decides which leads the
+  /* ⚠️ THREE POSTS SHARE 2026-09-11, so this order decides which leads the
      archive — the sort below is stable and same-day posts keep the order here. */
+  notShowingUp,
   marketing2027,
   kidsAskAi,
   websiteMatters,

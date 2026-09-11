@@ -1,0 +1,195 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: 'top-10-reasons-youre-not-showing-up-in-ai-search',
+  title: 'Top 10 Reasons You’re Not Showing Up in AI Search',
+  date: '2026-09-11',
+  excerpt:
+    'Someone just asked ChatGPT who to hire. It named your competitor. Here’s why — and what to fix first.',
+  /* ⚠️ NOT NAMED AFTER THE SLUG — the file arrived as
+     not-showing-up-in-ai-search.png. Harmless: nothing derives an image path
+     from the slug, this field is the only thing that resolves it. */
+  image: '/blog/not-showing-up-in-ai-search.png',
+  // Describes the card rather than repeating the headline, which is already the
+  // page's h1 immediately below it.
+  imageAlt:
+    'An “AI visibility check” card scoring 2 of 6 passed. Failing: answers readable without JavaScript, AI crawlers allowed in, answer in the first sentence, questions people actually ask. Passing: service area on the page, content on your own domain. Along the bottom: “source: your website” beside a red “Not cited” tag.',
+};
+
+Someone just asked ChatGPT who to hire. It named your competitor. Here’s why — and what to fix first.
+
+<PostTldr>
+Most businesses are missing from AI answers because the AI literally can’t read their site — not
+because the business is bad.
+
+- The fixes are mostly boring: crawlable text, open doors for crawlers, direct answers to real
+  questions, on your own domain.
+- The other half is proof. If nothing outside your own site vouches for you — reviews, a live
+  profile, mentions you didn’t write — AI has no reason to put your name forward.
+- You can’t fix what you haven’t measured. Check whether you’re cited today, then work down this
+  list.
+
+</PostTldr>
+
+You’ve got a decent website. Reviews are good. Google still sends you some traffic. And yet when
+someone asks ChatGPT, Perplexity, or Google’s AI “who’s the best [what you do] near [where you are],”
+your name never comes up.
+
+It’s rarely one dramatic thing. It’s usually three or four small things stacked on top of each other,
+and the AI quietly gives up and recommends someone else.
+
+Here are the ten we see most, roughly in order of how often they’re the culprit.
+
+## 1. Your answers are hidden behind JavaScript
+
+This is the big one. Most [FAQ plugins, accordion widgets](/blog/why-faq-plugins-arent-a-good-idea),
+and “smart” content blocks load their text with JavaScript after the page opens. Your visitors see it
+fine. AI crawlers generally don’t run JavaScript — they read the raw HTML and move on. So the exact
+answers you’d want quoted are, to them, a blank space.
+
+**Fix:** Your questions and answers need to be plain text in the page the moment it loads. View your
+page source (right-click → View Page Source) and search for one of your FAQ answers. If it’s not
+there, the AI can’t see it either.
+
+## 2. You’ve locked the AI crawlers out
+
+Your robots.txt file tells crawlers which ones are welcome.
+[A lot of themes, security plugins, and hosting defaults](/blog/is-my-site-blocking-chatgpt) now
+block AI crawlers — GPTBot, ClaudeBot, PerplexityBot, Google-Extended — without telling you. You may
+have opted out of AI search without ever choosing to.
+
+**Fix:** Open `yourdomain.com/robots.txt` and look for those names next to “Disallow.” If you want to
+be cited, they need to be allowed in.
+
+## 3. The basics aren’t on the page
+
+“What does it cost?” “Do you cover my town?” “Are you open Saturdays?” If your site says “contact us
+for a quote” and “serving the greater area,” the AI has nothing to work with. It can’t recommend a
+plumber in Dover if it can’t confirm you work in Dover.
+
+**Fix:** Put the plain facts in plain text: services, service area by town name, hours, starting
+prices or price ranges, response times. Specific beats impressive every time.
+
+## 4. You bury the answer
+
+A lot of pages start with a story, a mission statement, or three paragraphs about your founding year
+before they get to the point. Answer engines pull the cleanest, most direct sentence they can find.
+If yours is in paragraph four, they’ll take someone else’s paragraph one.
+
+**Fix:** Lead with the answer. First sentence, 30–60 words, then the explanation. Think “Yes, we do
+same-day water heater replacement in Portsmouth” — not “For over 20 years, we’ve been committed
+to…”
+
+## 5. Your content isn’t shaped like a question
+
+People type questions into AI. Your site is written in headings like “Our Services” and “About Us.”
+There’s a mismatch, and the AI has to do the work of connecting the two. Often it doesn’t bother.
+
+**Fix:** Add real question-and-answer content. This is why
+[FAQ pages, done right](/blog/what-questions-should-be-on-your-faq-page), are one of the best AEO
+tools you have — they’re already shaped like what people ask.
+
+## 6. You’re answering the wrong questions
+
+You have an FAQ, but it’s the questions *you* want to answer: “What makes us different?” “Why choose
+us?” Meanwhile people are asking “Do you charge for estimates?” and “Can you come out tonight?”
+
+**Fix:** Start from what people actually ask AI about businesses like yours in your area, and answer
+those. If you don’t know what those questions are, that’s the first thing to find out.
+
+## 7. Your SEO foundation is shaky
+
+[AEO](/blog/what-is-aeo) isn’t a replacement for SEO — it’s the next floor up. If your site is slow,
+has thin pages, missing titles, broken links, or hasn’t been touched since 2019, answer engines treat
+it the same way Google does: as something not worth trusting.
+
+**Fix:** Get the basics right first. Clear page titles, a real page for each service, a working
+mobile site, no dead ends. Then build the AEO layer on top.
+
+## 8. Your best info lives somewhere AI can’t use it
+
+Your price list is a PDF. Your hours are in an image. Your latest work is only on Instagram. Your FAQ
+is embedded from another service inside an iframe. All of that looks fine to a human and reads as
+nothing — or as someone else’s content — to a crawler.
+
+**Fix:** Anything you want quoted should be plain HTML text on a page you own. If it’s in a PDF, an
+image, a social post, or an embed from another domain, copy the important parts onto your site as
+text.
+
+## 9. There’s nothing telling AI you can be trusted
+
+Everything above is about what your own site says. This one is about whether anybody else agrees.
+
+An answer engine is about to put your name in front of a stranger and, in effect, vouch for you. It
+would rather do that for a business the web corroborates than one that only vouches for itself. Your
+site claiming you’re the best roofer in town is an assertion. Forty recent
+[Google reviews](/blog/does-ai-use-my-google-reviews-how-reviews-affect-ai-recommendations), an
+active profile, a mention in a local news piece, and a supplier listing you as an approved installer
+are evidence.
+
+So the question isn’t just “can AI read me?” It’s “if AI goes looking for a second opinion about me,
+does it find one?” For a lot of small businesses the honest answer is no — and a competitor with
+half the craftsmanship but a visible footprint gets named instead.
+
+The signals that matter most:
+
+- **Reviews, recent and plentiful.** Volume, rating and how fresh they are. Four reviews from 2022
+  reads as a business that might not be trading any more.
+- **A profile that looks alive.** Your Google Business Profile filled in and current — hours,
+  services, photos, answered questions. Social accounts that have been posted to this year.
+- **Mentions you didn’t write.** Local press, suppliers, trade associations, community pages,
+  directories. [Anywhere your name appears](/blog/what-else-influences-companies-being-mentioned-in-ai)
+  next to what you do, that you don’t control.
+- **Consistency across all of it.** If your name is spelled three ways, your address is stale on two
+  listings, and your hours disagree, every one of those signals gets weaker — because now the web
+  doesn’t agree with itself either.
+
+**Fix:** Ask every happy customer for a review, the day the job is done — it’s the highest-return
+habit on this whole list. Fill in your Google Business Profile properly and keep it current. Get
+listed wherever your trade lists people, and make your name, address, phone and hours identical
+everywhere. This is the same work that has always helped local SEO. It just happens to be what an AI
+reads to decide whether you’re a safe recommendation.
+
+## 10. You’ve never actually checked
+
+Most businesses have no idea whether they’re cited today, for what, or who’s being cited instead. So
+nothing gets fixed, because nothing looks broken.
+
+**Fix:** Ask ChatGPT, Perplexity and Gemini five questions a real customer would ask. Write down who
+comes up. Then do it again next month. Better yet, track it automatically, because the answers change
+as your competitors’ content changes.
+
+## Where to start
+
+Don’t try to fix all ten. Check the first two — can AI read your site, and are crawlers allowed in?
+If either fails, nothing else on this list matters yet. Once the doors are open, work down: real
+questions, direct answers, plain text on your own domain.
+
+That’s the whole job. [FaqFlo’s free check](/free-report) tells you in about a minute where you stand
+on the ones that matter most, and whether you’re being cited right now.
+
+<PostFaq
+  items={[
+    {
+      q: 'How do I know if AI can read my website?',
+      a: 'Open your page, right-click, and choose “View Page Source.” Search for a sentence from your FAQ or service description. If it isn’t in that raw HTML, AI crawlers can’t see it either — it’s being loaded by JavaScript after the fact.',
+    },
+    {
+      q: 'Is being blocked in robots.txt really that common?',
+      a: 'Yes. Many security plugins, hosting providers, and themes now block AI crawlers by default, and most owners never look at the file. Check yourdomain.com/robots.txt for GPTBot, ClaudeBot, PerplexityBot, and Google-Extended before you do anything else.',
+    },
+    {
+      q: 'Do I need to fix all ten before I’ll get cited?',
+      a: 'No. Crawlability and crawler access (reasons 1 and 2) are the gates — nothing works until those are open. After that, each fix improves your odds, and direct answers to real questions on your own domain do most of the heavy lifting.',
+    },
+    {
+      q: 'Does good SEO already cover this?',
+      a: 'Partly. A healthy, fast, well-structured site is the foundation, and it helps here too. But AEO adds things SEO alone doesn’t: answers written to be quoted, question-shaped content, and checking that AI crawlers can actually read it.',
+    },
+    {
+      q: 'How long until I show up in AI answers after fixing these?',
+      a: 'It varies by engine and how often your site gets crawled. Most engines find a changed page within hours to a couple of weeks, and the first AI answers quoting you usually land two to eight weeks after you publish. That’s why tracking matters: you want to see the change when it happens and catch the questions where a competitor is still getting named instead of you.',
+    },
+  ]}
+/>
