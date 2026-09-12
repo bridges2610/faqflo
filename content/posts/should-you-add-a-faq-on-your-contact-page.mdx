@@ -1,0 +1,222 @@
+import { PostFaq } from '@/components/blog/post-faq';
+import { PostTldr } from '@/components/blog/post-tldr';
+
+export const meta = {
+  slug: 'should-you-add-a-faq-on-your-contact-page',
+  title: 'Should You Add a FAQ on Your Contact Page?',
+  date: '2026-09-12',
+  excerpt:
+    'Yes — a short one. The questions people ask before they reach out are the questions that decide whether they reach out at all.',
+  /* ⚠️ NOT NAMED AFTER THE SLUG — the file arrived as faq-on-contact-page.png.
+     Harmless: nothing derives an image path from the slug, this field is the
+     only thing that resolves it. */
+  image: '/blog/faq-on-contact-page.png',
+  // Describes the card rather than repeating the headline, which is already the
+  // page's h1 immediately below it.
+  imageAlt:
+    'A contact page mockup: name, email and “How can we help?” fields above a Send message button. Below them, a section headed “Before you reach out” with two questions — “Do you cover my town?” answered “Yes — all of Rockingham County, same-day”, and “How fast do you reply?” answered “Within one business day, usually same afternoon”. Along the bottom: “source: own website” beside a green “Readable by AI” tag.',
+};
+
+Yes — a short one. The questions people ask before they reach out are the questions that decide
+whether they reach out at all.
+
+<PostTldr>
+Yes. A short FAQ (4–6 questions) on your contact page answers the doubts that stop people from
+filling out the form.
+
+- Keep it to “before I contact you” questions — hours, service area, response time, pricing basics —
+  and put it below the form, not above it.
+- Publish it as real, crawlable HTML so AI answer engines can read it. Your contact page is where AI
+  looks for the facts about your business.
+
+</PostTldr>
+
+## Why the contact page is the wrong place to leave people guessing
+
+Think about what someone is doing on your contact page. They’ve already decided you might be the
+right fit. They’re one step from calling or sending a message.
+
+Then a small question stops them. Are they even open on Saturdays? Do they come out to my town? Am I
+going to get a reply today or next week?
+
+If the answer isn’t on the page, some people will guess. A lot of people will leave. Not because you
+couldn’t help them — because they didn’t know for sure.
+
+A short FAQ right there answers the question before it becomes a reason to bounce. That’s the whole
+case for it.
+
+## What belongs on a contact page FAQ
+
+Not your full FAQ. That
+[lives on its own page](/blog/what-questions-should-be-on-your-faq-page), and it should. The contact
+page FAQ is smaller and more specific. It only covers the questions people ask right before they get
+in touch.
+
+For most businesses that’s some mix of:
+
+- **Hours.** When are you open, and when do you answer messages?
+- **Service area.** Which towns, zip codes, or regions do you cover?
+- **Response time.** “We reply to every message within one business day.” One sentence, and it
+  removes a lot of doubt.
+- **The best way to reach you.** Call for emergencies, form for quotes, email for billing — whatever
+  is true.
+- **Pricing basics.** Do you charge for estimates? Is there a minimum? You don’t need a price list.
+  You need to answer the question people are nervous to ask.
+- **What happens next.** “We’ll call to confirm a time, then send a written quote.” People like
+  knowing the steps.
+
+Four to six questions is plenty. If you’re past eight, you’re rebuilding your main FAQ page and
+burying the form.
+
+## Where to put it
+
+Below the form or contact details. Never above them.
+
+The contact page has one job: make it easy to reach you. The FAQ supports that job. It shouldn’t
+compete with it. Someone who already knows they want to call shouldn’t have to scroll past six
+questions to find the number.
+
+A good layout looks like this: phone, email, and form at the top. Address and hours next. Then a
+heading like “Before you reach out” with your short FAQ underneath.
+
+## The part most people miss: AI reads your contact page
+
+Here’s the reason this matters more in 2026 than it did a few years ago.
+
+When someone asks ChatGPT, Perplexity, or Google’s AI something like “Is there a plumber in Concord
+who does weekend calls?” the AI goes looking for facts. Hours. Service area. Whether you do
+emergencies. Those facts are exactly what a contact page FAQ contains.
+
+If those answers are written in plain text on your site, the AI can find them, quote them, and name
+your business. If they’re missing — or trapped inside a JavaScript widget the AI can’t read — it
+names someone else.
+
+This is the layer above regular SEO. SEO is still the foundation: a clear, well-built contact page
+that Google can index and rank. [AEO](/blog/what-is-aeo) (answer engine optimization) is the next
+floor up — writing your answers so an AI can lift them straight into a recommendation. A contact page
+FAQ does both jobs at once if you build it right.
+
+## How to build it right
+
+Three rules.
+
+**Answer first, then explain.** “Yes, we serve all of Rockingham County. That includes Portsmouth,
+Exeter, Hampton, and Dover.” The first sentence is the answer. The rest is detail. That’s the shape
+an AI can quote and a hurried person can skim.
+
+**Be specific.** “We respond fast” says nothing. “We reply within one business day, usually the same
+afternoon” is a fact someone can plan around — and a fact an AI can repeat.
+
+**Use real HTML, not a plugin.** Most
+[FAQ plugins and accordion widgets](/blog/why-faq-plugins-arent-a-good-idea) load their answers with
+JavaScript. Visitors see them. AI crawlers usually don’t, because they read the raw page and don’t
+run scripts. Your answers need to be in the page itself, on your own domain. A plain heading and
+paragraph for each question works. So does a copy-paste HTML block from a tool built for this.
+
+## Two worked examples
+
+Here’s what the three rules look like in practice. Five questions each, in the order they’d appear
+under the form.
+
+⚠️ These are templates, not facts. **Swap in your own numbers before you publish anything.** A price,
+a response time or a service area copied from an example is a promise you didn’t make — and the whole
+point of this exercise is that an AI will repeat it word for word.
+
+### A dental practice
+
+**Are you accepting new patients?**
+Yes, we’re accepting new patients for general and family dentistry. New patient appointments are
+usually available within two weeks.
+
+**Do you take my insurance?**
+We’re in-network with Delta Dental, Cigna, and MetLife, and we file claims for most other PPO plans
+as an out-of-network provider. Call us with your plan name and we’ll check before you book.
+
+**Can I be seen today if I’m in pain?**
+Yes. We hold same-day emergency slots every weekday and see most urgent cases within two hours. Call
+the office rather than using the form — the phone is monitored all day.
+
+**What does a first visit cost without insurance?**
+A new patient exam, cleaning and X-rays is $189. If treatment is needed, you’ll get a written plan
+with costs before anything is scheduled.
+
+**What happens after I book?**
+You’ll get a confirmation text and a short medical history form to fill in beforehand. Arrive ten
+minutes early for your first visit and we’ll take it from there.
+
+### A roofing company
+
+**Do you cover my town?**
+We cover all of Rockingham County, including Portsmouth, Exeter, Hampton, Dover and Stratham. If
+you’re just outside that, call anyway and we’ll tell you honestly whether the trip makes sense.
+
+**Do you charge for estimates?**
+No. Roof inspections and written estimates are free, and there’s no obligation. We’ll send the quote
+in writing the same day we visit.
+
+**How fast can you get out for a leak?**
+Same day for active leaks in our service area. Emergency tarping is a flat $450, credited toward the
+repair if you go ahead with us.
+
+**Do you handle insurance claims?**
+Yes. We document the damage, meet your adjuster on site, and bill the claim directly. You deal with
+us, not with the paperwork.
+
+**What happens after I request a quote?**
+We’ll call to confirm a time, inspect the roof and take photos, then email a written quote with
+options and prices. No one will show up unannounced.
+
+Read those out loud. Every one of them leads with the answer, names a real place or number, and would
+fit inside an AI’s reply without editing. That’s the standard.
+
+## When you might skip it
+
+There are a couple of cases where a contact page FAQ isn’t worth it.
+
+If your contact page is just a phone number and an address with almost no traffic, start by fixing
+your main FAQ page and your Google Business Profile first. Come back to this later.
+
+And if every question you’d list is already answered clearly in the two lines above the form — hours,
+area, response time, right there — you may not need a separate FAQ section. The point is that the
+answers exist on the page. The format is secondary.
+
+For everyone else, it’s one of the cheapest improvements you can make to a page that already gets
+your most motivated visitors.
+
+## Where FaqFlo comes in
+
+FaqFlo finds the questions people actually ask AI about businesses like yours, writes answer-first
+responses built to be quoted, and gives you a clean, crawlable HTML block you paste onto any page —
+including your contact page. No plugin, no JavaScript trap, and the content stays on your domain so
+the credit comes to you. Then it tracks whether ChatGPT, Perplexity and Gemini start naming your
+business.
+
+Your contact page already has the people who want to reach you. A short FAQ makes sure nothing small
+gets in the way — and that the AI sending the next person your way has the facts straight.
+
+[Start with the free check.](/free-report)
+
+<PostFaq
+  items={[
+    {
+      q: 'How many questions should a contact page FAQ have?',
+      a: 'Four to six is the sweet spot. Enough to cover hours, service area, response time, and pricing basics, but short enough that it doesn’t crowd out the form. Save the full list for your main FAQ page.',
+    },
+    {
+      q: 'Should the FAQ go above or below the contact form?',
+      a: 'Below. The contact page exists so people can reach you, and anyone who’s ready to call shouldn’t have to scroll past questions first. Put the phone, email, and form at the top and the FAQ underneath.',
+    },
+    {
+      q: 'Do I still need a separate FAQ page if I add one to the contact page?',
+      a: 'Yes. The contact page FAQ only covers the questions people ask right before reaching out. Your main FAQ page handles everything else — your services, process, guarantees, and the longer answers that don’t belong next to a form.',
+    },
+    {
+      q: 'Will a FAQ on my contact page help me show up in AI answers?',
+      a: 'It can, if the answers are written in plain, crawlable HTML on your own site. AI answer engines look for facts like hours, service area, and response time, and the contact page is a natural place to find them. If the FAQ is loaded by a JavaScript plugin, the AI usually can’t read it at all.',
+    },
+    {
+      q: 'Can I use a FAQ plugin or accordion for this?',
+      a: 'You can for the look, but don’t rely on it for visibility. Most plugins render answers with JavaScript, which AI crawlers generally skip. Make sure the actual question-and-answer text exists in the page’s HTML first, then add an accordion on top if you want the tidy layout.',
+    },
+  ]}
+/>
