@@ -7,6 +7,7 @@ import * as marketing2027 from '@/content/posts/what-does-marketing-look-like-in
 import * as notShowingUp from '@/content/posts/top-10-reasons-youre-not-showing-up-in-ai-search.mdx';
 import * as contactFaq from '@/content/posts/should-you-add-a-faq-on-your-contact-page.mdx';
 import * as moreReviews from '@/content/posts/how-to-get-more-google-reviews.mdx';
+import * as electricians from '@/content/posts/how-electricians-can-be-found-in-chatgpt.mdx';
 import * as officeManager from '@/content/posts/even-your-office-manager-can-use-faqflo.mdx';
 import * as pickupTime from '@/content/posts/how-long-does-it-take-for-ai-search-to-pick-up-your-content.mdx';
 import * as blockingChatgpt from '@/content/posts/is-my-site-blocking-chatgpt.mdx';
@@ -88,6 +89,7 @@ export { AUTHOR, AUTHOR_AVATAR, AUTHOR_BIO } from './author';
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  electricians,
   /* ⚠️ TWO POSTS SHARE 2026-09-12, so this order decides which leads the
      archive — the sort below is stable and same-day posts keep the order here. */
   moreReviews,
