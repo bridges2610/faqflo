@@ -1,0 +1,148 @@
+import { PostFaq } from "@/components/blog/post-faq";
+import { PostTldr } from "@/components/blog/post-tldr";
+
+export const meta = {
+  slug: "why-does-perplexity-mention-my-site-and-chatgpt-doesnt",
+  title: "Why Does Perplexity Mention My Site & ChatGPT Doesn’t?",
+  date: "2026-09-28",
+  excerpt:
+    "Same question, same business, two different answers. Here’s what’s going on and how to fix it.",
+  image: "/blog/why-perplexity-mentions-my-site-and-chatgpt-doesnt.png",
+  // Describes the card rather than repeating the headline, which is already the
+  // page's h1 immediately below it.
+  imageAlt:
+    "A mock AI answer card for “Who does gutter cleaning in Columbus?” Perplexity’s answer names Keystone Gutters and its same-week cleaning with flat pricing by home size, sourced from their own website and tagged “Cited.” ChatGPT’s answer lists Buckeye Home Services and a few national chains from a directory listing, tagged “Not mentioned.”",
+};
+
+Same question, same business, two different answers. Here’s what’s going on and how to fix it.
+
+<PostTldr>
+- Perplexity searches the web every time you ask. ChatGPT often answers from memory, and a small
+  business usually isn’t in that memory.
+- ChatGPT has its own search crawler. If your site blocks it, even by accident, ChatGPT can’t quote
+  you.
+- Clear, crawlable answers on your own site give both engines something to pick up.
+
+</PostTldr>
+
+You asked Perplexity about your kind of business, and it named you, with a link to your site. Then
+you asked ChatGPT the same question. It named someone else, or it gave a vague list with no names at
+all.
+
+It’s frustrating, but it isn’t random. The two tools work differently, and once you see how, most of
+the gap makes sense.
+
+## Perplexity looks things up every time
+
+Perplexity is built as a search tool. Each time someone asks a question, it goes out to the web,
+reads a handful of pages, and writes an answer with links to its sources.
+
+So if your site has a clear answer to the question, Perplexity has a real shot at finding it that
+day. That’s why smaller, local businesses often show up there first.
+
+## ChatGPT doesn’t always look anything up
+
+ChatGPT can search the web, but it doesn’t always. For a lot of questions, it answers from what it
+already learned during training. Think of it as answering from memory.
+
+That memory is huge, but it’s weighted toward things that get talked about a lot online: big brands,
+national chains, and popular directories. A two-truck gutter company in Columbus probably didn’t
+make much of an impression.
+
+When ChatGPT answers from memory, it can only name businesses it remembers. If it doesn’t remember
+you, it names someone it does.
+
+## ChatGPT’s search may be locked out of your site
+
+When ChatGPT does search, it uses its own crawler, called OAI-SearchBot. This is separate from
+GPTBot, the one that collects pages for training.
+
+Here’s the trap: many websites set up rules a couple of years ago to
+[block “the AI bots.”](/blog/should-you-block-ai-crawlers-the-case-for-and-against) Some of those
+rules block ChatGPT’s search crawler too. Your site might be wide open to Perplexity and closed to
+ChatGPT without you knowing.
+
+It’s not always your robots.txt file, either. Security plugins, firewalls, and hosting settings can
+quietly turn bots away as well.
+
+## They trust different sources
+
+Even when both tools search, they don’t pick the same pages. Each one has its own index and its own
+sense of which sources to trust. ChatGPT often leans on well-known sites like directories, review
+platforms, and big publishers. Perplexity is often happy to quote a specific page from a small
+business if it answers the question directly.
+
+So if the main place your business is described well is your own website, Perplexity may find you
+and ChatGPT may reach for a directory listing instead.
+
+## Your answers might be hidden
+
+If your FAQ or service details [load with JavaScript](/blog/why-faq-plugins-arent-a-good-idea),
+some crawlers see a nearly blank page. Your visitors see everything. The bots see very little. One
+engine might catch it through another route, and another might miss it entirely. Content that’s
+written right into the page’s HTML is the safe bet for all of them.
+
+## One more thing: answers change
+
+AI answers aren’t fixed. Ask ChatGPT the same question three times and you may get three slightly
+different lists. One test isn’t a verdict. Check a few times, with a few different wordings, before
+you decide where you stand.
+
+## How to close the gap
+
+**Keep your SEO in shape.** SEO is still the foundation. Good pages, a sound site, and solid local
+listings help every engine find you. [AEO](/blog/what-is-aeo) is the next floor up, not a
+replacement.
+
+**Let ChatGPT’s search crawler in.** [Check that OAI-SearchBot is allowed](/blog/is-my-site-blocking-chatgpt)
+in your robots.txt, and ask whoever runs your site whether a firewall or security setting is
+blocking bots.
+
+**Answer the real questions, clearly.** Put a direct, specific answer at the top: what you do, where,
+what it costs, how fast. “Same-week gutter cleaning across Columbus, flat pricing by home size” is
+easy to quote. “We’re passionate about service” isn’t.
+
+**Put it in plain HTML on your own site.** No JavaScript required to read it. That way any crawler
+that visits gets the full answer, and the credit goes to you.
+
+**Show up in other trusted places.** Keep your business listings and reviews current. They back up
+what your site says and give ChatGPT more places to find your name.
+
+**Check again over time.** Getting picked up by ChatGPT
+[can take longer](/blog/how-long-does-it-take-for-ai-search-to-pick-up-your-content) than
+Perplexity. Keep checking the questions that matter.
+
+## Where FaqFlo comes in
+
+FaqFlo checks whether AI crawlers can actually read your site, finds the questions people ask AI
+about businesses like yours, and writes answers built to be quoted. You paste them onto your own
+site as plain HTML, then FaqFlo tracks whether ChatGPT, Perplexity, and Google’s AI answers start
+naming you.
+
+If one engine sees you and the other doesn’t, [the free audit](/free-report) is the fastest way to
+find out why.
+
+<PostFaq
+  items={[
+    {
+      q: "Why does Perplexity cite my website but ChatGPT doesn’t?",
+      a: "Perplexity searches the web for almost every question, so it can find your site that day. ChatGPT often answers from what it learned in training, which favors big, well-known businesses. When ChatGPT does search, it may also be blocked from your site or prefer other sources.",
+    },
+    {
+      q: "What is OAI-SearchBot?",
+      a: "It’s the crawler ChatGPT uses to find pages for its search answers. It’s separate from GPTBot, which collects content for training. If you want ChatGPT to quote your site in search answers, OAI-SearchBot needs to be allowed.",
+    },
+    {
+      q: "Is it safe to block GPTBot but allow OAI-SearchBot?",
+      a: "Yes, you can set them separately. Blocking GPTBot keeps your content out of future training, while allowing OAI-SearchBot keeps you eligible to be cited in ChatGPT’s search answers. Just know that staying out of training means ChatGPT’s “memory” answers are less likely to include you.",
+    },
+    {
+      q: "How long does it take for ChatGPT to start mentioning my business?",
+      a: "There’s no set timeline. After you fix access and publish clear answers, search-based answers can pick you up fairly quickly, while answers from memory depend on future model updates. Tracking over several weeks gives you a truer picture than a single test.",
+    },
+    {
+      q: "Does this mean SEO doesn’t matter anymore?",
+      a: "No. SEO is the foundation that helps every engine find and trust your site. AEO builds on top of it by making your answers easy for AI to read and quote.",
+    },
+  ]}
+/>
