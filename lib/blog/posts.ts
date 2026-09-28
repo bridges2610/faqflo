@@ -11,6 +11,7 @@ import * as electricians from '@/content/posts/how-electricians-can-be-found-in-
 import * as sevenPages from '@/content/posts/the-7-pages-every-service-business-website-needs.mdx';
 import * as electricianMarketing from '@/content/posts/whats-the-best-marketing-strategy-for-electricians.mdx';
 import * as plumbersChatgpt from '@/content/posts/what-can-local-plumbing-companies-do-to-show-up-in-chatgpt.mdx';
+import * as marketingWaste from '@/content/posts/is-marketing-on-ai-a-waste-of-time.mdx';
 import * as badReviews from '@/content/posts/can-i-get-cited-by-ai-if-i-have-bad-reviews.mdx';
 import * as contentNotDead from '@/content/posts/5-big-reasons-content-isnt-dead.mdx';
 import * as officeManager from '@/content/posts/even-your-office-manager-can-use-faqflo.mdx';
@@ -94,6 +95,7 @@ export { AUTHOR, AUTHOR_AVATAR, AUTHOR_BIO } from './author';
 /* Order matters only for posts sharing a date: the sort below is stable, so
    same-day posts keep the order they appear in here. */
 const MODULES = [
+  marketingWaste,
   badReviews,
   contentNotDead,
   plumbersChatgpt,
