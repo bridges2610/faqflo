@@ -1,0 +1,167 @@
+import { PostFaq } from "@/components/blog/post-faq";
+import { PostTldr } from "@/components/blog/post-tldr";
+
+export const meta = {
+  slug: "is-wordpress-the-best-for-seo-and-aeo",
+  title: "Is WordPress the Best for SEO & AEO?",
+  date: "2026-09-28",
+  excerpt:
+    "It’s a great choice. But the platform isn’t what gets you found — the setup is.",
+  image: "/blog/is-wordpress-best-for-seo-aeo.png",
+  // Describes the card rather than repeating the headline, which is already the
+  // page's h1 immediately below it.
+  imageAlt:
+    "A checklist card titled “Can AI read this site?” for a WordPress site. Three rows pass with green checks: pages load as plain HTML, an SEO plugin sets titles and a sitemap, and AI crawlers are allowed in. The fourth row fails in red: the FAQ plugin runs on JavaScript, tagged “Invisible.” The footer reads “3 of 4 ready.”",
+};
+
+It’s a great choice. But the platform isn’t what gets you found — the setup is.
+
+<PostTldr>
+- WordPress is a strong platform for SEO and AEO, but it isn’t automatically the best —
+  Squarespace, Webflow, and Shopify can all get you found too.
+- What matters most is whether your answers show up as plain text in your page, whether AI crawlers
+  are allowed in, and whether your content answers real questions.
+- The biggest WordPress risk is add-ons: FAQ plugins that hide answers behind JavaScript and
+  security settings that quietly block AI crawlers.
+
+</PostTldr>
+
+Short answer: WordPress is one of the best platforms for SEO and AEO, but it won’t do the work for
+you. A well-set-up Squarespace site will beat a messy WordPress site every time.
+
+Here’s why, and what to check on your own site.
+
+## Why people say WordPress is the best
+
+WordPress runs about 4 in 10 websites on the internet. That’s a lot of trust, and there are good
+reasons for it.
+
+**You control almost everything.** Page titles, page addresses, your sitemap, your robots.txt file
+(the note that tells search engines and AI what they’re allowed to read). If you want to change it,
+you can.
+
+**Pages load as real HTML.** When someone — or something — visits a WordPress page, the server sends
+the finished page. The words are already there. That matters a lot for AI, and we’ll get to why in a
+second.
+
+**There’s a tool for everything.** SEO plugins help you write good titles, build a sitemap, and add
+schema (hidden labels that tell search engines what your content means).
+
+**Publishing is easy.** Writing a new page or blog post takes minutes, and anyone on your team can
+do it. That matters, because the sites that get found are the ones that keep adding clear answers.
+
+**Your content is yours.** You can move it, copy it, or change hosts whenever you want.
+
+So yes — WordPress gives you a great foundation. But a foundation isn’t a house.
+
+## SEO first, then AEO
+
+Think of it like a building.
+
+**SEO is the foundation.** It helps you show up when someone searches Google and scrolls a list of
+links. Fast pages, clear titles, good content, other sites linking to you. You still need all of it.
+
+**AEO is the next floor up.** [AEO](/blog/what-is-aeo) stands for Answer Engine Optimization. It’s
+about getting your business named when someone asks ChatGPT, Perplexity, or Google’s AI Overviews a
+question — like “Who does same-day AC repair near me?”
+
+Good SEO helps AEO. But AEO adds a few new rules, and that’s where platforms like WordPress can trip
+you up.
+
+## Where WordPress goes wrong for AI
+
+Most AI crawlers read the raw HTML of your page and leave. They generally don’t run JavaScript, the
+code that makes pages move and change after they load.
+
+WordPress sends real HTML, so you start in good shape. The problem is what you add on top.
+
+**FAQ plugins.** [Many FAQ and accordion plugins](/blog/why-faq-plugins-arent-a-good-idea) load
+their answers with JavaScript. Your visitors see a nice list of questions. The AI sees nothing. Your
+best answers — the exact thing an AI would love to quote — are invisible.
+
+**Security settings.** Some security plugins, firewalls, and hosting companies now block AI crawlers
+by default. Your site could be turning away ChatGPT and Perplexity without you ever clicking a
+button.
+
+**Plugin pile-up.** Every plugin adds weight. Too many, and your pages get slow. Slow pages hurt SEO,
+and a site that times out can get skipped by crawlers.
+
+**Heavy page builders.** Some drag-and-drop builders stack up extra code. Usually the words still
+come through, but it’s worth checking.
+
+None of this is WordPress’s fault. It’s just that WordPress lets you add almost anything — including
+things that hurt you.
+
+## What about Squarespace, Wix, Webflow, and Shopify?
+
+Here’s the honest version.
+
+**Squarespace** sends real HTML and handles the basics well. You get less control than WordPress,
+but less to break.
+
+**Webflow** gives you clean code and lots of control. It’s a favorite of designers for a reason.
+
+**Shopify** is built for stores and handles product pages well. Its blog and page tools are simpler,
+but they work.
+
+**Wix** has improved a lot for SEO. The thing to watch: some site builders place pasted HTML inside
+a frame (a little window from another address). Content in a frame may not count as part of your
+page. Always check that pasted content shows up in your page’s real source.
+
+The pattern: any of these can work. The question isn’t “which platform?” It’s “can AI read my
+answers, and are they good answers?”
+
+## How to check your site in 5 minutes
+
+You don’t need to switch platforms. You need to check a few things.
+
+1. **Look at your page source.** Open your FAQ page, right-click, and choose “View Page Source.”
+   Press Ctrl+F (or Cmd+F) and search for one of your answers. If you can find it, AI can too. If you
+   can’t, it’s hidden behind JavaScript.
+2. **Check your robots.txt.** Type your website address followed by /robots.txt. Look for lines that
+   block GPTBot, ClaudeBot, PerplexityBot, or Google-Extended. If they’re blocked,
+   [AI can’t read your site](/blog/is-my-site-blocking-chatgpt).
+3. **Read your answers out loud.** Does the first sentence actually answer the question? “We’re
+   passionate about quality” isn’t an answer. “We fix AC units same-day in Tampa with no after-hours
+   fee” is.
+4. **Check your speed.** If your pages feel slow on your phone, they’re slow for crawlers too. Remove
+   plugins you don’t use.
+
+## Where FaqFlo comes in
+
+FaqFlo works the same on WordPress, Squarespace, Webflow, or a plain HTML site — no plugin required.
+
+[Our free audit](/free-report) tells you whether AI can read your site and whether AI crawlers are
+allowed in. Then FaqFlo finds the questions people actually ask AI about businesses like yours,
+writes answers built to be quoted, and gives you clean HTML you paste into your own site. On
+WordPress, that’s a [Custom HTML block](/blog/how-to-add-html-to-wordpress-squarespace-webflow-or-wix).
+Your answers live on your domain, in plain text, visible to AI from the first second.
+
+Then we track whether ChatGPT, Perplexity, and Google’s AI Overviews start naming you.
+
+WordPress gives you a great foundation. FaqFlo helps you build the next floor.
+
+<PostFaq
+  items={[
+    {
+      q: "Is WordPress better than Squarespace for SEO?",
+      a: "WordPress gives you more control, which can help if you use it well. But Squarespace handles the basics cleanly and is harder to break. For most small businesses, good content and a clean setup matter more than which one you pick.",
+    },
+    {
+      q: "Do I need to switch to WordPress to show up in AI answers?",
+      a: "No. AI answer engines don’t care what platform you use — they care whether they can read your content and whether it answers real questions. Fixing your setup on the platform you have is almost always faster and cheaper than switching.",
+    },
+    {
+      q: "Are WordPress FAQ plugins bad for AEO?",
+      a: "Many are, because they load answers with JavaScript that AI crawlers don’t run. Your visitors see the answers, but the AI doesn’t. Check your page source — if you can’t find your answers there, AI can’t either.",
+    },
+    {
+      q: "Can my WordPress site be blocking AI without me knowing?",
+      a: "Yes. Some security plugins, firewalls, and hosting companies block AI crawlers by default. Check your robots.txt file and your security settings for rules that block GPTBot, ClaudeBot, PerplexityBot, or Google-Extended.",
+    },
+    {
+      q: "Is SEO still worth it if AI is answering questions now?",
+      a: "Yes. SEO is still the foundation — it helps Google find you, and a strong site helps AI trust you. AEO is the next floor up, and it works best on a site that already does SEO well.",
+    },
+  ]}
+/>
